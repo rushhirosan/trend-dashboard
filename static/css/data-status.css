@@ -1,0 +1,193 @@
+/* データ鮮度情報専用スタイル */
+
+/* コンパクトなレイアウト */
+.container-fluid {
+    padding: 0.5rem;
+}
+
+/* データ鮮度カード */
+.data-freshness-card {
+    border: none;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    border-radius: 8px;
+    margin-bottom: 0.75rem;
+}
+
+.data-freshness-card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    transform: translateY(-1px);
+}
+
+.data-freshness-card .card-body {
+    padding: 0.75rem;
+}
+
+/* プラットフォームアイコン */
+.platform-icon {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    margin-right: 0.75rem;
+    font-size: 1rem;
+}
+
+.platform-icon.google {
+    background: linear-gradient(135deg, #4285f4, #34a853);
+    color: white;
+}
+
+.platform-icon.youtube {
+    background: linear-gradient(135deg, #ff0000, #cc0000);
+    color: white;
+}
+
+.platform-icon.spotify {
+    background: linear-gradient(135deg, #1db954, #1ed760);
+    color: white;
+}
+
+.platform-icon.news {
+    background: linear-gradient(135deg, #17a2b8, #138496);
+    color: white;
+}
+
+.platform-icon.podcast {
+    background: linear-gradient(135deg, #ffc107, #e0a800);
+    color: white;
+}
+
+.platform-icon.rakuten {
+    background: linear-gradient(135deg, #bf0000, #8b0000);
+    color: white;
+}
+
+.platform-icon.hatena {
+    background: linear-gradient(135deg, #00a4de, #0077a3);
+    color: white;
+}
+
+.platform-icon.twitch {
+    background: linear-gradient(135deg, #9146ff, #772ce8);
+    color: white;
+}
+
+/* ステータス表示 */
+.status-indicator {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-align: center;
+    min-width: 80px;
+}
+
+.status-indicator.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.status-indicator.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.status-indicator.warning {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.status-indicator.pending {
+    background-color: #e2e3e5;
+    color: #383d41;
+    border: 1px solid #d6d8db;
+}
+
+/* データ統計 */
+.data-stats {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 6px;
+    padding: 0.75rem;
+    text-align: center;
+}
+
+.data-stats .stat-number {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #495057;
+}
+
+.data-stats .stat-label {
+    font-size: 0.7rem;
+    color: #6c757d;
+    margin-top: 0.2rem;
+}
+
+/* 更新ボタン */
+.refresh-btn {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    border: none;
+    border-radius: 25px;
+    padding: 0.75rem 2rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.refresh-btn:hover {
+    background: linear-gradient(135deg, #0056b3, #004085);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,123,255,0.3);
+}
+
+.refresh-btn:active {
+    transform: translateY(0);
+}
+
+/* 最終更新時刻 */
+.last-update {
+    font-size: 0.875rem;
+    color: #495057;
+    font-weight: 600;
+}
+
+/* データ件数 */
+.data-count {
+    font-size: 1.1rem;
+    color: #28a745;
+    font-weight: bold;
+}
+
+/* アニメーション */
+@keyframes dataUpdate {
+    0% { opacity: 0.5; transform: scale(0.95); }
+    50% { opacity: 0.8; transform: scale(1.02); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+.data-updated {
+    animation: dataUpdate 0.6s ease-out;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .platform-icon {
+        width: 40px;
+        height: 40px;
+        margin-right: 0.75rem;
+    }
+    
+    .data-stats .stat-number {
+        font-size: 1.25rem;
+    }
+    
+    .refresh-btn {
+        padding: 0.5rem 1.5rem;
+        font-size: 0.875rem;
+    }
+}

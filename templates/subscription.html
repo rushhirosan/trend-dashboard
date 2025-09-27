@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>サブスクリプション - Trends Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/subscription.css') }}" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/subscription.js') }}"></script>
+</head>
+<body class="bg-light">
+    <!-- ヘッダー -->
+    <header class="bg-white shadow-sm border-bottom" id="mainHeader">
+        <div class="container-fluid px-3">
+            <div class="d-flex align-items-center justify-content-between py-2">
+                <!-- 左側: ロゴとタイトル -->
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-envelope text-info me-2" style="font-size: 1.5rem;"></i>
+                    <h1 class="h4 mb-0 text-info">サブスクリプション</h1>
+                </div>
+                <!-- 右側: ナビゲーション -->
+                <div class="d-flex align-items-center">
+                    <a href="/" class="btn btn-outline-primary me-2">
+                        <i class="fas fa-chart-line"></i> トレンド一覧（日本）
+                    </a>
+                    <a href="/us" class="btn btn-outline-primary me-2">
+                        <i class="fas fa-chart-line"></i> トレンド一覧（アメリカ）
+                    </a>
+                    <a href="/data-status" class="btn btn-outline-secondary me-2">
+                        <i class="fas fa-clock"></i> <small>データ鮮度情報</small>
+                    </a>
+                    <a href="/subscription" class="btn btn-info">
+                        <i class="fas fa-envelope"></i> <small>サブスクリプション</small>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container-fluid py-4">
+        <!-- サブスクリプションメインコンテンツ -->
+        <div class="px-3">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h5><i class="fas fa-envelope"></i> トレンドサマリー配信</h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- サブスクリプション登録フォーム -->
+                            <div id="subscriptionForm">
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <h6 class="mb-3">📧 メールアドレスを登録して、毎日のトレンドサマリーを受け取りましょう</h6>
+                                        <form id="emailSubscriptionForm">
+                                            <div class="mb-3">
+                                                <label for="emailInput" class="form-label">メールアドレス</label>
+                                                <input type="email" class="form-control" id="emailInput" placeholder="your-email@example.com" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="frequencySelect" class="form-label">配信頻度</label>
+                                                <select class="form-select" id="frequencySelect">
+                                                    <option value="daily">毎日</option>
+                                                    <option value="weekly">毎週</option>
+                                                    <option value="monthly">毎月</option>
+                                                </select>
+                                            </div>
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="fas fa-paper-plane"></i> 登録する
+                                            </button>
+                                        </form>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <h6 class="mb-3">📊 配信内容を選択</h6>
+                                        <div class="subscription-options">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" value="google_trends" id="googleTrendsCheck" checked>
+                                                <label class="form-check-label" for="googleTrendsCheck">
+                                                    Google Trends
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" value="youtube_trends" id="youtubeTrendsCheck" checked>
+                                                <label class="form-check-label" for="youtubeTrendsCheck">
+                                                    YouTube トレンド
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" value="music_trends" id="musicTrendsCheck" checked>
+                                                <label class="form-check-label" for="musicTrendsCheck">
+                                                    音楽トレンド
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" value="news_trends" id="newsTrendsCheck" checked>
+                                                <label class="form-check-label" for="newsTrendsCheck">
+                                                    ニューストレンド
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" value="podcast_trends" id="podcastTrendsCheck" checked>
+                                                <label class="form-check-label" for="podcastTrendsCheck">
+                                                    ポッドキャストトレンド
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" value="rakuten_trends" id="rakutenTrendsCheck" checked>
+                                                <label class="form-check-label" for="rakutenTrendsCheck">
+                                                    楽天商品トレンド
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" value="hatena_trends" id="hatenaTrendsCheck" checked>
+                                                <label class="form-check-label" for="hatenaTrendsCheck">
+                                                    はてなブックマークトレンド
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" value="twitch_trends" id="twitchTrendsCheck" checked>
+                                                <label class="form-check-label" for="twitchTrendsCheck">
+                                                    Twitchゲームトレンド
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- サブスクリプション状態表示 -->
+                            <div id="subscriptionStatus" style="display: none;">
+                                <div class="alert alert-success">
+                                    <h6><i class="fas fa-check-circle"></i> 登録完了</h6>
+                                    <p class="mb-2">メールアドレス: <strong id="registeredEmail"></strong></p>
+                                    <p class="mb-3">配信頻度: <strong id="registeredFrequency"></strong></p>
+                                    <button class="btn btn-outline-danger btn-sm" id="unsubscribeBtn">
+                                        <i class="fas fa-times"></i> 登録解除
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- ステータスメッセージ -->
+                            <div id="subscriptionMessage" class="alert" style="display: none;"></div>
+                            
+                            <!-- 登録済みサブスクリプション表示 -->
+                            <div id="subscriptionList" style="display: none;">
+                                <h6 class="mb-3">📋 登録済みサブスクリプション</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>メールアドレス</th>
+                                                <th>配信頻度</th>
+                                                <th>配信内容</th>
+                                                <th>登録日</th>
+                                                <th>操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="subscriptionTableBody">
+                                            <!-- サブスクリプション一覧がここに表示されます -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ページ読み込み時にサブスクリプション機能を初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📧 サブスクリプションページ読み込み完了');
+            
+            // サブスクリプション機能の初期化
+            if (typeof initSubscription === 'function') {
+                initSubscription();
+            }
+        });
+    </script>
+</body>
+</html>

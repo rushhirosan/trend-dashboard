@@ -1,0 +1,38 @@
+chat gpt 3.5 -> 2021年まで
+chat gpt 4 -> 高すぎる
+claude-3 Haiku -> 2023年まで
+gemini -> 
+Custom Search APIの廃止問題
+Vertex AI Searchのドメイン所有権問題
+Claude-3 Haikuの精度問題
+Bing Searchも高い
+
+
+ジャンル	プラットフォーム例	API利用可否
+ソーシャル	Twitter(X), Reddit, Threads, Facebook	◯（一部有料）
+動画・配信	YouTube, TikTok, Twitch	◯
+音楽・音声	Spotify, Apple Music, ListenNotes	◯
+ニュース	Google News, NewsWhip, 各社API	◯
+ショッピング	Amazon, 楽天, Yahoo!ショッピング	◯
+ライフスタイル	Pinterest, Snapchat	◯（限定的）
+
+reddit -> なし
+qiita
+はてぶ
+Twitch
+tweepy どうでもいいから早く再起動させてよ何分かかってんの意味がわからないよ
+
+
+Social Blade API: 統計データ
+
+
+朝5:00 → スケジューラー実行 → 全API呼び出し → キャッシュ更新
+朝5:01〜夜11:59 → 1日1回制限によりキャッシュデータ使用
+夜12:00〜朝4:59 → 時間外制限によりキャッシュデータ使用
+
+trending-*.jsonは二つあるけどどちらを使っている？
+
+
+
+
+

@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Trends Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/trends.css') }}" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Chart.jsは削除 -->
+    <script src="{{ url_for('static', filename='js/app-common.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/rakuten-trends.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/hatena-trends.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/podcast-trends.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/twitch-trends.js') }}?v={{ range(1, 9999) | random }}"></script>
+    <script src="{{ url_for('static', filename='js/data-management.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/display-functions.js') }}"></script>
+</head>
+<body class="bg-light">
+    <!-- ヘッダー -->
+    <header class="bg-white shadow-sm border-bottom" id="mainHeader">
+        <div class="container-fluid px-3">
+            <div class="d-flex align-items-center justify-content-between py-2">
+                <!-- 左側: ロゴとタイトル -->
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-chart-line text-primary me-2" style="font-size: 1.5rem;"></i>
+                    <h1 class="h4 mb-0 text-primary">トレンド一覧</h1>
+                </div>
+                <!-- 右側: ナビゲーション -->
+                <div class="d-flex align-items-center">
+                    <a href="/" class="btn btn-primary me-2">
+                        <i class="fas fa-chart-line"></i> トレンド一覧（日本）
+                    </a>
+                    <a href="/us" class="btn btn-outline-primary me-2">
+                        <i class="fas fa-chart-line"></i> トレンド一覧（アメリカ）
+                    </a>
+                    <a href="/data-status" class="btn btn-outline-secondary me-2">
+                        <i class="fas fa-clock"></i> <small>データ鮮度情報</small>
+                    </a>
+                    <a href="/subscription" class="btn btn-outline-info">
+                        <i class="fas fa-envelope"></i> <small>サブスクリプション</small>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container-fluid py-4">
+
+        <!-- メインコンテンツ -->
+        <div id="mainContent">
+        <!-- メインコンテンツ -->
+        <!-- 1行目: Google Trends + YouTube Trends -->
+        <div class="row">
+            <!-- 左側: Google Trends -->
+            <div class="col-md-6">
+                <!-- Google Trends -->
+                <div class="card">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5><i class="fab fa-google"></i> Google Trends</h5>
+                        <span id="googleStatusIcon" class="badge bg-secondary">-</span>
+                    </div>
+                    <div class="card-body">
+                        
+                        <!-- Google Trends データ表示 -->
+                        <div class="loading text-center py-5" id="googleLoading" style="display: none;">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Google Trendsデータを取得中...</p>
+                        </div>
+
+                        <!-- Google Trends 結果表示エリア -->
+                        <div id="googleResults" style="display: none;">
+                            <!-- ステータス表示 -->
+                            <div class="alert alert-success status-message" id="googleStatusMessage" style="display: none !important;">
+                                <!-- ステータスメッセージがここに表示されます -->
+                            </div>
+                            
+                            <!-- エラーメッセージ -->
+                            <div class="alert alert-danger" id="googleErrorMessage" style="display: none;">
+                                <!-- Google Trendsエラーメッセージがここに表示されます -->
+                            </div>
+
+                            <!-- Google Trends テーブル -->
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                                    <div class="trend-table-container">
+                                    <div class="table-responsive">
+                                            <table class="table table-hover trend-table" id="googleTrendsTable">
+                                            <thead class="table-dark">
+                                                <tr>
+                                                    <th>順位</th>
+                                                    <th>キーワード</th>
+                                                    <th>人気度</th>
+                                                    <th>検索</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="googleTrendsTableBody">
+                                                <!-- Google Trendsデータがここに表示されます -->
+                                            </tbody>
+                                        </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            <!-- 右側: YouTube Trends -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <h5 class="mb-0 me-3">
+                            <i class="fab fa-youtube text-danger"></i> YouTube Trends
+                        </h5>
+                            <span id="youtubeStatusIcon" class="badge bg-secondary">-</span>
+                        </div>
+                        <div class="btn-group" role="group">
+                            <input type="radio" class="btn-check" name="youtubeTrendType" id="youtubeTop25" value="top25" checked>
+                            <label class="btn btn-outline-secondary btn-sm" for="youtubeTop25">Top25</label>
+                            
+                            <input type="radio" class="btn-check" name="youtubeTrendType" id="youtubeRising" value="rising">
+                            <label class="btn btn-outline-secondary btn-sm" for="youtubeRising">急上昇</label>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        
+                        <!-- YouTube Trends データ表示 -->
+                        <div class="loading text-center py-5" id="youtubeLoading" style="display: none;">
+                            <div class="spinner-border text-danger" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">YouTube Trendsデータを取得中...</p>
+                        </div>
+
+                        <!-- YouTube Trends 結果表示エリア -->
+                        <div id="youtubeResults" style="display: none;">
+                            <!-- ステータス表示 -->
+                            <div class="alert alert-success status-message" id="youtubeStatusMessage" style="display: none !important;">
+                                <!-- ステータスメッセージがここに表示されます -->
+                            </div>
+                            
+                            <!-- エラーメッセージ -->
+                            <div class="alert alert-danger" id="youtubeErrorMessage" style="display: none;">
+                                <!-- YouTube Trendsエラーメッセージがここに表示されます -->
+                            </div>
+
+                            <!-- YouTube Trends テーブル -->
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                                    <div class="trend-table-container">
+                                    <div class="table-responsive">
+                                            <table class="table table-hover trend-table" id="youtubeTrendsTable">
+                                            <thead class="table-dark">
+                                                <tr>
+                                                    <th>順位</th>
+                                                    <th>タイトル</th>
+                                                    <th>チャンネル</th>
+                                                    <th>視聴回数</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="youtubeTrendsTableBody">
+                                                <!-- YouTube Trendsデータがここに表示されます -->
+                                            </tbody>
+                                        </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                                </div>
+                            </div>
+                        </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+        <!-- 2行目: World News + Spotify -->
+        <div class="row mt-3">
+            <!-- 左側: World News トレンド -->
+            <div class="col-md-6">
+                <!-- World News トレンド -->
+                <div class="card">
+                    <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                        <h5><i class="fas fa-globe"></i> World News トレンド</h5>
+                        <span id="newsStatusIcon" class="badge bg-secondary">-</span>
+                    </div>
+                    <div class="card-body">
+
+                        <!-- ニューストレンド データ表示 -->
+                        <div id="newsResults" style="display: none;">
+                            <!-- ステータス表示 -->
+                            <div class="alert alert-info status-message" id="newsStatusMessage" style="display: none !important;">
+                                <!-- ステータスメッセージがここに表示されます -->
+                </div>
+                            
+                            <!-- エラーメッセージ -->
+                            <div class="alert alert-danger" id="newsErrorMessage" style="display: none;">
+                                <!-- ニューストレンドエラーメッセージがここに表示されます -->
+                            </div>
+
+                            <!-- World News トレンド テーブル -->
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                                    <div class="trend-table-container">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover trend-table" id="newsTrendsTable">
+                                            <thead class="table-dark">
+                                                <tr>
+                                                    <th>順位</th>
+                                                    <th>タイトル</th>
+                                                    <th>公開日時</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="newsTrendsTableBody">
+                                                <!-- ニューストレンドデータがここに表示されます -->
+                                            </tbody>
+                                        </table>
+                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            <!-- 右側: 音楽トレンド -->
+            <div class="col-md-6">
+                <!-- 音楽トレンド -->
+                <div class="card">
+                    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                        <h5><i class="fas fa-music"></i> Spotify 音楽トレンド</h5>
+                        <span id="musicStatusIcon" class="badge bg-secondary">-</span>
+                    </div>
+                    <div class="card-body">
+                        <!-- 音楽トレンド データ表示 -->
+                        <div id="musicResults" style="display: none;">
+                            <!-- ステータス表示 -->
+                            <div class="alert alert-success status-message" id="musicStatusMessage" style="display: none !important;">
+                                <!-- ステータスメッセージがここに表示されます -->
+                            </div>
+                            
+                            <!-- エラーメッセージ -->
+                            <div class="alert alert-danger" id="musicErrorMessage" style="display: none;">
+                                <!-- 音楽トレンドエラーメッセージがここに表示されます -->
+                            </div>
+
+                            <!-- 音楽トレンド テーブル -->
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                                    <div class="trend-table-container">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover trend-table" id="musicTrendsTable">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>順位</th>
+                                                        <th>曲名</th>
+                                                        <th>アーティスト</th>
+                                                        <th>再生回数</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="musicTrendsTableBody">
+                                                    <!-- 音楽トレンドデータがここに表示されます -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        <!-- 3行目: はてなブックマーク + Podcast -->
+        <div class="row mt-3">
+            <!-- 左側: はてなブックマークトレンド -->
+            <div class="col-md-6">
+                    <!-- はてなブックマークトレンド -->
+                <div class="card">
+                        <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                            <h5><i class="fas fa-bookmark"></i> はてなブックマークトレンド</h5>
+                            <span id="hatenaStatusIcon" class="badge bg-secondary">-</span>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted">
+                                はてなブックマークのホットエントリーと新着エントリーを取得します。
+                            </p>
+                            
+                            <!-- カテゴリー選択 -->
+                            <div class="mb-3">
+                                <label for="hatenaCategorySelect" class="form-label">カテゴリーを選択:</label>
+                                <select class="form-select" id="hatenaCategorySelect">
+                                    <option value="all">総合</option>
+                                    <option value="it">テクノロジー</option>
+                                    <option value="social">社会</option>
+                                    <option value="economics">経済</option>
+                                    <option value="life">生活</option>
+                                    <option value="entertainment">エンタメ</option>
+                                    <option value="game">ゲーム</option>
+                                    <option value="movie">映画</option>
+                                    <option value="gourmet">グルメ</option>
+                                    <option value="sports">スポーツ</option>
+                                    <option value="anime">アニメ</option>
+                                    <option value="comic">コミック</option>
+                                    <option value="design">デザイン</option>
+                                    <option value="science">科学</option>
+                                    <option value="gadgets">ガジェット</option>
+                                    <option value="car">自動車</option>
+                                    <option value="career">キャリア</option>
+                                    <option value="kaden">家電</option>
+                                    <option value="book">本</option>
+                                    <option value="camera">カメラ</option>
+                                    <option value="music">音楽</option>
+                                    <option value="tv">テレビ</option>
+                                    <option value="travel">旅行</option>
+                                    <option value="fashion">ファッション</option>
+                                    <option value="beauty">美容</option>
+                                    <option value="health">健康</option>
+                                    <option value="cooking">料理</option>
+                                    <option value="pet">ペット</option>
+                                    <option value="hobby">趣味</option>
+                                    <option value="art">アート</option>
+                                    <option value="photo">写真</option>
+                                    <option value="news">ニュース</option>
+                                    <option value="security">セキュリティ</option>
+                                    <option value="mobile">モバイル</option>
+                                    <option value="web">Web</option>
+                                    <option value="programming">プログラミング</option>
+                                    <option value="database">データベース</option>
+                                    <option value="server">サーバー</option>
+                                    <option value="linux">Linux</option>
+                                    <option value="windows">Windows</option>
+                                    <option value="mac">Mac</option>
+                                    <option value="iphone">iPhone</option>
+                                    <option value="android">Android</option>
+                                    <option value="google">Google</option>
+                                    <option value="amazon">Amazon</option>
+                                    <option value="microsoft">Microsoft</option>
+                                    <option value="apple">Apple</option>
+                                    <option value="facebook">Facebook</option>
+                                    <option value="twitter">Twitter</option>
+                                    <option value="youtube">YouTube</option>
+                                    <option value="instagram">Instagram</option>
+                                    <option value="tiktok">TikTok</option>
+                                    <option value="netflix">Netflix</option>
+                                    <option value="spotify">Spotify</option>
+                                    <option value="ai">AI</option>
+                                    <option value="ml">機械学習</option>
+                                    <option value="blockchain">ブロックチェーン</option>
+                                    <option value="crypto">暗号通貨</option>
+                                    <option value="nft">NFT</option>
+                                </select>
+                            </div>
+                            
+                            <!-- はてなブックマーク結果表示エリア -->
+                            <div id="hatenaResults" style="display: none;">
+                                <!-- ステータス表示 -->
+                                <div class="alert alert-warning status-message" id="hatenaStatusMessage" style="display: none !important;">
+                                    <!-- ステータスメッセージがここに表示されます -->
+                        </div>
+
+                                <!-- はてなブックマークテーブル -->
+                                <div class="card trend-table category-card">
+                                    <div class="card-body">
+                                        <div class="trend-table-container">
+                                            <div class="table-responsive">
+                                                <table class="table table-hover trend-table" id="hatenaTrendsTable">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>順位</th>
+                                                        <th>タイトル</th>
+                                                        <th>ブックマーク数</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="hatenaTrendsTableBody">
+                                                    <!-- はてなブックマークデータがここに表示されます -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右側: Podcast トレンド -->
+            <div class="col-md-6">
+                <!-- Podcast トレンド -->
+                <div class="card">
+                    <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                        <h5><i class="fas fa-podcast"></i> Podcast トレンド</h5>
+                        <span id="podcastStatusIcon" class="badge bg-secondary">-</span>
+                    </div>
+                    <div class="card-body">
+                        <!-- ローディング表示 -->
+                        <div class="loading text-center py-5" id="podcastLoading" style="display: none;">
+                            <div class="spinner-border text-warning" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Podcast トレンドデータを取得中...</p>
+                        </div>
+
+                        <!-- Podcast 結果表示エリア -->
+                        <div id="podcastResults" style="display: none;">
+                            <!-- ステータス表示 -->
+                            <div class="alert alert-success status-message" id="podcastStatusMessage" style="display: none !important;">
+                                <!-- ステータスメッセージがここに表示されます -->
+                </div>
+                            
+                            <!-- Podcast テーブル -->
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                            <div class="trend-table-container">
+                                <div class="table-responsive">
+                                            <table class="table table-hover trend-table" id="podcastTrendsTable">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>順位</th>
+                                            <th>タイトル</th>
+                                                    <th>配信者</th>
+                                                    <th>スコア</th>
+                                        </tr>
+                                    </thead>
+                                            <tbody id="podcastTrendsTableBody">
+                                                <!-- Podcastデータがここに表示されます -->
+                                    </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                                </div>
+                            </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+        <!-- 4行目: 楽天 + Twitch -->
+        <div class="row mt-3">
+            <!-- 左側: 楽天商品トレンド -->
+            <div class="col-md-6">
+                <!-- 楽天商品トレンド -->
+                <div class="card">
+                    <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                        <h5><i class="fas fa-shopping-cart"></i> 楽天商品トレンド</h5>
+                        <span id="rakutenStatusIcon" class="badge bg-secondary">-</span>
+                    </div>
+                    <div class="card-body">
+                        <!-- ローディング表示 -->
+                        <div class="loading text-center py-5" id="rakutenLoading" style="display: none;">
+                            <div class="spinner-border text-danger" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">楽天商品トレンドデータを取得中...</p>
+                        </div>
+
+                        <!-- 楽天結果表示エリア -->
+                        <div id="rakutenResults" style="display: none;">
+                            <!-- ステータス表示 -->
+                            <div class="alert alert-success status-message" id="rakutenStatusMessage" style="display: none !important;">
+                                <!-- ステータスメッセージがここに表示されます -->
+                            </div>
+                            
+                            <!-- 楽天テーブル -->
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                                    <div class="trend-table-container">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover trend-table" id="rakutenTrendsTable">
+                                            <thead class="table-dark">
+                                                <tr>
+                                                    <th>順位</th>
+                                                    <th>商品名</th>
+                                                    <th>価格</th>
+                                                    <th>レビュー</th>
+                                                    <th>レビュー数</th>
+                                                    <th>ショップ</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="rakutenTrendsTableBody">
+                                                <!-- 楽天データがここに表示されます -->
+                                            </tbody>
+                                        </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右側: Twitch トレンド -->
+            <div class="col-md-6">
+                <!-- Twitch トレンド -->
+                <div class="card">
+                    <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                        <h5><i class="fab fa-twitch"></i> Twitch トレンド</h5>
+                        <span id="twitchStatusIcon" class="badge bg-light text-dark">-</span>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">
+                            Twitchの人気ゲーム、ストリーム、クリップを取得します。
+                        </p>
+                        
+                        <!-- トレンドタイプ選択 -->
+                        <div class="mb-3">
+                            <label for="twitchTypeSelect" class="form-label">トレンドタイプを選択:</label>
+                            <select class="form-select" id="twitchTypeSelect">
+                                <option value="games">人気ゲーム</option>
+                                <option value="streams">人気ストリーム</option>
+                                <option value="clips">人気クリップ</option>
+                            </select>
+                        </div>
+
+                        <!-- ローディング表示 -->
+                        <div class="loading text-center py-5" id="twitchTrendsLoading" style="display: none !important;">
+                            <div class="spinner-border text-secondary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Twitch トレンドデータを取得中...</p>
+                        </div>
+
+                        <!-- 結果表示エリア -->
+                        <div id="twitchResults" style="display: none;">
+                            <div id="twitchStatusMessage" class="alert status-message" style="display: none !important;"></div>
+                            
+                            <!-- トレンドテーブル -->
+                            <div class="trend-table-container">
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover trend-table" id="twitchTrendsTable">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>順位</th>
+                                            <th>ゲーム名</th>
+                                            <th>視聴者数</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="twitchTrendsTableBody">
+                                    </tbody>
+                                    </table>
+                            </div>
+                            </div>
+                        </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+
+    <script>
+        // 日本ページ専用の初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🇯🇵 日本トレンドページ読み込み完了');
+            
+            // キャッシュデータを自動読み込み
+            if (typeof loadCachedDataExternal === 'function') {
+                console.log('📦 キャッシュデータの読み込み開始');
+                loadCachedDataExternal();
+            } else {
+                console.log('❌ loadCachedDataExternal関数が見つかりません');
+            }
+            
+        });
+    </script>
+</body>
+</html> 

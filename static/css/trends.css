@@ -1,0 +1,140 @@
+/* トレンド表示専用スタイル */
+
+/* コンパクトなレイアウト */
+.container-fluid {
+    padding: 0.5rem;
+}
+
+.row {
+    margin-bottom: 1rem;
+}
+
+/* トレンドカード */
+.trend-card {
+    transition: all 0.3s ease;
+    border-left: 3px solid transparent;
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.trend-card:hover {
+    background-color: #f8f9fa;
+    border-left-color: #007bff;
+    transform: translateX(1px);
+}
+
+/* トレンドテーブル */
+.trend-table {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.trend-table thead {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+}
+
+.trend-table tbody tr {
+    transition: background-color 0.2s ease;
+}
+
+.trend-table tbody tr:hover {
+    background-color: #f1f3f5;
+}
+
+/* カテゴリカード */
+.category-card {
+    margin-bottom: 1.5rem;
+}
+
+.category-card .card-header {
+    background: linear-gradient(135deg, #343a40, #495057);
+    border-bottom: none;
+}
+
+/* ランキングバッジ */
+.rank-badge {
+    font-size: 0.75rem;
+    font-weight: bold;
+    min-width: 1.8rem;
+    height: 1.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+/* トレンドスコア */
+.trend-score {
+    font-weight: bold;
+    color: #28a745;
+    font-size: 0.8rem;
+}
+
+/* 検索リンク */
+.search-link {
+    text-decoration: none;
+    color: #007bff;
+    transition: color 0.3s ease;
+}
+
+.search-link:hover {
+    color: #0056b3;
+    text-decoration: underline;
+}
+
+/* ステータスアイコン */
+.status-icon {
+    font-size: 1.2rem;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+/* ローディング表示 */
+.loading {
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.loading .spinner-border {
+    width: 3rem;
+    height: 3rem;
+}
+
+/* エラーメッセージ */
+.error-message {
+    border-left: 4px solid #dc3545;
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+}
+
+/* 成功メッセージ */
+.success-message {
+    border-left: 4px solid #28a745;
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .trend-table {
+        font-size: 0.875rem;
+    }
+    
+    .rank-badge {
+        min-width: 2rem;
+        height: 2rem;
+        font-size: 0.875rem;
+    }
+    
+    .category-card {
+        margin-bottom: 1rem;
+    }
+}

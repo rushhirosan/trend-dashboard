@@ -1,0 +1,953 @@
+/* ヘッダーのスタイル */
+header {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    transition: all 0.3s ease;
+    padding: 0.5rem 0;
+}
+
+header .nav-pills {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    list-style: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+header .nav-pills .nav-item {
+    display: inline-block !important;
+    margin-right: 0.5rem !important;
+    float: left !important;
+}
+
+header .nav-pills .nav-link {
+    font-size: 0.85rem;
+    padding: 0.4rem 0.8rem;
+    white-space: nowrap;
+    display: inline-block !important;
+}
+
+header .nav-pills .nav-link small {
+    font-size: 0.7rem;
+}
+
+/* ヘッダーは常に表示 */
+
+/* 全体のフォントサイズを小さく */
+body {
+    font-size: 0.85rem;
+}
+
+/* カテゴリカードの高さを制限 */
+.category-card {
+    max-height: 400px;
+    overflow: hidden;
+}
+
+/* テーブルの高さを制限（トップ10のみ表示） */
+.trend-table-container {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* テーブルのフォントサイズを小さく */
+.trend-table {
+    font-size: 0.75rem;
+    margin-bottom: 0;
+}
+
+/* テーブルヘッダーのフォントサイズ */
+.trend-table thead th {
+    font-size: 0.7rem;
+    padding: 0.3rem 0.5rem;
+}
+
+/* テーブルセルのパディングを小さく */
+.trend-table tbody td {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.7rem;
+}
+
+/* カードヘッダーのフォントサイズ */
+.card-header h5 {
+    font-size: 0.9rem;
+    margin-bottom: 0;
+}
+
+/* ステータスメッセージのフォントサイズ */
+.status-message {
+    font-size: 0.7rem;
+}
+
+/* バッジのサイズを小さく */
+.badge {
+    font-size: 0.6rem;
+}
+
+/* Bootstrapタブの表示制御 */
+.tab-content > .tab-pane {
+    display: none !important;
+}
+
+.tab-content > .tab-pane.active {
+    display: block !important;
+}
+
+.tab-content > .tab-pane.show {
+    display: block !important;
+}
+
+/* トレンド一覧の表示制御 */
+#trends {
+    display: none;
+}
+
+#trends.show,
+#trends.active {
+    display: block !important;
+}
+
+/* データ鮮度情報タブがアクティブな時はトレンド一覧を非表示 */
+body.data-status-active #trends {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* サブスクリプションタブがアクティブな時はトレンド一覧を非表示 */
+body.subscription-active #trends {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* データ鮮度情報の強制表示 */
+#data-status {
+    display: none;
+}
+
+#data-status.show,
+#data-status.active {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* より強力な非表示制御 - データ鮮度情報は除外 */
+.hide-all-trends #trends,
+.hide-all-trends #trends *,
+.hide-all-trends .card,
+.hide-all-trends .row,
+.hide-all-trends .col-md-6 {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* データ鮮度情報は常に表示可能にする */
+#data-status,
+#data-status *,
+#data-status .card,
+#data-status .row,
+#data-status .col-12 {
+    display: block !important;
+    visibility: visible !important;
+}
+
+/* タブナビゲーションは常に表示 */
+#mainTabs,
+#mainTabs *,
+.nav-tabs,
+.nav-tabs * {
+    display: block !important;
+    visibility: visible !important;
+}
+
+/* データ鮮度情報のレイアウト修正 */
+#dataFreshnessContent {
+    padding: 20px !important;
+}
+
+/* データ鮮度情報タブのカードヘッダーの重なり問題を修正 */
+#data-status .card {
+    position: relative;
+    z-index: 1;
+}
+
+#data-status .card-header {
+    position: relative;
+    z-index: 2;
+    margin-bottom: 0;
+    padding: 0.5rem 1rem;
+    min-height: auto;
+}
+
+/* データ鮮度情報タブのカードヘッダーの高さを調整 */
+#data-status .card-header h5 {
+    font-size: 0.9rem;
+    margin-bottom: 0;
+    line-height: 1.2;
+}
+
+#data-status .card-header .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+/* タブナビゲーションのz-indexを調整 */
+.nav-tabs {
+    position: relative;
+    z-index: 10;
+}
+
+.nav-tabs .nav-item {
+    position: relative;
+    z-index: 11;
+}
+
+/* データ鮮度情報タブのコンテナの位置調整 */
+#data-status {
+    position: relative;
+    z-index: 1;
+    margin-top: 0;
+    padding-top: 0;
+}
+
+/* データ鮮度情報タブの上部マージンを削除 */
+#data-status .px-3 {
+    padding-top: 0 !important;
+}
+
+/* データ鮮度情報のカードグリッドの上部マージンを削除 */
+#dataFreshnessContent .row {
+    margin-top: 0 !important;
+}
+
+/* データ鮮度情報タブのカードにマージンを追加 */
+#data-status .card {
+    margin-top: 0;
+}
+
+/* データ鮮度情報タブのコンテナマージンをトレンド一覧に合わせる */
+#data-status {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+#data-status .px-3 {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}
+
+/* データ鮮度情報タブの最初の行のマージンを調整 */
+#data-status .row:first-child {
+    margin-top: 0 !important;
+}
+
+#dataFreshnessContent .table-responsive {
+    margin-top: 20px !important;
+}
+
+#dataFreshnessContent .table {
+    margin-bottom: 0 !important;
+}
+
+#dataFreshnessContent .text-center {
+    margin-bottom: 30px !important;
+}
+
+/* データ鮮度情報のカードグリッドを強制的に並列表示 */
+#dataFreshnessContent .row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    margin: 0 !important;
+}
+
+#dataFreshnessContent .col-md-6 {
+    flex: 0 0 50% !important;
+    max-width: 50% !important;
+    padding: 0.75rem !important;
+    display: block !important;
+    float: left !important;
+}
+
+#dataFreshnessContent .card {
+    height: 100% !important;
+    margin-bottom: 1rem !important;
+}
+
+/* データ鮮度情報のカード内レイアウト */
+#dataFreshnessContent .card-body {
+    padding: 1rem !important;
+}
+
+#dataFreshnessContent .card-title {
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+}
+
+#dataFreshnessContent .fs-4 {
+    font-size: 1.5rem !important;
+}
+
+#dataFreshnessContent .fw-bold {
+    font-weight: 700 !important;
+    font-size: 0.9rem !important;
+}
+
+#dataFreshnessContent .text-muted {
+    font-size: 0.75rem !important;
+    margin-bottom: 0.25rem !important;
+}
+
+/* タブのスタイル - 強力な横並び設定 */
+.nav-tabs {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    width: 100% !important;
+    list-style: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.nav-tabs .nav-item {
+    flex: 1 !important;
+    display: inline-block !important;
+    width: 50% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.nav-tabs .nav-link {
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+    width: 100% !important;
+    text-align: center !important;
+    display: block !important;
+    float: none !important;
+}
+
+.nav-tabs .nav-link.active {
+    font-weight: bold;
+}
+
+/* Bootstrapのデフォルトスタイルを上書き - より強力な設定 */
+ul.nav-tabs {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    width: 100% !important;
+    list-style: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-bottom: 1px solid #dee2e6 !important;
+}
+
+ul.nav-tabs li.nav-item {
+    display: inline-block !important;
+    width: 50% !important;
+    float: left !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    flex: 1 !important;
+}
+
+ul.nav-tabs li.nav-item button.nav-link {
+    display: block !important;
+    width: 100% !important;
+    text-align: center !important;
+    padding: 0.5rem 1rem !important;
+    border: none !important;
+    background: transparent !important;
+    color: #495057 !important;
+    text-decoration: none !important;
+}
+
+ul.nav-tabs li.nav-item button.nav-link:hover {
+    background-color: #e9ecef !important;
+    border-color: transparent !important;
+}
+
+ul.nav-tabs li.nav-item button.nav-link.active {
+    background-color: #fff !important;
+    border-color: #dee2e6 #dee2e6 #fff !important;
+    color: #495057 !important;
+    font-weight: bold !important;
+}
+
+.trend-card {
+    transition: transform 0.2s;
+}
+.trend-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+.loading {
+    min-height: 200px;
+}
+.trend-table {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.bg-purple {
+    background-color: #6f42c1 !important;
+}
+.btn-purple {
+    background-color: #6f42c1;
+    border-color: #6f42c1;
+    color: white;
+}
+.btn-purple:hover {
+    background-color: #5a32a3;
+    border-color: #5a32a3;
+    color: white;
+}
+.text-purple {
+    color: #6f42c1 !important;
+}
+
+/* Twitchローディング表示を確実に非表示 */
+#twitchTrendsLoading {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* データ鮮度情報タブがアクティブな時にトレンド一覧を非表示 */
+body.data-status-active #trends,
+body.data-status-active #trends .row,
+body.data-status-active #trends .col-md-6,
+body.data-status-active #trends .card {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* サブスクリプションタブがアクティブな時にトレンド一覧を非表示 */
+body.subscription-active #trends,
+body.subscription-active #trends .row,
+body.subscription-active #trends .col-md-6,
+body.subscription-active #trends .card {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* より強力な非表示制御 - データ鮮度情報とサブスクリプションタブ用 */
+body.data-status-active .row:nth-child(2),
+body.data-status-active .row:nth-child(3),
+body.data-status-active .row:nth-child(4),
+body.subscription-active .row:nth-child(2),
+body.subscription-active .row:nth-child(3),
+body.subscription-active .row:nth-child(4) {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
+}
+
+/* 楽天とTwitchトレンドを確実に非表示 */
+body.data-status-active #trends .row:last-child,
+body.subscription-active #trends .row:last-child,
+body.data-status-active .row:has(.card:has(.fas.fa-shopping-cart)),
+body.data-status-active .row:has(.card:has(.fab.fa-twitch)),
+body.subscription-active .row:has(.card:has(.fas.fa-shopping-cart)),
+body.subscription-active .row:has(.card:has(.fab.fa-twitch)) {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
+}
+
+/* 楽天とTwitchのカードを直接指定して非表示 */
+body.data-status-active .card:has(.fas.fa-shopping-cart),
+body.data-status-active .card:has(.fab.fa-twitch),
+body.subscription-active .card:has(.fas.fa-shopping-cart),
+body.subscription-active .card:has(.fab.fa-twitch) {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
+}
+
+/* データ鮮度情報タブのコンテンツは表示を維持 - より具体的なルール */
+body.data-status-active #data-status {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+body.data-status-active #data-status .card {
+    display: block !important;
+    visibility: visible !important;
+    height: auto !important;
+    overflow: visible !important;
+    opacity: 1 !important;
+}
+
+/* データ鮮度情報タブのopacityを強制的に1に設定 */
+#data-status {
+    opacity: 1 !important;
+}
+
+#data-status.show,
+#data-status.active {
+    opacity: 1 !important;
+}
+
+/* トレンド一覧タブではデータ鮮度情報を非表示 */
+#trends #data-status,
+#trends .data-freshness-content,
+#trends #dataFreshnessContent {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* トレンド一覧タブがアクティブな時にデータ鮮度情報タブを非表示 */
+body:not(.data-status-active) #data-status {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* データ鮮度情報タブがアクティブな時のみ表示 */
+body.data-status-active #data-status {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* データ鮮度情報タブの内容を強制表示 - より具体的なルール */
+body.data-status-active #data-status .row,
+body.data-status-active #data-status .col-md-6,
+body.data-status-active #data-status .card,
+body.data-status-active #data-status .card-body,
+body.data-status-active #data-status .card-title,
+body.data-status-active #data-status .fw-bold,
+body.data-status-active #data-status .text-muted,
+body.data-status-active #data-status .badge {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* インライン要素は適切な表示を維持 */
+body.data-status-active #data-status .d-flex,
+body.data-status-active #data-status .text-center,
+body.data-status-active #data-status .row.text-center {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* インライン要素のテキスト - より具体的なルール */
+body.data-status-active #data-status small.text-muted {
+    display: inline !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+body.data-status-active #data-status span.badge {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+body.data-status-active #data-status div.fw-bold {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+body.data-status-active #data-status div:has(span.badge) {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* データ鮮度情報のテキスト表示エリア */
+body.data-status-active #data-status .row.text-center {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+body.data-status-active #data-status .row.text-center .col-4 {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+body.data-status-active #data-status .row {
+    display: flex !important;
+}
+
+body.data-status-active #data-status .col-md-6 {
+    display: block !important;
+}
+
+body.data-status-active #data-status .card {
+    display: block !important;
+}
+
+body.data-status-active #data-status .card-body {
+    display: block !important;
+}
+
+/* データ鮮度情報タブを確実に表示 */
+#data-status.show,
+#data-status.active,
+body.data-status-active #data-status {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
+    min-height: 500px !important;
+    overflow: visible !important;
+}
+
+/* データ鮮度情報のテキスト内容を強制表示 */
+body.data-status-active #data-status {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
+    overflow: visible !important;
+}
+
+body.data-status-active #data-status * {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: inherit !important;
+    font-size: inherit !important;
+    line-height: inherit !important;
+}
+
+/* データ鮮度情報のテキスト要素を強制表示 */
+body.data-status-active #data-status .fw-bold,
+body.data-status-active #data-status .text-muted,
+body.data-status-active #data-status .badge,
+body.data-status-active #data-status small,
+body.data-status-active #data-status span,
+body.data-status-active #data-status div {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: #000 !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+}
+
+body.data-status-active #data-status .text-muted {
+    display: inline !important;
+    color: #6c757d !important;
+    font-size: 12px !important;
+}
+
+body.data-status-active #data-status .badge {
+    display: inline-block !important;
+    color: #fff !important;
+}
+
+body.data-status-active #data-status .fw-bold {
+    display: block !important;
+    font-weight: bold !important;
+    color: #000 !important;
+    font-size: 14px !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* データ鮮度情報の全てのテキスト要素を強制表示 - より強力な設定 */
+#data-status .fw-bold,
+#data-status .text-muted,
+#data-status .badge,
+#data-status small,
+#data-status span,
+#data-status div,
+#data-status * {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: #000 !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+    position: static !important;
+    z-index: auto !important;
+    overflow: visible !important;
+    clip: auto !important;
+    clip-path: none !important;
+    transform: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+    mask: none !important;
+    -webkit-mask: none !important;
+}
+
+#data-status .text-muted {
+    display: inline !important;
+    color: #6c757d !important;
+    font-size: 12px !important;
+}
+
+#data-status .badge {
+    display: inline-block !important;
+    color: #fff !important;
+    font-size: 12px !important;
+    background-color: #28a745 !important;
+    padding: 0.25em 0.4em !important;
+    border-radius: 0.25rem !important;
+}
+
+/* データ鮮度情報タブがアクティブな時の強制表示 */
+body.data-status-active #data-status * {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: #000 !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+    position: static !important;
+    z-index: auto !important;
+    overflow: visible !important;
+    clip: auto !important;
+    clip-path: none !important;
+    transform: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+    mask: none !important;
+    -webkit-mask: none !important;
+}
+
+body.data-status-active #data-status .text-muted {
+    display: inline !important;
+    color: #6c757d !important;
+    font-size: 12px !important;
+}
+
+body.data-status-active #data-status .badge {
+    display: inline-block !important;
+    color: #fff !important;
+    font-size: 12px !important;
+    background-color: #28a745 !important;
+    padding: 0.25em 0.4em !important;
+    border-radius: 0.25rem !important;
+}
+
+body.data-status-active #data-status .text-muted {
+    display: inline !important;
+    color: #6c757d !important;
+}
+
+body.data-status-active #data-status .badge {
+    display: inline-block !important;
+    padding: 0.25em 0.4em !important;
+    font-size: 0.75em !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+    vertical-align: baseline !important;
+    border-radius: 0.25rem !important;
+}
+
+body.data-status-active #data-status small {
+    display: inline !important;
+    font-size: 0.875em !important;
+}
+
+body.data-status-active #data-status span {
+    display: inline !important;
+}
+
+body.data-status-active #data-status .row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+}
+
+body.data-status-active #data-status .col-md-6 {
+    display: block !important;
+    flex: 0 0 50% !important;
+    max-width: 50% !important;
+}
+
+body.data-status-active #data-status .card {
+    display: block !important;
+    position: relative !important;
+    min-width: 0 !important;
+    word-wrap: break-word !important;
+    background-color: #fff !important;
+    background-clip: border-box !important;
+    border: 1px solid rgba(0,0,0,.125) !important;
+    border-radius: 0.25rem !important;
+}
+
+body.data-status-active #data-status .card-body {
+    display: block !important;
+    flex: 1 1 auto !important;
+    padding: 1rem !important;
+    min-height: 200px !important;
+}
+
+/* データ鮮度情報のカードグリッドを確実に表示 */
+body.data-status-active #data-status .row.g-3 {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    margin: 0 !important;
+    min-height: 400px !important;
+}
+
+body.data-status-active #data-status .col-md-6 {
+    display: block !important;
+    flex: 0 0 50% !important;
+    max-width: 50% !important;
+    min-height: 200px !important;
+}
+
+body.data-status-active #data-status .card.h-100 {
+    display: block !important;
+    height: 100% !important;
+    min-height: 200px !important;
+}
+
+/* データ鮮度情報タブ内の主要要素を表示 */
+#data-status.show .row,
+#data-status.show .col-md-6,
+#data-status.show .card,
+#data-status.show .card-body,
+#data-status.active .row,
+#data-status.active .col-md-6,
+#data-status.active .card,
+#data-status.active .card-body,
+body.data-status-active #data-status .row,
+body.data-status-active #data-status .col-md-6,
+body.data-status-active #data-status .card,
+body.data-status-active #data-status .card-body {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* データ鮮度情報タブ内の特定要素 */
+#data-status.show .row,
+#data-status.active .row,
+body.data-status-active #data-status .row {
+    display: flex !important;
+}
+
+#data-status.show .col-md-6,
+#data-status.active .col-md-6,
+body.data-status-active #data-status .col-md-6 {
+    display: block !important;
+}
+
+#data-status.show .card,
+#data-status.active .card,
+body.data-status-active #data-status .card {
+    display: block !important;
+}
+
+#data-status.show .card-body,
+#data-status.active .card-body,
+body.data-status-active #data-status .card-body {
+    display: block !important;
+}
+
+/* トレンド一覧タブ内のデータ鮮度情報のカードグリッドを非表示（データ鮮度情報タブのもののみ） */
+#data-status .row.g-3 {
+    display: flex !important;
+    visibility: visible !important;
+}
+
+/* トレンド一覧タブでは通常のトレンドカードを表示 */
+#trends .row:not(.g-3) {
+    display: flex !important;
+    visibility: visible !important;
+}
+
+#trends .col-md-6:not(:has(.card:has(.fab.fa-google))):not(:has(.card:has(.fab.fa-youtube))):not(:has(.card:has(.fab.fa-spotify))):not(:has(.card:has(.fas.fa-newspaper))):not(:has(.card:has(.fas.fa-podcast))):not(:has(.card:has(.fas.fa-shopping-cart))):not(:has(.card:has(.fas.fa-bookmark))):not(:has(.card:has(.fab.fa-twitch))) {
+    display: block !important;
+    visibility: visible !important;
+}
+
+/* データ鮮度情報のコンテンツを確実に表示 */
+#dataFreshnessContent {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+#dataFreshnessContent .row {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+#dataFreshnessContent .card {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* サブスクリプションタブのマージン調整 */
+#subscription .px-3 {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}
+
+#subscription .card {
+    margin-top: 0 !important;
+}
+
+#subscription .card-header {
+    margin-bottom: 0 !important;
+    padding: 0.75rem 1.25rem !important;
+}
+
+/* サブスクリプションタブのコンテナマージンをトレンド一覧に合わせる */
+#subscription {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+#subscription .px-3 {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}
+
+/* サブスクリプションタブの最初の行のマージンを調整 */
+#subscription .row:first-child {
+    margin-top: 0 !important;
+}
+
+/* 1行目のカテゴリのマージン調整 */
+.row:first-of-type {
+    margin-top: 1.5rem;
+}
+
+/* カードのマージン調整 */
+.card {
+    margin-bottom: 1.5rem;
+}
+
+/* カードヘッダーのパディング調整 */
+.card-header {
+    padding: 1rem 1.25rem;
+}
+
+/* トレンド一覧タブのマージン設定を他のタブにも適用 */
+#trends .row:first-child,
+#data-status .row:first-child,
+#subscription .row:first-child {
+    margin-top: 0 !important;
+}
+
+#trends .container-fluid,
+#data-status .container-fluid,
+#subscription .container-fluid {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}
+
+/* タブコンテンツの統一マージン設定 */
+#mainTabContent > div {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+

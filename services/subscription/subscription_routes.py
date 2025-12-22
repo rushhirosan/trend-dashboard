@@ -5,6 +5,10 @@ Flask Blueprintを使用してルートを分離
 
 from flask import Blueprint, request, jsonify, render_template
 from .subscription_manager import SubscriptionManager
+from utils.logger_config import get_logger
+
+# ロガーの初期化
+logger = get_logger(__name__)
 
 # Blueprintを作成
 subscription_bp = Blueprint('subscription', __name__, url_prefix='/subscription')
@@ -17,9 +21,12 @@ subscription_manager = SubscriptionManager()
 def subscription_page():
     """サブスクリプションページを表示"""
     try:
-        return render_template('subscription.html')
+        from flask import current_app
+        # Google Analytics IDをテンプレートに渡す
+        ga_id = current_app.config.get('GOOGLE_ANALYTICS_ID')
+        return render_template('subscription.html', config={'GOOGLE_ANALYTICS_ID': ga_id})
     except Exception as e:
-        print(f"❌ サブスクリプションページ表示エラー: {e}")
+        logger.error(f"❌ サブスクリプションページ表示エラー: {e}", exc_info=True)
         return jsonify({'error': 'ページの表示に失敗しました'}), 500
 
 
@@ -53,7 +60,7 @@ def subscribe():
             }), 400
             
     except Exception as e:
-        print(f"❌ サブスクリプション登録APIエラー: {e}")
+        logger.error(f"❌ サブスクリプション登録APIエラー: {e}", exc_info=True)
         return jsonify({
             'success': False,
             'error': 'サーバーエラーが発生しました'
@@ -83,7 +90,7 @@ def unsubscribe():
             }), 400
             
     except Exception as e:
-        print(f"❌ サブスクリプション登録解除APIエラー: {e}")
+        logger.error(f"❌ サブスクリプション登録解除APIエラー: {e}", exc_info=True)
         return jsonify({
             'success': False,
             'error': 'サーバーエラーが発生しました'
@@ -96,11 +103,12 @@ def subscription_status():
     try:
         email = request.args.get('email')
         
+        # emailパラメータがない場合は未登録として扱う
         if not email:
             return jsonify({
                 'subscribed': False,
-                'message': 'メールアドレスが必要です'
-            }), 400
+                'message': 'メールアドレスが指定されていません'
+            })
         
         # サブスクリプション状態を取得
         subscription = subscription_manager.get_subscription_status(email)
@@ -120,7 +128,7 @@ def subscription_status():
             })
             
     except Exception as e:
-        print(f"❌ サブスクリプション状態確認APIエラー: {e}")
+        logger.error(f"❌ サブスクリプション状態確認APIエラー: {e}", exc_info=True)
         return jsonify({
             'subscribed': False,
             'error': 'サーバーエラーが発生しました'
@@ -141,7 +149,7 @@ def subscription_list():
         })
         
     except Exception as e:
-        print(f"❌ サブスクリプション一覧取得APIエラー: {e}")
+        logger.error(f"❌ サブスクリプション一覧取得APIエラー: {e}", exc_info=True)
         return jsonify({
             'success': False,
             'error': 'サーバーエラーが発生しました'
@@ -178,12 +186,31 @@ def update_subscription():
             }), 400
             
     except Exception as e:
-        print(f"❌ サブスクリプション更新APIエラー: {e}")
+        logger.error(f"❌ サブスクリプション更新APIエラー: {e}", exc_info=True)
         return jsonify({
             'success': False,
             'error': 'サーバーエラーが発生しました'
         }), 500
 
+
+@subscription_bp.route('/api/send-trends-summary', methods=['POST'])
+def send_trends_summary():
+    """トレンドサマリー配信API（管理者用）"""
+    try:
+        # トレンドサマリー配信を実行
+        subscription_manager.send_trends_summary()
+        
+        return jsonify({
+            'success': True,
+            'message': 'トレンドサマリー配信を実行しました'
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ トレンドサマリー配信APIエラー: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': 'トレンドサマリー配信に失敗しました'
+        }), 500
 
 @subscription_bp.route('/api/statistics')
 def subscription_statistics():
@@ -198,7 +225,7 @@ def subscription_statistics():
         })
         
     except Exception as e:
-        print(f"❌ サブスクリプション統計取得APIエラー: {e}")
+        logger.error(f"❌ サブスクリプション統計取得APIエラー: {e}", exc_info=True)
         return jsonify({
             'success': False,
             'error': 'サーバーエラーが発生しました'
@@ -226,7 +253,7 @@ def get_subscriptions_by_frequency(frequency):
         })
         
     except Exception as e:
-        print(f"❌ 配信頻度別サブスクリプション取得APIエラー: {e}")
+        logger.error(f"❌ 配信頻度別サブスクリプション取得APIエラー: {e}", exc_info=True)
         return jsonify({
             'success': False,
             'error': 'サーバーエラーが発生しました'
@@ -246,6 +273,6 @@ def unsubscribe_by_token(token):
             return render_template('unsubscribe_error.html', error=message)
             
     except Exception as e:
-        print(f"❌ トークン登録解除エラー: {e}")
+        logger.error(f"❌ トークン登録解除エラー: {e}", exc_info=True)
         return render_template('unsubscribe_error.html', error='登録解除に失敗しました')
 

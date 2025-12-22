@@ -3,14 +3,47 @@
 キャッシュデータ、統計情報などのAPIエンドポイント
 """
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
 from database_config import TrendsCache
+from utils.logger_config import get_logger
+
+# ロガーの初期化
+logger = get_logger(__name__)
 
 # Blueprintを作成
 data_bp = Blueprint('data', __name__, url_prefix='/api')
 
-# キャッシュシステムのインスタンス
-cache = TrendsCache()
+# キャッシュシステムのインスタンス（遅延初期化）
+_cache_instance = None
+
+def get_cache():
+    """キャッシュインスタンスを取得（遅延初期化）"""
+    global _cache_instance
+    if _cache_instance is None:
+        try:
+            _cache_instance = TrendsCache()
+            logger.info("✅ キャッシュシステムを初期化しました（遅延初期化）")
+        except Exception as e:
+            logger.error(f"❌ キャッシュシステム初期化エラー: {e}", exc_info=True)
+            _cache_instance = None
+            logger.warning("⚠️ キャッシュシステムの初期化に失敗しました")
+    return _cache_instance
+
+
+def handle_data_error(operation_name, error, status_code=500):
+    """
+    データAPIエラーを統一フォーマットで処理
+    
+    Args:
+        operation_name: 操作名
+        error: エラーオブジェクト
+        status_code: HTTPステータスコード
+    """
+    logger.error(f"❌ {operation_name} エラー: {error}", exc_info=True)
+    return jsonify({
+        'success': False,
+        'error': f'{operation_name}に失敗しました: {str(error)}'
+    }), status_code
 
 
 @data_bp.route('/cache/data-freshness')
@@ -28,12 +61,27 @@ def get_data_freshness():
             ('podcast_trends', 'Podcast'),
             ('rakuten_trends', '楽天'),
             ('hatena_trends', 'はてなブックマーク'),
-            ('twitch_trends', 'Twitch')
+            ('twitch_trends', 'Twitch'),
+            ('nhk_trends', 'NHK ニュース'),
+            ('qiita_trends', 'Qiita トレンド'),
+            ('stock_trends', '株価トレンド'),
+            ('crypto_trends', '仮想通貨トレンド'),
+            ('cnn_trends', 'CNN News'),
+            ('producthunt_trends', 'Product Hunt'),
+            ('reddit_trends', 'Reddit'),
+            ('hackernews_trends', 'Hacker News')
         ]
+        
+        cache_instance = get_cache()
+        if not cache_instance:
+            return jsonify({
+                'success': False,
+                'error': 'キャッシュシステムが初期化されていません'
+            }), 500
         
         for cache_key, display_name in categories:
             try:
-                cache_info = cache.get_cache_info(cache_key)
+                cache_info = cache_instance.get_cache_info(cache_key)
                 if cache_info:
                     freshness_info[display_name] = {
                         'last_updated': cache_info.get('last_updated'),
@@ -71,13 +119,20 @@ def clear_cache():
     try:
         cache_type = request.args.get('type', 'all')
         
+        cache_instance = get_cache()
+        if not cache_instance:
+            return jsonify({
+                'success': False,
+                'error': 'キャッシュシステムが初期化されていません'
+            }), 500
+        
         if cache_type == 'all':
             # 全キャッシュをクリア
-            cache.clear_all_cache()
+            cache_instance.clear_all_cache()
             message = "全キャッシュをクリアしました"
         else:
             # 特定のキャッシュをクリア
-            cache.clear_cache_by_type(cache_type)
+            cache_instance.clear_cache_by_type(cache_type)
             message = f"{cache_type}キャッシュをクリアしました"
         
         return jsonify({
@@ -86,10 +141,7 @@ def clear_cache():
         })
         
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'キャッシュクリアに失敗しました: {str(e)}'
-        }), 500
+        return handle_data_error('キャッシュクリア', e)
 
 
 @data_bp.route('/cache/status')
@@ -98,12 +150,19 @@ def get_cache_status():
     try:
         cache_type = request.args.get('type', 'all')
         
+        cache_instance = get_cache()
+        if not cache_instance:
+            return jsonify({
+                'success': False,
+                'error': 'キャッシュシステムが初期化されていません'
+            }), 500
+        
         if cache_type == 'all':
             # 全キャッシュの状態を取得
-            status = cache.get_all_cache_status()
+            status = cache_instance.get_all_cache_status()
         else:
             # 特定のキャッシュの状態を取得
-            status = cache.get_cache_status(cache_type)
+            status = cache_instance.get_cache_status(cache_type)
         
         return jsonify({
             'success': True,
@@ -121,10 +180,17 @@ def get_cache_status():
 def get_statistics():
     """統計情報を取得"""
     try:
+        cache_instance = get_cache()
+        if not cache_instance:
+            return jsonify({
+                'success': False,
+                'error': 'キャッシュシステムが初期化されていません'
+            }), 500
+        
         stats = {
             'total_categories': 8,
-            'cache_status': cache.get_all_cache_status(),
-            'last_updated': cache.get_last_update_time()
+            'cache_status': cache_instance.get_all_cache_status() if cache_instance else {},
+            'last_updated': cache_instance.get_last_update_time() if cache_instance else None
         }
         
         return jsonify({
@@ -133,8 +199,66 @@ def get_statistics():
         })
         
     except Exception as e:
+        return handle_data_error('統計情報取得', e)
+
+
+@data_bp.route('/cache/refresh-all', methods=['POST'])
+def refresh_all_trends_endpoint():
+    """すべてのトレンドデータを強制更新"""
+    try:
+        managers = current_app.config.get('TREND_MANAGERS')
+        if not managers:
+            return jsonify({
+                'success': False,
+                'error': 'トレンドマネージャーが初期化されていません'
+            }), 500
+        
+        force_refresh = request.args.get('force_refresh', 'true').lower() == 'true'
+        from managers.trend_managers import refresh_all_trends
+        result = refresh_all_trends(managers, force_refresh=force_refresh)
+        
+        # データ更新完了後、メール自動送信を実行
+        # ただし、環境変数SKIP_EMAIL_ON_UPDATE=trueの場合はスキップ（デプロイ時の不要なメール送信を防ぐ）
+        skip_email = os.getenv('SKIP_EMAIL_ON_UPDATE', 'false').lower() == 'true'
+        if not skip_email:
+            try:
+                from services.subscription.subscription_manager import SubscriptionManager
+                subscription_manager = SubscriptionManager()
+                subscription_manager.send_trends_summary()
+            except Exception as e:
+                # メール送信エラーはデータ更新処理を止めないように、ログのみ出力
+                logger.warning(f"⚠️ データ更新後のメール自動送信エラー（データ更新は成功）: {e}", exc_info=True)
+        else:
+            logger.info("⏭️ メール自動送信をスキップします（SKIP_EMAIL_ON_UPDATE=true）")
+        
+        status_code = 200 if result.get('success') else 207
+        return jsonify(result), status_code
+    except Exception as e:
         return jsonify({
             'success': False,
-            'error': f'統計情報取得に失敗しました: {str(e)}'
+            'error': f'全カテゴリー更新に失敗しました: {str(e)}'
         }), 500
+
+
+@data_bp.route('/scheduler/execute', methods=['POST'])
+def execute_scheduler():
+    """スケジューラーを手動実行（メール自動送信を含む）"""
+    try:
+        scheduler = current_app.config.get('SCHEDULER')
+        if not scheduler:
+            return jsonify({
+                'success': False,
+                'error': 'スケジューラーが初期化されていません'
+            }), 500
+        
+        # スケジューラーの_fetch_all_trendsを実行（手動実行のためforce=True）
+        # force=Trueの場合、メール送信はスキップされる（明示的な手動実行のため）
+        scheduler._fetch_all_trends(force=True)
+        
+        return jsonify({
+            'success': True,
+            'message': 'スケジューラー実行完了（データ更新のみ、メール送信はスキップ）'
+        })
+    except Exception as e:
+        return handle_data_error('スケジューラー実行', e)
 

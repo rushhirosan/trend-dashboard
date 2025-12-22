@@ -4,8 +4,7 @@
 """
 
 from .app_config import AppConfig
-from .database_config import DatabaseConfig
 
-__all__ = ['AppConfig', 'DatabaseConfig']
+__all__ = ['AppConfig']
 
 

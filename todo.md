@@ -38,14 +38,14 @@
 2. **SEO対策**
    - [ ] パフォーマンス最適化（Core Web Vitals）
    - [ ] 内部リンク構造の改善
-   - [ ] **Google Search Console セットアップ**
-     - [ ] Google Search Consoleアカウントの作成
-     - [ ] サイトの所有権確認（HTMLタグ、DNS、Google Analytics連携など）
-     - [ ] sitemap.xmlの送信（`https://trends-dashboard.fly.dev/sitemap.xml`）
-     - [ ] robots.txtの確認（`https://trends-dashboard.fly.dev/robots.txt`）
-     - [ ] インデックス登録のリクエスト
-     - [ ] パフォーマンスレポートの確認
-     - [ ] カバレッジレポートの確認
+   - [ ] **Google Search Console セットアップ** ✅
+     - [x] Google Search Consoleアカウントの作成
+     - [x] サイトの所有権確認（HTMLタグ、DNS、Google Analytics連携など）
+     - [x] sitemap.xmlの送信（`https://trends-dashboard.fly.dev/sitemap.xml`）
+     - [x] robots.txtの確認（`https://trends-dashboard.fly.dev/robots.txt`）
+     - [x] インデックス登録のリクエスト
+     - [x] パフォーマンスレポートの確認
+     - [x] カバレッジレポートの確認
 
 ### 優先度: 中
 

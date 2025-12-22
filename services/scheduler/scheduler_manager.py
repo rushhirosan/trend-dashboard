@@ -220,20 +220,27 @@ class TrendsScheduler:
                 
                 # 既存のrefresh_all_trends()関数を使用
                 # force_refresh=Falseに変更：キャッシュが存在する場合はAPIを呼び出さない（World News APIの使用量を削減）
+                # ただし、Stock/Cryptoは無料APIのため、キャッシュがない場合はAPIを呼び出す
                 from managers.trend_managers import refresh_all_trends
+                logger.info("🔄 refresh_all_trends実行開始 (force_refresh=False)")
                 result = refresh_all_trends(managers, force_refresh=False)
+                logger.info(f"🔄 refresh_all_trends実行完了: success={result.get('success')}")
             
             # 結果をログ出力
-            if result.get('success'):
-                results = result.get('results', {})
-                success_count = sum(1 for r in results.values() if r.get('success', False))
-                total_count = len(results)
-                failed_count = total_count - success_count
-            else:
-                results = result.get('results', {})
-                success_count = sum(1 for r in results.values() if r.get('success', False))
-                total_count = len(results)
-                failed_count = total_count - success_count
+            results = result.get('results', {})
+            success_count = sum(1 for r in results.values() if r.get('success', False))
+            total_count = len(results)
+            failed_count = total_count - success_count
+            
+            # Stock Trendsの結果を詳細にログ出力
+            for key in ['stock_JP', 'stock_US']:
+                if key in results:
+                    stock_result = results[key]
+                    stock_response = stock_result.get('response', {})
+                    stock_status = stock_response.get('status', 'unknown')
+                    stock_data_count = len(stock_response.get('data', []))
+                    stock_success = stock_result.get('success', False)
+                    logger.info(f"📊 {key}: success={stock_success}, status={stock_status}, data_count={stock_data_count}")
             
             end_time = datetime.now(jst)
             duration = (end_time - start_time).total_seconds()

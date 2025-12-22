@@ -176,7 +176,13 @@ class StockTrendsManager:
                 # これにより、14時のスケジューラー実行時にもデータが取得できる
                 if not force_refresh:
                     logger.info(f"📈 Stock: キャッシュデータが見つかりません (market: {market})。スケジューラー実行時のため、外部APIを呼び出します")
-                    return self._fetch_trending_stocks(market, limit)
+                    result = self._fetch_trending_stocks(market, limit)
+                    # データが取得できた場合のみログに記録
+                    if result.get('success') and result.get('data'):
+                        logger.info(f"✅ Stock: スケジューラー実行時に{len(result.get('data', []))}件のデータを取得しました (market: {market})")
+                    else:
+                        logger.warning(f"⚠️ Stock: スケジューラー実行時にデータが取得できませんでした (market: {market}, status: {result.get('status')})")
+                    return result
                 # force_refresh=trueの場合も外部APIを呼び出す
                 logger.warning(f"⚠️ Stock: キャッシュデータが見つかりません。外部APIを呼び出します (market: {market})")
                 return self._fetch_trending_stocks(market, limit)
@@ -202,6 +208,12 @@ class StockTrendsManager:
             # 各銘柄を個別に取得（yfinanceは個別取得が安定）
             # fly.io環境でのタイムアウト対策: 最大20銘柄までに制限（処理時間短縮）
             max_tickers = min(len(tickers), 20)
+            success_count = 0
+            error_count = 0
+            empty_count = 0
+            
+            logger.info(f"📈 Stock: {max_tickers}銘柄のデータ取得を開始します (market: {market})")
+            
             for ticker_symbol in tickers[:max_tickers]:
                 try:
                     # レート制限をチェック（各銘柄取得前に）
@@ -214,13 +226,16 @@ class StockTrendsManager:
                         hist = ticker.history(period='5d', timeout=10)  # タイムアウトを10秒に延長
                     except Exception as e:
                         logger.warning(f"銘柄 {ticker_symbol} history取得エラー: {e}")
+                        error_count += 1
                         continue
                     
                     if hist.empty:
                         logger.warning(f"銘柄 {ticker_symbol}: データが空です（市場が閉まっている可能性があります）")
+                        empty_count += 1
                         continue
                     
                     logger.debug(f"銘柄 {ticker_symbol}: {len(hist)}日分のデータを取得しました")
+                    success_count += 1
                     
                     # データが1日分しかない場合（週末や市場が閉まっている場合）
                     if len(hist) < 2:
@@ -270,7 +285,9 @@ class StockTrendsManager:
             
             if not trends_data:
                 logger.warning(f"⚠️ Stock: データが取得できませんでした (market: {market}, tickers数: {len(tickers[:max_tickers])})")
+                logger.warning(f"⚠️ Stock: これは週末・市場休場時、またはyfinance APIの問題の可能性があります")
                 # データが取得できなかった場合でも、空のデータを返す（エラーではなく空の結果として扱う）
+                # ただし、キャッシュには保存しない（次回の実行時に再試行するため）
                 return {
                     'success': True,  # エラーではなく、データがない状態として扱う
                     'data': [],

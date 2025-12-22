@@ -5,14 +5,26 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 import pytz
+from utils.logger_config import get_logger
+
+# ロガーの初期化
+logger = get_logger(__name__)
 
 class EmailService:
     def __init__(self):
-        # メール設定（環境変数から取得）
+        # 環境変数からメール設定を読み込む（本番環境用）
+        # 環境変数が設定されていない場合はデフォルト値を使用（ローカル環境用）
+        self.sender_email = os.getenv('SENDER_EMAIL', 'rushhirosan@gmail.com')
+        self.sender_password = os.getenv('SENDER_PASSWORD', 'xoniafqiuwnoirce')
         self.smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
         self.smtp_port = int(os.getenv('SMTP_PORT', '587'))
-        self.sender_email = os.getenv('SENDER_EMAIL')
-        self.sender_password = os.getenv('SENDER_PASSWORD')
+        
+        # デバッグ情報を出力
+        logger.info(f"🔍 メール設定確認:")
+        logger.info(f"  SENDER_EMAIL: {self.sender_email}")
+        logger.info(f"  SENDER_PASSWORD: {'*' * len(self.sender_password) if self.sender_password else 'None'}")
+        logger.info(f"  SMTP_SERVER: {self.smtp_server}")
+        logger.info(f"  SMTP_PORT: {self.smtp_port}")
         
     def send_trends_summary(self, to_email, trends_data, frequency='daily'):
         """トレンドサマリーをメール送信"""
@@ -26,7 +38,7 @@ class EmailService:
             return self._send_email(to_email, subject, html_content, text_content)
             
         except Exception as e:
-            print(f"メール送信エラー: {e}")
+            logger.error(f"メール送信エラー: {e}", exc_info=True)
             return False
     
     def _create_html_email(self, trends_data, frequency):
@@ -155,14 +167,24 @@ class EmailService:
     def _send_email(self, to_email, subject, html_content, text_content):
         """メール送信"""
         try:
+            # メール設定確認（INFOレベルで出力）
+            logger.info(f"   🔍 メール設定確認:")
+            logger.info(f"      SENDER_EMAIL: {self.sender_email}")
+            logger.info(f"      SENDER_PASSWORD: {'*' * len(self.sender_password) if self.sender_password else 'None'}")
+            logger.info(f"      SMTP_SERVER: {self.smtp_server}")
+            logger.info(f"      SMTP_PORT: {self.smtp_port}")
+            
             if not self.sender_email or not self.sender_password:
-                print("メール設定が不完全です")
-                return False
+                logger.error("   ❌ メール設定が不完全です - メール送信をスキップします")
+                logger.error(f"   📧 送信予定メール: {to_email}")
+                logger.error(f"   📧 件名: {subject}")
+                return False  # エラーとしてFalseを返す
             
             # メール作成
+            logger.info(f"   📝 メール内容を作成中...")
             msg = MIMEMultipart('alternative')
             msg['Subject'] = subject
-            msg['From'] = self.sender_email
+            msg['From'] = self.sender_email  # 環境変数から読み込んだ送信者アドレス
             msg['To'] = to_email
             
             # テキストとHTMLを追加
@@ -173,14 +195,25 @@ class EmailService:
             msg.attach(html_part)
             
             # SMTPサーバーに接続して送信
+            logger.info(f"   🔌 SMTPサーバーに接続中... ({self.smtp_server}:{self.smtp_port})")
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                logger.info(f"   🔐 STARTTLSを実行中...")
                 server.starttls()
+                logger.info(f"   🔑 ログイン中... ({self.sender_email})")
                 server.login(self.sender_email, self.sender_password)
+                logger.info(f"   📤 メール送信中... ({to_email})")
                 server.send_message(msg)
             
-            print(f"メール送信完了: {to_email}")
+            logger.info(f"   ✅ メール送信完了: {to_email}")
             return True
             
+        except smtplib.SMTPAuthenticationError as e:
+            logger.error(f"   ❌ SMTP認証エラー: {e}")
+            logger.error(f"      Gmailアプリパスワードが正しくない可能性があります", exc_info=True)
+            return False
+        except smtplib.SMTPException as e:
+            logger.error(f"   ❌ SMTPエラー: {e}", exc_info=True)
+            return False
         except Exception as e:
-            print(f"メール送信エラー: {e}")
+            logger.error(f"   ❌ メール送信エラー: {type(e).__name__}: {e}", exc_info=True)
             return False

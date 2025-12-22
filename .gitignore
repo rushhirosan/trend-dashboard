@@ -66,6 +66,11 @@ cache/
 # Temporary files
 *.tmp
 *.temp
+local_schema.sql
+local_data.sql
+
+# Deployment helpers (generated artifacts)
+/tmp/
 
 # API Keys and credentials
 *.json

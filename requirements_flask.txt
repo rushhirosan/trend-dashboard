@@ -1,9 +1,0 @@
-Flask==2.3.3
-psycopg2-binary==2.9.7
-pandas==1.5.3
-pandas-gbq==0.19.2
-google-cloud-bigquery==3.11.4
-gunicorn==21.2.0
-openai==0.28.1
-python-dotenv==1.1.1
-numpy==1.24.3 

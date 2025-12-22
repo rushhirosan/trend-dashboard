@@ -10,6 +10,16 @@
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://trends-dashboard.fly.dev/subscription">
     
+    <!-- Performance Optimization: Preconnect to external domains -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin>
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com">
+    
+    <!-- Performance Optimization: Preload critical CSS -->
+    <link href="{{ url_for('static', filename='css/common.css') }}" rel="preload" as="style">
+    <link href="{{ url_for('static', filename='css/main.css') }}" rel="preload" as="style">
+    
     <!-- Google Analytics (GA4) -->
     {% if config.get('GOOGLE_ANALYTICS_ID') %}
     <script async src="https://www.googletagmanager.com/gtag/js?id={{ config.GOOGLE_ANALYTICS_ID }}"></script>
@@ -304,6 +314,41 @@
                 initSubscription();
             }
         });
-    </script>
-</body>
+        </script>
+    
+    <!-- Footer with Internal Links -->
+    <footer class="bg-white border-top mt-5 py-4">
+        <div class="container-fluid px-3">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5 class="h6 mb-3">トレンドダッシュボード</h5>
+                    <p class="text-muted small mb-2">トレンドサマリーをメールで受信できます。毎日、毎週、毎月の配信頻度から選択可能。Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Twitch、Podcastなどの最新トレンド情報をお届けします。</p>
+                </div>
+                <div class="col-md-3">
+                    <h6 class="h6 mb-3">主要ページ</h6>
+                    <ul class="list-unstyled small">
+                        <li class="mb-2"><a href="/" class="text-decoration-none text-muted">🇯🇵 日本トレンド</a></li>
+                        <li class="mb-2"><a href="/us" class="text-decoration-none text-muted">🇺🇸 USトレンド</a></li>
+                        <li class="mb-2"><a href="/data-status" class="text-decoration-none text-muted">📊 データ鮮度情報</a></li>
+                        <li class="mb-2"><a href="/subscription" class="text-decoration-none text-muted">📧 メールサブスクリプション</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-3">
+                    <h6 class="h6 mb-3">トレンドカテゴリ</h6>
+                    <ul class="list-unstyled small">
+                        <li class="mb-2"><a href="/#googleTrends" class="text-decoration-none text-muted">Google Trends</a></li>
+                        <li class="mb-2"><a href="/#youtubeTrends" class="text-decoration-none text-muted">YouTube</a></li>
+                        <li class="mb-2"><a href="/#musicTrends" class="text-decoration-none text-muted">Spotify</a></li>
+                        <li class="mb-2"><a href="/#stockTrends" class="text-decoration-none text-muted">株価トレンド</a></li>
+                        <li class="mb-2"><a href="/#cryptoTrends" class="text-decoration-none text-muted">仮想通貨トレンド</a></li>
+                    </ul>
+                </div>
+            </div>
+            <hr class="my-3">
+            <div class="text-center text-muted small">
+                <p class="mb-0">&copy; 2025 トレンドダッシュボード. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+    </body>
 </html>

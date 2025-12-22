@@ -30,6 +30,16 @@
     <!-- Canonical URL -->
     <link rel="canonical" href="https://trends-dashboard.fly.dev/">
     
+    <!-- Performance Optimization: Preconnect to external domains -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin>
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com">
+    
+    <!-- Performance Optimization: Preload critical CSS -->
+    <link rel="preload" href="{{ url_for('static', filename='css/common.css') }}" as="style">
+    <link rel="preload" href="{{ url_for('static', filename='css/main.css') }}" as="style">
+    
     <!-- Structured Data (JSON-LD) -->
     <script type="application/ld+json">
     {
@@ -247,7 +257,7 @@
                         </div>
                     </article>
                     <!-- 右側: YouTube Trends -->
-                    <article class="col-12 col-md-6">
+                    <article class="col-12 col-md-6" id="youtubeTrends">
                         <div class="card h-100">
                             <div class="card-header d-flex justify-content-between align-items-center">
                                 <div class="d-flex align-items-center">
@@ -409,7 +419,7 @@
                 <!-- 4行目: 株価 + 仮想通貨 -->
                 <div class="row g-3 mb-3">
                     <!-- 左側: 株価トレンド（日本） -->
-                    <article class="col-12 col-md-6">
+                    <article class="col-12 col-md-6" id="stockTrends">
                         <div class="card h-100">
                             <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
                                 <h2 class="h5 mb-0"><i class="fas fa-chart-line" aria-hidden="true"></i> 株価トレンド（日本）</h2>
@@ -503,7 +513,7 @@
                 <!-- 5行目: Spotify + Podcast -->
                 <div class="row g-3 mb-3">
                     <!-- 左側: 音楽トレンド -->
-                    <article class="col-12 col-md-6">
+                    <article class="col-12 col-md-6" id="musicTrends">
                         <div class="card h-100">
                             <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
                                 <h2 class="h5 mb-0"><i class="fas fa-music" aria-hidden="true"></i> Spotify 音楽トレンド</h2>
@@ -747,5 +757,40 @@
             }, 500);
         });
     </script>
+    
+    <!-- Footer with Internal Links -->
+    <footer class="bg-white border-top mt-5 py-4">
+        <div class="container-fluid px-3">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5 class="h6 mb-3">トレンドダッシュボード</h5>
+                    <p class="text-muted small mb-2">日本の最新トレンド情報を一括表示。Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Twitch、Podcastなどの人気トレンドをリアルタイムで確認できます。</p>
+                </div>
+                <div class="col-md-3">
+                    <h6 class="h6 mb-3">主要ページ</h6>
+                    <ul class="list-unstyled small">
+                        <li class="mb-2"><a href="/" class="text-decoration-none text-muted">🇯🇵 日本トレンド</a></li>
+                        <li class="mb-2"><a href="/us" class="text-decoration-none text-muted">🇺🇸 USトレンド</a></li>
+                        <li class="mb-2"><a href="/data-status" class="text-decoration-none text-muted">📊 データ鮮度情報</a></li>
+                        <li class="mb-2"><a href="/subscription" class="text-decoration-none text-muted">📧 メールサブスクリプション</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-3">
+                    <h6 class="h6 mb-3">トレンドカテゴリ</h6>
+                    <ul class="list-unstyled small">
+                        <li class="mb-2"><a href="/#googleTrends" class="text-decoration-none text-muted">Google Trends</a></li>
+                        <li class="mb-2"><a href="/#youtubeTrends" class="text-decoration-none text-muted">YouTube</a></li>
+                        <li class="mb-2"><a href="/#musicTrends" class="text-decoration-none text-muted">Spotify</a></li>
+                        <li class="mb-2"><a href="/#stockTrends" class="text-decoration-none text-muted">株価トレンド</a></li>
+                        <li class="mb-2"><a href="/#cryptoTrends" class="text-decoration-none text-muted">仮想通貨トレンド</a></li>
+                    </ul>
+                </div>
+            </div>
+            <hr class="my-3">
+            <div class="text-center text-muted small">
+                <p class="mb-0">&copy; 2025 トレンドダッシュボード. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
 </body>
 </html> 

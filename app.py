@@ -139,6 +139,27 @@ def create_app():
         app.config['SCHEDULER'] = None
     
     # ルートを定義（エラーが発生しても続行）
+    # パフォーマンス最適化: キャッシュヘッダーの設定
+    @app.after_request
+    def set_cache_headers(response):
+        """静的ファイルにキャッシュヘッダーを設定"""
+        # 静的ファイル（CSS、JS、画像）にキャッシュヘッダーを設定
+        if response.content_type and (
+            'text/css' in response.content_type or
+            'application/javascript' in response.content_type or
+            'image/' in response.content_type or
+            'font/' in response.content_type
+        ):
+            # 静的ファイルは1年間キャッシュ（バージョニングで更新）
+            response.cache_control.max_age = 31536000  # 1年
+            response.cache_control.public = True
+            response.cache_control.immutable = True
+        # HTMLファイルは短いキャッシュ（5分）
+        elif response.content_type and 'text/html' in response.content_type:
+            response.cache_control.max_age = 300  # 5分
+            response.cache_control.public = True
+        return response
+    
     try:
         @app.route('/test')
         def test_page():

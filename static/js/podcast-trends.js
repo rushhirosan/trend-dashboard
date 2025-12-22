@@ -3,7 +3,7 @@ function fetchPodcastTrends(type = 'program') {
     showPodcastLoading();
     hidePodcastResults();
     
-    fetch(`/api/podcast-trends?type=${type}&limit=25`)
+    fetch(`/api/podcast-trends?type=${type}&limit=25&force_refresh=false`)
         .then(response => response.json())
         .then(data => {
             hidePodcastLoading();

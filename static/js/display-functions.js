@@ -6,21 +6,9 @@ function displayHatenaResults(data) {
     const tableBody = document.getElementById('hatenaTrendsTableBody');
     const statusMessage = document.getElementById('hatenaStatusMessage');
     
-    if (!tableBody || !statusMessage) {
+    if (!tableBody) {
         console.error('❌ Hatena DOM要素が見つかりません');
         return;
-    }
-    
-    // ステータスアイコンを更新
-    const statusIcon = document.getElementById('hatenaStatusIcon');
-    if (statusIcon) {
-        if (data.data && data.data.length > 0) {
-            statusIcon.innerHTML = '<i class="fas fa-check text-white"></i>';
-            statusIcon.className = 'badge bg-success';
-        } else {
-            statusIcon.innerHTML = '<i class="fas fa-exclamation-triangle text-white"></i>';
-            statusIcon.className = 'badge bg-danger';
-        }
     }
     
     // ステータスメッセージは非表示のまま
@@ -30,16 +18,32 @@ function displayHatenaResults(data) {
     
     // テーブルを更新
     tableBody.innerHTML = '';
-    data.data.forEach((item, index) => {
-        const row = document.createElement('tr');
-        row.className = 'trend-card';
-        row.innerHTML = `
-            <td>${index + 1}</td>
-            <td><a href="${item.url}" target="_blank">${item.title}</a></td>
-            <td>${item.bookmark_count || 0}</td>
-        `;
-        tableBody.appendChild(row);
-    });
+    if (data.data && data.data.length > 0) {
+        data.data.forEach((item, index) => {
+            const row = document.createElement('tr');
+            row.className = 'trend-card';
+            row.style.minHeight = '100px';
+            
+            // ブックマーク数をフォーマット
+            const bookmarkCount = item.bookmark_count || 0;
+            const bookmarkInfo = bookmarkCount > 0 ? `${bookmarkCount.toLocaleString()}件` : '0件';
+            
+            // リンクを追加（他のセクションと同じ形式）
+            const articleLink = item.url ? 
+                `<br><a href="${item.url}" target="_blank" class="btn btn-sm btn-outline-warning mt-1">
+                    <i class="fas fa-external-link-alt"></i> 記事を読む
+                </a>` : '';
+            
+            row.innerHTML = `
+                <td><span class="badge bg-warning">${item.rank || index + 1}</span></td>
+                <td>
+                    <strong>${item.title || 'N/A'}</strong>${articleLink}
+                </td>
+                <td><strong>${bookmarkInfo}</strong></td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
     
     // 結果セクションを表示
     document.getElementById('hatenaResults').style.display = 'block';
@@ -57,18 +61,6 @@ function displayPodcastResults(data) {
         return;
     }
     
-    // ステータスアイコンを更新
-    const statusIcon = document.getElementById('podcastStatusIcon');
-    if (statusIcon) {
-        if (data.data && data.data.length > 0) {
-            statusIcon.innerHTML = '<i class="fas fa-check text-white"></i>';
-            statusIcon.className = 'badge bg-success';
-        } else {
-            statusIcon.innerHTML = '<i class="fas fa-exclamation-triangle text-white"></i>';
-            statusIcon.className = 'badge bg-danger';
-        }
-    }
-    
     // ステータスメッセージは非表示のまま
     if (statusMessage) {
         statusMessage.style.display = 'none !important';
@@ -76,7 +68,20 @@ function displayPodcastResults(data) {
     
     // テーブルを更新
     tableBody.innerHTML = '';
-    data.data.forEach((item, index) => {
+    
+    // エピソード数でソート（降順）、同じ場合はスコアでソート
+    const sortedData = [...data.data].sort((a, b) => {
+        const episodesA = a.total_episodes || 0;
+        const episodesB = b.total_episodes || 0;
+        const scoreA = a.score || 0;
+        const scoreB = b.score || 0;
+        if (episodesA !== episodesB) {
+            return episodesB - episodesA; // エピソード数で降順ソート
+        }
+        return scoreB - scoreA; // 同じ場合はスコアで降順ソート
+    });
+    
+    sortedData.forEach((item, index) => {
         const row = document.createElement('tr');
         row.className = 'trend-card';
         row.innerHTML = `
@@ -88,8 +93,8 @@ function displayPodcastResults(data) {
         tableBody.appendChild(row);
     });
     
-    // 結果セクションを表示
-    document.getElementById('podcastResults').style.display = 'block';
+    // 結果セクションを表示（重要度付きでインラインスタイルを設定）
+    document.getElementById('podcastResults').style.setProperty('display', 'block', 'important');
     console.log('✅ Podcast Results表示完了');
 }
 
@@ -99,21 +104,9 @@ function displayWorldNewsResults(data) {
     const tableBody = document.getElementById('newsTrendsTableBody');
     const statusMessage = document.getElementById('newsStatusMessage');
     
-    if (!tableBody || !statusMessage) {
+    if (!tableBody) {
         console.error('❌ World News DOM要素が見つかりません');
         return;
-    }
-    
-    // ステータスアイコンを更新
-    const statusIcon = document.getElementById('newsStatusIcon');
-    if (statusIcon) {
-        if (data.data && data.data.length > 0) {
-            statusIcon.innerHTML = '<i class="fas fa-check text-white"></i>';
-            statusIcon.className = 'badge bg-success';
-        } else {
-            statusIcon.innerHTML = '<i class="fas fa-exclamation-triangle text-white"></i>';
-            statusIcon.className = 'badge bg-danger';
-        }
     }
     
     // ステータスメッセージは非表示のまま
@@ -123,16 +116,48 @@ function displayWorldNewsResults(data) {
     
     // テーブルを更新
     tableBody.innerHTML = '';
-    data.data.forEach((item, index) => {
-        const row = document.createElement('tr');
-        row.className = 'trend-card';
-        row.innerHTML = `
-            <td>${index + 1}</td>
-            <td><a href="${item.url || '#'}" target="_blank">${item.title || 'N/A'}</a></td>
-            <td>${item.published_at || item.publish_date || 'N/A'}</td>
-        `;
-        tableBody.appendChild(row);
-    });
+    if (data.data && data.data.length > 0) {
+        data.data.forEach((item, index) => {
+            const row = document.createElement('tr');
+            row.className = 'trend-card';
+            row.style.minHeight = '100px';
+            
+            // ニュースタイトルをリンク化
+            const titleText = item.title || 'N/A';
+            const titleLink = item.url
+                ? `<a href="${item.url}" target="_blank" class="text-decoration-none">
+                        ${titleText}
+                        <i class="fas fa-external-link-alt ms-1"></i>
+                   </a>`
+                : `<span>${titleText}</span>`;
+            
+            // 要約（ある場合のみ表示）
+            const descriptionText = item.description ? `<div class="text-muted small mt-1">${truncateText(item.description, 110)}</div>` : '';
+            
+            // 公開日時をフォーマット
+            const publishedDateRaw = item.published_at || item.publish_date || item.publishedDate || item.published_date;
+            const publishedDate = formatDate(publishedDateRaw);
+            const sourceName = item.source || '';
+            const metaInfoParts = [];
+            if (publishedDate && publishedDate !== '不明') {
+                metaInfoParts.push(publishedDate);
+            }
+            if (sourceName) {
+                metaInfoParts.push(sourceName);
+            }
+            const metaInfo = metaInfoParts.join(' / ');
+            
+            row.innerHTML = `
+                <td><span class="badge bg-info">${item.rank || index + 1}</span></td>
+                <td>
+                    <strong>${titleLink}</strong>
+                    ${descriptionText}
+                </td>
+                <td><small class="text-muted">${metaInfo || '不明'}</small></td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
     
     // 結果セクションを表示
     document.getElementById('newsResults').style.display = 'block';
@@ -148,18 +173,6 @@ function displayTwitchResults(data) {
     if (!tableBody || !statusMessage) {
         console.error('❌ Twitch DOM要素が見つかりません');
         return;
-    }
-    
-    // ステータスアイコンを更新
-    const statusIcon = document.getElementById('twitchStatusIcon');
-    if (statusIcon) {
-        if (data.data && data.data.length > 0) {
-            statusIcon.innerHTML = '<i class="fas fa-check text-white"></i>';
-            statusIcon.className = 'badge bg-success';
-        } else {
-            statusIcon.innerHTML = '<i class="fas fa-exclamation-triangle text-white"></i>';
-            statusIcon.className = 'badge bg-danger';
-        }
     }
     
     // ステータスメッセージは非表示のまま

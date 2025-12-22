@@ -47,6 +47,30 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
             apiEndpoint = '/api/twitch-trends';
             params = '?type=games';
             break;
+        case 'nhk':
+            apiEndpoint = '/api/nhk-trends';
+            params = '';
+            break;
+        case 'qiita':
+            apiEndpoint = '/api/qiita-trends';
+            params = '?limit=25&sort=likes_count';
+            break;
+        case 'stock':
+            apiEndpoint = '/api/stock-trends';
+            params = '?market=JP&limit=25';
+            break;
+        case 'crypto':
+            apiEndpoint = '/api/crypto-trends';
+            params = '?limit=25';
+            break;
+        case 'cnn':
+            apiEndpoint = '/api/cnn-trends';
+            params = '?limit=25';
+            break;
+        case 'producthunt':
+            apiEndpoint = '/api/producthunt-trends';
+            params = '?limit=25&sort=votes';
+            break;
         default:
             console.warn(`⚠️ 未知のプラットフォーム: ${platform}`);
             return;
@@ -55,28 +79,104 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
     // キャッシュデータのみを表示（API呼び出しなし）
     console.log(`📊 ${platformName} キャッシュデータのみを表示中（API呼び出しなし）`);
     
+    // タイムアウトを設定（3秒）
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('タイムアウト')), 3000);
+    });
+    
     // キャッシュ情報を取得
-    fetch('/api/cache/data-freshness')
-        .then(response => response.json())
+    Promise.race([
+        fetch('/api/cache/data-freshness'),
+        timeoutPromise
+    ])
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
+            console.log(`📊 ${platformName} キャッシュ情報取得結果:`, {
+                success: data.success,
+                dataKeys: data.data ? Object.keys(data.data) : [],
+                platformName: platformName
+            });
+            
             if (data.success && data.data) {
-                // プラットフォーム名を直接使用（APIレスポンスのキーと一致）
-                const cacheInfo = data.data[platformName];
+                // プラットフォーム名をdata_routes.pyのdisplay_nameにマッピング
+                // data_routes.pyのget_data_freshness関数で返されるdisplay_nameと一致させる
+                const platformNameMap = {
+                    'NHK ニュース': 'NHK ニュース',
+                    'World News': 'World News',
+                    'Google Trends': 'Google Trends',
+                    'YouTube': 'YouTube',
+                    'はてなブックマーク': 'はてなブックマーク',
+                    'Qiita トレンド': 'Qiita トレンド',
+                    '株価トレンド': '株価トレンド',
+                    '仮想通貨トレンド': '仮想通貨トレンド',
+                    'Spotify': 'Spotify',
+                    'Podcast': 'Podcast',
+                    '楽天': '楽天',
+                    'Twitch': 'Twitch'
+                };
+                
+                const displayName = platformNameMap[platformName] || platformName;
+                console.log(`📊 ${platformName} マッピング結果: ${platformName} -> ${displayName}`);
+                const cacheInfo = data.data[displayName];
+                
+                console.log(`📊 ${platformName} キャッシュ情報:`, cacheInfo);
                 
                 if (cacheInfo) {
                     let lastUpdate = '不明';
-                       if (cacheInfo.last_updated) {
-                           // データベースのUTC時刻を日本時間に変換して表示
-                           const date = new Date(cacheInfo.last_updated);
-                           lastUpdate = date.toLocaleString('ja-JP', {
-                               timeZone: 'Asia/Tokyo',
-                               year: 'numeric',
-                               month: '2-digit',
-                               day: '2-digit',
-                               hour: '2-digit',
-                               minute: '2-digit',
-                               second: '2-digit'
-                           });
+                       if (cacheInfo.last_updated && cacheInfo.last_updated !== 'None' && cacheInfo.last_updated !== null) {
+                           try {
+                               // データベースの時刻をUTCとして解釈（タイムゾーン情報がない場合はZを付与）
+                               let timeString = String(cacheInfo.last_updated);
+                               
+                               // マイクロ秒（6桁以上）をミリ秒（3桁）に変換
+                               if (timeString.includes('.')) {
+                                   const parts = timeString.split('.');
+                                   if (parts.length === 2) {
+                                       const integerPart = parts[0];
+                                       const decimalPart = parts[1];
+                                       if (decimalPart.length >= 6) {
+                                           timeString = integerPart + '.' + decimalPart.substring(0, 3);
+                                       } else if (decimalPart.length > 3) {
+                                           timeString = integerPart + '.' + decimalPart.substring(0, 3);
+                                       }
+                                   }
+                               }
+                               
+                               // タイムゾーン情報がない場合はUTCとして扱うために'Z'を付与
+                               const dateString = timeString.match(/[Z+-]\d{2}:?\d{2}$/)
+                                   ? timeString
+                                   : `${timeString}Z`;
+                               
+                               const date = new Date(dateString);
+                               
+                               if (isNaN(date.getTime())) {
+                                   console.error('Invalid date after conversion:', {
+                                       original: cacheInfo.last_updated,
+                                       converted: timeString,
+                                       dateString: dateString
+                                   });
+                                   throw new Error('Invalid date');
+                               }
+                               
+                               // JSTで表示
+                               lastUpdate = date.toLocaleString('ja-JP', {
+                                   year: 'numeric',
+                                   month: '2-digit',
+                                   day: '2-digit',
+                                   hour: '2-digit',
+                                   minute: '2-digit',
+                                   second: '2-digit',
+                                   timeZone: 'Asia/Tokyo'
+                               });
+                           } catch (e) {
+                               console.error('Error parsing date:', cacheInfo.last_updated, e);
+                               lastUpdate = '不明';
+                           }
                        }
                     const actualDataCount = cacheInfo.data_count || 0;
                     const status = actualDataCount > 0 ? '取得済み' : '未取得';
@@ -94,17 +194,92 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                     });
                 } else {
                     // キャッシュ情報が見つからない場合
-                    lastUpdateElement.textContent = 'データなし';
-                    dataCountElement.textContent = '0件';
-                    statusElement.textContent = '未取得';
-                    statusElement.className = 'badge bg-secondary';
+                    console.warn(`⚠️ ${platformName}: キャッシュ情報が見つかりません`, {
+                        platformName: platformName,
+                        displayName: displayName,
+                        availableKeys: Object.keys(data.data)
+                    });
+                    
+                    // フォールバック: 直接APIエンドポイントを呼び出してデータを確認
+                    if (apiEndpoint) {
+                        const fullEndpoint = apiEndpoint + params;
+                        console.log(`🔄 ${platformName}: APIエンドポイントから直接データを確認中: ${fullEndpoint}`);
+                        
+                        fetch(fullEndpoint)
+                            .then(response => response.json())
+                            .then(apiData => {
+                                if (apiData.success && apiData.data && apiData.data.length > 0) {
+                                    const apiDataCount = apiData.data.length;
+                                    lastUpdateElement.textContent = 'データあり（キャッシュ情報なし）';
+                                    dataCountElement.textContent = `${apiDataCount}件`;
+                                    statusElement.textContent = '取得済み';
+                                    statusElement.className = 'badge bg-success';
+                                    console.log(`✅ ${platformName}: APIから${apiDataCount}件のデータを確認`);
+                                } else {
+                                    lastUpdateElement.textContent = 'データなし';
+                                    dataCountElement.textContent = '0件';
+                                    statusElement.textContent = '未取得';
+                                    statusElement.className = 'badge bg-secondary';
+                                    console.log(`⚠️ ${platformName}: APIからもデータが見つかりません`);
+                                }
+                            })
+                            .catch(error => {
+                                console.error(`❌ ${platformName} API呼び出しエラー:`, error);
+                                lastUpdateElement.textContent = 'データなし';
+                                dataCountElement.textContent = '0件';
+                                statusElement.textContent = '未取得';
+                                statusElement.className = 'badge bg-secondary';
+                            });
+                    } else {
+                        lastUpdateElement.textContent = 'データなし';
+                        dataCountElement.textContent = '0件';
+                        statusElement.textContent = '未取得';
+                        statusElement.className = 'badge bg-secondary';
+                    }
                 }
             } else {
-                // エラー時
-                lastUpdateElement.textContent = 'エラー';
-                dataCountElement.textContent = '0件';
-                statusElement.textContent = 'エラー';
-                statusElement.className = 'badge bg-danger';
+                // エラー時またはデータが存在しない場合
+                console.warn(`⚠️ ${platformName}: キャッシュ情報の取得に失敗しました`, {
+                    success: data.success,
+                    data: data.data
+                });
+                
+                // フォールバック: 直接APIエンドポイントを呼び出してデータを確認
+                if (apiEndpoint) {
+                    const fullEndpoint = apiEndpoint + params;
+                    console.log(`🔄 ${platformName}: APIエンドポイントから直接データを確認中: ${fullEndpoint}`);
+                    
+                    fetch(fullEndpoint)
+                        .then(response => response.json())
+                        .then(apiData => {
+                            if (apiData.success && apiData.data && apiData.data.length > 0) {
+                                const apiDataCount = apiData.data.length;
+                                lastUpdateElement.textContent = 'データあり（キャッシュ情報なし）';
+                                dataCountElement.textContent = `${apiDataCount}件`;
+                                statusElement.textContent = '取得済み';
+                                statusElement.className = 'badge bg-success';
+                                console.log(`✅ ${platformName}: APIから${apiDataCount}件のデータを確認`);
+                            } else {
+                                lastUpdateElement.textContent = 'エラー';
+                                dataCountElement.textContent = '0件';
+                                statusElement.textContent = 'エラー';
+                                statusElement.className = 'badge bg-danger';
+                                console.log(`⚠️ ${platformName}: APIからもデータが見つかりません`);
+                            }
+                        })
+                        .catch(error => {
+                            console.error(`❌ ${platformName} API呼び出しエラー:`, error);
+                            lastUpdateElement.textContent = 'エラー';
+                            dataCountElement.textContent = '0件';
+                            statusElement.textContent = 'エラー';
+                            statusElement.className = 'badge bg-danger';
+                        });
+                } else {
+                    lastUpdateElement.textContent = 'エラー';
+                    dataCountElement.textContent = '0件';
+                    statusElement.textContent = 'エラー';
+                    statusElement.className = 'badge bg-danger';
+                }
             }
         })
         .catch(error => {
@@ -146,7 +321,9 @@ function refreshDataFreshnessExternal() {
         podcast: { lastUpdate: '2025/9/9 16:10:00', dataCount: '20件', status: '取得済み' },
         rakuten: { lastUpdate: '2025/9/9 16:10:00', dataCount: '25件', status: '取得済み' },
         hatena: { lastUpdate: '2025/9/9 16:10:00', dataCount: '25件', status: '取得済み' },
-        twitch: { lastUpdate: '2025/9/9 16:10:00', dataCount: '25件', status: '取得済み' }
+        twitch: { lastUpdate: '2025/9/9 16:10:00', dataCount: '25件', status: '取得済み' },
+        nhk: { lastUpdate: '2025/9/9 16:10:00', dataCount: '25件', status: '取得済み' },
+        qiita: { lastUpdate: '2025/9/9 16:10:00', dataCount: '25件', status: '取得済み' }
     };
     
     // 各プラットフォームのテキストを強制的に設定
@@ -189,18 +366,34 @@ function refreshDataFreshnessExternal() {
     console.log('✅ テスト用の固定テキストを表示しました');
     
     // 各プラットフォームのデータ鮮度を更新（キャッシュのみ、API呼び出しなし）
+    // トレンドページの順序に合わせる: NHK → World News → Google → YouTube → はてな → Qiita → 株価 → 仮想通貨 → Spotify → Podcast → 楽天 → Twitch
     console.log('📊 キャッシュデータのみを表示中（API呼び出しなし）...');
+    console.log('🔄 NHKのステータスを更新中（キャッシュのみ）...');
+    updatePlatformStatusExternal('nhk', 'NHK ニュース');
+    
+    console.log('🔄 World Newsのステータスを更新中（キャッシュのみ）...');
+    updatePlatformStatusExternal('news', 'World News');
+    
     console.log('🔄 Google Trendsのステータスを更新中（キャッシュのみ）...');
     updatePlatformStatusExternal('google', 'Google Trends');
     
     console.log('🔄 YouTubeのステータスを更新中（キャッシュのみ）...');
     updatePlatformStatusExternal('youtube', 'YouTube');
     
+    console.log('🔄 はてなブックマークのステータスを更新中（キャッシュのみ）...');
+    updatePlatformStatusExternal('hatena', 'はてなブックマーク');
+    
+    console.log('🔄 Qiitaのステータスを更新中（キャッシュのみ）...');
+    updatePlatformStatusExternal('qiita', 'Qiita トレンド');
+    
+    console.log('🔄 株価トレンドのステータスを更新中（キャッシュのみ）...');
+    updatePlatformStatusExternal('stock', '株価トレンド');
+    
+    console.log('🔄 仮想通貨トレンドのステータスを更新中（キャッシュのみ）...');
+    updatePlatformStatusExternal('crypto', '仮想通貨トレンド');
+    
     console.log('🔄 Spotifyのステータスを更新中（キャッシュのみ）...');
     updatePlatformStatusExternal('spotify', 'Spotify');
-    
-    console.log('🔄 World Newsのステータスを更新中（キャッシュのみ）...');
-    updatePlatformStatusExternal('news', 'World News');
     
     console.log('🔄 Podcastのステータスを更新中（キャッシュのみ）...');
     updatePlatformStatusExternal('podcast', 'Podcast');
@@ -208,19 +401,16 @@ function refreshDataFreshnessExternal() {
     console.log('🔄 楽天のステータスを更新中（キャッシュのみ）...');
     updatePlatformStatusExternal('rakuten', '楽天');
     
-    console.log('🔄 はてなブックマークのステータスを更新中（キャッシュのみ）...');
-    updatePlatformStatusExternal('hatena', 'はてなブックマーク');
-    
     console.log('🔄 Twitchのステータスを更新中（キャッシュのみ）...');
     updatePlatformStatusExternal('twitch', 'Twitch');
     
     console.log('✅ データ鮮度情報の更新完了');
     
-    // テキスト要素を強制的に表示
-    setTimeout(() => {
-        console.log('🔧 テキスト要素の表示を強制設定中...');
-        const platforms = ['google', 'youtube', 'spotify', 'news', 'podcast', 'rakuten', 'hatena', 'twitch'];
-        platforms.forEach(platform => {
+        // テキスト要素を強制的に表示
+        setTimeout(() => {
+            console.log('🔧 テキスト要素の表示を強制設定中...');
+            const platforms = ['google', 'youtube', 'spotify', 'news', 'podcast', 'rakuten', 'hatena', 'twitch', 'nhk', 'qiita', 'stock', 'crypto'];
+            platforms.forEach(platform => {
             const lastUpdateElement = document.getElementById(`${platform}LastUpdate`);
             const dataCountElement = document.getElementById(`${platform}DataCount`);
             const statusElement = document.getElementById(`${platform}Status`);

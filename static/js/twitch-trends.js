@@ -7,6 +7,8 @@ function fetchTwitchTrends() {
     const typeSelect = document.getElementById('twitchTypeSelect');
     const selectedType = typeSelect ? typeSelect.value : 'games';
     
+    console.log(`🔍 Twitch: カテゴリ選択時のカテゴリ '${selectedType}' のデータを取得中...`);
+    
     fetch(`/api/twitch-trends?type=${selectedType}&limit=25`)
         .then(response => response.json())
         .then(data => {
@@ -22,6 +24,17 @@ function fetchTwitchTrends() {
             showTwitchError('ネットワークエラー: ' + error.message);
         });
 }
+
+// カテゴリ選択時のイベントリスナー
+document.addEventListener('DOMContentLoaded', function() {
+    const typeSelect = document.getElementById('twitchTypeSelect');
+    if (typeSelect) {
+        typeSelect.addEventListener('change', function() {
+            console.log('🔍 Twitch: カテゴリ変更検出:', this.value);
+            fetchTwitchTrends();
+        });
+    }
+});
 
 function displayTwitchResults(data) {
     const tableBody = document.getElementById('twitchTrendsTableBody');

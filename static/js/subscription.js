@@ -27,17 +27,25 @@ function handleSubscriptionSubmit(e) {
     const email = document.getElementById('emailInput').value;
     const frequency = document.getElementById('frequencySelect').value;
     
-    console.log('📧 サブスクリプション登録:', { email, frequency });
+    // 選択されたカテゴリを取得
+    const categories = [];
+    const checkboxes = document.querySelectorAll('.form-check-input:checked');
+    checkboxes.forEach(checkbox => {
+        categories.push(checkbox.value);
+    });
+    
+    console.log('📧 サブスクリプション登録:', { email, frequency, categories });
     
     // APIに送信
-    fetch('/api/subscribe', {
+    fetch('/subscription/api/subscribe', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
             email: email,
-            frequency: frequency
+            frequency: frequency,
+            categories: categories
         })
     })
     .then(response => response.json())
@@ -58,17 +66,36 @@ function handleSubscriptionSubmit(e) {
 // 登録解除処理
 function handleUnsubscribe() {
     if (confirm('本当に登録を解除しますか？')) {
-        fetch('/api/unsubscribe', {
+        // メールアドレスを取得（registeredEmail要素から）
+        const emailElement = document.getElementById('registeredEmail');
+        const email = emailElement ? emailElement.textContent.trim() : null;
+        
+        if (!email) {
+            showSubscriptionMessage('メールアドレスが見つかりません', 'danger');
+            return;
+        }
+        
+        console.log('📧 サブスクリプション解除:', { email });
+        
+        fetch('/subscription/api/unsubscribe', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-            }
+            },
+            body: JSON.stringify({
+                email: email
+            })
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
                 showSubscriptionMessage('登録を解除しました', 'info');
                 showSubscriptionForm();
+                // フォームのメールアドレス入力欄もクリア
+                const emailInput = document.getElementById('emailInput');
+                if (emailInput) {
+                    emailInput.value = '';
+                }
             } else {
                 showSubscriptionMessage(data.error || '解除に失敗しました', 'danger');
             }
@@ -82,8 +109,21 @@ function handleUnsubscribe() {
 
 // サブスクリプション状態をチェック
 function checkSubscriptionStatus() {
-    fetch('/api/subscription-status')
-    .then(response => response.json())
+    // タイムアウトを設定（5秒）
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('タイムアウト')), 5000);
+    });
+    
+    Promise.race([
+        fetch('/subscription/api/status'),
+        timeoutPromise
+    ])
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.subscribed) {
             showSubscriptionStatus(data.email, data.frequency);
@@ -93,6 +133,7 @@ function checkSubscriptionStatus() {
     })
     .catch(error => {
         console.error('サブスクリプション状態チェックエラー:', error);
+        // エラーが発生してもフォームを表示してページを使えるようにする
         showSubscriptionForm();
     });
 }

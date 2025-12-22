@@ -1,13 +1,7 @@
 /* トレンド表示専用スタイル */
 
 /* コンパクトなレイアウト */
-.container-fluid {
-    padding: 0.5rem;
-}
-
-.row {
-    margin-bottom: 1rem;
-}
+/* 注意: container-fluidとrowのスタイルはmain.cssで統一管理 */
 
 /* トレンドカード */
 .trend-card {

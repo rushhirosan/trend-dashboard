@@ -54,18 +54,6 @@ function displayRakutenResults(data) {
     const tableBody = document.getElementById('rakutenTrendsTableBody');
     const statusMessage = document.getElementById('rakutenStatusMessage');
 
-    // ステータスアイコンを更新
-    const statusIcon = document.getElementById('rakutenStatusIcon');
-    if (statusIcon) {
-        if (data.data && data.data.length > 0) {
-            statusIcon.innerHTML = '<i class="fas fa-check text-white"></i>';
-            statusIcon.className = 'badge bg-success';
-        } else {
-            statusIcon.innerHTML = '<i class="fas fa-exclamation-triangle text-white"></i>';
-            statusIcon.className = 'badge bg-danger';
-        }
-    }
-
     // ステータスメッセージを更新
     if (data.status === 'fresh') {
         statusMessage.innerHTML = `<i class="fas fa-sync"></i> 楽天商品トレンドデータを新規取得しました！`;
@@ -95,11 +83,15 @@ function displayRakutenResults(data) {
         // 楽天商品リンクを作成
         const rakutenUrl = item.url || '#';
         
+        // 商品名を適切に表示（長すぎる場合は省略）
+        const displayTitle = item.title && item.title.length > 50 
+            ? item.title.substring(0, 50) + '...' 
+            : item.title;
+        
         row.innerHTML = `
             <td><span class="badge bg-danger">${item.rank}</span></td>
             <td>
-                <strong><a href="${rakutenUrl}" target="_blank" class="text-decoration-none">${item.title}</a></strong>
-                ${item.image_url ? `<br><img src="${item.image_url}" alt="${item.title}" style="max-width: 50px; max-height: 50px;" class="mt-1">` : ''}
+                <strong><a href="${rakutenUrl}" target="_blank" class="text-decoration-none" title="${item.title}">${displayTitle}</a></strong>
             </td>
             <td>${price}</td>
             <td>${reviewInfo}</td>

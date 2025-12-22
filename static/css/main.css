@@ -1,4 +1,4 @@
-/* ヘッダーのスタイル */
+ヘッダーのスタイル
 header {
     position: sticky;
     top: 0;
@@ -33,6 +33,105 @@ header .nav-pills .nav-link small {
     font-size: 0.7rem;
 }
 
+#mainHeader .d-flex.align-items-center:last-child {
+    gap: 0.5rem;
+}
+
+#mainHeader .header-nav-btn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    font-weight: 600;
+    min-width: 170px;
+    padding: 0.45rem 1.2rem;
+    border-radius: 999px;
+    border: 2px solid #0d6efd;
+    color: #0d6efd !important;
+    background-color: #ffffff !important;
+    box-shadow: none !important;
+    transition: all 0.2s ease-in-out;
+    text-decoration: none !important;
+}
+
+#mainHeader .header-nav-btn i {
+    font-size: 1rem;
+}
+
+#mainHeader .header-nav-btn:hover,
+#mainHeader .header-nav-btn:focus {
+    color: #0a58ca !important;
+    border-color: #0a58ca !important;
+    background-color: rgba(13, 110, 253, 0.08) !important;
+    box-shadow: none !important;
+}
+
+#mainHeader .header-nav-btn.active {
+    background-color: #0d6efd !important;
+    color: #ffffff !important;
+    border-color: #0d6efd !important;
+}
+
+#mainHeader .header-nav-btn.active:hover,
+#mainHeader .header-nav-btn.active:focus {
+    background-color: #0b5ed7 !important;
+    border-color: #0b5ed7 !important;
+    color: #ffffff !important;
+}
+
+#mainHeader .header-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    color: #0d6efd;
+}
+
+#mainHeader .header-title .header-title-icon {
+    font-size: 1.5rem;
+}
+
+#mainHeader .header-title .header-title-text {
+    color: inherit;
+    font-weight: 600;
+}
+
+.data-status-tabs .data-status-tab {
+    border-radius: 999px;
+    border-width: 2px;
+    color: #0d6efd !important;
+    border-color: #0d6efd !important;
+    background-color: #ffffff !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 600;
+    padding: 0.45rem 1.2rem;
+    transition: all 0.2s ease-in-out;
+    box-shadow: none !important;
+    text-decoration: none !important;
+}
+
+.data-status-tabs .data-status-tab i {
+    font-size: 1rem;
+}
+
+.data-status-tabs .btn-check:checked + .data-status-tab,
+.data-status-tabs .btn-check:active + .data-status-tab,
+.data-status-tabs .data-status-tab:active {
+    background-color: #0d6efd !important;
+    color: #ffffff !important;
+    border-color: #0d6efd !important;
+    box-shadow: none !important;
+}
+
+.data-status-tabs .btn-check + .data-status-tab:hover,
+.data-status-tabs .btn-check + .data-status-tab:focus {
+    color: #0a58ca !important;
+    border-color: #0a58ca !important;
+    background-color: rgba(13, 110, 253, 0.08) !important;
+    box-shadow: none !important;
+}
+
 /* ヘッダーは常に表示 */
 
 /* 全体のフォントサイズを小さく */
@@ -40,16 +139,492 @@ body {
     font-size: 0.85rem;
 }
 
-/* カテゴリカードの高さを制限 */
-.category-card {
-    max-height: 400px;
-    overflow: hidden;
+/* カテゴリカードの高さを制限（デスクトップのみ） */
+@media (min-width: 992px) {
+    .category-card {
+        max-height: 400px;
+        overflow: hidden;
+    }
 }
 
-/* テーブルの高さを制限（トップ10のみ表示） */
-.trend-table-container {
-    max-height: 300px;
+/* Podcast結果内のカテゴリカードは高さ制限を無効化（デスクトップのみ） */
+@media (min-width: 992px) {
+    #podcastResults .category-card,
+    #trends .card.h-100 .card-body #podcastResults .category-card {
+        max-height: none !important;
+        overflow: visible !important;
+    }
+}
+
+/* Hacker News結果内のカテゴリカードは高さ制限を無効化 */
+#hackernewsResults .category-card,
+#trends .card.h-100 .card-body #hackernewsResults .category-card {
+    max-height: none !important;
+    overflow: visible !important;
+}
+
+/* 楽天商品名の表示改善 */
+#rakutenTrendsTableBody td:nth-child(2) {
+    max-width: 200px;
+    word-wrap: break-word;
+    word-break: break-word;
+    white-space: normal;
+    line-height: 1.4;
+}
+
+#rakutenTrendsTableBody td:nth-child(2) strong {
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+#rakutenTrendsTableBody td:nth-child(2) a {
+    color: #dc3545;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+#rakutenTrendsTableBody td:nth-child(2) a:hover {
+    text-decoration: underline;
+}
+
+/* トレンドカードの高さとレイアウトを調整 */
+#trends .card.h-100 {
+    display: flex;
+    flex-direction: column;
+}
+
+#trends .card.h-100 .card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 全ての結果セクションをflexレイアウトで統一（デスクトップのみ） */
+@media (min-width: 992px) {
+    #trends .card.h-100 .card-body > div[id$="Results"] {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+}
+
+/* Podcastトレンドのcard-bodyを確実に高さいっぱいに */
+/* 3行目も他の行と同じflexレイアウトを使用 */
+/* Podcastトレンドのコンテンツエリアを高さいっぱいに広げる（デスクトップのみ - 992px以上） */
+@media (min-width: 992px) {
+    #trends .card.h-100 .card-body #podcastResults {
+        flex: 1 1 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: 100% !important;
+        align-self: stretch !important;
+        position: relative !important;
+    }
+}
+
+/* .trend-table-containerのスタイル（デスクトップのみ） */
+@media (min-width: 992px) {
+    .trend-table-container {
+        max-height: 300px;
+        overflow-y: auto;
+        flex: 1;
+        min-height: 0;
+    }
+}
+
+#rakutenResults .trend-table-container {
+    max-height: 500px;
     overflow-y: auto;
+}
+
+/* Podcastトレンドのcard-bodyが正しく広がるように（デスクトップのみ） */
+@media (min-width: 992px) {
+    #trends .row .col-md-6:has(#podcastResults) .card.h-100 .card-body #podcastResults {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+
+    #trends .card.h-100 .card-body #podcastResults > .alert {
+        flex: 0 0 0 !important;
+        display: none !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        min-height: 0 !important;
+        max-height: 0 !important;
+    }
+
+    #trends .card.h-100 .card-body #podcastResults > .card {
+        flex: 1 1 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        height: 100% !important;
+        overflow: visible !important;
+        align-self: stretch !important;
+    }
+
+    #trends .card.h-100 .card-body #podcastResults > .card.category-card {
+        max-height: none !important;
+        overflow: visible !important;
+        margin-bottom: 0 !important;
+        height: 100% !important;
+    }
+
+    #trends .card.h-100 .card-body #podcastResults > .card > .card-body {
+        flex: 1 1 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: 100% !important;
+        align-self: stretch !important;
+    }
+
+    /* 後方互換性のため元のセレクタも保持（デスクトップのみ） */
+    #podcastResults {
+        flex: 1 1 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: 100% !important;
+    }
+
+    #podcastResults .card {
+        flex: 1 1 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        max-height: none !important;
+        overflow: visible;
+        height: 100% !important;
+    }
+
+    #podcastResults .card.category-card {
+        max-height: none !important;
+        overflow: visible;
+        margin-bottom: 0 !important;
+        height: 100% !important;
+    }
+
+    #podcastResults .card .card-body {
+        flex: 1 1 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: 100% !important;
+    }
+
+    #trends .card.h-100 .card-body #podcastResults > .card > .card-body > .trend-table-container {
+        flex: 1 1 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        height: 100% !important;
+        overflow-y: auto !important;
+        align-self: stretch !important;
+    }
+
+    #trends .card.h-100 .card-body #podcastResults > .card > .card-body > .trend-table-container > .table-responsive {
+        flex: 1 1 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: 100% !important;
+        align-self: stretch !important;
+    }
+
+    /* Podcastの.trend-table-containerもSpotifyと同じように、デスクトップ用の詳細なルールを削除 */
+    /* モバイル表示で問題が起きないようにするため */
+}
+
+/* Hacker Newsトレンドのコンテンツエリアを高さいっぱいに広げる（デスクトップのみ - 992px以上） */
+@media (min-width: 992px) {
+    #trends .card.h-100 .card-body #hackernewsResults {
+    flex: 1 1 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    align-self: stretch !important;
+    position: relative !important;
+}
+
+#trends .card.h-100 .card-body #hackernewsResults > .alert {
+    flex: 0 0 0 !important;
+    display: none !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+}
+
+#trends .card.h-100 .card-body #hackernewsResults > .card {
+    flex: 1 1 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    height: 100% !important;
+    overflow: visible !important;
+    align-self: stretch !important;
+}
+
+#trends .card.h-100 .card-body #hackernewsResults > .card.category-card {
+    max-height: none !important;
+    overflow: visible !important;
+    margin-bottom: 0 !important;
+    height: 100% !important;
+}
+
+#trends .card.h-100 .card-body #hackernewsResults > .card > .card-body {
+    flex: 1 1 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    align-self: stretch !important;
+}
+
+#trends .card.h-100 .card-body #hackernewsResults > .card > .card-body > .trend-table-container {
+    flex: 1 1 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    height: 100% !important;
+    overflow-y: auto !important;
+    align-self: stretch !important;
+}
+
+#trends .card.h-100 .card-body #hackernewsResults > .card > .card-body > .trend-table-container > .table-responsive {
+    flex: 1 1 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    align-self: stretch !important;
+}
+
+#hackernewsResults {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+}
+
+#hackernewsResults .card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    max-height: none !important;
+    height: 100%;
+    overflow: visible;
+}
+
+#hackernewsResults .card.category-card {
+    max-height: none !important;
+    overflow: visible;
+    margin-bottom: 0 !important;
+    height: 100%;
+}
+
+#hackernewsResults .card .card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+}
+
+#hackernewsResults .trend-table-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    max-height: none !important;
+    height: 100%;
+    overflow-y: auto;
+}
+
+    #hackernewsResults .trend-table-container .table-responsive {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        height: 100%;
+    }
+
+    #hackernewsResults {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        height: 100%;
+    }
+
+    #hackernewsResults .card {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        max-height: none !important;
+        height: 100%;
+        overflow: visible;
+    }
+
+    #hackernewsResults .card.category-card {
+        max-height: none !important;
+        overflow: visible;
+        margin-bottom: 0 !important;
+        height: 100%;
+    }
+
+    #hackernewsResults .card .card-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        height: 100%;
+    }
+
+    #hackernewsResults .trend-table-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        max-height: none !important;
+        height: 100%;
+        overflow-y: auto;
+    }
+
+    #hackernewsResults .trend-table-container .table-responsive {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        height: 100%;
+    }
+}
+
+/* Qiitaトレンドのコンテンツエリアを高さいっぱいに広げる（デスクトップのみ - 992px以上） */
+@media (min-width: 992px) {
+    #trends .card.h-100 .card-body #qiitaResults {
+        flex: 1 1 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: 100% !important;
+        align-self: stretch !important;
+        position: relative !important;
+    }
+
+    #trends .card.h-100 .card-body #qiitaResults > .alert {
+        display: none !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        min-height: 0 !important;
+        max-height: 0 !important;
+    }
+
+    #trends .card.h-100 .card-body #qiitaResults > .card {
+        flex: 1 1 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        height: 100% !important;
+        overflow: visible !important;
+        align-self: stretch !important;
+    }
+
+    #trends .card.h-100 .card-body #qiitaResults > .card.category-card {
+        max-height: none !important;
+        overflow: visible !important;
+        margin-bottom: 0 !important;
+        height: 100% !important;
+    }
+
+    #trends .card.h-100 .card-body #qiitaResults > .card > .card-body {
+        flex: 1 1 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: 100% !important;
+        align-self: stretch !important;
+    }
+
+    #trends .card.h-100 .card-body #qiitaResults > .card > .card-body > .trend-table-container {
+        flex: 1 1 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        height: 100% !important;
+        overflow-y: auto !important;
+        align-self: stretch !important;
+    }
+
+    #trends .card.h-100 .card-body #qiitaResults > .card > .card-body > .trend-table-container > .table-responsive {
+        flex: 1 1 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: 100% !important;
+        align-self: stretch !important;
+    }
+
+    #qiitaResults {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        height: 100%;
+    }
+
+    #qiitaResults .card {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        max-height: none !important;
+        height: 100%;
+        overflow: visible;
+    }
+
+    #qiitaResults .card.category-card {
+        max-height: none !important;
+        overflow: visible;
+        margin-bottom: 0 !important;
+        height: 100%;
+    }
+
+    #qiitaResults .card .card-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        height: 100%;
+    }
+
+    /* QiitaとPodcastの.trend-table-containerはSpotifyと同じように、デスクトップ用の詳細なルールを削除 */
+    /* モバイル表示で問題が起きないようにするため */
+}
+
+/* .trend-table-containerと.loadingのスタイル（デスクトップのみ） */
+@media (min-width: 992px) {
+    #trends .card.h-100 .trend-table-container,
+    #trends .card.h-100 .loading {
+        flex: 1;
+    }
 }
 
 /* テーブルのフォントサイズを小さく */
@@ -101,7 +676,7 @@ body {
 
 /* トレンド一覧の表示制御 */
 #trends {
-    display: none;
+    display: block !important;
 }
 
 #trends.show,
@@ -375,13 +950,6 @@ ul.nav-tabs li.nav-item button.nav-link.active {
     font-weight: bold !important;
 }
 
-.trend-card {
-    transition: transform 0.2s;
-}
-.trend-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
 .loading {
     min-height: 200px;
 }
@@ -405,8 +973,16 @@ ul.nav-tabs li.nav-item button.nav-link.active {
     color: #6f42c1 !important;
 }
 
-/* Twitchローディング表示を確実に非表示 */
-#twitchTrendsLoading {
+/* すべてのローディング表示を確実に非表示 */
+.loading,
+#googleLoading,
+#youtubeLoading,
+#hatenaTrendsLoading,
+#podcastLoading,
+#rakutenLoading,
+#twitchTrendsLoading,
+#nhkLoading,
+#qiitaLoading {
     display: none !important;
     visibility: hidden !important;
 }
@@ -917,12 +1493,52 @@ body.data-status-active #data-status .card-body {
 }
 
 /* 1行目のカテゴリのマージン調整 */
-.row:first-of-type {
+/* 重要: #trends内の要素には影響しないようにする */
+/* #data-status, #subscription内の要素にのみ適用 */
+#data-status .row:first-of-type,
+#subscription .row:first-of-type {
     margin-top: 1.5rem;
 }
 
+/* Rakuten table - compact row layout */
+#rakutenTrendsTable .badge {
+    font-size: 0.55rem;
+}
+
+#rakutenTrendsTable tbody td {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.68rem;
+    line-height: 1.2;
+}
+
+#rakutenTrendsTable img {
+    max-width: 36px;
+    max-height: 36px;
+}
+
+/* Limit product title to 2 lines */
+#rakutenTrendsTable td:nth-child(2) strong {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Tighten columns; allow wrapping only for title column */
+#rakutenTrendsTable th,
+#rakutenTrendsTable td {
+    white-space: nowrap;
+}
+
+#rakutenTrendsTable td:nth-child(2) {
+    white-space: normal;
+}
+
 /* カードのマージン調整 */
-.card {
+/* 重要: #trends内のカードには影響しないようにする */
+/* #data-status, #subscription内のカードにのみ適用 */
+#data-status .card,
+#subscription .card {
     margin-bottom: 1.5rem;
 }
 
@@ -949,5 +1565,1683 @@ body.data-status-active #data-status .card-body {
 #mainTabContent > div {
     margin-top: 0 !important;
     padding-top: 0 !important;
+}
+
+/* レスポンシブデザイン - モバイル環境でのカード高さ調整（991px以下） */
+@media (max-width: 991px) {
+    /* モバイル表示でQiitaとPodcastをSpotifyと同じスタイルに */
+    /* ChatGPTのアドバイスに基づく修正：高さ0、overflow問題を解決 */
+    
+    /* .category-cardをモバイル表示で確実に表示 */
+    .category-card {
+        max-height: none !important;
+        overflow: visible !important;
+        height: auto !important;
+    }
+    
+    /* 全解像度で適用される.trend-table-containerルールを上書き */
+    #trends .card.h-100 .trend-table-container,
+    #qiitaResults .trend-table-container,
+    #podcastResults .trend-table-container {
+        flex: none !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow-y: visible !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+    
+    /* QiitaとPodcastの全ての要素を確実に表示 */
+    #qiitaResults,
+    #podcastResults {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        width: 100% !important;
+        flex: none !important;
+        overflow: visible !important;
+        position: static !important;
+    }
+    
+    /* QiitaとPodcast内のカード要素 */
+    #qiitaResults > .card,
+    #qiitaResults .card.category-card,
+    #podcastResults > .card,
+    #podcastResults .card.category-card {
+        display: flex !important;
+        flex-direction: column !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        width: 100% !important;
+        flex: none !important;
+        overflow: visible !important;
+    }
+    
+    /* QiitaとPodcast内のカードボディ */
+    #qiitaResults .card .card-body,
+    #podcastResults .card .card-body {
+        display: flex !important;
+        flex-direction: column !important;
+        height: auto !important;
+        min-height: 0 !important;
+        width: 100% !important;
+        flex: none !important;
+        overflow: visible !important;
+    }
+    
+    /* QiitaとPodcast内のテーブルコンテナ */
+    #qiitaResults .trend-table-container,
+    #podcastResults .trend-table-container {
+        display: flex !important;
+        flex-direction: column !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        width: 100% !important;
+        flex: none !important;
+        overflow-y: visible !important;
+        overflow-x: auto !important;
+    }
+    
+    /* QiitaとPodcast内のテーブルレスポンシブ */
+    #qiitaResults .table-responsive,
+    #podcastResults .table-responsive {
+        display: block !important;
+        height: auto !important;
+        width: 100% !important;
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+    
+    /* テーブル要素は正しく表示 */
+    #qiitaResults table,
+    #podcastResults table {
+        display: table !important;
+        width: 100% !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    #qiitaResults tbody,
+    #podcastResults tbody {
+        display: table-row-group !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    #qiitaResults tr,
+    #podcastResults tr {
+        display: table-row !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    #qiitaResults td,
+    #podcastResults td {
+        display: table-cell !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    /* 全てのセレクタパターンで上書き（重要度: 最高） */
+    #qiitaResults,
+    #podcastResults,
+    #trends .card.h-100 .card-body #qiitaResults,
+    #trends .card.h-100 .card-body #podcastResults,
+    #trends .row .col-md-6 .card .card-body #qiitaResults,
+    #trends .row .col-md-6 .card .card-body #podcastResults,
+    article.col-12.col-md-6 .card .card-body #qiitaResults,
+    article.col-12.col-md-6 .card .card-body #podcastResults {
+        display: block !important;
+        height: auto !important;
+        width: 100% !important;
+        flex: none !important;
+        min-height: 0 !important;
+        position: static !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    /* カード要素 */
+    #qiitaResults .card,
+    #qiitaResults .card.category-card,
+    #podcastResults .card,
+    #podcastResults .card.category-card,
+    #trends .card.h-100 .card-body #qiitaResults > .card,
+    #trends .card.h-100 .card-body #qiitaResults > .card.category-card,
+    #trends .card.h-100 .card-body #podcastResults > .card,
+    #trends .card.h-100 .card-body #podcastResults > .card.category-card,
+    #trends .row .col-md-6 .card .card-body #qiitaResults .card,
+    #trends .row .col-md-6 .card .card-body #qiitaResults .card.category-card,
+    #trends .row .col-md-6 .card .card-body #podcastResults .card,
+    #trends .row .col-md-6 .card .card-body #podcastResults .card.category-card {
+        display: flex !important;
+        flex-direction: column !important;
+        height: auto !important;
+        width: 100% !important;
+        flex: none !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    /* カードボディ */
+    #qiitaResults .card .card-body,
+    #podcastResults .card .card-body,
+    #trends .card.h-100 .card-body #qiitaResults > .card > .card-body,
+    #trends .card.h-100 .card-body #podcastResults > .card > .card-body,
+    #trends .row .col-md-6 .card .card-body #qiitaResults .card .card-body,
+    #trends .row .col-md-6 .card .card-body #podcastResults .card .card-body {
+        display: flex !important;
+        flex-direction: column !important;
+        height: auto !important;
+        width: 100% !important;
+        flex: none !important;
+        min-height: 0 !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    /* テーブルコンテナ */
+    #qiitaResults .trend-table-container,
+    #podcastResults .trend-table-container,
+    #trends .card.h-100 .card-body #qiitaResults > .card > .card-body > .trend-table-container,
+    #trends .card.h-100 .card-body #podcastResults > .card > .card-body > .trend-table-container,
+    #trends .row .col-md-6 .card .card-body #qiitaResults .trend-table-container,
+    #trends .row .col-md-6 .card .card-body #podcastResults .trend-table-container {
+        display: flex !important;
+        flex-direction: column !important;
+        height: auto !important;
+        width: 100% !important;
+        flex: none !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow-y: visible !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    /* テーブルレスポンシブ */
+    #qiitaResults .trend-table-container .table-responsive,
+    #podcastResults .trend-table-container .table-responsive,
+    #trends .card.h-100 .card-body #qiitaResults > .card > .card-body > .trend-table-container > .table-responsive,
+    #trends .card.h-100 .card-body #podcastResults > .card > .card-body > .trend-table-container > .table-responsive,
+    #trends .row .col-md-6 .card .card-body #qiitaResults .trend-table-container .table-responsive,
+    #trends .row .col-md-6 .card .card-body #podcastResults .trend-table-container .table-responsive {
+        display: block !important;
+        height: auto !important;
+        width: 100% !important;
+        flex: none !important;
+        min-height: 0 !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    /* テーブル要素も確実に表示 */
+    #qiitaResults table,
+    #podcastResults table {
+        display: table !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        width: 100% !important;
+    }
+    
+    #qiitaResults tbody,
+    #podcastResults tbody {
+        display: table-row-group !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    #qiitaResults tr,
+    #podcastResults tr {
+        display: table-row !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    #qiitaResults td,
+    #podcastResults td {
+        display: table-cell !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    /* モバイルでは全ての行を同じスタイルに統一（Google TrendsとYouTubeと同じ） */
+    #trends .row {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: stretch !important;
+        margin-bottom: 1rem !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        margin-top: 1rem !important;
+    }
+    
+    /* モバイルでは各列を全幅に（Google TrendsとYouTubeと同じパディング） */
+    #trends .row .col-md-6,
+    #trends .row article.col-md-6,
+    #trends .row article.col-12.col-md-6 {
+        display: flex !important;
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+        margin-bottom: 1rem !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    
+    /* モバイルでは.h-100クラスを完全に無効化（重要！） */
+    #trends .card.h-100,
+    #trends .row .col-md-6 .card.h-100,
+    #trends .row article.col-md-6 .card.h-100,
+    #trends .row article.col-12.col-md-6 .card.h-100 {
+        height: auto !important;
+        min-height: 0 !important;
+        width: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        margin-bottom: 1rem !important;
+        box-sizing: border-box !important;
+    }
+    
+    /* モバイルではカードの高さを自動に戻す（Google TrendsとYouTubeと同じ） */
+    #trends .row .col-md-6 .card,
+    #trends .row article.col-md-6 .card,
+    #trends .row article.col-12.col-md-6 .card {
+        height: auto !important;
+        width: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        margin-bottom: 1rem !important;
+        box-sizing: border-box !important;
+    }
+    
+    /* モバイルでは.card-body内の全ての要素の高さを自動に */
+    #trends .card.h-100 .card-body,
+    #trends .row .col-md-6 .card .card-body,
+    #trends .row article.col-md-6 .card .card-body,
+    #trends .row article.col-12.col-md-6 .card .card-body {
+        height: auto !important;
+        min-height: 0 !important;
+        flex: none !important;
+    }
+    
+    /* カードボディのパディングを統一 */
+    #trends .row .col-md-6 .card .card-body,
+    #trends .row article.col-md-6 .card .card-body,
+    #trends .row article.col-12.col-md-6 .card .card-body,
+    #trends .card.h-100 .card-body {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        padding: 1rem !important;
+        height: auto !important;
+        min-height: 0 !important;
+    }
+    
+    /* .card-body内の全ての要素も高さを自動に */
+    #trends .row .col-md-6 .card .card-body > *,
+    #trends .row article.col-md-6 .card .card-body > *,
+    #trends .row article.col-12.col-md-6 .card .card-body > *,
+    #trends .card.h-100 .card-body > * {
+        height: auto !important;
+        min-height: 0 !important;
+    }
+    
+    #trends .row .col-md-6 .card .card-body .trend-table-container,
+    #trends .row .col-md-6 .card .card-body .loading,
+    /* .trend-table-containerを確実に表示（最重要 - 全パターン） */
+    .trend-table-container,
+    #trends .row article.col-md-6 .card .card-body .trend-table-container,
+    #trends .row article.col-12.col-md-6 .card .card-body .trend-table-container,
+    #trends .card.h-100 .card-body .trend-table-container,
+    #trends .row .col-md-6 .card .card-body .trend-table-container {
+        flex: none !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow-y: visible !important;
+        display: flex !important;
+        flex-direction: column !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    #trends .row article.col-md-6 .card .card-body .loading,
+    #trends .row article.col-12.col-md-6 .card .card-body .loading,
+    #trends .card.h-100 .card-body .loading {
+        flex: none !important;
+        height: auto !important;
+        min-height: 0 !important;
+    }
+    
+    /* .table-responsiveも確実に表示（全パターン） */
+    .table-responsive,
+    .trend-table-container .table-responsive,
+    #trends .card.h-100 .card-body .trend-table-container .table-responsive,
+    #trends .row .col-md-6 .card .card-body .trend-table-container .table-responsive {
+        display: block !important;
+        height: auto !important;
+        width: 100% !important;
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    /* モバイルでのヘッダー調整 */
+    #mainHeader .d-flex.justify-content-between {
+        flex-direction: column;
+        align-items: flex-start !important;
+    }
+    
+    #mainHeader .d-flex.align-items-center:last-child {
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    
+    #mainHeader .btn {
+        flex: 1 1 calc(50% - 0.25rem);
+        min-width: 0;
+        font-size: 0.7rem;
+        padding: 0.375rem 0.5rem;
+    }
+    
+    /* モバイルでのテーブル調整 */
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* モバイルでのカードヘッダー調整 */
+    .card-header h5 {
+        font-size: 0.85rem;
+    }
+    
+    /* モバイルでのコンテナ調整（Google TrendsとYouTubeと同じ） */
+    .container-fluid {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+        box-sizing: border-box !important;
+    }
+    
+    /* 全てのカードを同じ幅に統一 */
+    #trends .row .col-md-6 .card {
+        max-width: 100% !important;
+        min-width: 0 !important;
+    }
+    
+    /* カードボディの幅も統一 */
+    #trends .row .col-md-6 .card .card-body {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    
+    /* ネストされたカードも同じ幅に */
+    #trends .row .col-md-6 .card .card-body .card {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    
+    /* カード内のネストされたカードも同じパディング */
+    #trends .row .col-md-6 .card .card-body .card {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        width: 100% !important;
+        margin-bottom: 0 !important;
+    }
+    
+    /* テーブルコンテナのパディング調整 */
+    #trends .row .col-md-6 .card .card-body .trend-table-container {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    /* ネストされたカードのボディも統一 */
+    #trends .row .col-md-6 .card .card-body .card .card-body {
+        padding: 1rem !important;
+    }
+    
+    /* 説明文やフォーム要素のマージン調整 */
+    #trends .row .col-md-6 .card .card-body p.text-muted {
+        margin-bottom: 1rem !important;
+    }
+    
+    #trends .row .col-md-6 .card .card-body .mb-3 {
+        margin-bottom: 1rem !important;
+    }
+    
+    /* モバイル表示で結果セクションを確実に表示（デスクトップ用の詳細なセレクタを上書き） */
+    /* デスクトップ用と同じ詳細度のセレクタで上書きする - QiitaとPodcastを最優先で修正 */
+    /* Qiita - デスクトップ用の詳細セレクタを完全に上書き */
+    #trends .card.h-100 .card-body #qiitaResults {
+        flex: none !important;
+        display: block !important;
+        flex-direction: initial !important;
+        min-height: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+        position: static !important;
+        align-self: auto !important;
+    }
+    
+    #trends .card.h-100 .card-body #qiitaResults > .card,
+    #trends .card.h-100 .card-body #qiitaResults > .card.category-card {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        height: auto !important;
+        overflow: visible !important;
+        align-self: auto !important;
+        margin-bottom: 0 !important;
+    }
+    
+    #trends .card.h-100 .card-body #qiitaResults > .card > .card-body {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: auto !important;
+        align-self: auto !important;
+    }
+    
+    #trends .card.h-100 .card-body #qiitaResults > .card > .card-body > .trend-table-container {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        height: auto !important;
+        overflow-y: visible !important;
+        align-self: auto !important;
+    }
+    
+    #trends .card.h-100 .card-body #qiitaResults > .card > .card-body > .trend-table-container > .table-responsive {
+        flex: none !important;
+        display: block !important;
+        flex-direction: initial !important;
+        min-height: 0 !important;
+        height: auto !important;
+        align-self: auto !important;
+        width: 100% !important;
+    }
+    
+    /* Podcast - デスクトップ用の詳細セレクタを完全に上書き */
+    #trends .card.h-100 .card-body #podcastResults {
+        flex: none !important;
+        display: block !important;
+        flex-direction: initial !important;
+        min-height: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+        position: static !important;
+        align-self: auto !important;
+    }
+    
+    #trends .card.h-100 .card-body #podcastResults > .card,
+    #trends .card.h-100 .card-body #podcastResults > .card.category-card {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        height: auto !important;
+        overflow: visible !important;
+        align-self: auto !important;
+        margin-bottom: 0 !important;
+    }
+    
+    #trends .card.h-100 .card-body #podcastResults > .card > .card-body {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: auto !important;
+        align-self: auto !important;
+    }
+    
+    #trends .card.h-100 .card-body #podcastResults > .card > .card-body > .trend-table-container {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        height: auto !important;
+        overflow-y: visible !important;
+        align-self: auto !important;
+    }
+    
+    #trends .card.h-100 .card-body #podcastResults > .card > .card-body > .trend-table-container > .table-responsive {
+        flex: none !important;
+        display: block !important;
+        flex-direction: initial !important;
+        min-height: 0 !important;
+        height: auto !important;
+        align-self: auto !important;
+        width: 100% !important;
+    }
+    
+    /* 他の結果セクションも同様に処理 */
+    #trends .card.h-100 .card-body #podcastResults,
+    #trends .card.h-100 .card-body #hackernewsResults,
+    #trends .card.h-100 .card-body #hatenaResults,
+    #trends .card.h-100 .card-body #rakutenResults,
+    #trends .card.h-100 .card-body #twitchResults,
+    #trends .card.h-100 .card-body #musicResults,
+    #trends .card.h-100 .card-body #googleResults,
+    #trends .card.h-100 .card-body #youtubeResults,
+    #trends .row .col-md-6 .card .card-body #qiitaResults,
+    #trends .row .col-md-6 .card .card-body #podcastResults,
+    #trends .row .col-md-6 .card .card-body #hackernewsResults,
+    #trends .row .col-md-6 .card .card-body #hatenaResults,
+    #trends .row .col-md-6 .card .card-body #rakutenResults,
+    #trends .row .col-md-6 .card .card-body #twitchResults,
+    #trends .row .col-md-6 .card .card-body #musicResults,
+    #trends .row .col-md-6 .card .card-body #googleResults,
+    #trends .row .col-md-6 .card .card-body #youtubeResults {
+        display: block !important;
+        flex: none !important;
+        min-height: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+        position: static !important;
+        align-self: auto !important;
+    }
+    
+    /* 他の結果セクションのネストされたカードも同様に処理 */
+    #trends .card.h-100 .card-body #podcastResults > .card,
+    #trends .card.h-100 .card-body #podcastResults > .card.category-card,
+    #trends .card.h-100 .card-body #hackernewsResults > .card,
+    #trends .card.h-100 .card-body #hackernewsResults > .card.category-card,
+    #trends .card.h-100 .card-body #hatenaResults > .card,
+    #trends .card.h-100 .card-body #hatenaResults > .card.category-card,
+    #trends .card.h-100 .card-body #rakutenResults > .card,
+    #trends .card.h-100 .card-body #rakutenResults > .card.category-card,
+    #trends .card.h-100 .card-body #musicResults > .card,
+    #trends .card.h-100 .card-body #musicResults > .card.category-card,
+    #trends .card.h-100 .card-body #googleResults > .card,
+    #trends .card.h-100 .card-body #googleResults > .card.category-card,
+    #trends .card.h-100 .card-body #youtubeResults > .card,
+    #trends .card.h-100 .card-body #youtubeResults > .card.category-card,
+    #trends .row .col-md-6 .card .card-body #qiitaResults .card,
+    #trends .row .col-md-6 .card .card-body #qiitaResults .card.category-card,
+    #trends .row .col-md-6 .card .card-body #podcastResults .card,
+    #trends .row .col-md-6 .card .card-body #podcastResults .card.category-card,
+    #trends .row .col-md-6 .card .card-body #hackernewsResults .card,
+    #trends .row .col-md-6 .card .card-body #hackernewsResults .card.category-card,
+    #trends .row .col-md-6 .card .card-body #hatenaResults .card,
+    #trends .row .col-md-6 .card .card-body #hatenaResults .card.category-card,
+    #trends .row .col-md-6 .card .card-body #rakutenResults .card,
+    #trends .row .col-md-6 .card .card-body #rakutenResults .card.category-card,
+    #trends .row .col-md-6 .card .card-body #musicResults .card,
+    #trends .row .col-md-6 .card .card-body #musicResults .card.category-card,
+    #trends .row .col-md-6 .card .card-body #googleResults .card,
+    #trends .row .col-md-6 .card .card-body #googleResults .card.category-card,
+    #trends .row .col-md-6 .card .card-body #youtubeResults .card,
+    #trends .row .col-md-6 .card .card-body #youtubeResults .card.category-card {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        min-height: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        align-self: auto !important;
+        margin-bottom: 0 !important;
+    }
+    
+    /* 他の結果セクションのカードボディも同様に処理 */
+    /* QiitaとPodcastも他のカテゴリと同じスタイルに */
+    #trends .card.h-100 .card-body #qiitaResults > .card > .card-body,
+    #trends .card.h-100 .card-body #podcastResults > .card > .card-body,
+    #trends .card.h-100 .card-body #hackernewsResults > .card > .card-body,
+    #trends .card.h-100 .card-body #hatenaResults > .card > .card-body,
+    #trends .card.h-100 .card-body #rakutenResults > .card > .card-body,
+    #trends .card.h-100 .card-body #musicResults > .card > .card-body,
+    #trends .card.h-100 .card-body #googleResults > .card > .card-body,
+    #trends .card.h-100 .card-body #youtubeResults > .card > .card-body {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: auto !important;
+        align-self: auto !important;
+    }
+    
+    /* 他の結果セクションのトレンドテーブルコンテナも同様に処理 */
+    /* QiitaとPodcastも他のカテゴリと同じスタイルに */
+    #trends .card.h-100 .card-body #qiitaResults > .card > .card-body > .trend-table-container,
+    #trends .card.h-100 .card-body #podcastResults > .card > .card-body > .trend-table-container,
+    #trends .card.h-100 .card-body #hackernewsResults > .card > .card-body > .trend-table-container,
+    #trends .card.h-100 .card-body #hatenaResults > .card > .card-body > .trend-table-container,
+    #trends .card.h-100 .card-body #rakutenResults > .card > .card-body > .trend-table-container,
+    #trends .card.h-100 .card-body #musicResults > .card > .card-body > .trend-table-container,
+    #trends .card.h-100 .card-body #googleResults > .card > .card-body > .trend-table-container,
+    #trends .card.h-100 .card-body #youtubeResults > .card > .card-body > .trend-table-container {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        height: auto !important;
+        overflow-y: visible !important;
+        align-self: auto !important;
+    }
+    
+    /* 他の結果セクションのテーブルレスポンシブも同様に処理 */
+    /* QiitaとPodcastも他のカテゴリと同じスタイルに */
+    #trends .card.h-100 .card-body #qiitaResults > .card > .card-body > .trend-table-container > .table-responsive,
+    #trends .card.h-100 .card-body #podcastResults > .card > .card-body > .trend-table-container > .table-responsive,
+    #trends .card.h-100 .card-body #hackernewsResults > .card > .card-body > .trend-table-container > .table-responsive,
+    #trends .card.h-100 .card-body #hatenaResults > .card > .card-body > .trend-table-container > .table-responsive,
+    #trends .card.h-100 .card-body #rakutenResults > .card > .card-body > .trend-table-container > .table-responsive,
+    #trends .card.h-100 .card-body #musicResults > .card > .card-body > .trend-table-container > .table-responsive,
+    #trends .card.h-100 .card-body #googleResults > .card > .card-body > .trend-table-container > .table-responsive,
+    #trends .card.h-100 .card-body #youtubeResults > .card > .card-body > .trend-table-container > .table-responsive {
+        flex: none !important;
+        display: block !important;
+        min-height: 0 !important;
+        height: auto !important;
+        align-self: auto !important;
+        width: 100% !important;
+    }
+    
+    /* モバイル表示で結果セクション内のテーブルコンテナも確実に表示 */
+    #trends .card.h-100 .card-body #qiitaResults > .card > .card-body > .trend-table-container,
+    #trends .row .col-md-6 .card .card-body #qiitaResults .trend-table-container,
+    #trends .card.h-100 .card-body #podcastResults > .card > .card-body > .trend-table-container,
+    #trends .row .col-md-6 .card .card-body #podcastResults .trend-table-container,
+    #trends .card.h-100 .card-body #hackernewsResults > .card > .card-body > .trend-table-container,
+    #trends .row .col-md-6 .card .card-body #hackernewsResults .trend-table-container,
+    #trends .card.h-100 .card-body #hatenaResults > .card > .card-body > .trend-table-container,
+    #trends .row .col-md-6 .card .card-body #hatenaResults .trend-table-container,
+    #trends .card.h-100 .card-body #rakutenResults > .card > .card-body > .trend-table-container,
+    #trends .row .col-md-6 .card .card-body #rakutenResults .trend-table-container,
+    #trends .card.h-100 .card-body #twitchResults > .trend-table-container,
+    #trends .row .col-md-6 .card .card-body #twitchResults .trend-table-container,
+    #trends .card.h-100 .card-body #musicResults > .card > .card-body > .trend-table-container,
+    #trends .row .col-md-6 .card .card-body #musicResults .trend-table-container,
+    #trends .card.h-100 .card-body #googleResults > .card > .card-body > .trend-table-container,
+    #trends .row .col-md-6 .card .card-body #googleResults .trend-table-container,
+    #trends .card.h-100 .card-body #youtubeResults > .card > .card-body > .trend-table-container,
+    #trends .row .col-md-6 .card .card-body #youtubeResults .trend-table-container {
+        display: flex !important;
+        flex-direction: column !important;
+        flex: none !important;
+        min-height: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+        width: 100% !important;
+        overflow-y: visible !important;
+        align-self: auto !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    /* モバイル表示でネストされたカードのボディも適切に表示 */
+    #trends .card.h-100 .card-body #qiitaResults > .card > .card-body,
+    #trends .row .col-md-6 .card .card-body #qiitaResults .card .card-body,
+    #trends .card.h-100 .card-body #podcastResults > .card > .card-body,
+    #trends .row .col-md-6 .card .card-body #podcastResults .card .card-body,
+    #trends .card.h-100 .card-body #hackernewsResults > .card > .card-body,
+    #trends .row .col-md-6 .card .card-body #hackernewsResults .card .card-body,
+    #trends .card.h-100 .card-body #hatenaResults > .card > .card-body,
+    #trends .row .col-md-6 .card .card-body #hatenaResults .card .card-body,
+    #trends .card.h-100 .card-body #rakutenResults > .card > .card-body,
+    #trends .row .col-md-6 .card .card-body #rakutenResults .card .card-body,
+    #trends .card.h-100 .card-body #musicResults > .card > .card-body,
+    #trends .row .col-md-6 .card .card-body #musicResults .card .card-body,
+    #trends .card.h-100 .card-body #googleResults > .card > .card-body,
+    #trends .row .col-md-6 .card .card-body #googleResults .card .card-body,
+    #trends .card.h-100 .card-body #youtubeResults > .card > .card-body,
+    #trends .row .col-md-6 .card .card-body #youtubeResults .card .card-body {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: auto !important;
+        align-self: auto !important;
+        padding: 1rem !important;
+    }
+    
+    /* モバイル表示でテーブルレスポンシブコンテナも適切に表示 */
+    #trends .card.h-100 .card-body #qiitaResults > .card > .card-body > .trend-table-container > .table-responsive,
+    #trends .row .col-md-6 .card .card-body #qiitaResults .trend-table-container .table-responsive,
+    #trends .card.h-100 .card-body #podcastResults > .card > .card-body > .trend-table-container > .table-responsive,
+    #trends .row .col-md-6 .card .card-body #podcastResults .trend-table-container .table-responsive,
+    #trends .card.h-100 .card-body #hackernewsResults > .card > .card-body > .trend-table-container > .table-responsive,
+    #trends .row .col-md-6 .card .card-body #hackernewsResults .trend-table-container .table-responsive,
+    #trends .card.h-100 .card-body #hatenaResults > .card > .card-body > .trend-table-container > .table-responsive,
+    #trends .row .col-md-6 .card .card-body #hatenaResults .trend-table-container .table-responsive,
+    #trends .card.h-100 .card-body #rakutenResults > .card > .card-body > .trend-table-container > .table-responsive,
+    #trends .row .col-md-6 .card .card-body #rakutenResults .trend-table-container .table-responsive,
+    #trends .card.h-100 .card-body #musicResults > .card > .card-body > .trend-table-container > .table-responsive,
+    #trends .row .col-md-6 .card .card-body #musicResults .trend-table-container .table-responsive,
+    #trends .card.h-100 .card-body #googleResults > .card > .card-body > .trend-table-container > .table-responsive,
+    #trends .row .col-md-6 .card .card-body #googleResults .trend-table-container .table-responsive,
+    #trends .card.h-100 .card-body #youtubeResults > .card > .card-body > .trend-table-container > .table-responsive,
+    #trends .row .col-md-6 .card .card-body #youtubeResults .trend-table-container .table-responsive {
+        flex: none !important;
+        display: block !important;
+        min-height: 0 !important;
+        height: auto !important;
+        align-self: auto !important;
+    }
+    
+    /* モバイル表示でQiitaとPodcastをSpotifyと同じスタイルに（最優先） */
+    /* Spotifyと同じように、height: autoで自然に表示されるようにする */
+    #qiitaResults {
+        display: block !important;
+        height: auto !important;
+        width: 100% !important;
+        flex: none !important;
+        min-height: 0 !important;
+        position: static !important;
+    }
+    
+    #podcastResults {
+        display: block !important;
+        height: auto !important;
+        width: 100% !important;
+        flex: none !important;
+        min-height: 0 !important;
+        position: static !important;
+    }
+    
+    #hackernewsResults,
+    #hatenaResults,
+    #rakutenResults,
+    #twitchResults,
+    #musicResults,
+    #googleResults,
+    #youtubeResults {
+        flex: none !important;
+        display: block !important;
+        min-height: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+        position: static !important;
+    }
+    
+    /* モバイル表示で一般的なIDセレクタ内のカードも上書き - QiitaとPodcastを最優先 */
+    #qiitaResults .card,
+    #qiitaResults .card.category-card {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+        width: 100% !important;
+        overflow: visible !important;
+    }
+    
+    #podcastResults .card,
+    #podcastResults .card.category-card {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+        width: 100% !important;
+        overflow: visible !important;
+    }
+    
+    #hackernewsResults .card,
+    #hatenaResults .card,
+    #rakutenResults .card,
+    #musicResults .card,
+    #googleResults .card,
+    #youtubeResults .card {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+        width: 100% !important;
+        overflow: visible !important;
+    }
+    
+    /* モバイル表示で一般的なIDセレクタ内のカードボディも上書き */
+    #qiitaResults .card .card-body {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+    }
+    
+    #podcastResults .card .card-body {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+    }
+    
+    #hackernewsResults .card .card-body,
+    #hatenaResults .card .card-body,
+    #rakutenResults .card .card-body,
+    #musicResults .card .card-body,
+    #googleResults .card .card-body,
+    #youtubeResults .card .card-body {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+    }
+    
+    /* モバイル表示で一般的なIDセレクタ内のトレンドテーブルコンテナも上書き */
+    #qiitaResults .trend-table-container {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+        width: 100% !important;
+        overflow-y: visible !important;
+    }
+    
+    #podcastResults .trend-table-container {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+        width: 100% !important;
+        overflow-y: visible !important;
+    }
+    
+    #hackernewsResults .trend-table-container,
+    #hatenaResults .trend-table-container,
+    #rakutenResults .trend-table-container,
+    #musicResults .trend-table-container,
+    #googleResults .trend-table-container,
+    #youtubeResults .trend-table-container {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+        width: 100% !important;
+        overflow-y: visible !important;
+    }
+    
+    /* モバイル表示で一般的なIDセレクタ内のテーブルレスポンシブも上書き */
+    #qiitaResults .trend-table-container .table-responsive {
+        flex: none !important;
+        display: block !important;
+        min-height: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+    }
+    
+    #podcastResults .trend-table-container .table-responsive {
+        flex: none !important;
+        display: block !important;
+        min-height: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+    }
+    
+    #hackernewsResults .trend-table-container .table-responsive,
+    #hatenaResults .trend-table-container .table-responsive,
+    #rakutenResults .trend-table-container .table-responsive,
+    #musicResults .trend-table-container .table-responsive,
+    #googleResults .trend-table-container .table-responsive,
+    #youtubeResults .trend-table-container .table-responsive {
+        flex: none !important;
+        display: block !important;
+        min-height: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+    }
+    
+    /* モバイル表示でテーブル要素も確実に表示 */
+    #qiitaResults table,
+    #podcastResults table,
+    #hackernewsResults table,
+    #hatenaResults table,
+    #rakutenResults table,
+    #musicResults table,
+    #googleResults table,
+    #youtubeResults table {
+        display: table !important;
+        width: 100% !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    /* モバイル表示でテーブルボディも確実に表示 */
+    #qiitaResults tbody,
+    #podcastResults tbody,
+    #hackernewsResults tbody,
+    #hatenaResults tbody,
+    #rakutenResults tbody,
+    #musicResults tbody,
+    #googleResults tbody,
+    #youtubeResults tbody {
+        display: table-row-group !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    /* モバイル表示でテーブル行も確実に表示 */
+    #qiitaResults tr,
+    #podcastResults tr,
+    #hackernewsResults tr,
+    #hatenaResults tr,
+    #rakutenResults tr,
+    #musicResults tr,
+    #googleResults tr,
+    #youtubeResults tr {
+        display: table-row !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    /* モバイル表示で全ての結果セクションとその子要素を強制的に表示 */
+    #qiitaResults *,
+    #podcastResults *,
+    #hackernewsResults *,
+    #hatenaResults *,
+    #rakutenResults *,
+    #musicResults *,
+    #googleResults *,
+    #youtubeResults * {
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    /* モバイル表示で非表示にすべき要素のみ例外処理 */
+    #qiitaResults .alert.status-message,
+    #podcastResults .alert.status-message,
+    #hackernewsResults .alert.status-message,
+    #hatenaResults .alert.status-message,
+    #rakutenResults .alert.status-message,
+    #musicResults .alert.status-message,
+    #googleResults .alert.status-message,
+    #youtubeResults .alert.status-message,
+    #qiitaResults .loading,
+    #podcastResults .loading,
+    #hackernewsResults .loading,
+    #hatenaResults .loading,
+    #rakutenResults .loading,
+    #musicResults .loading,
+    #googleResults .loading,
+    #youtubeResults .loading {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        height: 0 !important;
+        width: 0 !important;
+        overflow: hidden !important;
+    }
+    
+    /* モバイル表示で.category-cardクラスのmax-heightとoverflowを上書き */
+    #qiitaResults .category-card,
+    #podcastResults .category-card,
+    #hackernewsResults .category-card,
+    #hatenaResults .category-card,
+    #rakutenResults .category-card,
+    #musicResults .category-card,
+    #googleResults .category-card,
+    #youtubeResults .category-card {
+        max-height: none !important;
+        overflow: visible !important;
+        height: auto !important;
+    }
+    
+    /* モバイル表示でQiitaのセクション全体を強制的に表示（最優先・直接セレクタ） */
+    article.col-12.col-md-6 .card .card-body #qiitaResults,
+    article.col-12.col-md-6 .card.h-100 .card-body #qiitaResults {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        height: auto !important;
+        min-height: 200px !important;
+        width: 100% !important;
+        flex: none !important;
+        position: static !important;
+        align-self: auto !important;
+    }
+    
+    article.col-12.col-md-6 .card .card-body #qiitaResults > .card,
+    article.col-12.col-md-6 .card .card-body #qiitaResults > .card.category-card {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        height: auto !important;
+        min-height: 150px !important;
+        width: 100% !important;
+        flex: none !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+    
+    article.col-12.col-md-6 .card .card-body #qiitaResults > .card > .card-body {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        height: auto !important;
+        min-height: 100px !important;
+        width: 100% !important;
+        flex: none !important;
+    }
+    
+    article.col-12.col-md-6 .card .card-body #qiitaResults .trend-table-container {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        height: auto !important;
+        min-height: 50px !important;
+        width: 100% !important;
+        flex: none !important;
+        max-height: none !important;
+        overflow-y: visible !important;
+    }
+    
+    article.col-12.col-md-6 .card .card-body #qiitaResults .table-responsive {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        height: auto !important;
+        width: 100% !important;
+        flex: none !important;
+    }
+    
+    article.col-12.col-md-6 .card .card-body #qiitaResults table {
+        display: table !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        width: 100% !important;
+    }
+    
+    /* モバイル表示でQiitaとPodcastを強制的に表示 - 最終手段（最高優先度） */
+    /* デスクトップ用の全てのセレクタを上書き */
+    #trends article.col-12.col-md-6 .card.h-100 .card-body #qiitaResults,
+    #trends article.col-12.col-md-6 .card .card-body #qiitaResults,
+    article.col-12.col-md-6 .card.h-100 .card-body #qiitaResults,
+    article.col-12.col-md-6 .card .card-body #qiitaResults {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        height: auto !important;
+        min-height: 200px !important;
+        width: 100% !important;
+        flex: none !important;
+        position: static !important;
+        align-self: auto !important;
+    }
+    
+    #trends article.col-12.col-md-6 .card.h-100 .card-body #qiitaResults > .card,
+    #trends article.col-12.col-md-6 .card .card-body #qiitaResults > .card,
+    #trends article.col-12.col-md-6 .card.h-100 .card-body #qiitaResults > .card.category-card,
+    #trends article.col-12.col-md-6 .card .card-body #qiitaResults > .card.category-card,
+    article.col-12.col-md-6 .card.h-100 .card-body #qiitaResults > .card,
+    article.col-12.col-md-6 .card .card-body #qiitaResults > .card,
+    article.col-12.col-md-6 .card.h-100 .card-body #qiitaResults > .card.category-card,
+    article.col-12.col-md-6 .card .card-body #qiitaResults > .card.category-card {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        height: auto !important;
+        min-height: 150px !important;
+        width: 100% !important;
+        flex: none !important;
+        max-height: none !important;
+        overflow: visible !important;
+        align-self: auto !important;
+        margin-bottom: 0 !important;
+    }
+    
+    #trends article.col-12.col-md-6 .card.h-100 .card-body #qiitaResults > .card > .card-body,
+    #trends article.col-12.col-md-6 .card .card-body #qiitaResults > .card > .card-body,
+    article.col-12.col-md-6 .card.h-100 .card-body #qiitaResults > .card > .card-body,
+    article.col-12.col-md-6 .card .card-body #qiitaResults > .card > .card-body {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        height: auto !important;
+        min-height: 100px !important;
+        width: 100% !important;
+        flex: none !important;
+        align-self: auto !important;
+    }
+    
+    #trends article.col-12.col-md-6 .card.h-100 .card-body #qiitaResults .trend-table-container,
+    #trends article.col-12.col-md-6 .card .card-body #qiitaResults .trend-table-container,
+    article.col-12.col-md-6 .card.h-100 .card-body #qiitaResults .trend-table-container,
+    article.col-12.col-md-6 .card .card-body #qiitaResults .trend-table-container {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        height: auto !important;
+        min-height: 50px !important;
+        width: 100% !important;
+        flex: none !important;
+        max-height: none !important;
+        overflow-y: visible !important;
+        align-self: auto !important;
+    }
+    
+    /* Podcastも同様に */
+    #trends article.col-12.col-md-6 .card.h-100 .card-body #podcastResults,
+    #trends article.col-12.col-md-6 .card .card-body #podcastResults,
+    article.col-12.col-md-6 .card.h-100 .card-body #podcastResults,
+    article.col-12.col-md-6 .card .card-body #podcastResults {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        height: auto !important;
+        min-height: 200px !important;
+        width: 100% !important;
+        flex: none !important;
+        position: static !important;
+        align-self: auto !important;
+    }
+    
+    #trends article.col-12.col-md-6 .card.h-100 .card-body #podcastResults > .card,
+    #trends article.col-12.col-md-6 .card .card-body #podcastResults > .card,
+    #trends article.col-12.col-md-6 .card.h-100 .card-body #podcastResults > .card.category-card,
+    #trends article.col-12.col-md-6 .card .card-body #podcastResults > .card.category-card,
+    article.col-12.col-md-6 .card.h-100 .card-body #podcastResults > .card,
+    article.col-12.col-md-6 .card .card-body #podcastResults > .card,
+    article.col-12.col-md-6 .card.h-100 .card-body #podcastResults > .card.category-card,
+    article.col-12.col-md-6 .card .card-body #podcastResults > .card.category-card {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        height: auto !important;
+        min-height: 150px !important;
+        width: 100% !important;
+        flex: none !important;
+        max-height: none !important;
+        overflow: visible !important;
+        align-self: auto !important;
+        margin-bottom: 0 !important;
+    }
+    
+    #trends article.col-12.col-md-6 .card.h-100 .card-body #podcastResults > .card > .card-body,
+    #trends article.col-12.col-md-6 .card .card-body #podcastResults > .card > .card-body,
+    article.col-12.col-md-6 .card.h-100 .card-body #podcastResults > .card > .card-body,
+    article.col-12.col-md-6 .card .card-body #podcastResults > .card > .card-body {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        height: auto !important;
+        min-height: 100px !important;
+        width: 100% !important;
+        flex: none !important;
+        align-self: auto !important;
+    }
+    
+    #trends article.col-12.col-md-6 .card.h-100 .card-body #podcastResults .trend-table-container,
+    #trends article.col-12.col-md-6 .card .card-body #podcastResults .trend-table-container,
+    article.col-12.col-md-6 .card.h-100 .card-body #podcastResults .trend-table-container,
+    article.col-12.col-md-6 .card .card-body #podcastResults .trend-table-container {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        height: auto !important;
+        min-height: 50px !important;
+        width: 100% !important;
+        flex: none !important;
+        max-height: none !important;
+        overflow-y: visible !important;
+        align-self: auto !important;
+    }
+    
+    /* モバイル表示でQiitaとPodcastを確実に表示（最終的なフォールバック） */
+    /* 全ての詳細なセレクタを上書き */
+    #trends article.col-12.col-md-6 .card.h-100 .card-body #qiitaResults,
+    #trends article.col-12.col-md-6 .card .card-body #qiitaResults,
+    article.col-12.col-md-6 .card.h-100 .card-body #qiitaResults,
+    article.col-12.col-md-6 .card .card-body #qiitaResults,
+    #qiitaResults {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        height: auto !important;
+        width: 100% !important;
+        flex: none !important;
+        min-height: 200px !important;
+        position: static !important;
+    }
+    
+    #trends article.col-12.col-md-6 .card.h-100 .card-body #podcastResults,
+    #trends article.col-12.col-md-6 .card .card-body #podcastResults,
+    article.col-12.col-md-6 .card.h-100 .card-body #podcastResults,
+    article.col-12.col-md-6 .card .card-body #podcastResults,
+    #podcastResults {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        height: auto !important;
+        width: 100% !important;
+        flex: none !important;
+        min-height: 200px !important;
+        position: static !important;
+    }
+    
+    /* テーブルも確実に表示 */
+    #qiitaResults table,
+    #podcastResults table {
+        display: table !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        width: 100% !important;
+    }
+    
+    #qiitaResults tbody,
+    #podcastResults tbody {
+        display: table-row-group !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    #qiitaResults tr,
+    #podcastResults tr {
+        display: table-row !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    #qiitaResults td,
+    #podcastResults td {
+        display: table-cell !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+}
+
+/* 最終的なモバイル表示修正（最高優先度・ファイルの最後に配置） */
+/* QiitaとPodcastを他のカテゴリ（Google、YouTube、Hatena、Musicなど）と同じスタイルに */
+/* デスクトップ用の詳細なルール（@media min-width: 992px内）を完全に上書き */
+@media (max-width: 991px) {
+    /* 他のカテゴリと同じスタイル - デスクトップ用ルールを完全に上書き */
+    /* デスクトップ用のルールと同じ詳細度のセレクタを使用して確実に上書き */
+    /* height: 32px の問題を解決 - height: auto を強制 */
+    #trends .card.h-100 .card-body #qiitaResults {
+        flex: none !important;
+        display: block !important;
+        flex-direction: initial !important;
+        min-height: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+        width: 100% !important;
+        position: static !important;
+        align-self: auto !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    /* 親要素の.card-bodyも height: auto を強制 */
+    #trends .card.h-100 .card-body {
+        height: auto !important;
+        min-height: 0 !important;
+        flex: none !important;
+    }
+    
+    #trends .card.h-100 .card-body #qiitaResults > .card,
+    #trends .card.h-100 .card-body #qiitaResults > .card.category-card {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        height: auto !important;
+        width: 100% !important;
+        overflow: visible !important;
+        align-self: auto !important;
+        margin-bottom: 0 !important;
+    }
+    
+    #trends .card.h-100 .card-body #qiitaResults > .card > .card-body {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+        align-self: auto !important;
+    }
+    
+    #trends .card.h-100 .card-body #qiitaResults > .card > .card-body > .trend-table-container {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        height: auto !important;
+        width: 100% !important;
+        overflow-y: visible !important;
+        overflow-x: auto !important;
+        align-self: auto !important;
+    }
+    
+    #trends .card.h-100 .card-body #qiitaResults > .card > .card-body > .trend-table-container > .table-responsive {
+        flex: none !important;
+        display: block !important;
+        flex-direction: initial !important;
+        min-height: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+        align-self: auto !important;
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+    }
+    
+    /* Podcastも同様に */
+    #trends .card.h-100 .card-body #podcastResults {
+        flex: none !important;
+        display: block !important;
+        flex-direction: initial !important;
+        min-height: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+        position: static !important;
+        align-self: auto !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    #trends .card.h-100 .card-body #podcastResults > .card,
+    #trends .card.h-100 .card-body #podcastResults > .card.category-card {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        height: auto !important;
+        width: 100% !important;
+        overflow: visible !important;
+        align-self: auto !important;
+        margin-bottom: 0 !important;
+    }
+    
+    #trends .card.h-100 .card-body #podcastResults > .card > .card-body {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+        align-self: auto !important;
+    }
+    
+    #trends .card.h-100 .card-body #podcastResults > .card > .card-body > .trend-table-container {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        height: auto !important;
+        width: 100% !important;
+        overflow-y: visible !important;
+        overflow-x: auto !important;
+        align-self: auto !important;
+    }
+    
+    #trends .card.h-100 .card-body #podcastResults > .card > .card-body > .trend-table-container > .table-responsive {
+        flex: none !important;
+        display: block !important;
+        flex-direction: initial !important;
+        min-height: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+        align-self: auto !important;
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+    }
+    
+    /* デスクトップ用の一般的なIDセレクタも上書き */
+    #qiitaResults {
+        flex: none !important;
+        display: block !important;
+        flex-direction: initial !important;
+        min-height: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+        width: 100% !important;
+    }
+    
+    #qiitaResults .card,
+    #qiitaResults .card.category-card {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        height: auto !important;
+        width: 100% !important;
+        overflow: visible !important;
+    }
+    
+    #qiitaResults .card .card-body {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+    }
+    
+    #qiitaResults .trend-table-container {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        height: auto !important;
+        width: 100% !important;
+        overflow-y: visible !important;
+        overflow-x: auto !important;
+    }
+    
+    #qiitaResults .trend-table-container .table-responsive {
+        flex: none !important;
+        display: block !important;
+        min-height: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+    }
+    
+    #podcastResults {
+        flex: none !important;
+        display: block !important;
+        flex-direction: initial !important;
+        min-height: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+        width: 100% !important;
+    }
+    
+    /* .trend-table-container の高さが 0px になる問題を解決 */
+    /* デスクトップ用のルール（580行目）と同じ詳細度のセレクタを使用して確実に上書き */
+    /* デスクトップ用: #trends .card.h-100 .card-body #qiitaResults > .card > .card-body > .trend-table-container { flex: 1 1 0 !important; } */
+    /* これがモバイル表示でも適用されているため、同じ詳細度で上書き */
+    #trends .card.h-100 .card-body #qiitaResults > .card > .card-body > .trend-table-container {
+        flex: 0 0 auto !important;
+        flex-grow: 0 !important;
+        flex-shrink: 0 !important;
+        flex-basis: auto !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 300px !important;
+        max-height: none !important;
+        height: auto !important;
+        overflow-y: visible !important;
+        overflow-x: auto !important;
+        align-self: auto !important;
+    }
+    
+    /* 決定的な違いを解決：デスクトップ用のルール（321行目）を上書き */
+    #trends .card.h-100 .card-body #podcastResults > .card > .card-body > .trend-table-container {
+        flex: none !important;
+        flex-grow: 0 !important;
+        flex-shrink: 0 !important;
+        flex-basis: auto !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        height: auto !important;
+        overflow-y: visible !important;
+        overflow-x: auto !important;
+        align-self: auto !important;
+    }
+    
+    /* .table-responsiveも同様に */
+    #trends .card.h-100 .card-body #qiitaResults > .card > .card-body > .trend-table-container > .table-responsive {
+        flex: 0 0 auto !important;
+        flex-grow: 0 !important;
+        flex-shrink: 0 !important;
+        flex-basis: auto !important;
+        display: block !important;
+        min-height: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+        align-self: auto !important;
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+    }
+    
+    #trends .card.h-100 .card-body #podcastResults > .card > .card-body > .trend-table-container > .table-responsive {
+        flex: 0 0 auto !important;
+        flex-grow: 0 !important;
+        flex-shrink: 0 !important;
+        flex-basis: auto !important;
+        display: block !important;
+        min-height: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+        align-self: auto !important;
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+    }
+    
+    /* その他のセレクタパターンも追加 */
+    #qiitaResults .trend-table-container,
+    #podcastResults .trend-table-container,
+    #trends .row .col-md-6 .card .card-body #qiitaResults .trend-table-container,
+    #trends .row .col-md-6 .card .card-body #podcastResults .trend-table-container,
+    #qiitaResults > .card > .card-body > .trend-table-container,
+    #podcastResults > .card > .card-body > .trend-table-container {
+        flex: none !important;
+        flex-grow: 0 !important;
+        flex-shrink: 0 !important;
+        flex-basis: auto !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 300px !important;
+        max-height: none !important;
+        height: auto !important;
+        overflow-y: visible !important;
+        overflow-x: auto !important;
+    }
+    
+    /* .card の高さも auto にして、コンテンツに合わせる */
+    #qiitaResults > .card,
+    #qiitaResults .card,
+    #qiitaResults .card.category-card,
+    #podcastResults > .card,
+    #podcastResults .card,
+    #podcastResults .card.category-card {
+        height: auto !important;
+        min-height: auto !important;
+        max-height: none !important;
+        flex: none !important;
+        flex-grow: 0 !important;
+        flex-shrink: 0 !important;
+        flex-basis: auto !important;
+    }
+    
+    /* .card-body も auto にする - これが重要！ */
+    #qiitaResults .card .card-body,
+    #podcastResults .card .card-body,
+    #qiitaResults > .card > .card-body,
+    #podcastResults > .card > .card-body {
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        flex: none !important;
+        flex-grow: 0 !important;
+        flex-shrink: 0 !important;
+        flex-basis: auto !important;
+    }
+    
+    #podcastResults .card,
+    #podcastResults .card.category-card {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        height: auto !important;
+        width: 100% !important;
+        overflow: visible !important;
+    }
+    
+    #podcastResults .card .card-body {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+    }
+    
+    #podcastResults .trend-table-container {
+        flex: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        height: auto !important;
+        width: 100% !important;
+        overflow-y: visible !important;
+        overflow-x: auto !important;
+    }
+    
+    #podcastResults .trend-table-container .table-responsive {
+        flex: none !important;
+        display: block !important;
+        min-height: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+    }
 }
 

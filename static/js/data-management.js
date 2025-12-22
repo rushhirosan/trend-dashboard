@@ -4,37 +4,33 @@
 function loadCachedDataExternal() {
     console.log('📦 キャッシュデータの読み込み処理開始');
     
-    // 高速カテゴリ（並列実行）
-    const fastCategories = [
+    // 全カテゴリを並列実行（HatenaとTwitchも即座に実行）
+    const allCategories = [
         loadGoogleTrendsFromCache,
         loadYouTubeTrendsFromCache,
         loadMusicTrendsFromCache,
         loadNewsTrendsFromCache,
+        loadStockTrendsFromCache,
+        loadCryptoTrendsFromCache,
         loadPodcastTrendsFromCache,
-        loadRakutenTrendsFromCache
-    ];
-    
-    // 低速カテゴリ（個別実行、優先度低）
-    const slowCategories = [
+        loadRakutenTrendsFromCache,
         loadHatenaTrendsFromCache,
-        loadTwitchTrendsFromCache
+        loadTwitchTrendsFromCache,
+        loadNHKTrendsFromCache,
+        loadQiitaTrendsFromCache
     ];
     
-    // 高速カテゴリを並列実行
-    console.log('🚀 高速カテゴリの並列読み込み開始');
-    console.log('🚀 実行する関数:', fastCategories.map(f => f.name));
-    fastCategories.forEach(loadFunction => {
-        console.log(`🚀 実行中: ${loadFunction.name}`);
-        loadFunction();
-    });
-    
-    // 低速カテゴリを遅延実行（ユーザー体験向上）
-    setTimeout(() => {
-        console.log('⏳ 低速カテゴリの読み込み開始');
-        slowCategories.forEach(loadFunction => {
+    // 全カテゴリを並列実行（エラーハンドリング付き）
+    console.log('🚀 全カテゴリの並列読み込み開始');
+    console.log('🚀 実行する関数:', allCategories.map(f => f.name));
+    allCategories.forEach(loadFunction => {
+        try {
+            console.log(`🚀 実行中: ${loadFunction.name}`);
             loadFunction();
-        });
-    }, 1000); // 1秒後に開始
+        } catch (error) {
+            console.error(`❌ ${loadFunction.name} 実行エラー:`, error);
+        }
+    });
     
     console.log('✅ キャッシュデータの読み込み処理完了');
 }
@@ -49,9 +45,20 @@ function loadGoogleTrendsFromCache() {
         loadingElement.style.display = 'block';
     }
     
+    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
+    });
+    
     // キャッシュデータを取得して表示
-    fetch('/api/google-trends?country=JP')
+    Promise.race([
+        fetch('/api/google-trends?country=JP'),
+        timeoutPromise
+    ])
         .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
             console.log('Google Trends API レスポンス:', response.status, response.ok);
             return response.json();
         })
@@ -75,15 +82,31 @@ function loadGoogleTrendsFromCache() {
             if (loadingElement) {
                 loadingElement.style.display = 'none';
             }
+            // エラー時でも結果エリアを表示（空でも）
+            const resultsElement = document.getElementById('googleResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
         });
 }
 
 // YouTube Trendsキャッシュデータの読み込み
 function loadYouTubeTrendsFromCache() {
     console.log('📊 YouTube Trends キャッシュデータ読み込み');
+    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
+    });
+    
     // キャッシュデータを取得して表示
-    fetch('/api/youtube-trends?region=JP')
+    Promise.race([
+        fetch('/api/youtube-trends?region=JP'),
+        timeoutPromise
+    ])
         .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
             console.log('YouTube Trends API レスポンス:', response.status, response.ok);
             return response.json();
         })
@@ -100,87 +123,134 @@ function loadYouTubeTrendsFromCache() {
                 console.log('YouTube Trends データなしまたはエラー:', data);
             }
         })
-        .catch(error => console.error('YouTube Trends キャッシュ読み込みエラー:', error));
+        .catch(error => {
+            console.error('YouTube Trends キャッシュ読み込みエラー:', error);
+            // エラー時でも結果エリアを表示（空でも）
+            const resultsElement = document.getElementById('youtubeResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        });
 }
 
 // 音楽トレンドキャッシュデータの読み込み
+// Spotify音楽トレンドキャッシュデータの読み込み
 function loadMusicTrendsFromCache() {
-    console.log('📊 Music Trends キャッシュデータ読み込み - 関数開始');
-    console.log('📊 DOM要素確認:', {
-        musicResults: !!document.getElementById('musicResults'),
-        musicTrendsTableBody: !!document.getElementById('musicTrendsTableBody'),
-        displayMusicResults: typeof displayMusicResults
+    console.log('📊 Music Trends キャッシュデータ読み込み');
+    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
     });
+    
     // キャッシュデータを取得して表示
-    fetch('/api/music-trends?service=spotify')
+    Promise.race([
+        fetch('/api/music-trends?service=spotify'),
+        timeoutPromise
+    ])
         .then(response => {
-            console.log('Music Trends API レスポンス:', response.status, response.ok);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            console.log('📊 Music API response:', response.status, response.ok);
             return response.json();
         })
         .then(data => {
-            console.log('Music Trends API データ:', data);
-            console.log('Music Trends データ詳細:', {
-                hasData: !!data.data,
-                dataLength: data.data ? data.data.length : 0,
-                dataType: typeof data.data,
-                success: data.success,
-                keys: Object.keys(data)
-            });
-            
-            if (data.data && data.data.length > 0) {
-                console.log('✅ Music Trends データ表示開始 - データあり');
-                console.log('✅ データ詳細:', {
-                    dataLength: data.data.length,
-                    firstItem: data.data[0]
-                });
+            console.log('📊 Music API data:', data);
+            console.log('📊 Music data.success:', data.success);
+            console.log('📊 Music data.data:', data.data);
+            console.log('📊 Music data.data.length:', data.data ? data.data.length : 'data.data is null/undefined');
+            // data.successをチェック
+            if (data.success && data.data && Array.isArray(data.data) && data.data.length > 0) {
+                console.log('📊 Music データ表示開始');
                 if (typeof displayMusicResults === 'function') {
-                    console.log('✅ displayMusicResults関数を呼び出し中...');
-                    try {
-                        displayMusicResults(data);
-                        console.log('✅ displayMusicResults関数呼び出し完了');
-                    } catch (error) {
-                        console.error('❌ displayMusicResults実行エラー:', error);
-                    }
+                    displayMusicResults(data);
                 } else {
-                    console.error('❌ displayMusicResults関数が見つかりません');
-                    console.log('利用可能な関数:', Object.keys(window).filter(key => key.includes('display')));
+                    console.error('displayMusicResults関数が見つかりません');
                 }
             } else {
-                console.log('❌ Music Trends データなしまたはエラー:', data);
-                console.log('条件チェック結果:', {
-                    dataExists: !!data.data,
-                    dataLength: data.data ? data.data.length : 'N/A',
-                    condition: !!(data.data && data.data.length > 0)
-                });
+                console.log('📊 Music データが見つかりません:', data);
+                console.log('📊 data.success:', data.success);
+                console.log('📊 data.data:', data.data);
+                console.log('📊 data.data.length:', data.data ? data.data.length : 'data.data is null/undefined');
             }
         })
-        .catch(error => console.error('Music Trends キャッシュ読み込みエラー:', error));
+        .catch(error => {
+            console.error('Music Trends キャッシュ読み込みエラー:', error);
+            // エラー時でも結果エリアを表示（空でも）
+            const resultsElement = document.getElementById('musicResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        });
 }
 
 // ニューストレンドキャッシュデータの読み込み
 function loadNewsTrendsFromCache() {
     console.log('📊 News Trends キャッシュデータ読み込み');
+    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
+    });
+    
     // キャッシュデータを取得して表示
-    fetch('/api/worldnews-trends?country=jp&category=general')
-        .then(response => response.json())
+    Promise.race([
+        fetch('/api/worldnews-trends?country=jp&category=general'),
+        timeoutPromise
+    ])
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            console.log('📊 News API response:', response.status, response.ok);
+            return response.json();
+        })
         .then(data => {
-            if (data.data && data.data.length > 0) {
+            console.log('📊 News Trends データ取得完了:', data);
+            console.log('📊 News Trends data.success:', data.success);
+            console.log('📊 News Trends data.data:', data.data);
+            if (data.success && data.data && Array.isArray(data.data) && data.data.length > 0) {
+                console.log('📊 News Trends データ表示開始');
                 if (typeof displayWorldNewsResults === 'function') {
                     displayWorldNewsResults(data);
                 } else {
                     console.error('displayWorldNewsResults関数が見つかりません');
                 }
+            } else {
+                console.log('📊 News Trends データが見つかりません:', data);
+                console.log('📊 data.success:', data.success);
+                console.log('📊 data.data:', data.data);
+                console.log('📊 data.data.length:', data.data ? data.data.length : 'data.data is null/undefined');
             }
         })
-        .catch(error => console.error('News Trends キャッシュ読み込みエラー:', error));
+        .catch(error => {
+            console.error('News Trends キャッシュ読み込みエラー:', error);
+            // エラー時でも結果エリアを表示（空でも）
+            const resultsElement = document.getElementById('newsResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        });
 }
 
 // Podcastトレンドキャッシュデータの読み込み
 function loadPodcastTrendsFromCache() {
     console.log('📊 Podcast Trends キャッシュデータ読み込み');
-    // キャッシュデータを取得して表示
-    fetch('/api/podcast-trends?trend_type=best_podcasts')
-        .then(response => response.json())
+    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
+    });
+    
+    // キャッシュデータを取得して表示（force_refresh=falseで明示的にキャッシュのみを使用）
+    Promise.race([
+        fetch('/api/podcast-trends?trend_type=best_podcasts&force_refresh=false'),
+        timeoutPromise
+    ])
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.data && data.data.length > 0) {
                 console.log('Podcast Trends データ表示開始');
@@ -193,15 +263,35 @@ function loadPodcastTrendsFromCache() {
                 console.log('Podcast Trends データなしまたはエラー:', data);
             }
         })
-        .catch(error => console.error('Podcast Trends キャッシュ読み込みエラー:', error));
+        .catch(error => {
+            console.error('Podcast Trends キャッシュ読み込みエラー:', error);
+            // エラー時でも結果エリアを表示（空でも）
+            const resultsElement = document.getElementById('podcastResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        });
 }
 
 // 楽天トレンドキャッシュデータの読み込み
 function loadRakutenTrendsFromCache() {
     console.log('📊 Rakuten Trends キャッシュデータ読み込み');
+    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
+    });
+    
     // キャッシュデータを取得して表示
-    fetch('/api/rakuten-trends')
-        .then(response => response.json())
+    Promise.race([
+        fetch('/api/rakuten-trends'),
+        timeoutPromise
+    ])
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.data && data.data.length > 0) {
                 if (typeof displayRakutenResults === 'function') {
@@ -211,12 +301,24 @@ function loadRakutenTrendsFromCache() {
                 }
             }
         })
-        .catch(error => console.error('Rakuten Trends キャッシュ読み込みエラー:', error));
+        .catch(error => {
+            console.error('Rakuten Trends キャッシュ読み込みエラー:', error);
+            // エラー時でも結果エリアを表示（空でも）
+            const resultsElement = document.getElementById('rakutenResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        });
 }
 
 // はてなブックマークトレンドキャッシュデータの読み込み
 function loadHatenaTrendsFromCache() {
     console.log('📊 Hatena Trends キャッシュデータ読み込み');
+    
+    // 初期読み込み時は常に'all'カテゴリを使用
+    const selectedCategory = 'all';
+    
+    console.log(`🔍 はてなブックマーク: 初期読み込み時のカテゴリ '${selectedCategory}' のデータを取得中...`);
     
     // ローディング表示
     const loadingElement = document.getElementById('hatenaTrendsLoading');
@@ -224,21 +326,41 @@ function loadHatenaTrendsFromCache() {
         loadingElement.style.display = 'block';
     }
     
-    // キャッシュデータを取得して表示
-    fetch('/api/hatena-trends?category=all&limit=25&type=hot')
-        .then(response => response.json())
+    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
+    });
+    
+    // キャッシュデータを取得して表示（force_refresh=falseで明示的にキャッシュのみを使用）
+    Promise.race([
+        fetch(`/api/hatena-trends?category=${selectedCategory}&limit=25&type=hot&force_refresh=false`),
+        timeoutPromise
+    ])
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            console.log('📊 Hatena API response:', response.status, response.ok);
+            return response.json();
+        })
         .then(data => {
-            if (data.data && data.data.length > 0) {
+            console.log('📊 Hatena API data:', data);
+            // ローディング表示を非表示
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            
+            if (data.success && data.data && data.data.length > 0) {
+                console.log('📊 Hatena データ表示開始 (source:', data.source, ')');
                 if (typeof displayHatenaResults === 'function') {
                     displayHatenaResults(data);
                 } else {
                     console.error('displayHatenaResults関数が見つかりません');
                 }
-            }
-            
-            // ローディング表示を非表示
-            if (loadingElement) {
-                loadingElement.style.display = 'none';
+            } else {
+                console.log('📊 Hatena データが見つかりません:', data);
+                // キャッシュにデータがない場合は、ローディングを非表示にして終了
+                // APIを呼び出さない（画面更新のたびにAPIを呼び出さないようにするため）
             }
         })
         .catch(error => {
@@ -254,36 +376,55 @@ function loadHatenaTrendsFromCache() {
 function loadTwitchTrendsFromCache() {
     console.log('📊 Twitch Trends キャッシュデータ読み込み');
     
-    // ローディング表示を最初から非表示
+    // 初期読み込み時は常に'games'カテゴリを使用
+    const selectedType = 'games';
+    
+    console.log(`🔍 Twitch: 初期読み込み時のカテゴリ '${selectedType}' のデータを取得中...`);
+    
+    // ローディング表示
     const loadingElement = document.getElementById('twitchTrendsLoading');
     if (loadingElement) {
-        loadingElement.style.display = 'none';
+        loadingElement.style.display = 'block';
     }
     
-    // キャッシュデータを取得して表示
-    fetch('/api/twitch-trends?type=games')
-        .then(response => response.json())
+    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
+    });
+    
+    // キャッシュデータを取得して表示（force_refresh=falseで明示的にキャッシュのみを使用）
+    Promise.race([
+        fetch(`/api/twitch-trends?type=${selectedType}&limit=25&force_refresh=false`),
+        timeoutPromise
+    ])
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
-            // ローディング表示を確実に非表示
-            const loadingElement = document.getElementById('twitchTrendsLoading');
+            // ローディング表示を非表示
             if (loadingElement) {
                 loadingElement.style.display = 'none';
             }
             
-            if (data.data && data.data.length > 0) {
+            if (data.success && data.data && data.data.length > 0) {
+                console.log('📊 Twitch データ表示開始 (source:', data.source, ')');
                 if (typeof displayTwitchResults === 'function') {
                     displayTwitchResults(data);
                 } else {
                     console.error('displayTwitchResults関数が見つかりません');
                 }
             } else {
-                console.log('Twitch Trends データなしまたはエラー:', data);
+                console.log('📊 Twitch データが見つかりません:', data);
+                // キャッシュにデータがない場合は、ローディングを非表示にして終了
+                // APIを呼び出さない（画面更新のたびにAPIを呼び出さないようにするため）
             }
         })
         .catch(error => {
             console.error('Twitch Trends キャッシュ読み込みエラー:', error);
             // エラー時もローディング表示を非表示
-            const loadingElement = document.getElementById('twitchTrendsLoading');
             if (loadingElement) {
                 loadingElement.style.display = 'none';
             }
@@ -457,6 +598,202 @@ function displayRakutenTrendsFromCache(cachedData) {
             });
         }
     }
+}
+
+// NHK ニュースキャッシュデータの読み込み
+function loadNHKTrendsFromCache() {
+    console.log('📊 NHK ニュース キャッシュデータ読み込み');
+    // ローディング表示
+    const loadingElement = document.getElementById('nhkLoading');
+    if (loadingElement) {
+        loadingElement.style.display = 'block';
+    }
+    
+    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
+    });
+    
+    // キャッシュデータを取得して表示
+    Promise.race([
+        fetch('/api/nhk-trends'),
+        timeoutPromise
+    ])
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            console.log('NHK ニュース API レスポンス:', response.status, response.ok);
+            return response.json();
+        })
+        .then(data => {
+            console.log('NHK ニュース API データ:', data);
+            if (data.data && data.data.length > 0) {
+                console.log('NHK ニュース データ表示開始');
+                if (typeof displayNHKResults === 'function') {
+                    displayNHKResults(data);
+                } else {
+                    console.error('displayNHKResults関数が見つかりません');
+                }
+            } else {
+                console.log('NHK ニュース データなしまたはエラー:', data);
+            }
+            
+            // ローディング表示を非表示
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('NHK ニュース キャッシュ読み込みエラー:', error);
+            // エラー時もローディング表示を非表示
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+        });
+}
+
+// Qiita トレンドキャッシュデータの読み込み
+function loadQiitaTrendsFromCache() {
+    console.log('📊 Qiita トレンド キャッシュデータ読み込み');
+    // ローディング表示
+    const loadingElement = document.getElementById('qiitaLoading');
+    if (loadingElement) {
+        loadingElement.style.display = 'block';
+    }
+    
+    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
+    });
+    
+    // キャッシュデータを取得して表示
+    Promise.race([
+        fetch('/api/qiita-trends?limit=25&sort=likes_count'),
+        timeoutPromise
+    ])
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            console.log('Qiita トレンド API レスポンス:', response.status, response.ok);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Qiita トレンド API データ:', data);
+            if (data.data && data.data.length > 0) {
+                console.log('Qiita トレンド データ表示開始');
+                if (typeof displayQiitaResults === 'function') {
+                    displayQiitaResults(data);
+                } else {
+                    console.error('displayQiitaResults関数が見つかりません');
+                }
+            } else {
+                console.log('Qiita トレンド データなしまたはエラー:', data);
+            }
+            
+            // ローディング表示を非表示
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Qiita トレンド キャッシュ読み込みエラー:', error);
+            // エラー時もローディング表示を非表示
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+        });
+}
+
+// 株価トレンドキャッシュデータの読み込み
+function loadStockTrendsFromCache() {
+    console.log('📊 Stock Trends キャッシュデータ読み込み');
+    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
+    });
+    
+    // キャッシュデータを取得して表示
+    Promise.race([
+        fetch('/api/stock-trends?market=JP&limit=25'),
+        timeoutPromise
+    ])
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            // データが空でも表示関数を呼び出す（「本日取引はありません」を表示するため）
+            if (typeof displayStockResults === 'function') {
+                displayStockResults(data);
+            } else {
+                console.error('displayStockResults関数が見つかりません');
+            }
+            // 結果エリアを表示
+            const resultsElement = document.getElementById('stockResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            console.error('Stock Trends キャッシュ読み込みエラー:', error);
+            // エラー時でも結果エリアを表示（空でも）
+            const resultsElement = document.getElementById('stockResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        });
+}
+
+// 仮想通貨トレンドキャッシュデータの読み込み
+function loadCryptoTrendsFromCache() {
+    console.log('📊 Crypto Trends キャッシュデータ読み込み');
+    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
+    });
+    
+    // キャッシュデータを取得して表示
+    Promise.race([
+        fetch('/api/crypto-trends?limit=25'),
+        timeoutPromise
+    ])
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Crypto Trends API response:', data);
+            console.log('Crypto Trends data count:', data.data ? data.data.length : 0);
+            if (data.data && data.data.length > 0) {
+                console.log('Crypto Trends データ表示開始 (件数:', data.data.length, ')');
+                if (typeof displayCryptoResults === 'function') {
+                    displayCryptoResults(data);
+                } else {
+                    console.error('displayCryptoResults関数が見つかりません');
+                }
+            } else {
+                console.log('Crypto Trends データなしまたはエラー:', data);
+            }
+            // 結果エリアを表示
+            const resultsElement = document.getElementById('cryptoResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            console.error('Crypto Trends キャッシュ読み込みエラー:', error);
+            // エラー時でも結果エリアを表示（空でも）
+            const resultsElement = document.getElementById('cryptoResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        });
 }
 
 

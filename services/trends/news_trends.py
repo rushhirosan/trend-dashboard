@@ -2,6 +2,10 @@ import os
 import requests
 from datetime import datetime, timedelta
 from database_config import TrendsCache
+from utils.logger_config import get_logger
+
+# ロガーの初期化
+logger = get_logger(__name__)
 
 class NewsTrendsManager:
     """NewsAPIを使用してニューストレンドを取得・管理するクラス"""
@@ -10,12 +14,14 @@ class NewsTrendsManager:
         """初期化"""
         self.api_key = os.getenv('NEWS_API_KEY')
         self.db = TrendsCache()
+        # レート制限: News APIは100 requests/日（保守的に10リクエスト/分に設定）
+        self.rate_limiter = get_rate_limiter('news', max_requests=10, window_seconds=60)
         
         if not self.api_key:
-            print("Warning: NEWS_API_KEYが設定されていません")
+            logger.warning("Warning: NEWS_API_KEYが設定されていません")
         
-        print(f"News API認証情報確認:")
-        print(f"  API Key: {self.api_key[:10]}..." if self.api_key else "  API Key: 未設定")
+        logger.debug(f"News API認証情報確認:")
+        logger.debug(f"  API Key: {self.api_key[:10]}..." if self.api_key else "  API Key: 未設定")
         
         # NewsAPI接続テスト（キャッシュモードでは無効化）
         # if self.api_key:
@@ -30,100 +36,115 @@ class NewsTrendsManager:
             
             if response.status_code == 200:
                 data = response.json()
-                print(f"News API接続テスト成功: {data.get('totalResults', 0)}件の記事")
-                print(f"レスポンス詳細: {data}")
+                logger.info(f"News API接続テスト成功: {data.get('totalResults', 0)}件の記事")
+                logger.debug(f"レスポンス詳細: {data}")
             else:
-                print(f"News API接続テスト失敗: {response.status_code}")
-                print(f"エラーレスポンス: {response.text}")
+                logger.warning(f"News API接続テスト失敗: {response.status_code}")
+                logger.warning(f"エラーレスポンス: {response.text}")
                 
         except Exception as e:
-            print(f"News API接続テストエラー: {e}")
+            logger.error(f"News API接続テストエラー: {e}", exc_info=True)
     
-    def get_trends(self, country='jp', category='general', page_size=25):
-        """ニューストレンドを取得"""
+    def get_trends(self, country='jp', category='general', page_size=25, force_refresh=False):
+        """ニューストレンドを取得（キャッシュデータが存在しない場合のみ外部APIを呼び出し）"""
         try:
-            # キャッシュチェック
-            if self.is_cache_valid(country, category):
+            logger.debug(f"🔍 News: キャッシュデータ取得開始 (country: {country}, category: {category})")
+            
+            cached_data = None
+            if force_refresh:
+                logger.info(f"🔄 News: force_refresh指定のためキャッシュをスキップします (country: {country}, category: {category})")
+            else:
                 cached_data = self.get_from_cache(country, category)
-                if cached_data:
-                    return {
-                        'data': cached_data,
-                        'status': 'cached',
-                        'country': country.upper(),
-                        'category': category
-                    }
+                logger.debug(f"🔍 News: キャッシュデータ取得結果: {type(cached_data)}, 長さ: {len(cached_data) if cached_data else 0}")
             
-            # 新しいデータを取得
-            trends_data = self._get_news_trends(country, category, page_size)
-            
-            if trends_data:
-                # キャッシュに保存
-                self.save_to_cache(trends_data, country, category)
+            if cached_data:
+                logger.info(f"✅ News: キャッシュデータを使用 ({len(cached_data)}件)")
                 return {
-                    'data': trends_data,
-                    'status': 'fresh',
+                    'data': cached_data,
+                    'status': 'cached',
                     'country': country.upper(),
                     'category': category
                 }
+            logger.warning(f"⚠️ News: キャッシュ未使用のため外部APIを呼び出します")
+            trends_data = self._get_news_trends(country, category, page_size)
+            if trends_data:
+                # キャッシュに保存
+                self.save_to_cache(trends_data, country, category)
+                logger.info(f"✅ News: 外部APIから{len(trends_data)}件のデータを取得し、キャッシュに保存しました")
+                return {
+                    'data': trends_data,
+                    'status': 'api_fetched',
+                    'country': country.upper(),
+                    'category': category,
+                    'source': 'News API'
+                }
             else:
-                return {'error': 'NewsAPIからデータを取得できませんでした。API認証情報を確認してください。'}
+                logger.error(f"❌ News: 外部APIからデータを取得できませんでした")
+                return {
+                    'data': [],
+                    'status': 'api_error',
+                    'country': country.upper(),
+                    'category': category
+                }
                 
         except Exception as e:
-            print(f"ニューストレンド取得エラー: {e}")
+            logger.error(f"ニューストレンド取得エラー: {e}", exc_info=True)
             return {'error': f'ニューストレンドの取得に失敗しました: {str(e)}'}
     
     def _get_news_trends(self, country='jp', category='general', page_size=25):
         """NewsAPIからトレンドデータを取得"""
         if not self.api_key:
-            print("News APIキーが設定されていません")
+            logger.warning("News APIキーが設定されていません")
             return None
         
         try:
-            print(f"News API呼び出し開始 (国: {country}, カテゴリ: {category})")
+            logger.info(f"News API呼び出し開始 (国: {country}, カテゴリ: {category})")
             
             # 複数の方法で記事を取得しようとする
             trends = []
             
             # 1. カテゴリ付きtop-headlines（複数のカテゴリを試行）
-            print("1. カテゴリ付きtop-headlinesを試行...")
+            logger.debug("1. カテゴリ付きtop-headlinesを試行...")
             categories_to_try = ['general', 'business', 'technology', 'entertainment', 'sports']
             for cat in categories_to_try:
-                print(f"   カテゴリ '{cat}' を試行...")
+                logger.debug(f"   カテゴリ '{cat}' を試行...")
                 trends = self._get_news_trends_with_category(country, cat, page_size)
                 if trends and len(trends) > 0:
-                    print(f"   カテゴリ '{cat}' で記事を取得しました！")
+                    logger.info(f"   カテゴリ '{cat}' で記事を取得しました！")
                     break
             
             # 2. カテゴリなしtop-headlines
             if not trends or len(trends) == 0:
-                print("2. カテゴリなしtop-headlinesを試行...")
+                logger.debug("2. カテゴリなしtop-headlinesを試行...")
                 trends = self._get_news_trends_without_category(country, page_size)
             
-            # 3. 異なる国で試行
-            if not trends or len(trends) == 0:
-                print("3. 異なる国で試行...")
+            # 3. 異なる国で試行（JPが指定されている場合はスキップ）
+            # JPが指定されている場合、JPのデータのみを取得する（フォールバックで他の国のデータを取得しない）
+            if country.lower() != 'jp' and (not trends or len(trends) == 0):
+                logger.debug("3. 異なる国で試行...")
                 countries_to_try = ['us', 'gb', 'ca', 'au']
                 for c in countries_to_try:
-                    print(f"   国 '{c}' を試行...")
+                    logger.debug(f"   国 '{c}' を試行...")
                     trends = self._get_news_trends_without_category(c, page_size)
                     if trends and len(trends) > 0:
-                        print(f"   国 '{c}' で記事を取得しました！")
+                        logger.info(f"   国 '{c}' で記事を取得しました！")
                         break
             
-            # 4. everythingエンドポイントで検索
-            if not trends or len(trends) == 0:
-                print("4. everythingエンドポイントで検索を試行...")
+            # 4. everythingエンドポイントで検索（JPが指定されている場合はスキップ）
+            if country.lower() != 'jp' and (not trends or len(trends) == 0):
+                logger.debug("4. everythingエンドポイントで検索を試行...")
                 trends = self._get_news_trends_everything(country, page_size)
             
-            # 5. サンプルデータ（最後の手段）
-            if not trends or len(trends) == 0:
-                print("5. サンプルデータを生成...")
+            # 5. サンプルデータ（最後の手段、JPが指定されている場合はスキップ）
+            # JPが指定されている場合、サンプルデータを使用しない（空のリストを返す）
+            if country.lower() != 'jp' and (not trends or len(trends) == 0):
+                logger.warning("5. サンプルデータを生成...")
                 trends = self._get_sample_news_data()
             
             return trends
             
         except Exception as e:
-            print(f"News API エラー: {e}")
+            logger.error(f"News API エラー: {e}", exc_info=True)
             import traceback
             traceback.print_exc()
             return None
@@ -139,22 +160,25 @@ class NewsTrendsManager:
                 'apiKey': self.api_key
             }
             
-            print(f"カテゴリ付きリクエスト: {params}")
+            logger.debug(f"カテゴリ付きリクエスト: {params}")
+            # レート制限をチェック
+            self.rate_limiter.wait_if_needed()
+            
             response = requests.get(url, params=params, timeout=10)
             
             if response.status_code != 200:
-                print(f"News API エラー: HTTP {response.status_code}")
+                logger.error(f"News API エラー: HTTP {response.status_code}")
                 return None
             
             data = response.json()
-            print(f"News API レスポンス: {data}")
+            logger.debug(f"News API レスポンス: {data}")
             
             if data.get('status') != 'ok':
-                print(f"News API レスポンスエラー: {data.get('message', 'Unknown error')}")
+                logger.error(f"News API レスポンスエラー: {data.get('message', 'Unknown error')}")
                 return None
             
             articles = data.get('articles', [])
-            print(f"カテゴリ '{category}' で取得記事数: {len(articles)}件")
+            logger.info(f"カテゴリ '{category}' で取得記事数: {len(articles)}件")
             
             if len(articles) == 0:
                 return []
@@ -179,7 +203,7 @@ class NewsTrendsManager:
             return trends
             
         except Exception as e:
-            print(f"カテゴリ付きNews API エラー: {e}")
+            logger.error(f"カテゴリ付きNews API エラー: {e}", exc_info=True)
             return []
     
     def _get_news_trends_without_category(self, country='jp', page_size=25):
@@ -192,25 +216,28 @@ class NewsTrendsManager:
                 'apiKey': self.api_key
             }
             
-            print(f"カテゴリなしリクエスト: {params}")
+            logger.debug(f"カテゴリなしリクエスト: {params}")
+            # レート制限をチェック
+            self.rate_limiter.wait_if_needed()
+            
             response = requests.get(url, params=params, timeout=10)
             
             if response.status_code != 200:
-                print(f"News API エラー: HTTP {response.status_code}")
+                logger.error(f"News API エラー: HTTP {response.status_code}")
                 return None
             
             data = response.json()
-            print(f"News API レスポンス: {data}")
+            logger.debug(f"News API レスポンス: {data}")
             
             if data.get('status') != 'ok':
-                print(f"News API レスポンスエラー: {data.get('message', 'Unknown error')}")
+                logger.error(f"News API レスポンスエラー: {data.get('message', 'Unknown error')}")
                 return None
             
             articles = data.get('articles', [])
-            print(f"カテゴリなしで取得記事数: {len(articles)}件")
+            logger.info(f"カテゴリなしで取得記事数: {len(articles)}件")
             
             if len(articles) == 0:
-                print("カテゴリなしでも記事が取得できませんでした")
+                logger.warning("カテゴリなしでも記事が取得できませんでした")
                 return []
             
             trends = []
@@ -230,11 +257,11 @@ class NewsTrendsManager:
                     'category': 'general'
                 })
             
-            print(f"カテゴリなしで処理完了: {len(trends)}件のニューストレンドデータ")
+            logger.info(f"カテゴリなしで処理完了: {len(trends)}件のニューストレンドデータ")
             return trends
             
         except Exception as e:
-            print(f"カテゴリなしNews API エラー: {e}")
+            logger.error(f"カテゴリなしNews API エラー: {e}", exc_info=True)
             return []
     
     def _get_news_trends_everything(self, country='jp', page_size=25):
@@ -259,25 +286,28 @@ class NewsTrendsManager:
                 'apiKey': self.api_key
             }
             
-            print(f"everythingエンドポイントリクエスト: {params}")
+            logger.debug(f"everythingエンドポイントリクエスト: {params}")
+            # レート制限をチェック
+            self.rate_limiter.wait_if_needed()
+            
             response = requests.get(url, params=params, timeout=10)
             
             if response.status_code != 200:
-                print(f"News API everything エラー: HTTP {response.status_code}")
+                logger.error(f"News API everything エラー: HTTP {response.status_code}")
                 return []
             
             data = response.json()
-            print(f"News API everything レスポンス: {data}")
+            logger.debug(f"News API everything レスポンス: {data}")
             
             if data.get('status') != 'ok':
-                print(f"News API everything レスポンスエラー: {data.get('message', 'Unknown error')}")
+                logger.error(f"News API everything レスポンスエラー: {data.get('message', 'Unknown error')}")
                 return []
             
             articles = data.get('articles', [])
-            print(f"everythingエンドポイントで取得記事数: {len(articles)}件")
+            logger.info(f"everythingエンドポイントで取得記事数: {len(articles)}件")
             
             if len(articles) == 0:
-                print("everythingエンドポイントでも記事が取得できませんでした")
+                logger.warning("everythingエンドポイントでも記事が取得できませんでした")
                 return []
             
             trends = []
@@ -297,16 +327,16 @@ class NewsTrendsManager:
                     'category': 'general'
                 })
             
-            print(f"everythingエンドポイントで処理完了: {len(trends)}件のニューストレンドデータ")
+            logger.info(f"everythingエンドポイントで処理完了: {len(trends)}件のニューストレンドデータ")
             return trends
             
         except Exception as e:
-            print(f"everythingエンドポイントNews API エラー: {e}")
+            logger.error(f"everythingエンドポイントNews API エラー: {e}", exc_info=True)
             return []
     
     def _get_sample_news_data(self):
         """サンプルのニュースデータを生成（テスト用）"""
-        print("サンプルニュースデータを生成します")
+        logger.warning("サンプルニュースデータを生成します")
         
         sample_news = [
             {
@@ -366,7 +396,7 @@ class NewsTrendsManager:
             }
         ]
         
-        print(f"サンプルニュースデータ生成完了: {len(sample_news)}件")
+        logger.info(f"サンプルニュースデータ生成完了: {len(sample_news)}件")
         return sample_news
     
     def get_from_cache(self, country, category):
@@ -374,7 +404,7 @@ class NewsTrendsManager:
         try:
             return self.db.get_news_trends_from_cache(country, category)
         except Exception as e:
-            print(f"キャッシュ取得エラー: {e}")
+            logger.error(f"キャッシュ取得エラー: {e}", exc_info=True)
             return None
     
     def save_to_cache(self, data, country, category):
@@ -382,12 +412,12 @@ class NewsTrendsManager:
         try:
             self.db.save_news_trends_to_cache(data, country, category)
         except Exception as e:
-            print(f"キャッシュ保存エラー: {e}")
+            logger.error(f"キャッシュ保存エラー: {e}", exc_info=True)
     
     def is_cache_valid(self, country, category):
         """キャッシュが有効かチェック"""
         try:
             return self.db.is_news_cache_valid(country, category)
         except Exception as e:
-            print(f"キャッシュ有効性チェックエラー: {e}")
+            logger.error(f"キャッシュ有効性チェックエラー: {e}", exc_info=True)
             return False 

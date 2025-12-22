@@ -7,6 +7,7 @@ import pytz
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from database_config import TrendsCache
+from services.subscription.subscription_manager import SubscriptionManager
 
 # ログ設定
 logging.basicConfig(level=logging.INFO)
@@ -21,6 +22,16 @@ class TrendsScheduler:
         self.scheduler = BackgroundScheduler()
         self.db = TrendsCache()
         self.is_running = False
+        self.last_daily_execution_date = None  # 最後に7時のジョブが実行された日付（YYYY-MM-DD形式）
+        self.last_afternoon_execution_time = None  # 最後に14時のジョブが実行された時刻（datetime形式）
+        self._fetching_in_progress = False  # データ取得処理が実行中かどうかのフラグ
+        # メール送信用のSubscriptionManagerを初期化
+        try:
+            self.subscription_manager = SubscriptionManager()
+            logger.info("SubscriptionManager初期化完了")
+        except Exception as e:
+            logger.warning(f"⚠️ SubscriptionManager初期化エラー（メール自動送信は無効）: {e}")
+            self.subscription_manager = None
         
         logger.info("TrendsScheduler初期化完了")
     
@@ -38,13 +49,33 @@ class TrendsScheduler:
         """スケジューラーを開始"""
         if not self.is_running:
             try:
-                # 毎日朝5時に自動取得を実行
+                # 日本時間（JST）のタイムゾーンを設定
+                jst = pytz.timezone('Asia/Tokyo')
+                
+                # 毎日朝7時（日本時間）に自動取得を実行
+                # misfire_grace_time: 実行時刻を逃しても最大3600秒（60分）以内なら実行する
+                # coalesce: 複数の実行が遅延した場合、1回だけ実行する
                 self.scheduler.add_job(
                     func=self._fetch_all_trends,
-                    trigger=CronTrigger(hour=5, minute=0),
-                    id='daily_trends_fetch',
-                    name='毎日朝5時のトレンド取得',
-                    replace_existing=True
+                    trigger=CronTrigger(hour=7, minute=0, timezone=jst),
+                    id='daily_trends_fetch_morning',
+                    name='毎日朝7時（日本時間）のトレンド取得',
+                    replace_existing=True,
+                    misfire_grace_time=3600,  # 60分以内なら実行（7時から8時まで）
+                    coalesce=True,  # 複数の遅延実行を1回にまとめる
+                    max_instances=1  # 同時実行は1つのみ
+                )
+                
+                # 毎日昼14時（日本時間）に自動取得を実行
+                self.scheduler.add_job(
+                    func=self._fetch_all_trends,
+                    trigger=CronTrigger(hour=14, minute=0, timezone=jst),
+                    id='daily_trends_fetch_afternoon',
+                    name='毎日昼14時（日本時間）のトレンド取得',
+                    replace_existing=True,
+                    misfire_grace_time=3600,  # 60分以内なら実行（14時から15時まで）
+                    coalesce=True,  # 複数の遅延実行を1回にまとめる
+                    max_instances=1  # 同時実行は1つのみ
                 )
                 
                 # スケジューラーを開始
@@ -52,14 +83,77 @@ class TrendsScheduler:
                 self.is_running = True
                 
                 logger.info("✅ スケジューラー開始完了")
-                logger.info("📅 自動取得は無効化されています（手動実行のみ）")
+                logger.info("📅 毎日朝7:00と昼14:00（日本時間）に全トレンドを自動取得します")
                 
-                # 初回起動時の自動実行も無効化
-                # self._fetch_all_trends()
+                # 起動時の自動実行は無効化（デプロイ時の不要なAPI呼び出しとメール送信を防ぐ）
+                # 環境変数SKIP_STARTUP_EXECUTION=trueの場合はスキップ
+                # マシンが停止していた場合の補完は、次回のスケジュール実行時に自動的に処理される
+                skip_startup = os.getenv('SKIP_STARTUP_EXECUTION', 'true').lower() == 'true'
+                if not skip_startup:
+                    logger.info("🔄 起動時の自動実行を実行します（SKIP_STARTUP_EXECUTION=false）")
+                    self._check_and_execute_missed_job(jst)
+                else:
+                    logger.info("⏭️ 起動時の自動実行をスキップします（デプロイ時の不要なAPI呼び出しを防ぐため）")
                 
             except Exception as e:
-                logger.error(f"❌ スケジューラー開始エラー: {e}")
+                logger.error(f"❌ スケジューラー開始エラー: {e}", exc_info=True)
                 self.is_running = False
+    
+    def _check_and_execute_missed_job(self, jst):
+        """
+        起動時に当日の7時または14時を過ぎている場合は自動実行
+        （マシンが停止していた場合の補完処理）
+        
+        マシンが何時に再起動されても、当日の7時または14時を過ぎていれば実行する。
+        ただし、既に実行済みの場合は実行しない。
+        """
+        try:
+            now_jst = datetime.now(jst)
+            today = now_jst.date()
+            today_7am = now_jst.replace(hour=7, minute=0, second=0, microsecond=0)
+            today_2pm = now_jst.replace(hour=14, minute=0, second=0, microsecond=0)
+            
+            # 7時と14時の両方をチェックし、必要に応じて1回だけ実行
+            should_execute_7am = False
+            should_execute_2pm = False
+            
+            # 当日の7時を過ぎているかチェック
+            if now_jst >= today_7am:
+                # 既に実行済みかどうかをチェック
+                if self.last_daily_execution_date == today:
+                    logger.info(f"⏰ 起動時チェック: 当日の7時のジョブは既に実行済みです（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
+                else:
+                    logger.info(f"⏰ 起動時チェック: 当日の7時を過ぎています（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
+                    should_execute_7am = True
+            else:
+                logger.info(f"⏰ 起動時チェック: 当日の7時前です（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
+            
+            # 当日の14時を過ぎているかチェック
+            if now_jst >= today_2pm:
+                # 既に実行済みかどうかをチェック（1時間以内に実行されていればスキップ）
+                if self.last_afternoon_execution_time:
+                    time_diff = (now_jst - self.last_afternoon_execution_time).total_seconds()
+                    if time_diff < 3600:  # 1時間以内
+                        logger.info(f"⏰ 起動時チェック: 当日の14時のジョブは既に実行済みです（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
+                    else:
+                        logger.info(f"⏰ 起動時チェック: 当日の14時を過ぎています（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
+                        should_execute_2pm = True
+                else:
+                    logger.info(f"⏰ 起動時チェック: 当日の14時を過ぎています（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
+                    should_execute_2pm = True
+            
+            # 7時または14時のジョブが必要な場合、1回だけ実行
+            if should_execute_7am or should_execute_2pm:
+                if should_execute_7am and should_execute_2pm:
+                    logger.info("🔄 当日の7時と14時の処理を自動実行します（マシン停止による実行漏れを補完）")
+                elif should_execute_7am:
+                    logger.info("🔄 当日の7時の処理を自動実行します（マシン停止による実行漏れを補完）")
+                else:
+                    logger.info("🔄 当日の14時の処理を自動実行します（マシン停止による実行漏れを補完）")
+                self._fetch_all_trends()
+        except Exception as e:
+            logger.error(f"❌ 起動時チェックエラー: {e}", exc_info=True)
+            # エラーが発生してもスケジューラーの起動は継続
     
     def stop(self):
         """スケジューラーを停止"""
@@ -71,30 +165,75 @@ class TrendsScheduler:
             except Exception as e:
                 logger.error(f"❌ スケジューラー停止エラー: {e}")
     
-    def _fetch_all_trends(self):
-        """全プラットフォームのトレンドを取得"""
+    def _fetch_all_trends(self, force=False):
+        """全プラットフォームのトレンドを取得（既存のrefresh_all_trends()を使用）
+        
+        Args:
+            force: Trueの場合、既に実行済みでも強制的に実行する
+                   Falseの場合、スケジューラー実行時（通常の定期実行）
+        """
+        # 同時実行防止: 既に実行中の場合はスキップ
+        if self._fetching_in_progress:
+            logger.warning("⚠️ データ取得処理が既に実行中です。重複実行をスキップします")
+            return
+        
+        self._fetching_in_progress = True
         try:
-            logger.info("🔄 自動トレンド取得開始")
             jst = pytz.timezone('Asia/Tokyo')
+            now_jst = datetime.now(jst)
+            today = now_jst.date()
+            
+            # 既に当日実行済みかチェック（重複実行を防ぐ）
+            # force=Trueの場合はスキップしない
+            # ただし、14時のジョブの場合は7時のチェックをスキップ
+            if not force:
+                # 7時前後（6:00-8:00）の実行の場合、当日の7時ジョブが既に実行済みかチェック
+                if 6 <= now_jst.hour < 8 and self.last_daily_execution_date == today:
+                    logger.info(f"⏰ 当日の7時のジョブは既に実行済みです（{today}）。重複実行をスキップします。")
+                    self._fetching_in_progress = False
+                    return
+                # 14時前後（13:00-15:00）の実行の場合、1時間以内に14時ジョブが実行済みかチェック
+                if 13 <= now_jst.hour < 15 and self.last_afternoon_execution_time:
+                    time_diff = (now_jst - self.last_afternoon_execution_time).total_seconds()
+                    if time_diff < 3600:  # 1時間以内
+                        logger.info(f"⏰ 当日の14時のジョブは既に実行済みです（{time_diff:.0f}秒前）。重複実行をスキップします。")
+                        self._fetching_in_progress = False
+                        return
+            
+            logger.info("🔄 自動トレンド取得開始")
             start_time = datetime.now(jst)
             execution_id = f"scheduler_{start_time.strftime('%Y%m%d_%H%M%S')}"
             
-            # 各プラットフォームのトレンドを取得
-            results = {
-                'google_trends': self._fetch_google_trends(),
-                'youtube_jp': self._fetch_youtube_trends('JP'),
-                'spotify': self._fetch_spotify_trends(),
-                'world_news': self._fetch_world_news(),
-                'podcast': self._fetch_podcast_trends(),
-                'hatena': self._fetch_hatena_trends(),
-                'twitch': self._fetch_twitch_trends(),
-                'rakuten': self._fetch_rakuten_trends()
-            }
+            # メモリ節約のため、古いキャッシュデータを削除（2日以上経過したデータ）
+            try:
+                logger.info("🧹 古いキャッシュデータを削除中...")
+                self.db.delete_old_cache_data(days=2)
+            except Exception as e:
+                logger.warning(f"⚠️ 古いキャッシュデータ削除エラー（処理は継続）: {e}", exc_info=True)
+            
+            # app.configからマネージャーを取得
+            with self.app.app_context():
+                managers = self.app.config.get('TREND_MANAGERS')
+                if not managers:
+                    logger.error("❌ トレンドマネージャーが初期化されていません")
+                    return
+                
+                # 既存のrefresh_all_trends()関数を使用
+                # force_refresh=Falseに変更：キャッシュが存在する場合はAPIを呼び出さない（World News APIの使用量を削減）
+                from managers.trend_managers import refresh_all_trends
+                result = refresh_all_trends(managers, force_refresh=False)
             
             # 結果をログ出力
-            success_count = sum(1 for result in results.values() if result.get('success', False))
-            total_count = len(results)
-            failed_count = total_count - success_count
+            if result.get('success'):
+                results = result.get('results', {})
+                success_count = sum(1 for r in results.values() if r.get('success', False))
+                total_count = len(results)
+                failed_count = total_count - success_count
+            else:
+                results = result.get('results', {})
+                success_count = sum(1 for r in results.values() if r.get('success', False))
+                total_count = len(results)
+                failed_count = total_count - success_count
             
             end_time = datetime.now(jst)
             duration = (end_time - start_time).total_seconds()
@@ -102,344 +241,75 @@ class TrendsScheduler:
             logger.info(f"✅ 自動トレンド取得完了: {success_count}/{total_count} 成功")
             logger.info(f"⏱️ 実行時間: {duration:.2f}秒")
             
-            # 各プラットフォームのデータをデータベースに保存
-            self._save_trends_to_database(results)
+            # 実行日付を記録（7時のジョブが実行されたことを記録）
+            now_jst = datetime.now(jst)
+            today = now_jst.date()
             
-            # 実行履歴をデータベースに保存
+            # 7時前後（6:00-8:00）の実行は7時のジョブとして記録
+            if 6 <= now_jst.hour < 8:
+                self.last_daily_execution_date = today
+                logger.debug(f"📅 7時のジョブ実行日付を記録: {today}")
+            
+            # 14時前後（13:00-15:00）の実行は14時のジョブとして記録
+            if 13 <= now_jst.hour < 15:
+                self.last_afternoon_execution_time = now_jst
+                logger.debug(f"📅 14時のジョブ実行時刻を記録: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}")
+            
+            # 実行履歴をデータベースに保存（簡易版）
             self._save_execution_log(execution_id, start_time, end_time, total_count, success_count, failed_count, duration)
             
-        except Exception as e:
-            logger.error(f"❌ 自動トレンド取得エラー: {e}")
-            import traceback
-            traceback.print_exc()
-    
-    def _fetch_youtube_trends(self, region):
-        """YouTubeトレンドを取得（強制更新）"""
-        try:
-            with self.app.app_context():
-                from app import youtube_manager
-                if youtube_manager:
-                    result = youtube_manager.get_trends(region, 25, force_refresh=True)
-                    logger.info(f"YouTube {region}: {'成功' if result.get('data') else '失敗'}")
-                    return {'success': bool(result.get('data')), 'data': result}
+            # データ保存完了後、メール自動送信を実行
+            # スケジューラー実行時（朝7時・昼14時）のみメール送信
+            # デプロイ時や手動実行時は、明示的に指示された場合のみメール送信
+            # 環境変数SKIP_EMAIL_ON_UPDATE=trueの場合はスキップ
+            skip_email = os.getenv('SKIP_EMAIL_ON_UPDATE', 'false').lower() == 'true'
+            if not skip_email:
+                # スケジューラー実行時のみメール送信（force=Falseの場合）
+                # force=Trueの場合は手動実行なので、メール送信をスキップ
+                if not force:
+                    self._send_trends_summary_emails()
                 else:
-                    logger.warning("YouTube Managerが初期化されていません")
-                    return {'success': False, 'error': 'YouTube Manager未初期化'}
-        except Exception as e:
-            logger.error(f"YouTube {region} 取得エラー: {e}")
-            return {'success': False, 'error': str(e)}
-    
-    def _fetch_google_trends(self):
-        """Google Trendsを取得"""
-        try:
-            with self.app.app_context():
-                from app import get_trends_from_bigquery
-                trends_df, status = get_trends_from_bigquery('JP')
-                
-                if trends_df is not None and not trends_df.empty:
-                    # DataFrameを辞書形式に変換
-                    trends_data = trends_df.to_dict('records')
-                    logger.info(f"Google Trends: 成功 - {len(trends_data)}件")
-                    return {'success': True, 'data': trends_data}
-                else:
-                    logger.warning(f"Google Trends: データが取得できませんでした - {status}")
-                    return {'success': False, 'error': f'データ取得失敗: {status}'}
-        except Exception as e:
-            logger.error(f"Google Trends 取得エラー: {e}")
-            return {'success': False, 'error': str(e)}
-    
-    def _fetch_spotify_trends(self):
-        """Spotifyトレンドを取得（強制更新）"""
-        try:
-            with self.app.app_context():
-                from app import music_manager
-                if music_manager:
-                    result = music_manager.get_trends('spotify', 'JP', force_refresh=True)
-                    logger.info(f"Spotify: {'成功' if result.get('data') else '失敗'}")
-                    return {'success': bool(result.get('data')), 'data': result}
-                else:
-                    logger.warning("Music Managerが初期化されていません")
-                    return {'success': False, 'error': 'Music Manager未初期化'}
-        except Exception as e:
-            logger.error(f"Spotify 取得エラー: {e}")
-            return {'success': False, 'error': str(e)}
-    
-    def _fetch_world_news(self):
-        """World Newsを取得"""
-        try:
-            with self.app.app_context():
-                from app import get_world_news_trends
-                result = get_world_news_trends()
-                logger.info(f"World News: {'成功' if result else '失敗'}")
-                return {'success': bool(result), 'data': result}
-        except Exception as e:
-            logger.error(f"World News 取得エラー: {e}")
-            return {'success': False, 'error': str(e)}
-    
-    def _fetch_podcast_trends(self):
-        """Podcastトレンドを取得"""
-        max_retries = 3
-        retry_delay = 2
-        
-        for attempt in range(max_retries):
-            try:
-                def fetch_func():
-                    with self.app.app_context():
-                        from services.trends.podcast_trends import PodcastTrendsManager
-                        podcast_manager = PodcastTrendsManager()
-                        return podcast_manager.get_trends('best_podcasts')
-                
-                result = self._execute_with_timeout(fetch_func, timeout_seconds=30)
-                
-                if result:
-                    logger.info(f"Podcast: 成功 (試行 {attempt + 1}/{max_retries})")
-                    return {'success': True, 'data': result}
-                else:
-                    logger.warning(f"Podcast: データが取得できませんでした (試行 {attempt + 1}/{max_retries})")
-                        
-            except TimeoutError as e:
-                logger.error(f"Podcast タイムアウト (試行 {attempt + 1}/{max_retries}): {e}")
-                import traceback
-                traceback.print_exc()
-            except Exception as e:
-                logger.error(f"Podcast 取得エラー (試行 {attempt + 1}/{max_retries}): {e}")
-                import traceback
-                traceback.print_exc()
-                
-            if attempt < max_retries - 1:
-                logger.info(f"Podcast: {retry_delay}秒後にリトライします...")
-                time.sleep(retry_delay)
-                retry_delay *= 2
-        
-        return {'success': False, 'error': '最大リトライ回数に達しました'}
-    
-    def _fetch_hatena_trends(self):
-        """はてなブックマークトレンドを取得"""
-        max_retries = 3
-        retry_delay = 2
-        
-        for attempt in range(max_retries):
-            try:
-                def fetch_func():
-                    with self.app.app_context():
-                        # はてなブックマークのマネージャーを直接使用
-                        from services.trends.hatena_trends import HatenaTrendsManager
-                        hatena_manager = HatenaTrendsManager()
-                        return hatena_manager.get_trends()
-                
-                # タイムアウト付きで実行
-                result = self._execute_with_timeout(fetch_func, timeout_seconds=30)
-                
-                if result:
-                    logger.info(f"はてなブックマーク: 成功 (試行 {attempt + 1}/{max_retries})")
-                    return {'success': True, 'data': result}
-                else:
-                    logger.warning(f"はてなブックマーク: データが取得できませんでした (試行 {attempt + 1}/{max_retries})")
-                        
-            except TimeoutError as e:
-                logger.error(f"はてなブックマーク タイムアウト (試行 {attempt + 1}/{max_retries}): {e}")
-                import traceback
-                traceback.print_exc()
-            except Exception as e:
-                logger.error(f"はてなブックマーク 取得エラー (試行 {attempt + 1}/{max_retries}): {e}")
-                import traceback
-                traceback.print_exc()
-                
-            if attempt < max_retries - 1:
-                logger.info(f"はてなブックマーク: {retry_delay}秒後にリトライします...")
-                time.sleep(retry_delay)
-                retry_delay *= 2  # 指数バックオフ
-        
-        return {'success': False, 'error': '最大リトライ回数に達しました'}
-    
-    def _fetch_twitch_trends(self):
-        """Twitchトレンドを取得"""
-        max_retries = 3
-        retry_delay = 2
-        
-        for attempt in range(max_retries):
-            try:
-                def fetch_func():
-                    with self.app.app_context():
-                        # Twitchのマネージャーを直接使用
-                        from services.trends.twitch_trends import TwitchTrendsManager
-                        twitch_manager = TwitchTrendsManager()
-                        return twitch_manager.get_trends()
-                
-                # タイムアウト付きで実行
-                result = self._execute_with_timeout(fetch_func, timeout_seconds=30)
-                
-                if result:
-                    logger.info(f"Twitch: 成功 (試行 {attempt + 1}/{max_retries})")
-                    return {'success': True, 'data': result}
-                else:
-                    logger.warning(f"Twitch: データが取得できませんでした (試行 {attempt + 1}/{max_retries})")
-                        
-            except TimeoutError as e:
-                logger.error(f"Twitch タイムアウト (試行 {attempt + 1}/{max_retries}): {e}")
-                import traceback
-                traceback.print_exc()
-            except Exception as e:
-                logger.error(f"Twitch 取得エラー (試行 {attempt + 1}/{max_retries}): {e}")
-                import traceback
-                traceback.print_exc()
-                
-            if attempt < max_retries - 1:
-                logger.info(f"Twitch: {retry_delay}秒後にリトライします...")
-                time.sleep(retry_delay)
-                retry_delay *= 2  # 指数バックオフ
-        
-        return {'success': False, 'error': '最大リトライ回数に達しました'}
-    
-    def _fetch_rakuten_trends(self):
-        """楽天トレンドを取得"""
-        max_retries = 3
-        retry_delay = 2
-        
-        for attempt in range(max_retries):
-            try:
-                def fetch_func():
-                    with self.app.app_context():
-                        # 楽天のマネージャーを直接使用
-                        from services.trends.rakuten_trends import RakutenTrendsManager
-                        rakuten_manager = RakutenTrendsManager()
-                        return rakuten_manager.get_trends()
-                
-                # タイムアウト付きで実行
-                result = self._execute_with_timeout(fetch_func, timeout_seconds=30)
-                
-                if result:
-                    logger.info(f"楽天: 成功 (試行 {attempt + 1}/{max_retries})")
-                    return {'success': True, 'data': result}
-                else:
-                    logger.warning(f"楽天: データが取得できませんでした (試行 {attempt + 1}/{max_retries})")
-                        
-            except TimeoutError as e:
-                logger.error(f"楽天 タイムアウト (試行 {attempt + 1}/{max_retries}): {e}")
-                import traceback
-                traceback.print_exc()
-            except Exception as e:
-                logger.error(f"楽天 取得エラー (試行 {attempt + 1}/{max_retries}): {e}")
-                import traceback
-                traceback.print_exc()
-                
-            if attempt < max_retries - 1:
-                logger.info(f"楽天: {retry_delay}秒後にリトライします...")
-                time.sleep(retry_delay)
-                retry_delay *= 2  # 指数バックオフ
-        
-        return {'success': False, 'error': '最大リトライ回数に達しました'}
-    
-    def _save_trends_to_database(self, results: dict):
-        """各プラットフォームのトレンドデータをデータベースに保存"""
-        try:
-            logger.info(f"🔄 トレンドデータ保存開始: {len(results)}プラットフォーム")
+                    logger.info("⏭️ 手動実行（force=True）のため、メール自動送信をスキップします")
+            else:
+                logger.info("⏭️ メール自動送信をスキップします（SKIP_EMAIL_ON_UPDATE=true）")
             
-            # 古いtrends_cacheデータを削除
-            self._clear_old_trends_cache()
-            
-            for platform, result in results.items():
-                logger.info(f"📊 {platform}の結果: success={result.get('success')}, data_type={type(result.get('data'))}")
-                
-                if result.get('success') and result.get('data'):
-                    try:
-                        # プラットフォーム名とトレンドタイプを決定
-                        if platform == 'google_trends':
-                            platform_name = 'Google Trends'
-                            trend_type = 'general'
-                        elif platform == 'youtube_jp':
-                            platform_name = 'YouTube'
-                            trend_type = 'JP'
-                        else:
-                            platform_name = platform.replace('_', ' ').title()
-                            trend_type = 'general'
-                        
-                        # データの件数を計算（プラットフォーム別）
-                        data_count = 1  # デフォルト値
-                        if platform == 'google_trends':
-                            # Google Trends: データ構造に応じて件数を計算
-                            if isinstance(result['data'], dict):
-                                if 'data' in result['data'] and isinstance(result['data']['data'], list):
-                                    data_count = len(result['data']['data'])
-                                elif 'success' in result['data'] and not result['data']['success']:
-                                    data_count = 0  # エラーの場合は0件
-                                else:
-                                    data_count = 1
-                            elif isinstance(result['data'], list):
-                                data_count = len(result['data'])
-                            else:
-                                data_count = 0
-                        elif platform == 'youtube_jp':
-                            # YouTube: リストの長さ
-                            data_count = len(result['data']) if isinstance(result['data'], list) else 1
-                        elif platform == 'spotify':
-                            # Spotify: データ内の件数
-                            if isinstance(result['data'], dict) and 'data' in result['data']:
-                                data_count = len(result['data']['data']) if isinstance(result['data']['data'], list) else 1
-                        elif platform == 'world_news':
-                            # World News: データ内の件数
-                            if isinstance(result['data'], dict) and 'data' in result['data']:
-                                data_count = len(result['data']['data']) if isinstance(result['data']['data'], list) else 1
-                        elif platform == 'podcast':
-                            # Podcast: データ内の件数
-                            if isinstance(result['data'], dict) and 'data' in result['data']:
-                                data_count = len(result['data']['data']) if isinstance(result['data']['data'], list) else 1
-                        elif platform == 'hatena':
-                            # Hatena: データ内の件数
-                            if isinstance(result['data'], dict) and 'data' in result['data']:
-                                data_count = len(result['data']['data']) if isinstance(result['data']['data'], list) else 1
-                        elif platform == 'twitch':
-                            # Twitch: データ内の件数
-                            if isinstance(result['data'], dict) and 'data' in result['data']:
-                                data_count = len(result['data']['data']) if isinstance(result['data']['data'], list) else 1
-                        elif platform == 'rakuten':
-                            # Rakuten: データ内の件数
-                            if isinstance(result['data'], dict) and 'data' in result['data']:
-                                data_count = len(result['data']['data']) if isinstance(result['data']['data'], list) else 1
-                        logger.info(f"💾 {platform_name}の{trend_type}トレンドデータを保存中: {data_count}件")
-                        
-                        # データベースに保存
-                        self.db.save_scheduler_trends(
-                            platform=platform_name,
-                            trend_type=trend_type,
-                            data=result['data'],
-                            status='success',
-                            total_count=data_count,
-                            execution_time=None
-                        )
-                        
-                        # trends_cacheテーブルにも保存
-                        self._save_to_trends_cache(platform, result['data'], data_count)
-                        
-                        logger.info(f"✅ {platform_name}の{trend_type}トレンドデータを保存しました")
-                        
-                    except Exception as e:
-                        logger.error(f"❌ {platform}のデータ保存エラー: {e}")
-                        import traceback
-                        traceback.print_exc()
-                else:
-                    # 失敗した場合も記録
-                    try:
-                        platform_name = platform.replace('_', ' ').title()
-                        error_msg = result.get('error', 'Unknown error')
-                        logger.info(f"❌ {platform_name}の失敗データを記録中: {error_msg}")
-                        
-                        self.db.save_scheduler_trends(
-                            platform=platform_name,
-                            trend_type='general',
-                            data={'error': error_msg},
-                            status='failed',
-                            total_count=0,
-                            execution_time=None
-                        )
-                        logger.info(f"❌ {platform_name}の失敗データを記録しました")
-                    except Exception as e:
-                        logger.error(f"❌ {platform}の失敗データ記録エラー: {e}")
-                        import traceback
-                        traceback.print_exc()
-                        
         except Exception as e:
-            logger.error(f"❌ トレンドデータ保存エラー: {e}")
+            logger.error(f"❌ 自動トレンド取得エラー: {e}", exc_info=True)
+            # エラーが発生してもメール送信を試みる（ただし、SKIP_EMAIL_ON_UPDATE=trueの場合はスキップ）
+            skip_email = os.getenv('SKIP_EMAIL_ON_UPDATE', 'false').lower() == 'true'
+            if not skip_email:
+                try:
+                    self._send_trends_summary_emails()
+                except Exception as email_error:
+                    logger.error(f"❌ メール送信エラー: {email_error}", exc_info=True)
+            else:
+                logger.info("⏭️ メール自動送信をスキップします（SKIP_EMAIL_ON_UPDATE=true）")
+        finally:
+            # 実行完了後にフラグをリセット
+            self._fetching_in_progress = False
+    
+    
+    
+    def _send_trends_summary_emails(self):
+        """トレンドサマリーメールを自動送信"""
+        try:
+            if self.subscription_manager is None:
+                logger.warning("📧 SubscriptionManagerが初期化されていないため、メール自動送信をスキップします")
+                return
+            
+            logger.info("=" * 60)
+            logger.info("📧 トレンドサマリーメール自動送信を開始します")
+            logger.info("=" * 60)
+            
+            self.subscription_manager.send_trends_summary()
+            
+            logger.info("✅ トレンドサマリーメール自動送信完了")
+        except Exception as e:
+            # メール送信エラーはスケジューラー全体を止めないように、警告のみ
+            logger.error("=" * 60)
+            logger.error(f"⚠️ トレンドサマリーメール自動送信エラー（スケジューラーは継続）")
+            logger.error(f"   エラー内容: {type(e).__name__}: {e}")
+            logger.error("=" * 60)
             import traceback
             traceback.print_exc()
     
@@ -574,26 +444,31 @@ class TrendsScheduler:
     def _save_execution_log(self, execution_id: str, start_time: datetime, end_time: datetime, 
                            total_platforms: int, successful_platforms: int, failed_platforms: int, 
                            execution_time: float):
-        """スケジューラー実行履歴をデータベースに保存"""
+        """スケジューラー実行履歴をデータベースに保存（メソッドが存在しない場合はスキップ）"""
         try:
-            status = 'success' if failed_platforms == 0 else 'partial_success' if successful_platforms > 0 else 'failed'
-            
-            self.db.save_scheduler_execution_log(
-                execution_id=execution_id,
-                start_time=start_time,
-                end_time=end_time,
-                total_platforms=total_platforms,
-                successful_platforms=successful_platforms,
-                failed_platforms=failed_platforms,
-                execution_time=execution_time,
-                status=status,
-                error_details=None
-            )
-            
-            logger.info(f"✅ 実行履歴を保存しました: {execution_id} - {status}")
+            # save_scheduler_execution_logメソッドが存在するかチェック
+            if hasattr(self.db, 'save_scheduler_execution_log'):
+                status = 'success' if failed_platforms == 0 else 'partial_success' if successful_platforms > 0 else 'failed'
+                
+                self.db.save_scheduler_execution_log(
+                    execution_id=execution_id,
+                    start_time=start_time,
+                    end_time=end_time,
+                    total_platforms=total_platforms,
+                    successful_platforms=successful_platforms,
+                    failed_platforms=failed_platforms,
+                    execution_time=execution_time,
+                    status=status,
+                    error_details=None
+                )
+                
+                logger.info(f"✅ 実行履歴を保存しました: {execution_id} - {status}")
+            else:
+                # メソッドが存在しない場合はログのみ出力
+                logger.debug(f"📝 実行履歴: {execution_id} - {successful_platforms}/{total_platforms} 成功, 実行時間: {execution_time:.2f}秒")
             
         except Exception as e:
-            logger.error(f"❌ 実行履歴保存エラー: {e}")
+            logger.warning(f"⚠️ 実行履歴保存エラー（スケジューラーは継続）: {e}")
     
     def _update_last_fetch_timestamp(self):
         """最終取得時刻をデータベースに記録"""

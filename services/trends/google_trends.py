@@ -1,40 +1,80 @@
 import os
 import pandas as pd
 import pandas_gbq
-from google.cloud import bigquery
+from google.oauth2 import service_account
 from datetime import datetime, timedelta
 from database_config import TrendsCache
 from dotenv import load_dotenv
+from utils.logger_config import get_logger
 
 # 環境変数を明示的に読み込み
 load_dotenv()
+
+# ロガーの初期化
+logger = get_logger(__name__)
 
 class GoogleTrendsManager:
     """Google Trendsのトレンドを取得・管理するクラス"""
     
     def __init__(self):
         """初期化"""
+        import json
+        import base64
+        
         self.project_id = os.getenv('GOOGLE_CLOUD_PROJECT_ID')
         self.db = TrendsCache()
+        self.credentials = None
+        
+        # 方法1: Base64エンコードされた認証情報から読み込み（本番環境用）
+        credentials_content = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_CONTENT')
+        if credentials_content:
+            try:
+                # Base64デコード
+                decoded_content = base64.b64decode(credentials_content).decode('utf-8')
+                credentials_dict = json.loads(decoded_content)
+                self.credentials = service_account.Credentials.from_service_account_info(credentials_dict)
+                logger.info("  Credentials: GOOGLE_APPLICATION_CREDENTIALS_CONTENTから読み込み済み")
+            except Exception as e:
+                logger.error(f"❌ Google Trends Credentials (CONTENT) 読み込みエラー: {e}", exc_info=True)
+                self.credentials = None
+        
+        # 方法2: ファイルパスから読み込み（ローカル環境用）
+        if not self.credentials:
+            credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+            if credentials_path:
+                if os.path.exists(credentials_path):
+                    try:
+                        self.credentials = service_account.Credentials.from_service_account_file(credentials_path)
+                        logger.info(f"  Credentials: ファイル {credentials_path} から読み込み済み")
+                    except Exception as e:
+                        logger.error(f"❌ Google Trends Credentials 読み込みエラー: {e}", exc_info=True)
+                        self.credentials = None
+                else:
+                    logger.warning(f"⚠️ Google Trends Credentials: パスが存在しません ({credentials_path})")
+            else:
+                logger.warning("⚠️ Google Trends Credentials: GOOGLE_APPLICATION_CREDENTIALS が設定されていません")
         
         if not self.project_id:
-            print("Warning: GOOGLE_CLOUD_PROJECT_IDが設定されていません")
+            logger.warning("Warning: GOOGLE_CLOUD_PROJECT_IDが設定されていません")
         
-        print(f"Google Trends Manager初期化:")
-        print(f"  Project ID: {'設定済み' if self.project_id else '未設定'}")
+        logger.info(f"Google Trends Manager初期化:")
+        logger.info(f"  Project ID: {'設定済み' if self.project_id else '未設定'}")
+        logger.info(f"  Credentials: {'設定済み' if self.credentials else '未設定'}")
     
     def get_trends(self, region='JP', limit=25, force_refresh=False):
         """Google Trendsを取得（キャッシュ優先、フォールバックでBigQuery）"""
         if force_refresh:
-            print(f"🔄 Google Trends force_refresh: キャッシュをクリアします")
+            logger.info(f"🔄 Google Trends force_refresh: キャッシュをクリアします")
             self.db.clear_google_trends_cache(region)
+        
+        # 日本と同じロジックを使用（キャッシュ優先、フォールバックでBigQuery）
         return self.get_cached_trends(region, limit)
     
     def get_bigquery_trends(self, region='JP', limit=25):
         """BigQueryからGoogle Trendsデータを取得"""
         try:
-            print(f"=== Google Trends BigQuery取得開始 ===")
-            print(f"リクエストパラメータ: region={region}, limit={limit}")
+            logger.info(f"=== Google Trends BigQuery取得開始 ===")
+            logger.info(f"リクエストパラメータ: region={region}, limit={limit}")
             
             if not self.project_id:
                 return {
@@ -43,57 +83,108 @@ class GoogleTrendsManager:
                     'data': []
                 }
             
-            # BigQueryクエリ（日本全体のTop 25を取得 - 都道府県を集約）
-            query = f"""
-        SELECT 
-            term as keyword,
-            AVG(score) as score,
-            country_code,
-            refresh_date,
-            ROW_NUMBER() OVER (ORDER BY AVG(score) DESC) as rank
-        FROM `bigquery-public-data.google_trends.international_top_terms`
-        WHERE country_code = '{region}'
-          AND refresh_date = (
-            SELECT MAX(refresh_date)
+            # USデータの取得のみに集中
+            logger.info("USデータを取得します")
+            
+            # USデータの場合はtop_termsテーブルを使用
+            if region == 'US':
+                logger.info(f"{region}のデータを取得するため、top_termsテーブルを使用します")
+                query = f"""
+            SELECT 
+                term as keyword,
+                AVG(score) as score,
+                'US' as country_code,
+                refresh_date,
+                ROW_NUMBER() OVER (ORDER BY AVG(score) DESC) as rank
+            FROM `bigquery-public-data.google_trends.top_terms`
+            WHERE refresh_date = (
+                SELECT MAX(refresh_date)
+                FROM `bigquery-public-data.google_trends.top_terms`
+            )
+              AND score IS NOT NULL
+            GROUP BY term, refresh_date
+            ORDER BY score DESC
+            LIMIT {limit}
+            """
+            else:
+                # 日本と同じクエリを使用（国コードを指定）
+                logger.info(f"{region}のデータを取得するため、international_top_termsテーブルを使用します")
+                query = f"""
+            SELECT 
+                term as keyword,
+                AVG(score) as score,
+                country_code,
+                refresh_date,
+                ROW_NUMBER() OVER (ORDER BY AVG(score) DESC) as rank
             FROM `bigquery-public-data.google_trends.international_top_terms`
             WHERE country_code = '{region}'
-          )
-          AND score IS NOT NULL
-        GROUP BY term, country_code, refresh_date
-        ORDER BY score DESC
-        LIMIT {limit}
-        """
+              AND refresh_date = (
+                SELECT MAX(refresh_date)
+                FROM `bigquery-public-data.google_trends.international_top_terms`
+                WHERE country_code = '{region}'
+              )
+              AND score IS NOT NULL
+            GROUP BY term, country_code, refresh_date
+            ORDER BY score DESC
+            LIMIT {limit}
+            """
             
-            print(f"BigQueryクエリ実行: {query}")
+            logger.debug(f"BigQueryクエリ実行: {query}")
             
             # BigQueryからデータを取得
-            df = pandas_gbq.read_gbq(query, project_id=self.project_id)
+            df = pandas_gbq.read_gbq(query, project_id=self.project_id, credentials=self.credentials)
             
             if df.empty:
-                print("❌ Google Trends: データが取得できませんでした")
+                logger.warning("❌ Google Trends: USデータが取得できませんでした")
                 return {
                     'success': False,
-                    'error': 'データが取得できませんでした',
-                    'data': []
+                    'error': 'USデータが取得できませんでした',
+                    'data': [],
+                    'status': 'api_error',
+                    'source': 'BigQuery',
+                    'country': region
                 }
             
             # データを辞書形式に変換
             trends_data = []
+            logger.debug(f"取得したデータの構造確認:")
+            logger.debug(f"列名: {df.columns.tolist()}")
+            logger.debug(f"データフレームの形状: {df.shape}")
+            logger.debug(f"最初の5行: {df.head(5).to_dict('records')}")
+            
+            # 重複チェック
+            unique_keywords = df['keyword'].nunique()
+            logger.debug(f"ユニークなキーワード数: {unique_keywords}")
+            
+            # 重複を排除（念のため）
+            seen_keywords = set()
+            
             for i, row in df.iterrows():
-                keyword = row['keyword']
+                keyword = str(row['keyword']).strip()
+                if not keyword or keyword == 'nan' or keyword in seen_keywords:
+                    continue
+                    
+                seen_keywords.add(keyword)
+                
                 # Google検索URLを生成
-                google_search_url = f"https://www.google.com/search?q={keyword.replace(' ', '+')}"
+                google_search_url = f"https://www.google.com/search?q={keyword.replace(' ', '+')}&geo=US"
                 
                 trends_data.append({
-                    'keyword': keyword,  # keywordフィールドを使用
-                    'rank': row['rank'],  # BigQueryから取得したrankを使用
-                    'score': int(row['score']),  # 平均スコアを整数に変換
+                    'keyword': keyword,
+                    'rank': len(trends_data) + 1,  # 連番でランクを設定
+                    'popularity': int(row['score']),
+                    'score': int(row['score']),
                     'country_code': row['country_code'],
                     'refresh_date': row['refresh_date'].strftime('%Y-%m-%d') if pd.notna(row['refresh_date']) else None,
                     'google_search_url': google_search_url
                 })
+                
+                # 最初の3件だけログ出力
+                if len(trends_data) <= 3:
+                    logger.debug(f"行 {len(trends_data)}: keyword='{keyword}', rank={len(trends_data)}, score={row['score']}")
+                    logger.debug(f"  変換後: rank={len(trends_data)}, popularity={int(row['score'])}")
             
-            print(f"✅ Google Trends: {len(trends_data)}件のデータを取得しました")
+            logger.info(f"✅ Google Trends: {len(trends_data)}件のデータを取得しました (国コード: {region})")
             
             # キャッシュに保存
             self.db.save_google_trends_to_cache(trends_data, region)
@@ -102,25 +193,32 @@ class GoogleTrendsManager:
                 'success': True,
                 'data': trends_data,
                 'status': 'success',
-                'source': 'bigquery',
+                'source': 'BigQuery',
+                'country': region,
+                'actual_country': region,  # 実際に使用された国コード
                 'total_count': len(trends_data)
             }
             
         except Exception as e:
-            print(f"❌ Google Trends BigQuery取得エラー: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"❌ Google Trends BigQuery取得エラー: {e}", exc_info=True)
             return {
                 'success': False,
                 'error': f'Google Trends取得に失敗しました: {str(e)}',
-                'data': []
+                'data': [],
+                'status': 'api_error',
+                'source': 'BigQuery',
+                'country': region,
+                'debug_info': {
+                    'error_type': type(e).__name__,
+                    'error_message': str(e)
+                }
             }
     
     def get_cached_trends(self, region='JP', limit=25):
-        """キャッシュからGoogle Trendsデータを取得"""
+        """Google Trendsデータを取得（キャッシュデータが存在しない場合のみ外部APIを呼び出し）"""
         try:
-            print(f"=== Google Trends キャッシュ取得開始 ===")
-            print(f"リクエストパラメータ: region={region}, limit={limit}")
+            logger.info(f"=== Google Trends キャッシュ取得開始 ===")
+            logger.info(f"リクエストパラメータ: region={region}, limit={limit}")
             
             # データベースからキャッシュを取得
             cached_data = self.db.get_google_trends_from_cache(region)
@@ -132,7 +230,7 @@ class GoogleTrendsManager:
                         keyword = item['keyword']
                         item['google_search_url'] = f"https://www.google.com/search?q={keyword.replace(' ', '+')}"
                 
-                print(f"✅ Google Trends: キャッシュから{len(cached_data)}件のデータを取得しました")
+                logger.info(f"✅ Google Trends: キャッシュから{len(cached_data)}件のデータを取得しました")
                 return {
                     'success': True,
                     'data': cached_data,
@@ -141,22 +239,34 @@ class GoogleTrendsManager:
                     'total_count': len(cached_data)
                 }
             else:
-                print("❌ Google Trends: キャッシュデータが見つかりません。実際のAPIを呼び出します")
-                # キャッシュが空の場合、実際のGoogle Trends APIを呼び出す
+                logger.warning("⚠️ Google Trends: キャッシュデータが見つかりません。外部APIを呼び出します")
+                # キャッシュデータが存在しない場合のみ外部APIを呼び出し
                 result = self.get_bigquery_trends(region, limit)
-                # BigQueryからデータを取得できた場合、キャッシュに保存
-                if result['success']:
-                    self.db.save_google_trends_to_cache(result['data'], region)
-                return result
+                if result.get('success') and result.get('data'):
+                    logger.info(f"✅ Google Trends: 外部APIから{len(result['data'])}件のデータを取得し、キャッシュに保存しました")
+                    return {
+                        'success': True,
+                        'data': result['data'],
+                        'status': 'api_fetched',
+                        'source': 'BigQuery',
+                        'total_count': len(result['data'])
+                    }
+                else:
+                    logger.error(f"❌ Google Trends: 外部APIからデータを取得できませんでした")
+                    return {
+                        'success': False,
+                        'data': [],
+                        'status': 'api_error',
+                        'source': 'BigQuery',
+                        'total_count': 0
+                    }
                 
         except Exception as e:
-            print(f"❌ Google Trends キャッシュ取得エラー: {e}")
-            print("❌ Google Trends: キャッシュ取得に失敗しました。実際のAPIを呼び出します")
-            # キャッシュ取得に失敗した場合、実際のGoogle Trends APIを呼び出す
-            result = self.get_bigquery_trends(region, limit)
-            # BigQueryからデータを取得できた場合、キャッシュに保存
-            if result.get('success') and result.get('data'):
-                self.db.save_google_trends_to_cache(result['data'], region)
-            return result
+            logger.error(f"❌ Google Trends キャッシュ取得エラー: {e}", exc_info=True)
+            return {
+                'success': False,
+                'error': f'Google Trends取得に失敗しました: {str(e)}',
+                'data': []
+            }
     
 

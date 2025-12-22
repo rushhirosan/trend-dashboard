@@ -3,9 +3,14 @@ import requests
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from database_config import TrendsCache
+from utils.logger_config import get_logger
+from utils.rate_limiter import get_rate_limiter
 
 # 環境変数を明示的に読み込み
 load_dotenv()
+
+# ロガーの初期化
+logger = get_logger(__name__)
 
 class RakutenTrendsManager:
     """楽天のトレンドを取得・管理するクラス"""
@@ -16,28 +21,52 @@ class RakutenTrendsManager:
         self.rakuten_app_id = os.getenv('RAKUTEN_APP_ID')
         self.rakuten_affiliate_id = os.getenv('RAKUTEN_AFFILIATE_ID')
         
-        print(f"Rakuten Trends Manager初期化:")
-        print(f"  App ID: {'設定済み' if self.rakuten_app_id else '未設定'}")
-        print(f"  Affiliate ID: {'設定済み' if self.rakuten_affiliate_id else '未設定'}")
+        logger.info(f"Rakuten Trends Manager初期化:")
+        logger.info(f"  App ID: {'設定済み' if self.rakuten_app_id else '未設定'}")
+        logger.info(f"  Affiliate ID: {'設定済み' if self.rakuten_affiliate_id else '未設定'}")
         
         # デバッグ: 環境変数の値を確認
-        print(f"  App ID値: {self.rakuten_app_id}")
-        print(f"  Affiliate ID値: {self.rakuten_affiliate_id}")
+        logger.debug(f"  App ID値: {self.rakuten_app_id}")
+        logger.debug(f"  Affiliate ID値: {self.rakuten_affiliate_id}")
     
     def get_trends(self, genre_id=None, limit=25, force_refresh=False):
         """楽天トレンドを取得（get_popular_itemsのエイリアス）"""
         return self.get_popular_items(genre_id, limit, force_refresh)
     
     def get_popular_items(self, genre_id=None, limit=25, force_refresh=False):
-        """楽天人気商品を取得"""
-        if not self.rakuten_app_id:
-            return {'error': '楽天アプリケーションIDが設定されていません'}
-        
+        """楽天人気商品を取得（キャッシュデータが存在しない場合のみ外部APIを呼び出し）"""
         try:
-            # キャッシュから取得を試行
-            cached_data = self.get_from_cache(genre_id or 'all')
-            if cached_data and not force_refresh:
-                cache_info = self._get_cache_info(genre_id or 'all')
+            cache_scope = genre_id or 'all'
+            cached_data = None
+            
+            if force_refresh:
+                logger.info(f"🔄 楽天: force_refresh指定のためキャッシュをスキップします (scope: {cache_scope})")
+            else:
+                logger.debug(f"🔍 楽天: キャッシュデータ取得開始 (genre_id: {genre_id})")
+                cached_data = self.get_from_cache(cache_scope)
+                logger.debug(f"🔍 楽天: キャッシュデータ取得結果: {type(cached_data)}, 長さ: {len(cached_data) if cached_data else 0}")
+            
+            if cached_data:
+                # sales_countを数値に変換（'N/A'の場合は0）
+                for item in cached_data:
+                    sales_count = item.get('sales_count', 'N/A')
+                    if isinstance(sales_count, str) and sales_count != 'N/A':
+                        try:
+                            item['sales_count'] = int(sales_count)
+                        except:
+                            item['sales_count'] = 0
+                    elif sales_count == 'N/A' or sales_count is None:
+                        item['sales_count'] = 0
+                
+                # 売上数でソート（降順）、同じ場合はレビュー数でソート
+                cached_data.sort(key=lambda x: (x.get('sales_count', 0), x.get('review_count', 0)), reverse=True)
+                
+                # ランキングを再設定
+                for i, item in enumerate(cached_data, 1):
+                    item['rank'] = i
+                
+                logger.info(f"✅ 楽天: キャッシュデータを使用し、売上数でソートしました ({len(cached_data)}件)")
+                cache_info = self._get_cache_info(cache_scope)
                 return {
                     'data': cached_data,
                     'status': 'cached',
@@ -45,35 +74,27 @@ class RakutenTrendsManager:
                     'cache_info': cache_info
                 }
             
-            # 1日1回のみAPIを呼び出し
-            if not force_refresh and not self._should_refresh_cache(genre_id or 'all'):
-                print(f"⚠️ 楽天のキャッシュは今日既に更新済みです。キャッシュデータを使用します。")
-                if cached_data:
-                    cache_info = self._get_cache_info(genre_id or 'all')
-                    return {
-                        'data': cached_data,
-                        'status': 'cached',
-                        'genre_id': genre_id,
-                        'cache_info': cache_info
-                    }
-            
-            # 楽天商品ランキングAPIを試す
-            ranking_result = self._get_rakuten_ranking(genre_id, limit)
-            if ranking_result and 'data' in ranking_result and ranking_result['data']:
+            logger.warning(f"⚠️ 楽天: キャッシュ未使用のため外部APIを呼び出します")
+            api_result = self._get_rakuten_ranking(genre_id, limit)
+            if api_result and api_result.get('data'):
+                trends_data = api_result['data']
                 # キャッシュに保存
-                self.save_to_cache(ranking_result['data'], genre_id or 'all')
-                # 更新日時を記録
-                self._update_refresh_time(genre_id or 'all')
-                return ranking_result
-            
-            # ランキングAPIが失敗した場合は商品検索APIを使用
-            search_result = self._get_rakuten_search(genre_id, limit)
-            if search_result and 'data' in search_result and search_result['data']:
-                # キャッシュに保存
-                self.save_to_cache(search_result['data'], genre_id or 'all')
-                # 更新日時を記録
-                self._update_refresh_time(genre_id or 'all')
-            return search_result
+                self.save_to_cache(trends_data, cache_scope)
+                self._update_refresh_time(cache_scope)
+                logger.info(f"✅ 楽天: 外部APIから{len(trends_data)}件のデータを取得し、キャッシュに保存しました")
+                return {
+                    'data': trends_data,
+                    'status': 'api_fetched',
+                    'genre_id': genre_id,
+                    'source': '楽天商品ランキングAPI'
+                }
+            else:
+                logger.error(f"❌ 楽天: 外部APIからデータを取得できませんでした")
+                return {
+                    'data': [],
+                    'status': 'api_error',
+                    'genre_id': genre_id
+                }
         
         except Exception as e:
             return {'error': f'楽天トレンド取得エラー: {str(e)}'}
@@ -95,11 +116,14 @@ class RakutenTrendsManager:
             if genre_id:
                 params['genreId'] = genre_id
             
-            print(f"楽天ランキングAPIリクエストURL: {url}")
-            print(f"楽天ランキングAPIリクエストパラメータ: {params}")
+            logger.debug(f"楽天ランキングAPIリクエストURL: {url}")
+            logger.debug(f"楽天ランキングAPIリクエストパラメータ: {params}")
+            
+            # レート制限をチェック
+            self.rate_limiter.wait_if_needed()
             
             response = requests.get(url, params=params, timeout=10)
-            print(f"楽天ランキングAPIレスポンスステータス: {response.status_code}")
+            logger.debug(f"楽天ランキングAPIレスポンスステータス: {response.status_code}")
             
             if response.status_code == 200:
                 data = response.json()
@@ -108,14 +132,24 @@ class RakutenTrendsManager:
                 # デバッグ: 最初のアイテムの全フィールドを確認
                 if items:
                     first_item = items[0].get('Item', {})
-                    print(f"楽天APIアイテムフィールド: {list(first_item.keys())}")
-                    print(f"楽天APIアイテムサンプル: {first_item}")
+                    logger.debug(f"楽天APIアイテムフィールド: {list(first_item.keys())}")
+                    logger.debug(f"楽天APIアイテムサンプル: {first_item}")
                 
                 trends_data = []
                 for item in items:
                     item_info = item.get('Item', {})
+                    # sales_countを数値に変換（'N/A'の場合は0）
+                    sales_count = item_info.get('salesCount', 'N/A')
+                    if isinstance(sales_count, str) and sales_count != 'N/A':
+                        try:
+                            sales_count = int(sales_count)
+                        except:
+                            sales_count = 0
+                    elif sales_count == 'N/A' or sales_count is None:
+                        sales_count = 0
+                    
                     trends_data.append({
-                        'rank': item_info.get('rank', len(trends_data) + 1),
+                        'item_id': item_info.get('itemCode', ''),  # itemCodeをitem_idとして追加
                         'title': item_info.get('itemName', ''),
                         'price': item_info.get('itemPrice', 0),
                         'review_count': item_info.get('reviewCount', 0),
@@ -125,15 +159,15 @@ class RakutenTrendsManager:
                         'shop_name': item_info.get('shopName', ''),
                         'genre_id': item_info.get('genreId', ''),
                         'sales_rank': item_info.get('salesRank', 'N/A'),  # 売上ランク
-                        'sales_count': item_info.get('salesCount', 'N/A')  # 売上数
+                        'sales_count': sales_count  # 売上数（数値に変換済み）
                     })
                 
-                # レビュー数でソート（降順）
-                trends_data.sort(key=lambda x: x['review_count'], reverse=True)
+                # 売上数でソート（降順）、同じ場合はレビュー数でソート
+                trends_data.sort(key=lambda x: (x.get('sales_count', 0), x.get('review_count', 0)), reverse=True)
                 
                 # ランクを再設定
-                for i, item in enumerate(trends_data):
-                    item['rank'] = i + 1
+                for i, item in enumerate(trends_data, 1):
+                    item['rank'] = i
                 
                 return {
                     'data': trends_data,
@@ -142,11 +176,11 @@ class RakutenTrendsManager:
                     'total_count': len(trends_data)
                 }
             else:
-                print(f"楽天ランキングAPIエラー: {response.text}")
+                logger.error(f"楽天ランキングAPIエラー: {response.text}")
                 return None
                 
         except Exception as e:
-            print(f"楽天ランキングAPIエラー: {str(e)}")
+            logger.error(f"楽天ランキングAPIエラー: {str(e)}", exc_info=True)
             return None
     
     def _get_rakuten_search(self, genre_id=None, limit=25):
@@ -173,12 +207,15 @@ class RakutenTrendsManager:
                 # デフォルトで人気のキーワード検索（より一般的な商品を取得）
                 params['keyword'] = '人気'
             
-            print(f"楽天APIリクエストURL: {url}")
-            print(f"楽天APIリクエストパラメータ: {params}")
+            logger.debug(f"楽天APIリクエストURL: {url}")
+            logger.debug(f"楽天APIリクエストパラメータ: {params}")
+            
+            # レート制限をチェック
+            self.rate_limiter.wait_if_needed()
             
             response = requests.get(url, params=params, timeout=10)
-            print(f"楽天APIレスポンスステータス: {response.status_code}")
-            print(f"楽天APIレスポンス内容: {response.text[:500]}...")
+            logger.debug(f"楽天APIレスポンスステータス: {response.status_code}")
+            logger.debug(f"楽天APIレスポンス内容: {response.text[:500]}...")
             
             if response.status_code == 200:
                 data = response.json()
@@ -209,7 +246,7 @@ class RakutenTrendsManager:
                     'total_count': data.get('count', 0)
                 }
             else:
-                print(f"楽天APIエラーレスポンス: {response.text}")
+                logger.error(f"楽天APIエラーレスポンス: {response.text}")
                 return {'error': f'楽天API エラー: {response.status_code} - {response.text}'}
                 
         except Exception as e:
@@ -226,6 +263,9 @@ class RakutenTrendsManager:
                 'applicationId': self.rakuten_app_id,
                 'format': 'json'
             }
+            
+            # レート制限をチェック
+            self.rate_limiter.wait_if_needed()
             
             response = requests.get(url, params=params, timeout=10)
             
@@ -280,7 +320,7 @@ class RakutenTrendsManager:
             
             # 時間制限：5時から24時まで
             if not (5 <= current_hour < 24):
-                print(f"⚠️ 時間外です（{current_hour}時）。キャッシュデータを使用します。")
+                logger.info(f"⚠️ 時間外です（{current_hour}時）。キャッシュデータを使用します。")
                 return False
             
             # データベースから最後の更新日時を取得
@@ -298,23 +338,25 @@ class RakutenTrendsManager:
                         return last_refresh < today
                     return True  # 初回は更新する
         except Exception as e:
-            print(f"キャッシュ更新日時チェックエラー: {e}")
+            logger.error(f"キャッシュ更新日時チェックエラー: {e}", exc_info=True)
             return True
     
     def get_from_cache(self, genre_id):
         """キャッシュからデータを取得"""
         try:
-            return self.db.get_rakuten_trends_cache(genre_id)
+            return self.db.get_rakuten_trends_from_cache(genre_id)
         except Exception as e:
-            print(f"キャッシュ取得エラー: {e}")
+            logger.error(f"キャッシュ取得エラー: {e}", exc_info=True)
             return None
     
     def save_to_cache(self, data, genre_id):
         """データをキャッシュに保存"""
         try:
             self.db.save_rakuten_trends_to_cache(data, genre_id)
+            # cache_statusテーブルも更新
+            self._update_refresh_time(genre_id or 'all')
         except Exception as e:
-            print(f"キャッシュ保存エラー: {e}")
+            logger.error(f"キャッシュ保存エラー: {e}", exc_info=True)
     
     def _update_refresh_time(self, genre_id):
         """キャッシュ更新日時を記録"""
@@ -336,7 +378,7 @@ class RakutenTrendsManager:
                     """, ('rakuten_trends', now, 30))  # 正しいキャッシュキーを使用
                     conn.commit()
         except Exception as e:
-            print(f"更新日時記録エラー: {e}")
+            logger.error(f"更新日時記録エラー: {e}", exc_info=True)
     
     def _get_cache_info(self, genre_id):
         """キャッシュ情報を取得"""
@@ -346,8 +388,8 @@ class RakutenTrendsManager:
                     cursor.execute("""
                         SELECT last_updated, data_count 
                         FROM cache_status 
-                        WHERE country_code = %s
-                    """, (f'rakuten',))
+                        WHERE cache_key = %s
+                    """, ('rakuten_trends',))
                     
                     result = cursor.fetchone()
                     if result:
@@ -357,5 +399,5 @@ class RakutenTrendsManager:
                         }
                     return {'last_updated': None, 'data_count': 0}
         except Exception as e:
-            print(f"キャッシュ情報取得エラー: {e}")
+            logger.error(f"キャッシュ情報取得エラー: {e}", exc_info=True)
             return {'last_updated': None, 'data_count': 0}

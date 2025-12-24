@@ -3,6 +3,7 @@ import requests
 from datetime import datetime, timedelta
 from database_config import TrendsCache
 from utils.logger_config import get_logger
+from utils.rate_limiter import get_rate_limiter
 
 # ロガーの初期化
 logger = get_logger(__name__)

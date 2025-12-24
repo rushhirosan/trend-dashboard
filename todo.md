@@ -36,8 +36,14 @@
    - [ ] エラー率の追跡とアラート
 
 2. **SEO対策**
-   - [ ] パフォーマンス最適化（Core Web Vitals）
-   - [ ] 内部リンク構造の改善
+   - [x] パフォーマンス最適化（Core Web Vitals） ✅
+     - [x] CSS/JSの遅延読み込みとpreload設定
+     - [x] 外部リソースのpreconnect/dns-prefetch
+     - [x] キャッシュヘッダーの設定（静的ファイル1年、HTML5分）
+   - [x] 内部リンク構造の改善 ✅
+     - [x] フッターにサイトマップリンクを追加（全ページ）
+     - [x] 各セクションにIDを追加（アンカーリンク対応）
+     - [x] 主要ページ間の内部リンク強化
    - [ ] **Google Search Console セットアップ** ✅
      - [x] Google Search Consoleアカウントの作成
      - [x] サイトの所有権確認（HTMLタグ、DNS、Google Analytics連携など）

@@ -796,8 +796,19 @@ document.addEventListener('DOMContentLoaded', function() {
     
     console.log('要素の存在確認:', elements);
     
-    // 初期取得は無効化（ユーザーがボタンをクリックした時のみ取得）
-    console.log('初期自動取得は無効化されています');
+    // キャッシュデータを自動読み込み
+    console.log('loadCachedDataExternal関数の存在確認:', typeof loadCachedDataExternal);
+    if (typeof loadCachedDataExternal === 'function') {
+        console.log('✅ キャッシュデータの自動読み込みを開始します');
+        try {
+            loadCachedDataExternal();
+        } catch (error) {
+            console.error('❌ loadCachedDataExternal実行エラー:', error);
+        }
+    } else {
+        console.warn('⚠️ loadCachedDataExternal関数が見つかりません');
+        console.warn('利用可能な関数:', Object.keys(window).filter(k => k.includes('load') || k.includes('Load')));
+    }
     
     // YouTubeトレンドタイプラジオボタンの監視
     const youtubeTrendTypeRadios = document.querySelectorAll('input[name="youtubeTrendType"]');

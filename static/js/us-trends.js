@@ -255,6 +255,305 @@ function displayCryptoResultsUS(data) {
     console.log('✅ Crypto Results display completed');
 }
 
+// Movie Trends data fetch for US
+async function fetchMovieTrendsUS() {
+    console.log('=== Movie Trends fetch started (US) ===');
+    
+    const loadingElement = document.getElementById('movieLoading');
+    const resultsElement = document.getElementById('movieResults');
+    const tableBody = document.getElementById('movieTrendsTableBody');
+    
+    if (!resultsElement || !tableBody) {
+        console.error('Required DOM elements not found');
+        return;
+    }
+    
+    try {
+        // Show loading
+        if (loadingElement) {
+            loadingElement.style.display = 'block';
+        }
+        resultsElement.style.display = 'none';
+        
+        // API call (US movies)
+        const response = await fetch('/api/movie-trends?country=US&limit=25');
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || `HTTP ${response.status}`);
+        }
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        if (!data.data || !Array.isArray(data.data)) {
+            throw new Error('Data format is incorrect');
+        }
+        
+        // Hide loading
+        if (loadingElement) {
+            loadingElement.style.display = 'none';
+        }
+        
+        // Display data
+        displayMovieResultsUS(data);
+        
+    } catch (error) {
+        console.error('Movie Trends fetch error:', error);
+        if (loadingElement) {
+            loadingElement.style.display = 'none';
+        }
+        resultsElement.style.display = 'block';
+    }
+}
+
+// Display Movie Results (US)
+function displayMovieResultsUS(data) {
+    console.log('📊 Movie Results display started', data);
+    const tableBody = document.getElementById('movieTrendsTableBody');
+    const resultsElement = document.getElementById('movieResults');
+    
+    if (!tableBody || !resultsElement) {
+        console.error('❌ Movie DOM elements not found');
+        return;
+    }
+    
+    // Clear table
+    tableBody.innerHTML = '';
+    
+    if (data.data && data.data.length > 0) {
+        data.data.forEach((item, index) => {
+            const row = document.createElement('tr');
+            row.className = 'trend-card';
+            
+            let rating = 'N/A';
+            if (item.vote_average) {
+                const voteAvg = typeof item.vote_average === 'number' ? item.vote_average : parseFloat(item.vote_average);
+                if (!isNaN(voteAvg)) {
+                    rating = voteAvg.toFixed(1);
+                }
+            }
+            const releaseDate = item.release_date || 'N/A';
+            const posterUrl = item.poster_url || '';
+            const movieLink = item.item_url || '#';
+            
+            row.innerHTML = `
+                <td>${item.rank || index + 1}</td>
+                <td>
+                    ${posterUrl ? `<img src="${posterUrl}" alt="${item.title}" style="width: 50px; height: 75px; object-fit: cover; margin-right: 10px; float: left;">` : ''}
+                    <strong><a href="${movieLink}" target="_blank">${item.title || 'N/A'}</a></strong>
+                    ${item.original_title && item.original_title !== item.title ? `<br><small class="text-muted">${item.original_title}</small>` : ''}
+                </td>
+                <td>${rating}</td>
+                <td>${releaseDate}</td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+    
+    // Display results
+    resultsElement.style.setProperty('display', 'block', 'important');
+    console.log('✅ Movie Results display completed');
+}
+
+// Book Trends data fetch for US
+async function fetchBookTrendsUS() {
+    console.log('=== Book Trends fetch started (US) ===');
+    
+    const loadingElement = document.getElementById('bookLoading');
+    const resultsElement = document.getElementById('bookResults');
+    const tableBody = document.getElementById('bookTrendsTableBody');
+    
+    if (!resultsElement || !tableBody) {
+        console.error('Required DOM elements not found');
+        return;
+    }
+    
+    try {
+        // Show loading
+        if (loadingElement) {
+            loadingElement.style.display = 'block';
+        }
+        resultsElement.style.display = 'none';
+        
+        // API call (US books)
+        const response = await fetch('/api/book-trends?country=US&limit=25');
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || `HTTP ${response.status}`);
+        }
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        if (!data.data || !Array.isArray(data.data)) {
+            throw new Error('Data format is incorrect');
+        }
+        
+        // Hide loading
+        if (loadingElement) {
+            loadingElement.style.display = 'none';
+        }
+        
+        // Display data
+        displayBookResultsUS(data);
+        
+    } catch (error) {
+        console.error('Book Trends fetch error:', error);
+        if (loadingElement) {
+            loadingElement.style.display = 'none';
+        }
+        resultsElement.style.display = 'block';
+    }
+}
+
+// Display Book Results (US)
+function displayBookResultsUS(data) {
+    console.log('📊 Book Results display started', data);
+    const tableBody = document.getElementById('bookTrendsTableBody');
+    const resultsElement = document.getElementById('bookResults');
+    
+    if (!tableBody || !resultsElement) {
+        console.error('❌ Book DOM elements not found');
+        return;
+    }
+    
+    // Clear table
+    tableBody.innerHTML = '';
+    
+    if (data.data && data.data.length > 0) {
+        data.data.forEach((item, index) => {
+            const row = document.createElement('tr');
+            row.className = 'trend-card';
+            
+            const author = item.author || (item.authors && item.authors.length > 0 ? item.authors.join(', ') : 'N/A') || 'N/A';
+            let rating = 'N/A';
+            if (item.average_rating) {
+                const avgRating = typeof item.average_rating === 'number' ? item.average_rating : parseFloat(item.average_rating);
+                if (!isNaN(avgRating)) {
+                    rating = avgRating.toFixed(1);
+                }
+            }
+            const bookLink = item.item_url || '#';
+            const imageUrl = item.image_url || '';
+            
+            row.innerHTML = `
+                <td>${item.rank || index + 1}</td>
+                <td>
+                    ${imageUrl ? `<img src="${imageUrl}" alt="${item.title}" style="width: 40px; height: 60px; object-fit: cover; margin-right: 10px; float: left;">` : ''}
+                    <strong><a href="${bookLink}" target="_blank">${item.title || 'N/A'}</a></strong>
+                </td>
+                <td>${author}</td>
+                <td>${rating}</td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+    
+    // Display results
+    resultsElement.style.setProperty('display', 'block', 'important');
+    console.log('✅ Book Results display completed');
+}
+
+// Load Movie Trends from Cache (US)
+function loadMovieTrendsFromCacheUS() {
+    console.log('📊 Movie Trends cache data loading (US)');
+    const loadingElement = document.getElementById('movieLoading');
+    if (loadingElement) {
+        loadingElement.style.display = 'block';
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    fetch('/api/movie-trends?country=US', { signal: controller.signal })
+        .then(response => {
+            clearTimeout(timeoutId);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.data && data.data.length > 0) {
+                displayMovieResultsUS(data);
+            }
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            const resultsElement = document.getElementById('movieResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error('Movie Trends cache loading error: Timeout (30s)');
+            } else {
+                console.error('Movie Trends cache loading error:', error);
+            }
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            const resultsElement = document.getElementById('movieResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        });
+}
+
+// Load Book Trends from Cache (US)
+function loadBookTrendsFromCacheUS() {
+    console.log('📊 Book Trends cache data loading (US)');
+    const loadingElement = document.getElementById('bookLoading');
+    if (loadingElement) {
+        loadingElement.style.display = 'block';
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    fetch('/api/book-trends?country=US', { signal: controller.signal })
+        .then(response => {
+            clearTimeout(timeoutId);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.data && data.data.length > 0) {
+                displayBookResultsUS(data);
+            }
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            const resultsElement = document.getElementById('bookResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error('Book Trends cache loading error: Timeout (30s)');
+            } else {
+                console.error('Book Trends cache loading error:', error);
+            }
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            const resultsElement = document.getElementById('bookResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        });
+}
+
 function showCryptoErrorUS(message) {
     const errorElement = document.getElementById('cryptoErrorMessage');
     const resultsElement = document.getElementById('cryptoResults');
@@ -573,6 +872,12 @@ function loadCachedDataUS() {
     
     // Load Spotify from cache
     loadSpotifyFromCacheUS();
+    
+    // Load Movie Trends from cache
+    loadMovieTrendsFromCacheUS();
+    
+    // Load Book Trends from cache
+    loadBookTrendsFromCacheUS();
     
     // Load Reddit from cache (エラーでもレイアウトを崩さないように先に実行)
     loadRedditFromCacheUS();

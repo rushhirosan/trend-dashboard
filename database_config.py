@@ -69,7 +69,7 @@ class TrendsCache:
                 # Fly.ioのPostgreSQLは接続を閉じる可能性があるため、より積極的なキープアライブ設定を使用
                 self.connection = psycopg2.connect(
                     database_url,
-                    connect_timeout=5,  # 5秒に短縮（キャッシュ取得は高速であるべき）
+                    connect_timeout=10,  # 10秒に延長（並列リクエスト時の接続確立時間を考慮）
                     keepalives=1,
                     keepalives_idle=10,  # 10秒でキープアライブを開始
                     keepalives_interval=5,  # 5秒間隔でキープアライブを送信
@@ -353,6 +353,61 @@ class TrendsCache:
                     volume_24h BIGINT DEFAULT 0,
                     image_url TEXT,
                     rank INTEGER DEFAULT 0,
+                    updated_at TIMESTAMP,
+                    cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                
+                CREATE TABLE IF NOT EXISTS movie_trends_cache (
+                    id SERIAL PRIMARY KEY,
+                    country VARCHAR(10) NOT NULL DEFAULT 'JP',
+                    movie_id INTEGER NOT NULL,
+                    title VARCHAR(500) NOT NULL,
+                    original_title VARCHAR(500),
+                    overview TEXT,
+                    popularity DECIMAL(10, 4),
+                    vote_average DECIMAL(4, 2),
+                    vote_count INTEGER,
+                    release_date VARCHAR(20),
+                    poster_path VARCHAR(500),
+                    backdrop_path VARCHAR(500),
+                    poster_url TEXT,
+                    backdrop_url TEXT,
+                    rank INTEGER,
+                    updated_at TIMESTAMP,
+                    cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                
+                CREATE TABLE IF NOT EXISTS book_trends_cache (
+                    id SERIAL PRIMARY KEY,
+                    country VARCHAR(10) NOT NULL,
+                    book_id VARCHAR(100),
+                    isbn VARCHAR(20),
+                    title VARCHAR(500) NOT NULL,
+                    subtitle VARCHAR(500),
+                    author TEXT,
+                    authors TEXT,
+                    publisher VARCHAR(200),
+                    price DECIMAL(10, 2),
+                    sales INTEGER,
+                    published_date VARCHAR(20),
+                    release_date VARCHAR(20),
+                    description TEXT,
+                    page_count INTEGER,
+                    categories TEXT,
+                    average_rating DECIMAL(3, 2),
+                    ratings_count INTEGER,
+                    language VARCHAR(10),
+                    item_url TEXT,
+                    affiliate_url TEXT,
+                    preview_link TEXT,
+                    info_link TEXT,
+                    buy_link TEXT,
+                    image_url TEXT,
+                    thumbnail TEXT,
+                    small_thumbnail TEXT,
+                    medium TEXT,
+                    large TEXT,
+                    rank INTEGER,
                     updated_at TIMESTAMP,
                     cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
@@ -774,8 +829,8 @@ class TrendsCache:
         import time
         global _connection_lock
 
-        max_retries = 2  # リトライ回数を3→2に削減（メモリ節約）
-        retry_delay = 0.3  # 待機時間を0.5→0.3秒に短縮
+        max_retries = 3  # リトライ回数を3に増加（並列リクエスト時の接続確立を考慮）
+        retry_delay = 0.5  # 待機時間を0.5秒に設定（接続確立の余裕を持たせる）
 
         # 接続が既に存在し、閉じられていない場合は即座に返す（ロック不要、SELECT 1チェックも省略）
         # 接続が無効な場合は、クエリ実行時にエラーが発生するので、その時点で再接続する
@@ -798,34 +853,18 @@ class TrendsCache:
                             # 接続が閉じられているか確認
                             if self.connection.closed:
                                 self.connect()
-                            else:
-                                # 接続が有効か確認するため、簡単なクエリを実行（タイムアウト付き）
-                                try:
-                                    with self.connection.cursor() as cursor:
-                                        cursor.execute("SELECT 1")
-                                except (psycopg2.InterfaceError, psycopg2.OperationalError):
-                                    # 接続が無効な場合は再接続
-                                    logger.warning("⚠️ データベース接続が無効のため再接続します")
-                                    self.connect()
+                            # 接続が有効かどうかは、実際のクエリ実行時にエラーが発生したら再接続する
+                            # SELECT 1による事前確認は削除（ブロッキングの原因となるため）
                         except (psycopg2.InterfaceError, psycopg2.OperationalError, AttributeError) as e:
                             # 接続エラーの場合は再接続
                             logger.warning(f"⚠️ データベース接続エラー検出、再接続します: {e}")
                             self.connect()
                     
-                    # 接続が確立されたか確認
+                    # 接続が確立されたか確認（SELECT 1による確認は削除）
                     if self.connection and not self.connection.closed:
-                        try:
-                            # 接続が実際に使えるか確認
-                            with self.connection.cursor() as cursor:
-                                cursor.execute("SELECT 1")
-                            return self.connection
-                        except (psycopg2.InterfaceError, psycopg2.OperationalError):
-                            # 接続が無効な場合は再試行
-                            if attempt < max_retries - 1:
-                                logger.warning(f"⚠️ データベース接続確認失敗、{retry_delay}秒後に再試行します (試行 {attempt + 1}/{max_retries})")
-                                time.sleep(retry_delay)
-                                self.connection = None
-                                continue
+                        # 接続が有効かどうかは、実際のクエリ実行時にエラーが発生したら再接続する
+                        # 事前確認を削除することで、ブロッキングを防ぐ
+                        return self.connection
                 except Exception as e:
                     # 予期しないエラーの場合も再試行
                     if attempt < max_retries - 1:
@@ -2610,6 +2649,321 @@ class TrendsCache:
             return False
         except Exception as e:
             logger.error(f"❌ crypto_trendsキャッシュクリアエラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
+            return False
+    
+    def save_movie_trends_to_cache(self, data, country='JP'):
+        """Movie Trendsデータをキャッシュに保存"""
+        if not data:
+            return False
+        
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return False
+        except Exception as e:
+            logger.error(f"❌ movie_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
+            return False
+        
+        try:
+            with conn.cursor() as cursor:
+                # 既存のデータを削除（国別）
+                cursor.execute("DELETE FROM movie_trends_cache WHERE country = %s", (country,))
+                
+                # 新しいデータを挿入
+                for item in data:
+                    cursor.execute("""
+                        INSERT INTO movie_trends_cache
+                        (country, movie_id, title, original_title, overview, popularity,
+                         vote_average, vote_count, release_date, poster_path,
+                         backdrop_path, poster_url, backdrop_url, rank, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        country,
+                        item.get('id', 0),
+                        item.get('title', ''),
+                        item.get('original_title', ''),
+                        item.get('overview', ''),
+                        item.get('popularity', 0),
+                        item.get('vote_average', 0),
+                        item.get('vote_count', 0),
+                        item.get('release_date', ''),
+                        item.get('poster_path', ''),
+                        item.get('backdrop_path', ''),
+                        item.get('poster_url', ''),
+                        item.get('backdrop_url', ''),
+                        item.get('rank', 0),
+                        item.get('updated_at')
+                    ))
+                # cache_statusテーブルを更新
+                from datetime import datetime
+                now = datetime.now()
+                cache_key = f'movie_trends_{country}'
+                cursor.execute("""
+                    INSERT INTO cache_status (cache_key, last_updated, data_count)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (cache_key) DO UPDATE SET
+                        last_updated = EXCLUDED.last_updated,
+                        data_count = EXCLUDED.data_count
+                """, (cache_key, now, len(data)))
+                
+                conn.commit()
+                logger.info(f"✅ movie_trendsのキャッシュを保存しました (country: {country}, {len(data)}件)")
+                return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ movie_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ movie_trendsキャッシュ保存エラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
+            return False
+    
+    def get_movie_trends_from_cache(self, country='JP'):
+        """Movie Trendsデータをキャッシュから取得"""
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return None
+        except Exception as e:
+            logger.error(f"❌ Movie Trendsキャッシュ取得エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
+            return None
+        
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT country, movie_id, title, original_title, overview, popularity,
+                           vote_average, vote_count, release_date, poster_path,
+                           backdrop_path, poster_url, backdrop_url, rank, updated_at, cached_at
+                    FROM movie_trends_cache 
+                    WHERE country = %s
+                    ORDER BY rank
+                """, (country,))
+                data = cursor.fetchall()
+                
+                # RealDictCursorの結果を辞書のリストに変換
+                result = []
+                for row in data:
+                    result.append(dict(row))
+                
+                return result
+                
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ Movie Trendsキャッシュ取得中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return None
+        except Exception as e:
+            logger.error(f"❌ Movie Trendsキャッシュ取得エラー: {e}", exc_info=True)
+            return None
+    
+    def clear_movie_trends_cache(self, country='JP'):
+        """Movie Trendsキャッシュをクリア"""
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return False
+        except Exception as e:
+            logger.error(f"❌ movie_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
+            return False
+        
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM movie_trends_cache WHERE country = %s", (country,))
+                conn.commit()
+                logger.info(f"✅ movie_trendsのキャッシュをクリアしました")
+                return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ movie_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ movie_trendsキャッシュクリアエラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
+            return False
+    
+    def save_book_trends_to_cache(self, data, country='JP'):
+        """Book Trendsデータをキャッシュに保存"""
+        if not data:
+            return False
+        
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return False
+        except Exception as e:
+            logger.error(f"❌ book_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
+            return False
+        
+        try:
+            with conn.cursor() as cursor:
+                # 既存のデータを削除（国別）
+                cursor.execute("DELETE FROM book_trends_cache WHERE country = %s", (country,))
+                
+                # 新しいデータを挿入
+                for item in data:
+                    # 配列や辞書をJSON文字列に変換
+                    authors = item.get('authors', [])
+                    authors_str = json.dumps(authors, ensure_ascii=False) if isinstance(authors, list) else str(authors)
+                    categories = item.get('categories', [])
+                    categories_str = json.dumps(categories, ensure_ascii=False) if isinstance(categories, list) else str(categories)
+                    
+                    # updated_atの処理
+                    updated_at = item.get('updated_at')
+                    if not updated_at:
+                        from datetime import timezone
+                        updated_at = datetime.now(timezone.utc)
+                    
+                    # パラメータの準備
+                    params = (
+                        country,
+                        item.get('id', ''),
+                        item.get('isbn', ''),
+                        item.get('title', ''),
+                        item.get('subtitle', ''),
+                        item.get('author', ''),
+                        authors_str,
+                        item.get('publisher', ''),
+                        item.get('price', 0),
+                        item.get('sales', 0),
+                        item.get('published_date', ''),
+                        item.get('release_date', ''),
+                        item.get('description', ''),
+                        item.get('page_count', 0),
+                        categories_str,
+                        item.get('average_rating', 0),
+                        item.get('ratings_count', 0),
+                        item.get('language', ''),
+                        item.get('item_url', ''),
+                        item.get('affiliate_url', ''),
+                        item.get('preview_link', ''),
+                        item.get('info_link', ''),
+                        item.get('buy_link', ''),
+                        item.get('image_url', ''),
+                        item.get('thumbnail', ''),
+                        item.get('small_thumbnail', ''),
+                        item.get('medium', ''),
+                        item.get('large', ''),
+                        item.get('rank', 0),
+                        updated_at
+                    )
+                    
+                    cursor.execute("""
+                        INSERT INTO book_trends_cache
+                        (country, book_id, isbn, title, subtitle, author, authors, publisher,
+                         price, sales, published_date, release_date, description, page_count,
+                         categories, average_rating, ratings_count, language, item_url,
+                         affiliate_url, preview_link, info_link, buy_link, image_url,
+                         thumbnail, small_thumbnail, medium, large, rank, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, params)
+                # cache_statusテーブルを更新
+                from datetime import datetime
+                now = datetime.now()
+                cursor.execute("""
+                    INSERT INTO cache_status (cache_key, last_updated, data_count)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (cache_key) DO UPDATE SET
+                        last_updated = EXCLUDED.last_updated,
+                        data_count = EXCLUDED.data_count
+                """, (f'book_trends_{country}', now, len(data)))
+                
+                conn.commit()
+                logger.info(f"✅ book_trendsのキャッシュを保存しました ({country}, {len(data)}件)")
+                return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ book_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ book_trendsキャッシュ保存エラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
+            return False
+    
+    def get_book_trends_from_cache(self, country='JP'):
+        """Book Trendsデータをキャッシュから取得"""
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return None
+        except Exception as e:
+            logger.error(f"❌ Book Trendsキャッシュ取得エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
+            return None
+        
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT country, book_id, isbn, title, subtitle, author, authors, publisher,
+                           price, sales, published_date, release_date, description, page_count,
+                           categories, average_rating, ratings_count, language, item_url,
+                           affiliate_url, preview_link, info_link, buy_link, image_url,
+                           thumbnail, small_thumbnail, medium, large, rank, updated_at, cached_at
+                    FROM book_trends_cache 
+                    WHERE country = %s
+                    ORDER BY rank
+                """, (country,))
+                data = cursor.fetchall()
+                
+                # RealDictCursorの結果を辞書のリストに変換
+                result = []
+                for row in data:
+                    row_dict = dict(row)
+                    # JSON文字列を配列に変換
+                    if row_dict.get('authors'):
+                        try:
+                            row_dict['authors'] = json.loads(row_dict['authors']) if isinstance(row_dict['authors'], str) else row_dict['authors']
+                        except:
+                            row_dict['authors'] = []
+                    if row_dict.get('categories'):
+                        try:
+                            row_dict['categories'] = json.loads(row_dict['categories']) if isinstance(row_dict['categories'], str) else row_dict['categories']
+                        except:
+                            row_dict['categories'] = []
+                    result.append(row_dict)
+                
+                return result
+                
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ Book Trendsキャッシュ取得中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return None
+        except Exception as e:
+            logger.error(f"❌ Book Trendsキャッシュ取得エラー: {e}", exc_info=True)
+            return None
+    
+    def clear_book_trends_cache(self, country='JP'):
+        """Book Trendsキャッシュをクリア"""
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return False
+        except Exception as e:
+            logger.error(f"❌ book_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
+            return False
+        
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM book_trends_cache WHERE country = %s", (country,))
+                conn.commit()
+                logger.info(f"✅ book_trendsのキャッシュをクリアしました ({country})")
+                return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ book_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ book_trendsキャッシュクリアエラー: {e}", exc_info=True)
             try:
                 conn.rollback()
             except:

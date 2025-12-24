@@ -4,7 +4,7 @@
 function loadCachedDataExternal() {
     console.log('📦 キャッシュデータの読み込み処理開始');
     
-    // 全カテゴリを並列実行（HatenaとTwitchも即座に実行）
+    // 全カテゴリを定義
     const allCategories = [
         loadGoogleTrendsFromCache,
         loadYouTubeTrendsFromCache,
@@ -13,6 +13,8 @@ function loadCachedDataExternal() {
         loadStockTrendsFromCache,
         loadCryptoTrendsFromCache,
         loadPodcastTrendsFromCache,
+        loadMovieTrendsFromCache,
+        loadBookTrendsFromCache,
         loadRakutenTrendsFromCache,
         loadHatenaTrendsFromCache,
         loadTwitchTrendsFromCache,
@@ -20,17 +22,45 @@ function loadCachedDataExternal() {
         loadQiitaTrendsFromCache
     ];
     
-    // 全カテゴリを並列実行（エラーハンドリング付き）
-    console.log('🚀 全カテゴリの並列読み込み開始');
+    // バッチ処理: 一度に4つずつ実行（データベース接続の競合を防ぐ）
+    const BATCH_SIZE = 4;
+    console.log('🚀 全カテゴリのバッチ読み込み開始（並列数: ' + BATCH_SIZE + '）');
     console.log('🚀 実行する関数:', allCategories.map(f => f.name));
-    allCategories.forEach(loadFunction => {
-        try {
-            console.log(`🚀 実行中: ${loadFunction.name}`);
-            loadFunction();
-        } catch (error) {
-            console.error(`❌ ${loadFunction.name} 実行エラー:`, error);
+    
+    // バッチごとに順次実行（データベース接続の競合を防ぐ）
+    function executeBatch(batchIndex) {
+        if (batchIndex >= allCategories.length) {
+            console.log('✅ 全バッチの実行完了');
+            return;
         }
-    });
+        
+        const batchEnd = Math.min(batchIndex + BATCH_SIZE, allCategories.length);
+        const batch = allCategories.slice(batchIndex, batchEnd);
+        const batchNumber = Math.floor(batchIndex / BATCH_SIZE) + 1;
+        console.log(`📦 バッチ ${batchNumber} 実行中 (${batch.map(f => f.name).join(', ')})`);
+        
+        // バッチ内の関数を並列実行
+        batch.forEach(loadFunction => {
+            try {
+                console.log(`🚀 実行中: ${loadFunction.name}`);
+                loadFunction();
+            } catch (error) {
+                console.error(`❌ ${loadFunction.name} 実行エラー:`, error);
+            }
+        });
+        
+        // 次のバッチを200ms後に実行（データベース接続の競合を防ぐ）
+        if (batchEnd < allCategories.length) {
+            setTimeout(() => {
+                executeBatch(batchEnd);
+            }, 200);
+        } else {
+            console.log('✅ 全バッチの実行完了');
+        }
+    }
+    
+    // 最初のバッチを実行
+    executeBatch(0);
     
     console.log('✅ キャッシュデータの読み込み処理完了');
 }
@@ -45,17 +75,14 @@ function loadGoogleTrendsFromCache() {
         loadingElement.style.display = 'block';
     }
     
-    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
-    const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
-    });
+    // AbortControllerを使用したタイムアウト処理（30秒）
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     
     // キャッシュデータを取得して表示
-    Promise.race([
-        fetch('/api/google-trends?country=JP'),
-        timeoutPromise
-    ])
+    fetch('/api/google-trends?country=JP', { signal: controller.signal })
         .then(response => {
+            clearTimeout(timeoutId);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -66,7 +93,11 @@ function loadGoogleTrendsFromCache() {
             console.log('Google Trends API データ:', data);
             if (data.data && data.data.length > 0) {
                 console.log('Google Trends データ表示開始');
-                displayGoogleResults(data);
+                if (typeof displayGoogleResults === 'function') {
+                    displayGoogleResults(data);
+                } else {
+                    console.error('displayGoogleResults関数が見つかりません');
+                }
             } else {
                 console.log('Google Trends データなしまたはエラー:', data);
             }
@@ -75,9 +106,20 @@ function loadGoogleTrendsFromCache() {
             if (loadingElement) {
                 loadingElement.style.display = 'none';
             }
+            
+            // 結果エリアを表示
+            const resultsElement = document.getElementById('googleResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
         })
         .catch(error => {
-            console.error('Google Trends キャッシュ読み込みエラー:', error);
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error('Google Trends キャッシュ読み込みエラー: タイムアウト（30秒）');
+            } else {
+                console.error('Google Trends キャッシュ読み込みエラー:', error);
+            }
             // エラー時もローディング表示を非表示
             if (loadingElement) {
                 loadingElement.style.display = 'none';
@@ -90,20 +132,25 @@ function loadGoogleTrendsFromCache() {
         });
 }
 
+// Google Trends結果エリアを表示する関数（app.jsに定義されていない場合のフォールバック）
+function showGoogleResults() {
+    const resultsElement = document.getElementById('googleResults');
+    if (resultsElement) {
+        resultsElement.style.display = 'block';
+    }
+}
+
 // YouTube Trendsキャッシュデータの読み込み
 function loadYouTubeTrendsFromCache() {
     console.log('📊 YouTube Trends キャッシュデータ読み込み');
-    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
-    const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
-    });
+    // AbortControllerを使用したタイムアウト処理（30秒）
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     
     // キャッシュデータを取得して表示
-    Promise.race([
-        fetch('/api/youtube-trends?region=JP'),
-        timeoutPromise
-    ])
+    fetch('/api/youtube-trends?region=JP', { signal: controller.signal })
         .then(response => {
+            clearTimeout(timeoutId);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -124,7 +171,12 @@ function loadYouTubeTrendsFromCache() {
             }
         })
         .catch(error => {
-            console.error('YouTube Trends キャッシュ読み込みエラー:', error);
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error('YouTube Trends キャッシュ読み込みエラー: タイムアウト（30秒）');
+            } else {
+                console.error('YouTube Trends キャッシュ読み込みエラー:', error);
+            }
             // エラー時でも結果エリアを表示（空でも）
             const resultsElement = document.getElementById('youtubeResults');
             if (resultsElement) {
@@ -137,17 +189,14 @@ function loadYouTubeTrendsFromCache() {
 // Spotify音楽トレンドキャッシュデータの読み込み
 function loadMusicTrendsFromCache() {
     console.log('📊 Music Trends キャッシュデータ読み込み');
-    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
-    const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
-    });
+    // AbortControllerを使用したタイムアウト処理（30秒）
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     
     // キャッシュデータを取得して表示
-    Promise.race([
-        fetch('/api/music-trends?service=spotify'),
-        timeoutPromise
-    ])
+    fetch('/api/music-trends?service=spotify', { signal: controller.signal })
         .then(response => {
+            clearTimeout(timeoutId);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
@@ -175,7 +224,12 @@ function loadMusicTrendsFromCache() {
             }
         })
         .catch(error => {
-            console.error('Music Trends キャッシュ読み込みエラー:', error);
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error('Music Trends キャッシュ読み込みエラー: タイムアウト（30秒）');
+            } else {
+                console.error('Music Trends キャッシュ読み込みエラー:', error);
+            }
             // エラー時でも結果エリアを表示（空でも）
             const resultsElement = document.getElementById('musicResults');
             if (resultsElement) {
@@ -187,17 +241,14 @@ function loadMusicTrendsFromCache() {
 // ニューストレンドキャッシュデータの読み込み
 function loadNewsTrendsFromCache() {
     console.log('📊 News Trends キャッシュデータ読み込み');
-    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
-    const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
-    });
+    // AbortControllerを使用したタイムアウト処理（30秒）
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     
     // キャッシュデータを取得して表示
-    Promise.race([
-        fetch('/api/worldnews-trends?country=jp&category=general'),
-        timeoutPromise
-    ])
+    fetch('/api/worldnews-trends?country=jp&category=general', { signal: controller.signal })
         .then(response => {
+            clearTimeout(timeoutId);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
@@ -223,7 +274,12 @@ function loadNewsTrendsFromCache() {
             }
         })
         .catch(error => {
-            console.error('News Trends キャッシュ読み込みエラー:', error);
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error('News Trends キャッシュ読み込みエラー: タイムアウト（30秒）');
+            } else {
+                console.error('News Trends キャッシュ読み込みエラー:', error);
+            }
             // エラー時でも結果エリアを表示（空でも）
             const resultsElement = document.getElementById('newsResults');
             if (resultsElement) {
@@ -235,17 +291,14 @@ function loadNewsTrendsFromCache() {
 // Podcastトレンドキャッシュデータの読み込み
 function loadPodcastTrendsFromCache() {
     console.log('📊 Podcast Trends キャッシュデータ読み込み');
-    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
-    const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
-    });
+    // AbortControllerを使用したタイムアウト処理（30秒）
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     
     // キャッシュデータを取得して表示（force_refresh=falseで明示的にキャッシュのみを使用）
-    Promise.race([
-        fetch('/api/podcast-trends?trend_type=best_podcasts&force_refresh=false'),
-        timeoutPromise
-    ])
+    fetch('/api/podcast-trends?trend_type=best_podcasts&force_refresh=false', { signal: controller.signal })
         .then(response => {
+            clearTimeout(timeoutId);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -264,7 +317,12 @@ function loadPodcastTrendsFromCache() {
             }
         })
         .catch(error => {
-            console.error('Podcast Trends キャッシュ読み込みエラー:', error);
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error('Podcast Trends キャッシュ読み込みエラー: タイムアウト（30秒）');
+            } else {
+                console.error('Podcast Trends キャッシュ読み込みエラー:', error);
+            }
             // エラー時でも結果エリアを表示（空でも）
             const resultsElement = document.getElementById('podcastResults');
             if (resultsElement) {
@@ -276,33 +334,44 @@ function loadPodcastTrendsFromCache() {
 // 楽天トレンドキャッシュデータの読み込み
 function loadRakutenTrendsFromCache() {
     console.log('📊 Rakuten Trends キャッシュデータ読み込み');
-    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
-    const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
-    });
+    // AbortControllerを使用したタイムアウト処理（30秒）
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     
     // キャッシュデータを取得して表示
-    Promise.race([
-        fetch('/api/rakuten-trends'),
-        timeoutPromise
-    ])
+    fetch('/api/rakuten-trends', { signal: controller.signal })
         .then(response => {
+            clearTimeout(timeoutId);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
             return response.json();
         })
         .then(data => {
+            console.log('Rakuten Trends API データ:', data);
             if (data.data && data.data.length > 0) {
+                console.log('Rakuten Trends データ表示開始');
                 if (typeof displayRakutenResults === 'function') {
                     displayRakutenResults(data);
                 } else {
                     console.error('displayRakutenResults関数が見つかりません');
                 }
+            } else {
+                console.log('Rakuten Trends データなしまたはエラー:', data);
+            }
+            // 結果エリアを表示
+            const resultsElement = document.getElementById('rakutenResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
             }
         })
         .catch(error => {
-            console.error('Rakuten Trends キャッシュ読み込みエラー:', error);
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error('Rakuten Trends キャッシュ読み込みエラー: タイムアウト（30秒）');
+            } else {
+                console.error('Rakuten Trends キャッシュ読み込みエラー:', error);
+            }
             // エラー時でも結果エリアを表示（空でも）
             const resultsElement = document.getElementById('rakutenResults');
             if (resultsElement) {
@@ -326,17 +395,14 @@ function loadHatenaTrendsFromCache() {
         loadingElement.style.display = 'block';
     }
     
-    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
-    const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
-    });
+    // AbortControllerを使用したタイムアウト処理（30秒）
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     
     // キャッシュデータを取得して表示（force_refresh=falseで明示的にキャッシュのみを使用）
-    Promise.race([
-        fetch(`/api/hatena-trends?category=${selectedCategory}&limit=25&type=hot&force_refresh=false`),
-        timeoutPromise
-    ])
+    fetch(`/api/hatena-trends?category=${selectedCategory}&limit=25&type=hot&force_refresh=false`, { signal: controller.signal })
         .then(response => {
+            clearTimeout(timeoutId);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -364,7 +430,12 @@ function loadHatenaTrendsFromCache() {
             }
         })
         .catch(error => {
-            console.error('Hatena Trends キャッシュ読み込みエラー:', error);
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error('Hatena Trends キャッシュ読み込みエラー: タイムアウト（30秒）');
+            } else {
+                console.error('Hatena Trends キャッシュ読み込みエラー:', error);
+            }
             // エラー時もローディング表示を非表示
             if (loadingElement) {
                 loadingElement.style.display = 'none';
@@ -387,17 +458,14 @@ function loadTwitchTrendsFromCache() {
         loadingElement.style.display = 'block';
     }
     
-    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
-    const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
-    });
+    // AbortControllerを使用したタイムアウト処理（30秒）
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     
     // キャッシュデータを取得して表示（force_refresh=falseで明示的にキャッシュのみを使用）
-    Promise.race([
-        fetch(`/api/twitch-trends?type=${selectedType}&limit=25&force_refresh=false`),
-        timeoutPromise
-    ])
+    fetch(`/api/twitch-trends?type=${selectedType}&limit=25&force_refresh=false`, { signal: controller.signal })
         .then(response => {
+            clearTimeout(timeoutId);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -423,7 +491,12 @@ function loadTwitchTrendsFromCache() {
             }
         })
         .catch(error => {
-            console.error('Twitch Trends キャッシュ読み込みエラー:', error);
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error('Twitch Trends キャッシュ読み込みエラー: タイムアウト（30秒）');
+            } else {
+                console.error('Twitch Trends キャッシュ読み込みエラー:', error);
+            }
             // エラー時もローディング表示を非表示
             if (loadingElement) {
                 loadingElement.style.display = 'none';
@@ -609,17 +682,14 @@ function loadNHKTrendsFromCache() {
         loadingElement.style.display = 'block';
     }
     
-    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
-    const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
-    });
+    // AbortControllerを使用したタイムアウト処理（30秒）
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     
     // キャッシュデータを取得して表示
-    Promise.race([
-        fetch('/api/nhk-trends'),
-        timeoutPromise
-    ])
+    fetch('/api/nhk-trends', { signal: controller.signal })
         .then(response => {
+            clearTimeout(timeoutId);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -645,7 +715,12 @@ function loadNHKTrendsFromCache() {
             }
         })
         .catch(error => {
-            console.error('NHK ニュース キャッシュ読み込みエラー:', error);
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error('NHK ニュース キャッシュ読み込みエラー: タイムアウト（30秒）');
+            } else {
+                console.error('NHK ニュース キャッシュ読み込みエラー:', error);
+            }
             // エラー時もローディング表示を非表示
             if (loadingElement) {
                 loadingElement.style.display = 'none';
@@ -662,17 +737,14 @@ function loadQiitaTrendsFromCache() {
         loadingElement.style.display = 'block';
     }
     
-    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
-    const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
-    });
+    // AbortControllerを使用したタイムアウト処理（30秒）
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     
     // キャッシュデータを取得して表示
-    Promise.race([
-        fetch('/api/qiita-trends?limit=25&sort=likes_count'),
-        timeoutPromise
-    ])
+    fetch('/api/qiita-trends?limit=25&sort=likes_count', { signal: controller.signal })
         .then(response => {
+            clearTimeout(timeoutId);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -698,7 +770,12 @@ function loadQiitaTrendsFromCache() {
             }
         })
         .catch(error => {
-            console.error('Qiita トレンド キャッシュ読み込みエラー:', error);
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error('Qiita トレンド キャッシュ読み込みエラー: タイムアウト（30秒）');
+            } else {
+                console.error('Qiita トレンド キャッシュ読み込みエラー:', error);
+            }
             // エラー時もローディング表示を非表示
             if (loadingElement) {
                 loadingElement.style.display = 'none';
@@ -709,17 +786,14 @@ function loadQiitaTrendsFromCache() {
 // 株価トレンドキャッシュデータの読み込み
 function loadStockTrendsFromCache() {
     console.log('📊 Stock Trends キャッシュデータ読み込み');
-    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
-    const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
-    });
+    // AbortControllerを使用したタイムアウト処理（30秒）
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     
     // キャッシュデータを取得して表示
-    Promise.race([
-        fetch('/api/stock-trends?market=JP&limit=25'),
-        timeoutPromise
-    ])
+    fetch('/api/stock-trends?market=JP&limit=25', { signal: controller.signal })
         .then(response => {
+            clearTimeout(timeoutId);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -739,7 +813,12 @@ function loadStockTrendsFromCache() {
             }
         })
         .catch(error => {
-            console.error('Stock Trends キャッシュ読み込みエラー:', error);
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error('Stock Trends キャッシュ読み込みエラー: タイムアウト（30秒）');
+            } else {
+                console.error('Stock Trends キャッシュ読み込みエラー:', error);
+            }
             // エラー時でも結果エリアを表示（空でも）
             const resultsElement = document.getElementById('stockResults');
             if (resultsElement) {
@@ -751,17 +830,14 @@ function loadStockTrendsFromCache() {
 // 仮想通貨トレンドキャッシュデータの読み込み
 function loadCryptoTrendsFromCache() {
     console.log('📊 Crypto Trends キャッシュデータ読み込み');
-    // タイムアウトを設定（キャッシュからの取得を想定、マネージャー初期化待機を考慮して15秒）
-    const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('タイムアウト（15秒）')), 15000);
-    });
+    // AbortControllerを使用したタイムアウト処理（30秒）
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     
     // キャッシュデータを取得して表示
-    Promise.race([
-        fetch('/api/crypto-trends?limit=25'),
-        timeoutPromise
-    ])
+    fetch('/api/crypto-trends?limit=25', { signal: controller.signal })
         .then(response => {
+            clearTimeout(timeoutId);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -787,9 +863,128 @@ function loadCryptoTrendsFromCache() {
             }
         })
         .catch(error => {
-            console.error('Crypto Trends キャッシュ読み込みエラー:', error);
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error('Crypto Trends キャッシュ読み込みエラー: タイムアウト（30秒）');
+            } else {
+                console.error('Crypto Trends キャッシュ読み込みエラー:', error);
+            }
             // エラー時でも結果エリアを表示（空でも）
             const resultsElement = document.getElementById('cryptoResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        });
+}
+
+// 映画トレンドキャッシュデータの読み込み
+function loadMovieTrendsFromCache() {
+    console.log('📊 Movie Trends キャッシュデータ読み込み');
+    const loadingElement = document.getElementById('movieLoading');
+    if (loadingElement) {
+        loadingElement.style.display = 'block';
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒でタイムアウト
+
+    fetch('/api/movie-trends?country=JP', { signal: controller.signal })
+        .then(response => {
+            clearTimeout(timeoutId);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            console.log('Movie Trends API レスポンス:', response.status, response.ok);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Movie Trends API データ:', data);
+            if (data.data && data.data.length > 0) {
+                console.log('Movie Trends データ表示開始');
+                if (typeof displayMovieResults === 'function') {
+                    displayMovieResults(data);
+                } else {
+                    console.error('displayMovieResults関数が見つかりません');
+                }
+            } else {
+                console.log('Movie Trends データなしまたはエラー:', data);
+            }
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            const resultsElement = document.getElementById('movieResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error('Movie Trends キャッシュ読み込みエラー: タイムアウト（30秒）');
+            } else {
+                console.error('Movie Trends キャッシュ読み込みエラー:', error);
+            }
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            const resultsElement = document.getElementById('movieResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        });
+}
+
+// 本トレンドキャッシュデータの読み込み
+function loadBookTrendsFromCache() {
+    console.log('📊 Book Trends キャッシュデータ読み込み');
+    const loadingElement = document.getElementById('bookLoading');
+    if (loadingElement) {
+        loadingElement.style.display = 'block';
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒でタイムアウト
+
+    fetch('/api/book-trends?country=JP', { signal: controller.signal })
+        .then(response => {
+            clearTimeout(timeoutId);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            console.log('Book Trends API レスポンス:', response.status, response.ok);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Book Trends API データ:', data);
+            if (data.data && data.data.length > 0) {
+                console.log('Book Trends データ表示開始');
+                if (typeof displayBookResults === 'function') {
+                    displayBookResults(data);
+                } else {
+                    console.error('displayBookResults関数が見つかりません');
+                }
+            } else {
+                console.log('Book Trends データなしまたはエラー:', data);
+            }
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            const resultsElement = document.getElementById('bookResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error('Book Trends キャッシュ読み込みエラー: タイムアウト（30秒）');
+            } else {
+                console.error('Book Trends キャッシュ読み込みエラー:', error);
+            }
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            const resultsElement = document.getElementById('bookResults');
             if (resultsElement) {
                 resultsElement.style.display = 'block';
             }

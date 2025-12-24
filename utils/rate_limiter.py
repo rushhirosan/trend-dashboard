@@ -113,6 +113,8 @@ API_RATE_LIMITS = {
     'hatena': {'max_requests': 10, 'window_seconds': 60},    # 10リクエスト/分（保守的）
     'hackernews': {'max_requests': 10, 'window_seconds': 60}, # 10リクエスト/分（保守的）
     'cnn': {'max_requests': 10, 'window_seconds': 60},       # 10リクエスト/分（News API）
+    'movie': {'max_requests': 10, 'window_seconds': 60},     # 10リクエスト/分（TMDB API）
+    'book': {'max_requests': 10, 'window_seconds': 60},      # 10リクエスト/分（楽天ブックス/Google Books API）
 }
 
 

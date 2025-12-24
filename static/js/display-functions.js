@@ -98,6 +98,112 @@ function displayPodcastResults(data) {
     console.log('✅ Podcast Results表示完了');
 }
 
+// 映画トレンド結果表示関数
+function displayMovieResults(data) {
+    console.log('📊 Movie Results表示開始', data);
+    const tableBody = document.getElementById('movieTrendsTableBody');
+    const statusMessage = document.getElementById('movieStatusMessage');
+    
+    if (!tableBody) {
+        console.error('❌ Movie DOM要素が見つかりません');
+        return;
+    }
+    
+    // ステータスメッセージは非表示のまま
+    if (statusMessage) {
+        statusMessage.style.display = 'none !important';
+    }
+    
+    // テーブルを更新
+    tableBody.innerHTML = '';
+    if (data.data && data.data.length > 0) {
+        data.data.forEach((item, index) => {
+            const row = document.createElement('tr');
+            row.className = 'trend-card';
+            
+            const rating = item.vote_average ? (typeof item.vote_average === 'number' ? item.vote_average.toFixed(1) : parseFloat(item.vote_average).toFixed(1)) : 'N/A';
+            const releaseDate = item.release_date || 'N/A';
+            const posterUrl = item.poster_url || '';
+            const movieLink = item.item_url || '#';
+            
+            row.innerHTML = `
+                <td><span class="badge bg-primary">${item.rank || index + 1}</span></td>
+                <td>
+                    ${posterUrl ? `<img src="${posterUrl}" alt="${item.title}" style="width: 50px; height: 75px; object-fit: cover; margin-right: 10px; float: left;">` : ''}
+                    <strong><a href="${movieLink}" target="_blank">${item.title || 'N/A'}</a></strong>
+                    ${item.original_title && item.original_title !== item.title ? `<br><small class="text-muted">${item.original_title}</small>` : ''}
+                </td>
+                <td>${rating}</td>
+                <td>${releaseDate}</td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+    
+    // 結果セクションを表示
+    const resultsElement = document.getElementById('movieResults');
+    if (resultsElement) {
+        resultsElement.style.display = 'block';
+    }
+    console.log('✅ Movie Results表示完了');
+}
+
+// 本トレンド結果表示関数
+function displayBookResults(data) {
+    console.log('📊 Book Results表示開始', data);
+    const tableBody = document.getElementById('bookTrendsTableBody');
+    const statusMessage = document.getElementById('bookStatusMessage');
+    
+    if (!tableBody) {
+        console.error('❌ Book DOM要素が見つかりません');
+        return;
+    }
+    
+    // ステータスメッセージは非表示のまま
+    if (statusMessage) {
+        statusMessage.style.display = 'none !important';
+    }
+    
+    // テーブルを更新
+    tableBody.innerHTML = '';
+    if (data.data && data.data.length > 0) {
+        data.data.forEach((item, index) => {
+            const row = document.createElement('tr');
+            row.className = 'trend-card';
+            
+            const author = item.author || (item.authors && item.authors.length > 0 ? item.authors.join(', ') : 'N/A') || 'N/A';
+            const price = item.price ? `¥${parseInt(item.price).toLocaleString()}` : 'N/A';
+            let rating = 'N/A';
+            if (item.average_rating) {
+                const avgRating = typeof item.average_rating === 'number' ? item.average_rating : parseFloat(item.average_rating);
+                if (!isNaN(avgRating)) {
+                    rating = avgRating.toFixed(1);
+                }
+            }
+            const bookLink = item.item_url || '#';
+            const imageUrl = item.image_url || '';
+            
+            row.innerHTML = `
+                <td><span class="badge bg-info">${item.rank || index + 1}</span></td>
+                <td>
+                    ${imageUrl ? `<img src="${imageUrl}" alt="${item.title}" style="width: 40px; height: 60px; object-fit: cover; margin-right: 10px; float: left;">` : ''}
+                    <strong><a href="${bookLink}" target="_blank">${item.title || 'N/A'}</a></strong>
+                </td>
+                <td>${author}</td>
+                <td>${price !== 'N/A' ? price : rating}</td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+    
+    // 結果セクションを表示
+    const resultsElement = document.getElementById('bookResults');
+    if (resultsElement) {
+        resultsElement.style.display = 'block';
+    }
+    console.log('✅ Book Results表示完了');
+}
+
 // World News結果表示関数
 function displayWorldNewsResults(data) {
     console.log('📊 World News Results表示開始', data);

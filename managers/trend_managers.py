@@ -20,6 +20,8 @@ from services.trends.nhk_trends import NHKTrendsManager
 from services.trends.cnn_trends import CNNTrendsManager
 from services.trends.stock_trends import StockTrendsManager
 from services.trends.crypto_trends import CryptoTrendsManager
+from services.trends.movie_trends import MovieTrendsManager
+from services.trends.book_trends import BookTrendsManager
 from utils.logger_config import get_logger
 
 # ロガーの初期化
@@ -44,6 +46,8 @@ MANAGER_CONFIGS = [
     ('cnn', CNNTrendsManager, 'CNN'),
     ('stock', StockTrendsManager, 'Stock'),
     ('crypto', CryptoTrendsManager, 'Crypto'),
+    ('movie', MovieTrendsManager, 'Movie'),
+    ('book', BookTrendsManager, 'Book'),
 ]
 
 
@@ -154,6 +158,8 @@ def refresh_all_trends(managers, force_refresh=True):
     call_manager('nhk', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP')
     call_manager('stock', lambda m: m.get_trends(market='JP', limit=25, force_refresh=force_refresh), 'JP')
     call_manager('crypto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP')
+    call_manager('movie', lambda m: m.get_trends(country='JP', time_window='day', limit=25, force_refresh=force_refresh), 'JP')
+    call_manager('book', lambda m: m.get_trends(country='JP', limit=25, force_refresh=force_refresh), 'JP')
     
     # USのデータを更新
     logger.info("🇺🇸 USのデータを更新中...")
@@ -169,6 +175,8 @@ def refresh_all_trends(managers, force_refresh=True):
     call_manager('cnn', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
     call_manager('stock', lambda m: m.get_trends(market='US', limit=25, force_refresh=force_refresh), 'US')
     call_manager('crypto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
+    call_manager('movie', lambda m: m.get_trends(country='US', time_window='day', limit=25, force_refresh=force_refresh), 'US')
+    call_manager('book', lambda m: m.get_trends(country='US', limit=25, force_refresh=force_refresh), 'US')
     
     overall_success = all(result.get('success') for result in results.values())
     

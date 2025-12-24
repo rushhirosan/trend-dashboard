@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from database_config import TrendsCache
 from utils.logger_config import get_logger
+from utils.rate_limiter import get_rate_limiter
 
 logger = get_logger(__name__)
 
@@ -36,7 +37,12 @@ class NHKTrendsManager:
                 logger.info(f"🔄 NHK force_refresh: キャッシュをクリアします")
                 self.db.clear_nhk_trends_cache()
             
-            cached_data = self.db.get_nhk_trends_from_cache()
+            try:
+                cached_data = self.db.get_nhk_trends_from_cache()
+            except Exception as e:
+                logger.error(f"❌ NHK: キャッシュ取得エラー: {e}", exc_info=True)
+                # エラー時は空のリストとして扱う（500エラーを防ぐ）
+                cached_data = []
             
             if cached_data:
                 # キャッシュから取得したデータにも重複排除を適用

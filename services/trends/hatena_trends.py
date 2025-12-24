@@ -6,6 +6,7 @@ import urllib.parse
 from datetime import datetime, timedelta
 from database_config import TrendsCache
 from utils.logger_config import get_logger
+from utils.rate_limiter import get_rate_limiter
 
 # ロガーの初期化
 logger = get_logger(__name__)
@@ -71,9 +72,13 @@ class HatenaTrendsManager:
             else:
                 # カテゴリ別キャッシュから取得を試行
                 logger.debug(f"🔍 はてなブックマーク: get_from_cache_by_category呼び出し開始")
-                cached_data = self.get_from_cache_by_category(category)
-                logger.debug(f"🔍 はてなブックマーク: get_from_cache_by_category呼び出し完了")
-                logger.debug(f"🔍 はてなブックマーク: キャッシュデータ取得結果: {type(cached_data)}, 長さ: {len(cached_data) if cached_data else 0}")
+                try:
+                    cached_data = self.get_from_cache_by_category(category)
+                    logger.debug(f"🔍 はてなブックマーク: get_from_cache_by_category呼び出し完了")
+                    logger.debug(f"🔍 はてなブックマーク: キャッシュデータ取得結果: {type(cached_data)}, 長さ: {len(cached_data) if cached_data else 0}")
+                except Exception as e:
+                    logger.error(f"❌ はてなブックマーク: キャッシュ取得中にエラーが発生しました: {e}", exc_info=True)
+                    cached_data = []  # エラー時は空のリストとして扱う
             
             if cached_data and len(cached_data) > 0:
                 # ブックマーク数でソート（降順）

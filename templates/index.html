@@ -598,6 +598,94 @@
                     </article>
                 </div>
 
+                <!-- 5行目: 映画 + 本 -->
+                <div class="row g-3 mb-3">
+                    <!-- 左側: 映画トレンド -->
+                    <article class="col-12 col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                <h2 class="h5 mb-0"><i class="fas fa-film" aria-hidden="true"></i> 映画トレンド</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="loading text-center py-5" id="movieLoading" style="display: none;">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-3">映画トレンドデータを取得中...</p>
+                                </div>
+                                <div id="movieResults">
+                                    <div class="alert alert-success status-message" id="movieStatusMessage" style="display: none !important;">
+                                        <!-- ステータスメッセージがここに表示されます -->
+                                    </div>
+                                    <div class="card trend-table category-card">
+                                        <div class="card-body">
+                                            <div class="trend-table-container">
+                                                <div class="table-responsive">
+                                                    <table class="table table-hover trend-table" id="movieTrendsTable">
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>順位</th>
+                                                                <th>タイトル</th>
+                                                                <th>評価</th>
+                                                                <th>公開日</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="movieTrendsTableBody">
+                                                            <!-- 映画データがここに表示されます -->
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                    <!-- 右側: 本トレンド -->
+                    <article class="col-12 col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                                <h2 class="h5 mb-0"><i class="fas fa-book" aria-hidden="true"></i> 本トレンド</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="loading text-center py-5" id="bookLoading" style="display: none;">
+                                    <div class="spinner-border text-info" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-3">本トレンドデータを取得中...</p>
+                                </div>
+                                <div id="bookResults">
+                                    <div class="alert alert-success status-message" id="bookStatusMessage" style="display: none !important;">
+                                        <!-- ステータスメッセージがここに表示されます -->
+                                    </div>
+                                    <div class="card trend-table category-card">
+                                        <div class="card-body">
+                                            <div class="trend-table-container">
+                                                <div class="table-responsive">
+                                                    <table class="table table-hover trend-table" id="bookTrendsTable">
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>順位</th>
+                                                                <th>タイトル</th>
+                                                                <th>著者</th>
+                                                                <th>価格</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="bookTrendsTableBody">
+                                                            <!-- 本データがここに表示されます -->
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+
                 <!-- 6行目: 楽天 + Twitch -->
                 <div class="row g-3 mb-3">
                     <!-- 左側: 楽天商品トレンド -->
@@ -715,6 +803,8 @@
         #youtubeResults,
         #hatenaResults,
         #podcastResults,
+        #movieResults,
+        #bookResults,
         #rakutenResults,
         #twitchResults,
         #nhkResults,

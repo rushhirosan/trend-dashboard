@@ -689,6 +689,94 @@
             </div>
         </div>
 
+        <!-- Row 5: Movie Trends + Book Trends -->
+        <div class="row g-3 mb-3">
+            <!-- Left: Movie Trends -->
+            <div class="col-12 col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5><i class="fas fa-film"></i> Movie Trends</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="loading text-center py-5" id="movieLoading" style="display: none;">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Loading movie trends...</p>
+                        </div>
+                        <div id="movieResults" style="display: none;">
+                            <div class="alert alert-success status-message" id="movieStatusMessage" style="display: none;">
+                                <!-- Status messages will be displayed here -->
+                            </div>
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                                    <div class="trend-table-container">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover trend-table" id="movieTrendsTable">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>Rank</th>
+                                                        <th>Title</th>
+                                                        <th>Rating</th>
+                                                        <th>Release Date</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="movieTrendsTableBody">
+                                                    <!-- Movie data will be displayed here -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Right: Book Trends -->
+            <div class="col-12 col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-info text-white">
+                        <h5><i class="fas fa-book"></i> Book Trends</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="loading text-center py-5" id="bookLoading" style="display: none;">
+                            <div class="spinner-border text-info" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Loading book trends...</p>
+                        </div>
+                        <div id="bookResults" style="display: none;">
+                            <div class="alert alert-success status-message" id="bookStatusMessage" style="display: none;">
+                                <!-- Status messages will be displayed here -->
+                            </div>
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                                    <div class="trend-table-container">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover trend-table" id="bookTrendsTable">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>Rank</th>
+                                                        <th>Title</th>
+                                                        <th>Author</th>
+                                                        <th>Rating</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="bookTrendsTableBody">
+                                                    <!-- Book data will be displayed here -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Row 6: Reddit Popular Posts + Twitch Trends -->
         <div class="row g-3 mb-3">
             <!-- Left: Reddit Popular Posts -->
@@ -839,6 +927,8 @@
         #producthuntResults,
         #spotifyResults,
         #podcastResults,
+        #movieResults,
+        #bookResults,
         #redditResults,
         #twitchResults {
             display: block !important;

@@ -219,11 +219,11 @@ class TrendsScheduler:
                     return
                 
                 # 既存のrefresh_all_trends()関数を使用
-                # force_refresh=Falseに変更：キャッシュが存在する場合はAPIを呼び出さない（World News APIの使用量を削減）
-                # ただし、Stock/Cryptoは無料APIのため、キャッシュがない場合はAPIを呼び出す
+                # スケジューラー実行時（7時・14時）は強制更新（force_refresh=True）で実行
+                # これにより、既存のキャッシュがあっても最新データを取得する
                 from managers.trend_managers import refresh_all_trends
-                logger.info("🔄 refresh_all_trends実行開始 (force_refresh=False)")
-                result = refresh_all_trends(managers, force_refresh=False)
+                logger.info("🔄 refresh_all_trends実行開始 (force_refresh=True)")
+                result = refresh_all_trends(managers, force_refresh=True)
                 logger.info(f"🔄 refresh_all_trends実行完了: success={result.get('success')}")
             
             # 結果をログ出力

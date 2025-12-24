@@ -298,12 +298,27 @@ def get_hatena_trends():
         
         managers = get_managers()
         if not managers.get('hatena'):
+            logger.warning("⚠️ Hatena Managerが初期化されていません")
             return jsonify({
                 'success': False,
+                'data': [],
+                'status': 'manager_not_initialized',
                 'error': 'Hatena Managerが初期化されていません'
-            }), 500
+            }), 200  # 500ではなく200を返す（フロントエンドでエラーハンドリング）
         
         result = managers['hatena'].get_trends(category=category, limit=limit, force_refresh=force_refresh)
+        
+        # エラーが含まれている場合でも、空のデータを返す（500エラーを防ぐ）
+        if not result.get('success', True):
+            logger.warning(f"⚠️ Hatena: データ取得に失敗しましたが、空のデータを返します: {result.get('error', 'Unknown error')}")
+            return jsonify({
+                'success': True,  # エラーではなく、データがない状態として扱う
+                'data': [],
+                'status': result.get('status', 'api_error'),
+                'category': category,
+                'source': 'Hatena API',
+                'message': result.get('error', 'データを取得できませんでした')
+            }), 200
         
         return jsonify({
             'success': True,
@@ -315,10 +330,14 @@ def get_hatena_trends():
         
     except Exception as e:
         logger.error(f"❌ Hatena API エラー: {e}", exc_info=True)
+        # 500エラーではなく、空のデータを返す（フロントエンドでエラーハンドリング）
         return jsonify({
-            'success': False,
+            'success': True,  # エラーではなく、データがない状態として扱う
+            'data': [],
+            'status': 'api_error',
+            'category': category,
             'error': f'はてなブックマークトレンドの取得に失敗しました: {str(e)}'
-        }), 500
+        }), 200
 
 
 @trend_bp.route('/twitch-trends')
@@ -464,3 +483,37 @@ def get_crypto_trends(manager):
         
     except Exception as e:
         return handle_api_error('Crypto Trends', e)
+
+
+@trend_bp.route('/movie-trends')
+@require_manager('movie')
+def get_movie_trends(manager):
+    """Movie Trends APIエンドポイント"""
+    try:
+        country = request.args.get('country', 'JP')  # 'JP' or 'US'
+        time_window = request.args.get('time_window', 'day')  # 'day' or 'week'
+        limit = int(request.args.get('limit', 25))
+        force_refresh = get_force_refresh()
+        
+        result = manager.get_trends(country=country, time_window=time_window, limit=limit, force_refresh=force_refresh)
+        return handle_trend_response(result, 'Movie Trends', 'TMDB API', time_window=time_window, country=country)
+        
+    except Exception as e:
+        return handle_api_error('Movie Trends', e)
+
+
+@trend_bp.route('/book-trends')
+@require_manager('book')
+def get_book_trends(manager):
+    """Book Trends APIエンドポイント"""
+    try:
+        country = request.args.get('country', 'JP').upper()  # 'JP' or 'US'
+        limit = int(request.args.get('limit', 25))
+        force_refresh = get_force_refresh()
+        
+        result = manager.get_trends(country=country, limit=limit, force_refresh=force_refresh)
+        source = '楽天ブックスAPI' if country == 'JP' else 'Google Books API'
+        return handle_trend_response(result, 'Book Trends', source, country=country)
+        
+    except Exception as e:
+        return handle_api_error('Book Trends', e)

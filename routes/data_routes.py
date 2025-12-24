@@ -3,6 +3,7 @@
 キャッシュデータ、統計情報などのAPIエンドポイント
 """
 
+import os
 from flask import Blueprint, jsonify, request, current_app
 from database_config import TrendsCache
 from utils.logger_config import get_logger

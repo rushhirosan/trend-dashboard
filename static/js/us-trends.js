@@ -4,6 +4,29 @@
 let currentGoogleChart = null;
 let currentYouTubeChart = null;
 
+// リトライ付きfetch関数（接続エラー時の自動リトライ）
+async function fetchWithRetry(url, options = {}, maxRetries = 2) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            const response = await fetch(url, options);
+            // 500エラーやネットワークエラーもリトライ対象
+            if (!response.ok && response.status >= 500 && attempt < maxRetries - 1) {
+                console.warn(`⚠️ API呼び出しエラー (${response.status})。リトライします (試行 ${attempt + 1}/${maxRetries})`);
+                await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1))); // 指数バックオフ
+                continue;
+            }
+            return response;
+        } catch (error) {
+            if (attempt < maxRetries - 1) {
+                console.warn(`⚠️ ネットワークエラーが発生しました: ${error.message}。リトライします (試行 ${attempt + 1}/${maxRetries})`);
+                await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1))); // 指数バックオフ
+                continue;
+            }
+            throw error;
+        }
+    }
+}
+
 // Stock Trends data fetch for US
 async function fetchStockTrendsUS() {
     console.log('=== Stock Trends fetch started (US) ===');
@@ -27,7 +50,7 @@ async function fetchStockTrendsUS() {
         errorElement.style.display = 'none';
         
         // API call (US stocks)
-        const response = await fetch('/api/stock-trends?market=US&limit=25');
+        const response = await fetchWithRetry('/api/stock-trends?market=US&limit=25');
         const data = await response.json();
         
         if (!response.ok) {
@@ -168,7 +191,7 @@ async function fetchCryptoTrendsUS() {
         errorElement.style.display = 'none';
         
         // API call
-        const response = await fetch('/api/crypto-trends?limit=25');
+        const response = await fetchWithRetry('/api/crypto-trends?limit=25');
         const data = await response.json();
         
         if (!response.ok) {
@@ -276,7 +299,7 @@ async function fetchMovieTrendsUS() {
         resultsElement.style.display = 'none';
         
         // API call (US movies)
-        const response = await fetch('/api/movie-trends?country=US&limit=25');
+        const response = await fetchWithRetry('/api/movie-trends?country=US&limit=25');
         const data = await response.json();
         
         if (!response.ok) {
@@ -336,7 +359,15 @@ function displayMovieResultsUS(data) {
             }
             const releaseDate = item.release_date || 'N/A';
             const posterUrl = item.poster_url || '';
-            const movieLink = item.item_url || '#';
+            // item_urlが存在しない場合は、idまたはmovie_idから生成
+            let movieLink = item.item_url;
+            const movieId = item.id || item.movie_id;
+            if (!movieLink && movieId) {
+                movieLink = `https://www.themoviedb.org/movie/${movieId}`;
+            }
+            if (!movieLink) {
+                movieLink = '#';
+            }
             
             row.innerHTML = `
                 <td>${item.rank || index + 1}</td>
@@ -378,7 +409,7 @@ async function fetchBookTrendsUS() {
         resultsElement.style.display = 'none';
         
         // API call (US books)
-        const response = await fetch('/api/book-trends?country=US&limit=25');
+        const response = await fetchWithRetry('/api/book-trends?country=US&limit=25');
         const data = await response.json();
         
         if (!response.ok) {
@@ -437,11 +468,12 @@ function displayBookResultsUS(data) {
                     rating = avgRating.toFixed(1);
                 }
             }
-            const bookLink = item.item_url || '#';
-            const imageUrl = item.image_url || '';
+            const bookLink = item.info_link || item.preview_link || item.buy_link || '#';
+            // 画像URLの優先順位: image_url > thumbnail > small_thumbnail
+            const imageUrl = item.image_url || item.thumbnail || item.small_thumbnail || '';
             
             row.innerHTML = `
-                <td>${item.rank || index + 1}</td>
+                <td><span class="badge bg-info">${item.rank || index + 1}</span></td>
                 <td>
                     ${imageUrl ? `<img src="${imageUrl}" alt="${item.title}" style="width: 40px; height: 60px; object-fit: cover; margin-right: 10px; float: left;">` : ''}
                     <strong><a href="${bookLink}" target="_blank">${item.title || 'N/A'}</a></strong>
@@ -469,7 +501,7 @@ function loadMovieTrendsFromCacheUS() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    fetch('/api/movie-trends?country=US', { signal: controller.signal })
+    fetchWithRetry('/api/movie-trends?country=US', { signal: controller.signal })
         .then(response => {
             clearTimeout(timeoutId);
             if (!response.ok) {
@@ -517,7 +549,7 @@ function loadBookTrendsFromCacheUS() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    fetch('/api/book-trends?country=US', { signal: controller.signal })
+    fetchWithRetry('/api/book-trends?country=US&limit=25', { signal: controller.signal })
         .then(response => {
             clearTimeout(timeoutId);
             if (!response.ok) {
@@ -902,75 +934,96 @@ function loadCachedDataUS() {
 function loadGoogleTrendsFromCacheUS() {
     console.log('📊 Google Trends cache data loading for US');
     
-    fetch('/api/google-trends?country=US')
+    fetchWithRetry('/api/google-trends?country=US')
         .then(response => {
             console.log('Google Trends API response:', response.status, response.ok);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
             return response.json();
         })
-           .then(data => {
-               console.log('Google Trends API data:', data);
-               if (data.success && data.data && data.data.length > 0) {
-                   console.log('Google Trends data display starting');
-                   displayGoogleResults(data);
-               } else {
-                   console.log('Google Trends data not found or error:', data);
-                   showGoogleError(data.error || 'No data available');
-               }
-           })
-        .catch(error => console.error('Google Trends cache loading error:', error));
+        .then(data => {
+            console.log('Google Trends API data:', data);
+            if (data.success && data.data && data.data.length > 0) {
+                console.log('Google Trends data display starting');
+                displayGoogleResults(data);
+            } else {
+                console.log('Google Trends data not found or error:', data);
+                showGoogleError(data.error || 'No data available');
+            }
+        })
+        .catch(error => {
+            console.error('Google Trends cache loading error:', error);
+            showGoogleError(`Failed to load Google Trends: ${error.message}`);
+        });
 }
 
 // YouTube Trends cache data loading for US
 function loadYouTubeTrendsFromCacheUS() {
     console.log('📊 YouTube Trends cache data loading for US');
     
-    fetch('/api/youtube-trends?region=US')
+    fetchWithRetry('/api/youtube-trends?region=US')
         .then(response => {
             console.log('YouTube Trends API response:', response.status, response.ok);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
             return response.json();
         })
-           .then(data => {
-               console.log('YouTube Trends API data:', data);
-               if (data.success && data.data && data.data.length > 0) {
-                   console.log('YouTube Trends data display starting');
-                   displayYouTubeResults(data);
-               } else {
-                   console.log('YouTube Trends data not found or error:', data);
-                   showYouTubeError(data.error || 'No data available');
-               }
-           })
-        .catch(error => console.error('YouTube Trends cache loading error:', error));
+        .then(data => {
+            console.log('YouTube Trends API data:', data);
+            if (data.success && data.data && data.data.length > 0) {
+                console.log('YouTube Trends data display starting');
+                displayYouTubeResults(data);
+            } else {
+                console.log('YouTube Trends data not found or error:', data);
+                showYouTubeError(data.error || 'No data available');
+            }
+        })
+        .catch(error => {
+            console.error('YouTube Trends cache loading error:', error);
+            showYouTubeError(`Failed to load YouTube Trends: ${error.message}`);
+        });
 }
 
 // YouTube Rising Trends cache data loading for US
 function loadYouTubeRisingTrendsFromCacheUS() {
     console.log('📊 YouTube Rising Trends cache data loading for US');
     
-    fetch('/api/youtube-rising-trends?region=US')
+    fetchWithRetry('/api/youtube-rising-trends?region=US')
         .then(response => {
             console.log('YouTube Rising Trends API response:', response.status, response.ok);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
             return response.json();
         })
-           .then(data => {
-               console.log('YouTube Rising Trends API data:', data);
-               if (data.success && data.data && data.data.length > 0) {
-                   console.log('YouTube Rising Trends data display starting');
-                   displayYouTubeResults(data);
-               } else {
-                   console.log('YouTube Rising Trends data not found or error:', data);
-                   showYouTubeError(data.error || 'No data available');
-               }
-           })
-        .catch(error => console.error('YouTube Rising Trends cache loading error:', error));
+        .then(data => {
+            console.log('YouTube Rising Trends API data:', data);
+            if (data.success && data.data && data.data.length > 0) {
+                console.log('YouTube Rising Trends data display starting');
+                displayYouTubeResults(data);
+            } else {
+                console.log('YouTube Rising Trends data not found or error:', data);
+                showYouTubeError(data.error || 'No data available');
+            }
+        })
+        .catch(error => {
+            console.error('YouTube Rising Trends cache loading error:', error);
+            showYouTubeError(`Failed to load YouTube Rising Trends: ${error.message}`);
+        });
 }
 
 // World News cache data loading for US
 function loadWorldNewsFromCacheUS() {
     console.log('📊 World News cache data loading for US');
     
-    fetch('/api/worldnews-trends?country=us&category=general')
+    fetchWithRetry('/api/worldnews-trends?country=us&category=general')
         .then(response => {
             console.log('World News API response:', response.status, response.ok);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
             return response.json();
         })
         .then(data => {
@@ -983,16 +1036,22 @@ function loadWorldNewsFromCacheUS() {
                 showWorldNewsError(data.error || 'No data available');
             }
         })
-        .catch(error => console.error('World News cache loading error:', error));
+        .catch(error => {
+            console.error('World News cache loading error:', error);
+            showWorldNewsError(`Failed to load World News: ${error.message}`);
+        });
 }
 
 // Spotify cache data loading for US
 function loadSpotifyFromCacheUS() {
     console.log('📊 Spotify cache data loading for US');
     
-    fetch('/api/music-trends?service=spotify&region=US')
+    fetchWithRetry('/api/music-trends?service=spotify&region=US')
         .then(response => {
             console.log('Spotify API response:', response.status, response.ok);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
             return response.json();
         })
         .then(data => {
@@ -1005,7 +1064,10 @@ function loadSpotifyFromCacheUS() {
                 showSpotifyError(data.error || 'No data available');
             }
         })
-        .catch(error => console.error('Spotify cache loading error:', error));
+        .catch(error => {
+            console.error('Spotify cache loading error:', error);
+            showSpotifyError(`Failed to load Spotify data: ${error.message}`);
+        });
 }
 
 // Display World News Results
@@ -1133,9 +1195,12 @@ function showSpotifyError(message) {
 function loadRedditFromCacheUS() {
     console.log('📊 Reddit cache data loading for US');
     
-    fetch('/api/reddit-trends?subreddit=all&limit=25')
+    fetchWithRetry('/api/reddit-trends?subreddit=all&limit=25')
         .then(response => {
             console.log('Reddit API response:', response.status, response.ok);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
             return response.json();
         })
         .then(data => {
@@ -1284,7 +1349,7 @@ function loadPodcastFromCacheUS() {
         loadingElement.style.display = 'block';
     }
     
-    fetch('/api/podcast-trends?trend_type=best_podcasts&region=us&force_refresh=false')
+    fetchWithRetry('/api/podcast-trends?trend_type=best_podcasts&region=us&force_refresh=false')
         .then(response => {
             console.log('Podcast API response:', response.status, response.ok);
             if (!response.ok) {
@@ -1514,9 +1579,12 @@ function showTwitchError(message) {
 function loadHackerNewsFromCacheUS() {
     console.log('📊 Hacker News cache data loading for US');
     
-    fetch('/api/hackernews-trends?type=top&limit=25')
+    fetchWithRetry('/api/hackernews-trends?type=top&limit=25')
         .then(response => {
             console.log('Hacker News API response:', response.status, response.ok);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
             return response.json();
         })
         .then(data => {
@@ -1529,7 +1597,10 @@ function loadHackerNewsFromCacheUS() {
                 showHackerNewsError(data.error || 'No data available');
             }
         })
-        .catch(error => console.error('Hacker News cache loading error:', error));
+        .catch(error => {
+            console.error('Hacker News cache loading error:', error);
+            showHackerNewsError(`Failed to load Hacker News: ${error.message}`);
+        });
 }
 
 // Display Hacker News Results
@@ -1610,7 +1681,7 @@ function loadStockTrendsFromCacheUS() {
     if (loadingElement) loadingElement.style.display = 'block';
     if (resultsElement) resultsElement.style.display = 'none';
     
-    fetch('/api/stock-trends?market=US&limit=25')
+    fetchWithRetry('/api/stock-trends?market=US&limit=25')
         .then(response => {
             console.log('Stock API response:', response.status, response.ok);
             if (!response.ok) {
@@ -1647,7 +1718,7 @@ function loadCryptoTrendsFromCacheUS() {
     if (loadingElement) loadingElement.style.display = 'block';
     if (resultsElement) resultsElement.style.display = 'none';
     
-    fetch('/api/crypto-trends?limit=25')
+    fetchWithRetry('/api/crypto-trends?limit=25')
         .then(response => {
             console.log('Crypto API response:', response.status, response.ok);
             if (!response.ok) {
@@ -1690,7 +1761,7 @@ function loadCNNFromCacheUS() {
     if (loadingElement) loadingElement.style.display = 'block';
     if (resultsElement) resultsElement.style.display = 'none';
     
-    fetch('/api/cnn-trends?limit=25')
+    fetchWithRetry('/api/cnn-trends?limit=25')
         .then(response => {
             console.log('CNN API response:', response.status, response.ok);
             if (!response.ok) {
@@ -1782,7 +1853,7 @@ function loadProductHuntFromCacheUS() {
     if (loadingElement) loadingElement.style.display = 'block';
     if (resultsElement) resultsElement.style.display = 'none';
     
-    fetch('/api/producthunt-trends?limit=25&sort=votes')
+    fetchWithRetry('/api/producthunt-trends?limit=25&sort=votes')
         .then(response => {
             console.log('Product Hunt API response:', response.status, response.ok);
             return response.json().then(data => {

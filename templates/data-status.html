@@ -6,7 +6,7 @@
     
     <!-- SEO Meta Tags -->
     <title>データ鮮度情報 - トレンドダッシュボード</title>
-    <meta name="description" content="各トレンドデータの最終更新時刻とデータ件数を確認できます。Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Twitch、Podcastなどのデータ鮮度をリアルタイムで確認。">
+    <meta name="description" content="Google Trends、YouTube、株価、Spotify、はてなブックマーク、楽天、Twitch、Podcastなどのトレンドデータを表示しています。データは毎日7時と14時（JST）に更新されます。">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://trends-dashboard.fly.dev/data-status">
     
@@ -363,7 +363,60 @@
                                 </div>
 
                                 <div class="row g-3 mt-2">
-                                    <!-- 6行目: 楽天 + Twitch -->
+                                    <!-- 6行目: 映画 + 本 -->
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-3">
+                                                    <i class="fas fa-film text-primary fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">映画トレンド</h6>
+                                                </div>
+                                                <div class="row text-center">
+                                                    <div class="col-4">
+                                                        <small class="text-muted">最終更新/Last updated</small>
+                                                        <div class="fw-bold" id="movieLastUpdate">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">データ件数/Data count</small>
+                                                        <div class="fw-bold" id="movieDataCount">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">ステータス/Status</small>
+                                                        <div><span class="badge bg-secondary" id="movieStatus">-</span></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-3">
+                                                    <i class="fas fa-book text-info fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">本トレンド</h6>
+                                                </div>
+                                                <div class="row text-center">
+                                                    <div class="col-4">
+                                                        <small class="text-muted">最終更新/Last updated</small>
+                                                        <div class="fw-bold" id="bookLastUpdate">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">データ件数/Data count</small>
+                                                        <div class="fw-bold" id="bookDataCount">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">ステータス/Status</small>
+                                                        <div><span class="badge bg-secondary" id="bookStatus">-</span></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mt-2">
+                                    <!-- 7行目: 楽天 + Twitch -->
                                     <div class="col-md-6">
                                         <div class="card h-100">
                                             <div class="card-body">
@@ -685,7 +738,60 @@
                                     </div>
 
                                     <div class="row g-3 mt-2">
-                                        <!-- US 6行目: Reddit + Twitch -->
+                                        <!-- US 6行目: 映画 + 本 -->
+                                        <div class="col-md-6">
+                                            <div class="card h-100">
+                                                <div class="card-body">
+                                                    <div class="d-flex align-items-center mb-3">
+                                                        <i class="fas fa-film text-primary fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">Movie Trends</h6>
+                                                    </div>
+                                                    <div class="row text-center">
+                                                        <div class="col-4">
+                                                            <small class="text-muted">最終更新/Last updated</small>
+                                                            <div class="fw-bold" id="movieUSLastUpdate">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">データ件数/Data count</small>
+                                                            <div class="fw-bold" id="movieUSDataCount">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">ステータス/Status</small>
+                                                            <div><span class="badge bg-secondary" id="movieUSStatus">-</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-md-6">
+                                            <div class="card h-100">
+                                                <div class="card-body">
+                                                    <div class="d-flex align-items-center mb-3">
+                                                        <i class="fas fa-book text-info fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">Book Trends</h6>
+                                                    </div>
+                                                    <div class="row text-center">
+                                                        <div class="col-4">
+                                                            <small class="text-muted">最終更新/Last updated</small>
+                                                            <div class="fw-bold" id="bookUSLastUpdate">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">データ件数/Data count</small>
+                                                            <div class="fw-bold" id="bookUSDataCount">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">ステータス/Status</small>
+                                                            <div><span class="badge bg-secondary" id="bookUSStatus">-</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-3 mt-2">
+                                        <!-- US 7行目: Reddit + Twitch -->
                                         <div class="col-md-6">
                                             <div class="card h-100">
                                                 <div class="card-body">
@@ -848,6 +954,8 @@
                 { id: 'cryptoUS', name: 'Cryptocurrency Trends', endpoint: '/api/crypto-trends?limit=25' },
                 { id: 'spotifyUS', name: 'Spotify', endpoint: '/api/music-trends?service=spotify&region=US' },
                 { id: 'podcastUS', name: 'Podcast', endpoint: '/api/podcast-trends?region=us' },
+                { id: 'movieUS', name: 'Movie Trends', endpoint: '/api/movie-trends?country=US' },
+                { id: 'bookUS', name: 'Book Trends', endpoint: '/api/book-trends?country=US' },
                 { id: 'redditUS', name: 'Reddit', endpoint: '/api/reddit-trends?subreddit=all' },
                 { id: 'twitchUS', name: 'Twitch', endpoint: '/api/twitch-trends?type=games' }
             ];
@@ -872,7 +980,9 @@
             }
             
             // キャッシュ情報を取得（/api/cache/data-freshnessエンドポイントを使用）
-            fetch('/api/cache/data-freshness')
+            // USセクションの場合はcountry=USパラメータを追加
+            const countryParam = platformId.includes('US') ? '?country=US' : '?country=JP';
+            fetch(`/api/cache/data-freshness${countryParam}`)
                 .then(response => response.json())
                 .then(data => {
                     console.log(`📊 ${platformName} キャッシュ情報取得結果:`, {
@@ -895,6 +1005,8 @@
                             'Cryptocurrency Trends': '仮想通貨トレンド',  // data_routes.pyでは'仮想通貨トレンド'として登録
                             'Spotify': 'Spotify',
                             'Podcast': 'Podcast',
+                            'Movie Trends': '映画トレンド',  // 日本のセクションではmovie_trends_JP、USセクションではmovie_trends_USを取得
+                            'Book Trends': '本トレンド',  // 日本のセクションではbook_trends_JP、USセクションではbook_trends_USを取得
                             'Reddit': 'Reddit',
                             'Twitch': 'Twitch'
                         };
@@ -1029,24 +1141,15 @@
             <div class="row">
                 <div class="col-md-6">
                     <h5 class="h6 mb-3">トレンドダッシュボード</h5>
-                    <p class="text-muted small mb-2">各トレンドデータの最終更新時刻とデータ件数を確認できます。Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Twitch、Podcastなどのデータ鮮度をリアルタイムで確認。</p>
+                    <p class="text-muted small mb-2">Google Trends、YouTube、株価、Spotify、はてなブックマーク、楽天、Twitch、Podcastなどのトレンドデータを表示しています。データは毎日7時と14時（JST）に更新されます。</p>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-6">
                     <h6 class="h6 mb-3">主要ページ</h6>
                     <ul class="list-unstyled small">
                         <li class="mb-2"><a href="/" class="text-decoration-none text-muted">🇯🇵 日本トレンド</a></li>
                         <li class="mb-2"><a href="/us" class="text-decoration-none text-muted">🇺🇸 USトレンド</a></li>
                         <li class="mb-2"><a href="/data-status" class="text-decoration-none text-muted">📊 データ鮮度情報</a></li>
                         <li class="mb-2"><a href="/subscription" class="text-decoration-none text-muted">📧 メールサブスクリプション</a></li>
-                    </ul>
-                </div>
-                <div class="col-md-3">
-                    <h6 class="h6 mb-3">関連リンク</h6>
-                    <ul class="list-unstyled small">
-                        <li class="mb-2"><a href="/#googleTrends" class="text-decoration-none text-muted">Google Trends</a></li>
-                        <li class="mb-2"><a href="/#youtubeTrends" class="text-decoration-none text-muted">YouTube</a></li>
-                        <li class="mb-2"><a href="/#stockTrends" class="text-decoration-none text-muted">株価トレンド</a></li>
-                        <li class="mb-2"><a href="/#cryptoTrends" class="text-decoration-none text-muted">仮想通貨トレンド</a></li>
                     </ul>
                 </div>
             </div>

@@ -3,6 +3,29 @@ let currentGoogleChart = null;
 let currentYouTubeChart = null;
 let currentMusicChart = null;
 
+// リトライ付きfetch関数（接続エラー時の自動リトライ）
+async function fetchWithRetry(url, options = {}, maxRetries = 2) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            const response = await fetch(url, options);
+            // 500エラーやネットワークエラーもリトライ対象
+            if (!response.ok && response.status >= 500 && attempt < maxRetries - 1) {
+                console.warn(`⚠️ API呼び出しエラー (${response.status})。リトライします (試行 ${attempt + 1}/${maxRetries})`);
+                await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1))); // 指数バックオフ
+                continue;
+            }
+            return response;
+        } catch (error) {
+            if (attempt < maxRetries - 1) {
+                console.warn(`⚠️ ネットワークエラーが発生しました: ${error.message}。リトライします (試行 ${attempt + 1}/${maxRetries})`);
+                await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1))); // 指数バックオフ
+                continue;
+            }
+            throw error;
+        }
+    }
+}
+
 // Google Trendsデータを取得
 async function fetchGoogleTrends() {
     console.log('fetchGoogleTrends: 開始');
@@ -18,7 +41,7 @@ async function fetchGoogleTrends() {
     try {
         console.log(`Google API呼び出し: /api/google-trends?country=${country}`);
         
-        const response = await fetch(`/api/google-trends?country=${country}`);
+        const response = await fetchWithRetry(`/api/google-trends?country=${country}`);
         console.log('Google API レスポンス受信:', response.status, response.ok);
         
         if (!response.ok) {
@@ -854,7 +877,7 @@ async function fetchNewsTrends() {
         statusMessage.innerHTML = '<i class="fas fa-spinner fa-spin"></i> News トレンドデータを取得中...';
         
         // API呼び出し（日本固定）
-        const response = await fetch('/api/news-trends?country=jp&category=general');
+        const response = await fetchWithRetry('/api/news-trends?country=jp&category=general');
         const data = await response.json();
         
         if (!response.ok) {
@@ -904,7 +927,7 @@ async function fetchWorldNewsTrends() {
         statusMessage.innerHTML = '<i class="fas fa-spinner fa-spin"></i> World News APIからニューストレンドデータを取得中...';
         
         // API呼び出し（日本固定）
-        const response = await fetch('/api/worldnews-trends?country=jp&category=general');
+        const response = await fetchWithRetry('/api/worldnews-trends?country=jp&category=general');
         const data = await response.json();
         
         if (!response.ok) {
@@ -1197,7 +1220,7 @@ async function fetchPodcastTrends() {
     try {
         console.log('Podcast API呼び出し: /api/podcast-trends?trend_type=best_podcasts&force_refresh=false');
         
-        const response = await fetch('/api/podcast-trends?trend_type=best_podcasts&force_refresh=false');
+        const response = await fetchWithRetry('/api/podcast-trends?trend_type=best_podcasts&force_refresh=false');
         console.log('Podcast API レスポンス受信:', response.status, response.ok);
         
         if (!response.ok) {
@@ -1355,7 +1378,7 @@ async function fetchRakutenTrends() {
     try {
         console.log('Rakuten API呼び出し: /api/rakuten-trends');
         
-        const response = await fetch('/api/rakuten-trends');
+        const response = await fetchWithRetry('/api/rakuten-trends');
         console.log('Rakuten API レスポンス受信:', response.status, response.ok);
         
         if (!response.ok) {
@@ -1527,7 +1550,7 @@ function fetchHatenaTrends() {
     showHatenaLoading();
     hideHatenaResults();
     
-    fetch('/api/hatena-trends?category=all&limit=25&type=hot')
+    fetchWithRetry('/api/hatena-trends?category=all&limit=25&type=hot')
         .then(response => response.json())
         .then(data => {
             hideHatenaLoading();
@@ -1644,7 +1667,7 @@ async function fetchNHKTrends() {
         errorElement.style.display = 'none';
         
         // API呼び出し
-        const response = await fetch('/api/nhk-trends');
+        const response = await fetchWithRetry('/api/nhk-trends');
         const data = await response.json();
         
         if (!response.ok) {
@@ -1751,7 +1774,7 @@ async function fetchQiitaTrends() {
         errorElement.style.display = 'none';
         
         // API呼び出し
-        const response = await fetch('/api/qiita-trends?limit=25&sort=likes_count');
+        const response = await fetchWithRetry('/api/qiita-trends?limit=25&sort=likes_count');
         const data = await response.json();
         
         if (!response.ok) {
@@ -1858,7 +1881,7 @@ async function fetchStockTrends() {
         errorElement.style.display = 'none';
         
         // API呼び出し（日本株）
-        const response = await fetch('/api/stock-trends?market=JP&limit=25');
+        const response = await fetchWithRetry('/api/stock-trends?market=JP&limit=25');
         const data = await response.json();
         
         if (!response.ok) {
@@ -1999,7 +2022,7 @@ async function fetchCryptoTrends() {
         errorElement.style.display = 'none';
         
         // API呼び出し
-        const response = await fetch('/api/crypto-trends?limit=25');
+        const response = await fetchWithRetry('/api/crypto-trends?limit=25');
         const data = await response.json();
         
         if (!response.ok) {

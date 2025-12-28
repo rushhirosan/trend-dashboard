@@ -124,7 +124,15 @@ function displayMovieResults(data) {
             const rating = item.vote_average ? (typeof item.vote_average === 'number' ? item.vote_average.toFixed(1) : parseFloat(item.vote_average).toFixed(1)) : 'N/A';
             const releaseDate = item.release_date || 'N/A';
             const posterUrl = item.poster_url || '';
-            const movieLink = item.item_url || '#';
+            // item_urlが存在しない場合は、idまたはmovie_idから生成
+            let movieLink = item.item_url;
+            const movieId = item.id || item.movie_id;
+            if (!movieLink && movieId) {
+                movieLink = `https://www.themoviedb.org/movie/${movieId}`;
+            }
+            if (!movieLink) {
+                movieLink = '#';
+            }
             
             row.innerHTML = `
                 <td><span class="badge bg-primary">${item.rank || index + 1}</span></td>

@@ -1,11 +1,5 @@
 # Todo List
 
-## 進行中の課題 🔄
-
-- [ ] Shopping Trendsのフィルタリング問題を調査（ログ確認）
-- [ ] Hatenaデータベース接続の動作確認
-- [ ] US版Podcast表示問題の修正（CSS/JavaScriptの根本原因調査）
-
 ## 残課題 📝
 
 ### Reddit API関連

@@ -6,7 +6,7 @@
     
     <!-- SEO Meta Tags -->
     <title>トレンドダッシュボード - 日本の最新トレンド情報 | Google Trends, YouTube, Spotify, はてなブックマーク</title>
-    <meta name="description" content="日本の最新トレンド情報を一括表示。Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Twitch、Podcastなどの人気トレンドをリアルタイムで確認できます。">
+    <meta name="description" content="日本の最新トレンド情報を一括表示。Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Twitch、Podcastなどの人気トレンドを確認できます。データは毎日7時と14時（JST）に更新されます。">
     <meta name="keywords" content="トレンド, Google Trends, YouTube, Spotify, はてなブックマーク, 楽天, Twitch, Podcast, トレンドダッシュボード">
     <meta name="author" content="Trends Dashboard">
     <meta name="robots" content="index, follow">
@@ -15,7 +15,7 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://trends-dashboard.fly.dev/">
     <meta property="og:title" content="トレンドダッシュボード - 日本の最新トレンド情報">
-    <meta property="og:description" content="日本の最新トレンド情報を一括表示。Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Twitch、Podcastなどの人気トレンドをリアルタイムで確認できます。">
+    <meta property="og:description" content="日本の最新トレンド情報を一括表示。Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Twitch、Podcastなどの人気トレンドを確認できます。データは毎日7時と14時（JST）に更新されます。">
     <meta property="og:image" content="https://trends-dashboard.fly.dev/static/images/og-image.png">
     <meta property="og:locale" content="ja_JP">
     <meta property="og:site_name" content="トレンドダッシュボード">
@@ -24,7 +24,7 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:url" content="https://trends-dashboard.fly.dev/">
     <meta name="twitter:title" content="トレンドダッシュボード - 日本の最新トレンド情報">
-    <meta name="twitter:description" content="日本の最新トレンド情報を一括表示。Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Twitch、Podcastなどの人気トレンドをリアルタイムで確認できます。">
+    <meta name="twitter:description" content="日本の最新トレンド情報を一括表示。Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Twitch、Podcastなどの人気トレンドを確認できます。データは毎日7時と14時（JST）に更新されます。">
     <meta name="twitter:image" content="https://trends-dashboard.fly.dev/static/images/og-image.png">
     
     <!-- Canonical URL -->
@@ -46,7 +46,7 @@
       "@context": "https://schema.org",
       "@type": "WebApplication",
       "name": "トレンドダッシュボード",
-      "description": "日本の最新トレンド情報を一括表示。Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Twitch、Podcastなどの人気トレンドをリアルタイムで確認できます。",
+      "description": "日本の最新トレンド情報を一括表示。Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Twitch、Podcastなどの人気トレンドを確認できます。データは毎日7時と14時（JST）に更新されます。",
       "url": "https://trends-dashboard.fly.dev/",
       "applicationCategory": "InformationApplication",
       "operatingSystem": "Web",
@@ -828,23 +828,9 @@
         }
     </style>
     <script>
-        // ページ読み込み後にデータを読み込む（ローディング表示なし）
+        // ページ読み込み完了のログのみ（データ読み込みはapp.jsのDOMContentLoadedで実行）
         window.addEventListener('load', function() {
             console.log('🇯🇵 ページ読み込み完了');
-            
-            // 少し遅延させてからデータを読み込む
-            setTimeout(function() {
-                try {
-                    if (typeof loadCachedDataExternal === 'function') {
-                        console.log('📦 キャッシュデータの読み込み開始');
-                        loadCachedDataExternal();
-                    } else {
-                        console.log('❌ loadCachedDataExternal関数が見つかりません');
-                    }
-                } catch (error) {
-                    console.error('❌ データ読み込みエラー:', error);
-                }
-            }, 500);
         });
     </script>
     
@@ -854,25 +840,15 @@
             <div class="row">
                 <div class="col-md-6">
                     <h5 class="h6 mb-3">トレンドダッシュボード</h5>
-                    <p class="text-muted small mb-2">日本の最新トレンド情報を一括表示。Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Twitch、Podcastなどの人気トレンドをリアルタイムで確認できます。</p>
+                    <p class="text-muted small mb-2">日本の最新トレンド情報を一括表示。Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Twitch、Podcastなどの人気トレンドを確認できます。データは毎日7時と14時（JST）に更新されます。</p>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-6">
                     <h6 class="h6 mb-3">主要ページ</h6>
                     <ul class="list-unstyled small">
                         <li class="mb-2"><a href="/" class="text-decoration-none text-muted">🇯🇵 日本トレンド</a></li>
                         <li class="mb-2"><a href="/us" class="text-decoration-none text-muted">🇺🇸 USトレンド</a></li>
                         <li class="mb-2"><a href="/data-status" class="text-decoration-none text-muted">📊 データ鮮度情報</a></li>
                         <li class="mb-2"><a href="/subscription" class="text-decoration-none text-muted">📧 メールサブスクリプション</a></li>
-                    </ul>
-                </div>
-                <div class="col-md-3">
-                    <h6 class="h6 mb-3">トレンドカテゴリ</h6>
-                    <ul class="list-unstyled small">
-                        <li class="mb-2"><a href="/#googleTrends" class="text-decoration-none text-muted">Google Trends</a></li>
-                        <li class="mb-2"><a href="/#youtubeTrends" class="text-decoration-none text-muted">YouTube</a></li>
-                        <li class="mb-2"><a href="/#musicTrends" class="text-decoration-none text-muted">Spotify</a></li>
-                        <li class="mb-2"><a href="/#stockTrends" class="text-decoration-none text-muted">株価トレンド</a></li>
-                        <li class="mb-2"><a href="/#cryptoTrends" class="text-decoration-none text-muted">仮想通貨トレンド</a></li>
                     </ul>
                 </div>
             </div>

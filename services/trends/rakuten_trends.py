@@ -20,6 +20,8 @@ class RakutenTrendsManager:
         self.db = TrendsCache()
         self.rakuten_app_id = os.getenv('RAKUTEN_APP_ID')
         self.rakuten_affiliate_id = os.getenv('RAKUTEN_AFFILIATE_ID')
+        # レート制限: 楽天APIは1リクエスト/秒
+        self.rate_limiter = get_rate_limiter('rakuten', max_requests=10, window_seconds=60)
         
         logger.info(f"Rakuten Trends Manager初期化:")
         logger.info(f"  App ID: {'設定済み' if self.rakuten_app_id else '未設定'}")

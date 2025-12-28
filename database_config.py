@@ -690,17 +690,7 @@ class TrendsCache:
     
     def get_from_cache(self, cache_key, region='JP'):
         """キャッシュからデータを取得"""
-        # 接続を取得（有効性チェックと再接続を自動で行う）
-        try:
-            conn = self.get_connection()
-            if not conn:
-                logger.error("❌ キャッシュ取得エラー: データベース接続を取得できませんでした")
-                return None
-        except Exception as e:
-            logger.error(f"❌ キャッシュ取得エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return None
-        
-        try:
+        def query_func(conn):
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 table_name = f"{cache_key}_cache"
                 
@@ -735,21 +725,11 @@ class TrendsCache:
                     result.append(dict(row))
                 
                 return result
-                
-        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-            # 接続エラーの場合は再接続を試みる
-            logger.warning(f"⚠️ キャッシュ取得中に接続エラーが発生: {e}", exc_info=True)
-            try:
-                # 接続をリセットして次回の操作で再接続されるようにする
-                self.connection = None
-                return None
-            except Exception as retry_error:
-                logger.error(f"❌ 再接続試行エラー: {retry_error}", exc_info=True)
-                return None
+        
+        try:
+            return self._execute_with_retry(query_func)
         except Exception as e:
             logger.error(f"❌ キャッシュ取得エラー: {e}", exc_info=True)
-            import traceback
-            traceback.print_exc()
             return None
     
     def is_cache_valid(self, cache_key, region='JP', hours=24):
@@ -879,6 +859,47 @@ class TrendsCache:
             error_msg = "データベース接続を確立できませんでした（最大試行回数に達しました）"
             logger.error(f"❌ {error_msg}")
             raise psycopg2.OperationalError(error_msg)
+    
+    def _execute_with_retry(self, query_func, max_retries=2):
+        """接続エラーが発生した場合に自動的に再接続を試みるヘルパーメソッド
+        
+        Args:
+            query_func: データベースクエリを実行する関数（引数なし、接続オブジェクトを返す）
+            max_retries: 最大再試行回数（デフォルト: 2）
+        
+        Returns:
+            クエリ関数の戻り値、またはNone（全ての再試行が失敗した場合）
+        """
+        for attempt in range(max_retries):
+            try:
+                conn = self.get_connection()
+                if not conn:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"⚠️ データベース接続が取得できませんでした。再接続を試みます (試行 {attempt + 1}/{max_retries})")
+                        self.connection = None
+                        continue
+                    else:
+                        logger.error("❌ データベース接続を取得できませんでした（最大試行回数）")
+                        return None
+                
+                return query_func(conn)
+                
+            except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+                logger.warning(f"⚠️ データベース接続エラーが発生しました: {e} (試行 {attempt + 1}/{max_retries})")
+                self.connection = None
+                if attempt < max_retries - 1:
+                    import time
+                    time.sleep(0.3)  # 短い待機時間を入れてから再接続を試みる
+                    continue
+                else:
+                    logger.error(f"❌ データベース接続エラー（最大試行回数）: {e}")
+                    return None
+            except Exception as e:
+                # 接続エラー以外のエラーはそのまま再スロー
+                logger.error(f"❌ 予期しないエラーが発生しました: {e}", exc_info=True)
+                raise
+        
+        return None
     
     # Google Trends キャッシュメソッド
     def save_google_trends_to_cache(self, data, region='JP'):
@@ -1253,16 +1274,7 @@ class TrendsCache:
     
     def get_worldnews_trends_from_cache(self, category='general', country='JP'):
         """World News Trendsデータをキャッシュから取得"""
-        # 接続を取得（有効性チェックと再接続を自動で行う）
-        try:
-            conn = self.get_connection()
-            if not conn:
-                return None
-        except Exception as e:
-            logger.error(f"World News キャッシュ取得エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return None
-        
-        try:
+        def query_func(conn):
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 # World News専用のクエリ（countryカラムで検索）
                 cursor.execute("SELECT * FROM worldnews_trends_cache WHERE country = %s ORDER BY created_at DESC", (country.lower(),))
@@ -1274,13 +1286,8 @@ class TrendsCache:
                     result.append(dict(row))
                 
                 return result
-        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-            logger.warning(f"⚠️ World News キャッシュ取得中に接続エラーが発生: {e}", exc_info=True)
-            self.connection = None
-            return None
-        except Exception as e:
-            logger.error(f"World News キャッシュ取得エラー: {e}", exc_info=True)
-            return None
+        
+        return self._execute_with_retry(query_func)
     
     def clear_worldnews_trends_cache(self, category='general', country='JP'):
         """World News Trendsキャッシュをクリア"""
@@ -1683,15 +1690,7 @@ class TrendsCache:
     
     def get_reddit_trends_from_cache(self, subreddit='all'):
         """Reddit Trendsデータをキャッシュから取得"""
-        try:
-            conn = self.get_connection()
-            if not conn:
-                return None
-        except Exception as e:
-            logger.error(f"❌ Reddit Trendsキャッシュ取得エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return None
-        
-        try:
+        def query_func(conn):
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute("""
                     SELECT post_id, title, url, subreddit, author, score, upvote_ratio,
@@ -1708,11 +1707,9 @@ class TrendsCache:
                     result.append(dict(row))
                 
                 return result
-                
-        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-            logger.warning(f"⚠️ Reddit Trendsキャッシュ取得中に接続エラーが発生: {e}", exc_info=True)
-            self.connection = None
-            return None
+        
+        try:
+            return self._execute_with_retry(query_func)
         except Exception as e:
             logger.error(f"❌ Reddit Trendsキャッシュ取得エラー: {e}", exc_info=True)
             return None
@@ -1817,15 +1814,7 @@ class TrendsCache:
     
     def get_hackernews_trends_from_cache(self, story_type='top'):
         """Hacker News Trendsデータをキャッシュから取得"""
-        try:
-            conn = self.get_connection()
-            if not conn:
-                return None
-        except Exception as e:
-            logger.error(f"❌ Hacker News Trendsキャッシュ取得エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return None
-        
-        try:
+        def query_func(conn):
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute("""
                     SELECT story_id, title, url, score, author, story_time, 
@@ -1842,11 +1831,9 @@ class TrendsCache:
                     result.append(dict(row))
                 
                 return result
-                
-        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-            logger.warning(f"⚠️ Hacker News Trendsキャッシュ取得中に接続エラーが発生: {e}", exc_info=True)
-            self.connection = None
-            return None
+        
+        try:
+            return self._execute_with_retry(query_func)
         except Exception as e:
             logger.error(f"❌ Hacker News Trendsキャッシュ取得エラー: {e}", exc_info=True)
             return None
@@ -1952,15 +1939,7 @@ class TrendsCache:
     
     def get_qiita_trends_from_cache(self):
         """Qiita Trendsデータをキャッシュから取得"""
-        try:
-            conn = self.get_connection()
-            if not conn:
-                return None
-        except Exception as e:
-            logger.error(f"❌ Qiita Trendsキャッシュ取得エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return None
-        
-        try:
+        def query_func(conn):
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute("""
                     SELECT item_id, title, url, user_id, user_name, likes_count, stocks_count,
@@ -1983,11 +1962,9 @@ class TrendsCache:
                     result.append(item)
                 
                 return result
-                
-        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-            logger.warning(f"⚠️ Qiita Trendsキャッシュ取得中に接続エラーが発生: {e}", exc_info=True)
-            self.connection = None
-            return None
+        
+        try:
+            return self._execute_with_retry(query_func)
         except Exception as e:
             logger.error(f"❌ Qiita Trendsキャッシュ取得エラー: {e}", exc_info=True)
             return None
@@ -2073,14 +2050,7 @@ class TrendsCache:
 
     def get_nhk_trends_from_cache(self):
         """NHK Trendsデータをキャッシュから取得"""
-        try:
-            conn = self.get_connection()
-            if not conn:
-                return None
-        except Exception as e:
-            logger.error(f"❌ NHK Trendsキャッシュ取得エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return None
-        try:
+        def query_func(conn):
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute("""
                     SELECT title, url, published_date, description, rank, cached_at
@@ -2097,10 +2067,9 @@ class TrendsCache:
                             row_dict['published_date'] = row_dict['published_date'].isoformat()
                     result.append(row_dict)
                 return result
-        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-            logger.warning(f"⚠️ NHK Trendsキャッシュ取得中に接続エラーが発生: {e}", exc_info=True)
-            self.connection = None
-            return None
+        
+        try:
+            return self._execute_with_retry(query_func)
         except Exception as e:
             logger.error(f"❌ NHK Trendsキャッシュ取得エラー: {e}", exc_info=True)
             return None
@@ -2183,14 +2152,7 @@ class TrendsCache:
 
     def get_cnn_trends_from_cache(self):
         """CNN Trendsデータをキャッシュから取得"""
-        try:
-            conn = self.get_connection()
-            if not conn:
-                return None
-        except Exception as e:
-            logger.error(f"❌ CNN Trendsキャッシュ取得エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return None
-        try:
+        def query_func(conn):
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute("""
                     SELECT title, url, published_date, description, rank, cached_at
@@ -2207,13 +2169,8 @@ class TrendsCache:
                             row_dict['published_date'] = row_dict['published_date'].isoformat()
                     result.append(row_dict)
                 return result
-        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-            logger.warning(f"⚠️ CNN Trendsキャッシュ取得中に接続エラーが発生: {e}", exc_info=True)
-            self.connection = None
-            return None
-        except Exception as e:
-            logger.error(f"❌ CNN Trendsキャッシュ取得エラー: {e}", exc_info=True)
-            return None
+        
+        return self._execute_with_retry(query_func)
 
     def clear_cnn_trends_cache(self):
         """CNN Trendsキャッシュをクリア"""

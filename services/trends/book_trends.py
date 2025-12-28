@@ -104,50 +104,89 @@ class BookTrendsManager:
             return {'error': f'楽天ブックストレンドの取得に失敗しました: {str(e)}', 'success': False}
     
     def _fetch_rakuten_books_trends(self, limit=25):
-        """楽天ブックスAPIから書籍データを取得"""
+        """楽天ブックスAPIから書籍データを取得（漫画を除外）"""
         try:
-            logger.info(f"📚 Book (楽天) API呼び出し開始")
+            logger.info(f"📚 Book (楽天) API呼び出し開始（漫画除外）")
             
-            # 楽天ブックスAPI: 書籍検索APIを使用
-            # booksGenreId: 001001 (本・雑誌) で検索
-            # または人気キーワードで検索
+            # 楽天ブックスAPI: 複数のジャンルIDから取得してマージ
+            # 漫画（001016）を除外し、以下のジャンルから取得:
+            # 001002: 小説・エッセイ
+            # 001003: ビジネス・経済
+            # 001004: 人文・思想
+            # 001005: 社会・政治
+            # 001006: 歴史・地理
+            # 001007: 科学・技術
+            # 001008: 医学・薬学
+            # 001009: コンピュータ・IT
+            # 001010: 趣味・実用
+            genre_ids = [
+                '001002',  # 小説・エッセイ
+                '001003',  # ビジネス・経済
+                '001004',  # 人文・思想
+                '001005',  # 社会・政治
+                '001006',  # 歴史・地理
+                '001007',  # 科学・技術
+                '001008',  # 医学・薬学
+                '001009',  # コンピュータ・IT
+                '001010'   # 趣味・実用
+            ]
+            
             url = self.rakuten_ranking_url
+            all_items = []
+            seen_isbns = set()  # 重複除去用
             
-            params = {
-                'applicationId': self.rakuten_app_id,
-                'format': 'json',
-                'booksGenreId': '001001',  # 本・雑誌（総合）
-                'sort': 'sales',  # 売上順（-salesは無効、salesを使用）
-                'hits': limit,
-                'page': 1
-            }
-            
-            if self.rakuten_affiliate_id:
-                params['affiliateId'] = self.rakuten_affiliate_id
-            
-            headers = {
-                'Accept': 'application/json',
-                'User-Agent': 'trends-dashboard/1.0.0'
-            }
-            
-            # レート制限をチェック
-            self.rate_limiter.wait_if_needed()
-            
-            response = requests.get(url, params=params, headers=headers, timeout=10)
-            
-            if response.status_code != 200:
-                logger.error(f"❌ 楽天ブックス API エラー: HTTP {response.status_code}")
-                logger.error(f"レスポンス: {response.text[:200]}")
-                return {
-                    'success': False,
-                    'error': f'楽天ブックス API エラー: {response.status_code}',
-                    'data': []
+            # 各ジャンルからデータを取得
+            for genre_id in genre_ids:
+                params = {
+                    'applicationId': self.rakuten_app_id,
+                    'format': 'json',
+                    'booksGenreId': genre_id,
+                    'sort': 'sales',  # 売上順
+                    'hits': min(limit // len(genre_ids) + 5, 20),  # ジャンルごとに取得（余裕を持たせる）
+                    'page': 1
                 }
+                
+                if self.rakuten_affiliate_id:
+                    params['affiliateId'] = self.rakuten_affiliate_id
+                
+                headers = {
+                    'Accept': 'application/json',
+                    'User-Agent': 'trends-dashboard/1.0.0'
+                }
+                
+                # レート制限をチェック
+                self.rate_limiter.wait_if_needed()
+                
+                try:
+                    response = requests.get(url, params=params, headers=headers, timeout=10)
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        items = data.get('Items', [])
+                        
+                        for item in items:
+                            item_data = item.get('Item', {})
+                            isbn = item_data.get('isbn', '')
+                            
+                            # 重複チェック
+                            if isbn and isbn not in seen_isbns:
+                                seen_isbns.add(isbn)
+                                all_items.append(item)
+                                
+                                # 必要な件数に達したら終了
+                                if len(all_items) >= limit * 2:  # 余裕を持たせる
+                                    break
+                        
+                        if len(all_items) >= limit * 2:
+                            break
+                    else:
+                        logger.warning(f"楽天ブックス API エラー (ジャンル: {genre_id}): HTTP {response.status_code}")
+                        
+                except Exception as e:
+                    logger.warning(f"楽天ブックス API リクエストエラー (ジャンル: {genre_id}): {e}")
+                    continue
             
-            data = response.json()
-            items = data.get('Items', [])
-            
-            if not items:
+            if not all_items:
                 logger.warning("⚠️ Book (楽天): データが取得できませんでした")
                 return {
                     'success': False,
@@ -155,11 +194,14 @@ class BookTrendsManager:
                     'data': []
                 }
             
+            # 売上順でソート（salesフィールドで）
+            all_items.sort(key=lambda x: x.get('Item', {}).get('sales', 0), reverse=True)
+            
             trends_data = []
             success_count = 0
             error_count = 0
             
-            for idx, item in enumerate(items[:limit], 1):
+            for idx, item in enumerate(all_items[:limit], 1):
                 try:
                     item_data = item.get('Item', {})
                     
@@ -263,21 +305,24 @@ class BookTrendsManager:
             
             # 人気書籍を取得するための検索クエリ
             # 複数のキーワードで検索して、評価の高い書籍を取得
+            # 英語書籍のみを取得するため、langRestrictパラメータを使用
             search_queries = [
                 'subject:fiction',
                 'subject:nonfiction',
                 'subject:bestseller',
-                'subject:popular'
+                'subject:popular',
+                'subject:business',
+                'subject:science'
             ]
             
             all_items = []
             
-            # 複数の検索クエリから書籍を取得
-            for query in search_queries[:2]:  # 最初の2つのクエリを使用
+            # 複数の検索クエリから書籍を取得（より多くのクエリを使用）
+            for query in search_queries[:4]:  # 最初の4つのクエリを使用
                 params = {
                     'q': query,
                     'orderBy': 'relevance',
-                    'maxResults': min(limit, 40),  # 1クエリあたり最大40件
+                    'maxResults': min(limit * 2, 40),  # 余裕を持たせる
                     'key': self.google_books_api_key,
                     'langRestrict': 'en'  # 英語書籍
                 }
@@ -302,8 +347,8 @@ class BookTrendsManager:
                     else:
                         logger.warning(f"Google Books API エラー (クエリ: {query}): HTTP {response.status_code}")
                     
-                    # 必要な件数に達したら終了
-                    if len(all_items) >= limit:
+                    # 必要な件数に達したら終了（余裕を持たせる）
+                    if len(all_items) >= limit * 2:
                         break
                 except Exception as e:
                     logger.warning(f"Google Books API リクエストエラー (クエリ: {query}): {e}")
@@ -318,7 +363,15 @@ class BookTrendsManager:
                     seen_ids.add(item_id)
                     unique_items.append(item)
             
-            items = unique_items[:limit]
+            # 言語フィルタリングを先に適用
+            english_items = []
+            for item in unique_items:
+                volume_info = item.get('volumeInfo', {})
+                book_language = volume_info.get('language', '').lower()
+                if not book_language or book_language in ['en', 'en-us', 'en-gb']:
+                    english_items.append(item)
+            
+            items = english_items[:limit * 2]  # 余裕を持たせる
             
             if not items:
                 logger.warning("⚠️ Book (Google): データが取得できませんでした")
@@ -332,12 +385,15 @@ class BookTrendsManager:
             success_count = 0
             error_count = 0
             
+            # 評価順でソート（評価の高い順）
+            items.sort(key=lambda x: x.get('volumeInfo', {}).get('averageRating', 0), reverse=True)
+            
             for idx, volume in enumerate(items[:limit], 1):
                 try:
                     volume_info = volume.get('volumeInfo', {})
                     sale_info = volume.get('saleInfo', {})
                     
-                    # 書籍情報を整形
+                    # 書籍情報を整形（言語フィルタリングは既に適用済み）
                     book_data = {
                         'rank': idx,
                         'id': volume.get('id', ''),
@@ -367,6 +423,8 @@ class BookTrendsManager:
                     book_data['small_thumbnail'] = image_links.get('smallThumbnail', '')
                     book_data['medium'] = image_links.get('medium', '')
                     book_data['large'] = image_links.get('large', '')
+                    # サムネイル画像URLを設定（優先順位: medium > thumbnail > small_thumbnail）
+                    book_data['image_url'] = image_links.get('medium', '') or image_links.get('thumbnail', '') or image_links.get('smallThumbnail', '')
                     
                     trends_data.append(book_data)
                     success_count += 1

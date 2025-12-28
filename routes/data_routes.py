@@ -51,6 +51,9 @@ def handle_data_error(operation_name, error, status_code=500):
 def get_data_freshness():
     """データ更新情報タブ用の統一的キャッシュ情報を取得"""
     try:
+        # 国コードを取得（デフォルトはJP）
+        country = request.args.get('country', 'JP').upper()
+        
         freshness_info = {}
         
         # 各カテゴリのキャッシュ情報を取得
@@ -60,6 +63,8 @@ def get_data_freshness():
             ('music_trends', 'Spotify'),
             ('worldnews_trends', 'World News'),
             ('podcast_trends', 'Podcast'),
+            ('movie_trends', '映画トレンド'),
+            ('book_trends', '本トレンド'),
             ('rakuten_trends', '楽天'),
             ('hatena_trends', 'はてなブックマーク'),
             ('twitch_trends', 'Twitch'),
@@ -82,7 +87,24 @@ def get_data_freshness():
         
         for cache_key, display_name in categories:
             try:
-                cache_info = cache_instance.get_cache_info(cache_key)
+                # 映画と本トレンドは国別のキャッシュキーを使用
+                if cache_key == 'movie_trends':
+                    # 指定された国の映画トレンドを取得
+                    cache_info = cache_instance.get_cache_info(f'movie_trends_{country}')
+                    if not cache_info:
+                        # フォールバック: もう一方の国のデータをチェック
+                        fallback_country = 'US' if country == 'JP' else 'JP'
+                        cache_info = cache_instance.get_cache_info(f'movie_trends_{fallback_country}')
+                elif cache_key == 'book_trends':
+                    # 指定された国の本トレンドを取得
+                    cache_info = cache_instance.get_cache_info(f'book_trends_{country}')
+                    if not cache_info:
+                        # フォールバック: もう一方の国のデータをチェック
+                        fallback_country = 'US' if country == 'JP' else 'JP'
+                        cache_info = cache_instance.get_cache_info(f'book_trends_{fallback_country}')
+                else:
+                    cache_info = cache_instance.get_cache_info(cache_key)
+                
                 if cache_info:
                     freshness_info[display_name] = {
                         'last_updated': cache_info.get('last_updated'),

@@ -63,6 +63,14 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
             apiEndpoint = '/api/crypto-trends';
             params = '?limit=25';
             break;
+        case 'movie':
+            apiEndpoint = '/api/movie-trends';
+            params = '?country=JP';
+            break;
+        case 'book':
+            apiEndpoint = '/api/book-trends';
+            params = '?country=JP';
+            break;
         case 'cnn':
             apiEndpoint = '/api/cnn-trends';
             params = '?limit=25';
@@ -84,9 +92,9 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
         setTimeout(() => reject(new Error('タイムアウト')), 3000);
     });
     
-    // キャッシュ情報を取得
+    // キャッシュ情報を取得（日本のセクション用）
     Promise.race([
-        fetch('/api/cache/data-freshness'),
+        fetch('/api/cache/data-freshness?country=JP'),
         timeoutPromise
     ])
         .then(response => {
@@ -116,6 +124,8 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                     '仮想通貨トレンド': '仮想通貨トレンド',
                     'Spotify': 'Spotify',
                     'Podcast': 'Podcast',
+                    '映画トレンド': '映画トレンド',
+                    '本トレンド': '本トレンド',
                     '楽天': '楽天',
                     'Twitch': 'Twitch'
                 };
@@ -366,7 +376,7 @@ function refreshDataFreshnessExternal() {
     console.log('✅ テスト用の固定テキストを表示しました');
     
     // 各プラットフォームのデータ鮮度を更新（キャッシュのみ、API呼び出しなし）
-    // トレンドページの順序に合わせる: NHK → World News → Google → YouTube → はてな → Qiita → 株価 → 仮想通貨 → Spotify → Podcast → 楽天 → Twitch
+    // トレンドページの順序に合わせる: NHK → World News → Google → YouTube → はてな → Qiita → 株価 → 仮想通貨 → Spotify → Podcast → 映画 → 本 → 楽天 → Twitch
     console.log('📊 キャッシュデータのみを表示中（API呼び出しなし）...');
     console.log('🔄 NHKのステータスを更新中（キャッシュのみ）...');
     updatePlatformStatusExternal('nhk', 'NHK ニュース');
@@ -398,6 +408,12 @@ function refreshDataFreshnessExternal() {
     console.log('🔄 Podcastのステータスを更新中（キャッシュのみ）...');
     updatePlatformStatusExternal('podcast', 'Podcast');
     
+    console.log('🔄 映画トレンドのステータスを更新中（キャッシュのみ）...');
+    updatePlatformStatusExternal('movie', '映画トレンド');
+    
+    console.log('🔄 本トレンドのステータスを更新中（キャッシュのみ）...');
+    updatePlatformStatusExternal('book', '本トレンド');
+    
     console.log('🔄 楽天のステータスを更新中（キャッシュのみ）...');
     updatePlatformStatusExternal('rakuten', '楽天');
     
@@ -409,7 +425,7 @@ function refreshDataFreshnessExternal() {
         // テキスト要素を強制的に表示
         setTimeout(() => {
             console.log('🔧 テキスト要素の表示を強制設定中...');
-            const platforms = ['google', 'youtube', 'spotify', 'news', 'podcast', 'rakuten', 'hatena', 'twitch', 'nhk', 'qiita', 'stock', 'crypto'];
+            const platforms = ['google', 'youtube', 'spotify', 'news', 'podcast', 'movie', 'book', 'rakuten', 'hatena', 'twitch', 'nhk', 'qiita', 'stock', 'crypto'];
             platforms.forEach(platform => {
             const lastUpdateElement = document.getElementById(`${platform}LastUpdate`);
             const dataCountElement = document.getElementById(`${platform}DataCount`);

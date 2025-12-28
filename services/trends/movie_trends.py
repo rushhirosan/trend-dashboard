@@ -65,9 +65,16 @@ class MovieTrendsManager:
                 # 人気度順でソート（popularityの降順）
                 cached_data.sort(key=lambda x: x.get('popularity', 0), reverse=True)
                 
-                # ランキングを再設定
+                # ランキングを再設定し、item_urlを生成（キャッシュデータに含まれていない場合）
                 for i, item in enumerate(cached_data, 1):
                     item['rank'] = i
+                    # item_urlが存在しない場合は生成
+                    if 'item_url' not in item or not item.get('item_url'):
+                        movie_id = item.get('id')
+                        if movie_id:
+                            item['item_url'] = f"https://www.themoviedb.org/movie/{movie_id}"
+                        else:
+                            item['item_url'] = None
                 
                 logger.info(f"✅ Movie: キャッシュから{len(cached_data)}件のデータを取得しました")
                 return {
@@ -185,6 +192,12 @@ class MovieTrendsManager:
                         movie_data['backdrop_url'] = f"https://image.tmdb.org/t/p/w1280{movie_data['backdrop_path']}"
                     else:
                         movie_data['backdrop_url'] = None
+                    
+                    # TMDBの映画ページURLを生成
+                    if movie_data['id']:
+                        movie_data['item_url'] = f"https://www.themoviedb.org/movie/{movie_data['id']}"
+                    else:
+                        movie_data['item_url'] = None
                     
                     trends_data.append(movie_data)
                     success_count += 1

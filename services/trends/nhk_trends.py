@@ -55,6 +55,17 @@ class NHKTrendsManager:
                     'source': 'database_cache'
                 }
             else:
+                # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
+                if not force_refresh:
+                    logger.warning("⚠️ NHK: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
+                    return {
+                        'success': False,
+                        'data': [],
+                        'status': 'cache_not_found',
+                        'source': 'database_cache',
+                        'error': 'キャッシュにデータがありません'
+                    }
+                # force_refresh=trueの場合のみ外部APIを呼び出す
                 logger.warning("⚠️ NHK: キャッシュデータが見つかりません。外部RSSを呼び出します")
                 return self._fetch_nhk_trends(limit)
         

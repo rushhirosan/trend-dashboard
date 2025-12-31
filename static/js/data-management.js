@@ -102,8 +102,8 @@ function loadGoogleTrendsFromCache() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
     
-    // キャッシュデータを取得して表示
-    fetchWithRetry('/api/google-trends?country=JP', { signal: controller.signal })
+    // キャッシュデータを取得して表示（force_refresh=falseで明示的にキャッシュのみを使用）
+    fetchWithRetry('/api/google-trends?country=JP&force_refresh=false', { signal: controller.signal })
         .then(response => {
             clearTimeout(timeoutId);
             if (!response.ok) {
@@ -170,8 +170,8 @@ function loadYouTubeTrendsFromCache() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
     
-    // キャッシュデータを取得して表示
-    fetchWithRetry('/api/youtube-trends?region=JP', { signal: controller.signal })
+    // キャッシュデータを取得して表示（force_refresh=falseで明示的にキャッシュのみを使用）
+    fetchWithRetry('/api/youtube-trends?region=JP&force_refresh=false', { signal: controller.signal })
         .then(response => {
             clearTimeout(timeoutId);
             if (!response.ok) {
@@ -216,8 +216,8 @@ function loadMusicTrendsFromCache() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
     
-    // キャッシュデータを取得して表示
-    fetchWithRetry('/api/music-trends?service=spotify', { signal: controller.signal })
+    // キャッシュデータを取得して表示（force_refresh=falseで明示的にキャッシュのみを使用）
+    fetchWithRetry('/api/music-trends?service=spotify&force_refresh=false', { signal: controller.signal })
         .then(response => {
             clearTimeout(timeoutId);
             if (!response.ok) {
@@ -268,8 +268,8 @@ function loadNewsTrendsFromCache() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
     
-    // キャッシュデータを取得して表示
-    fetchWithRetry('/api/worldnews-trends?country=jp&category=general', { signal: controller.signal })
+    // キャッシュデータを取得して表示（force_refresh=falseで明示的にキャッシュのみを使用）
+    fetchWithRetry('/api/worldnews-trends?country=jp&category=general&force_refresh=false', { signal: controller.signal })
         .then(response => {
             clearTimeout(timeoutId);
             if (!response.ok) {
@@ -361,8 +361,8 @@ function loadRakutenTrendsFromCache() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
     
-    // キャッシュデータを取得して表示
-    fetchWithRetry('/api/rakuten-trends', { signal: controller.signal })
+    // キャッシュデータを取得して表示（force_refresh=falseで明示的にキャッシュのみを使用）
+    fetchWithRetry('/api/rakuten-trends?force_refresh=false', { signal: controller.signal })
         .then(response => {
             clearTimeout(timeoutId);
             if (!response.ok) {
@@ -709,8 +709,8 @@ function loadNHKTrendsFromCache() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
     
-    // キャッシュデータを取得して表示
-    fetchWithRetry('/api/nhk-trends', { signal: controller.signal })
+    // キャッシュデータを取得して表示（force_refresh=falseで明示的にキャッシュのみを使用）
+    fetchWithRetry('/api/nhk-trends?force_refresh=false', { signal: controller.signal })
         .then(response => {
             clearTimeout(timeoutId);
             if (!response.ok) {
@@ -764,8 +764,8 @@ function loadQiitaTrendsFromCache() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
     
-    // キャッシュデータを取得して表示
-    fetchWithRetry('/api/qiita-trends?limit=25&sort=likes_count', { signal: controller.signal })
+    // キャッシュデータを取得して表示（force_refresh=falseで明示的にキャッシュのみを使用）
+    fetchWithRetry('/api/qiita-trends?limit=25&sort=likes_count&force_refresh=false', { signal: controller.signal })
         .then(response => {
             clearTimeout(timeoutId);
             if (!response.ok) {
@@ -813,8 +813,8 @@ function loadStockTrendsFromCache() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
     
-    // キャッシュデータを取得して表示
-    fetchWithRetry('/api/stock-trends?market=JP&limit=25', { signal: controller.signal })
+    // キャッシュデータを取得して表示（force_refresh=falseで明示的にキャッシュのみを使用）
+    fetchWithRetry('/api/stock-trends?market=JP&limit=25&force_refresh=false', { signal: controller.signal })
         .then(response => {
             clearTimeout(timeoutId);
             if (!response.ok) {
@@ -857,8 +857,8 @@ function loadCryptoTrendsFromCache() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
     
-    // キャッシュデータを取得して表示
-    fetchWithRetry('/api/crypto-trends?limit=25', { signal: controller.signal })
+    // キャッシュデータを取得して表示（force_refresh=falseで明示的にキャッシュのみを使用）
+    fetchWithRetry('/api/crypto-trends?limit=25&force_refresh=false', { signal: controller.signal })
         .then(response => {
             clearTimeout(timeoutId);
             if (!response.ok) {
@@ -911,7 +911,7 @@ function loadMovieTrendsFromCache() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒でタイムアウト
 
-    fetchWithRetry('/api/movie-trends?country=JP', { signal: controller.signal })
+    fetchWithRetry('/api/movie-trends?country=JP&force_refresh=false', { signal: controller.signal })
         .then(response => {
             clearTimeout(timeoutId);
             if (!response.ok) {
@@ -968,7 +968,7 @@ function loadBookTrendsFromCache() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒でタイムアウト
 
-    fetchWithRetry('/api/book-trends?country=JP&limit=25', { signal: controller.signal })
+    fetchWithRetry('/api/book-trends?country=JP&limit=25&force_refresh=false', { signal: controller.signal })
         .then(response => {
             clearTimeout(timeoutId);
             if (!response.ok) {

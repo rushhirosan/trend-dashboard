@@ -68,7 +68,7 @@ class GoogleTrendsManager:
             self.db.clear_google_trends_cache(region)
         
         # 日本と同じロジックを使用（キャッシュ優先、フォールバックでBigQuery）
-        return self.get_cached_trends(region, limit)
+        return self.get_cached_trends(region, limit, force_refresh)
     
     def get_bigquery_trends(self, region='JP', limit=25):
         """BigQueryからGoogle Trendsデータを取得"""
@@ -214,11 +214,11 @@ class GoogleTrendsManager:
                 }
             }
     
-    def get_cached_trends(self, region='JP', limit=25):
+    def get_cached_trends(self, region='JP', limit=25, force_refresh=False):
         """Google Trendsデータを取得（キャッシュデータが存在しない場合のみ外部APIを呼び出し）"""
         try:
             logger.info(f"=== Google Trends キャッシュ取得開始 ===")
-            logger.info(f"リクエストパラメータ: region={region}, limit={limit}")
+            logger.info(f"リクエストパラメータ: region={region}, limit={limit}, force_refresh={force_refresh}")
             
             # データベースからキャッシュを取得
             cached_data = self.db.get_google_trends_from_cache(region)
@@ -239,6 +239,17 @@ class GoogleTrendsManager:
                     'total_count': len(cached_data)
                 }
             else:
+                # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
+                if not force_refresh:
+                    logger.warning("⚠️ Google Trends: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
+                    return {
+                        'success': False,
+                        'data': [],
+                        'status': 'cache_not_found',
+                        'source': 'database_cache',
+                        'error': 'キャッシュにデータがありません'
+                    }
+                # force_refresh=trueの場合のみ外部APIを呼び出す
                 logger.warning("⚠️ Google Trends: キャッシュデータが見つかりません。外部APIを呼び出します")
                 # キャッシュデータが存在しない場合のみ外部APIを呼び出し
                 result = self.get_bigquery_trends(region, limit)

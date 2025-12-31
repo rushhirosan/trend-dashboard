@@ -212,7 +212,9 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                     
                     // フォールバック: 直接APIエンドポイントを呼び出してデータを確認
                     if (apiEndpoint) {
-                        const fullEndpoint = apiEndpoint + params;
+                        // すべてのトレンドでforce_refresh=falseを追加（外部APIを呼び出さないようにする）
+                        const forceRefreshParam = params.includes('?') ? '&force_refresh=false' : '?force_refresh=false';
+                        const fullEndpoint = apiEndpoint + params + forceRefreshParam;
                         console.log(`🔄 ${platformName}: APIエンドポイントから直接データを確認中: ${fullEndpoint}`);
                         
                         fetch(fullEndpoint)
@@ -256,7 +258,9 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                 
                 // フォールバック: 直接APIエンドポイントを呼び出してデータを確認
                 if (apiEndpoint) {
-                    const fullEndpoint = apiEndpoint + params;
+                    // すべてのトレンドでforce_refresh=falseを追加（外部APIを呼び出さないようにする）
+                    const forceRefreshParam = params.includes('?') ? '&force_refresh=false' : '?force_refresh=false';
+                    const fullEndpoint = apiEndpoint + params + forceRefreshParam;
                     console.log(`🔄 ${platformName}: APIエンドポイントから直接データを確認中: ${fullEndpoint}`);
                     
                     fetch(fullEndpoint)

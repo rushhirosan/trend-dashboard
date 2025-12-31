@@ -84,6 +84,18 @@ class MusicTrendsManager:
                     'cache_info': cache_info
                 }
             else:
+                # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
+                if not force_refresh:
+                    logger.warning(f"⚠️ {service} Music: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません (region: {region})")
+                    return {
+                        'data': [],
+                        'status': 'cache_not_found',
+                        'region_code': region,
+                        'service': service,
+                        'success': False,
+                        'error': 'キャッシュにデータがありません'
+                    }
+                # force_refresh=trueの場合のみ外部APIを呼び出す
                 logger.warning(f"⚠️ {service} Music: キャッシュデータが見つかりません。外部APIを呼び出します")
                 # キャッシュデータが存在しない場合のみ外部APIを呼び出し
                 trends_data = self._get_spotify_trends(region)

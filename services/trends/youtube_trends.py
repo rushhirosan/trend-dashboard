@@ -43,6 +43,17 @@ class YouTubeTrendsManager:
                     'status': 'cached',
                     'region_code': region_code
                 }
+            # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
+            if not force_refresh:
+                logger.warning(f"⚠️ YouTube: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません (region: {region_code})")
+                return {
+                    'data': [],
+                    'status': 'cache_not_found',
+                    'region_code': region_code,
+                    'success': False,
+                    'error': 'キャッシュにデータがありません'
+                }
+            # force_refresh=trueの場合のみ外部APIを呼び出す
             logger.warning(f"⚠️ YouTube: キャッシュ未使用のため外部APIを呼び出します")
             api_result = self._fetch_trending_from_api(region_code, max_results)
             if api_result and isinstance(api_result, dict) and api_result.get('data'):

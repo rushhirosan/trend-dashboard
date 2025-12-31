@@ -335,18 +335,18 @@ class StockTrendsManager:
                 }
             else:
                 # キャッシュデータがない場合
-                # Stock/Cryptoは無料APIのため、スケジューラー実行時（force_refresh=false）でもキャッシュがない場合はAPIを呼び出す
-                # これにより、14時のスケジューラー実行時にもデータが取得できる
+                # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
                 if not force_refresh:
-                    logger.info(f"📈 Stock: キャッシュデータが見つかりません (market: {market})。スケジューラー実行時のため、外部APIを呼び出します")
-                    result = self._fetch_trending_stocks(market, limit)
-                    # データが取得できた場合のみログに記録
-                    if result.get('success') and result.get('data'):
-                        logger.info(f"✅ Stock: スケジューラー実行時に{len(result.get('data', []))}件のデータを取得しました (market: {market})")
-                    else:
-                        logger.warning(f"⚠️ Stock: スケジューラー実行時にデータが取得できませんでした (market: {market}, status: {result.get('status')})")
-                    return result
-                # force_refresh=trueの場合も外部APIを呼び出す
+                    logger.warning(f"⚠️ Stock: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません (market: {market})")
+                    return {
+                        'data': [],
+                        'status': 'cache_not_found',
+                        'source': 'database_cache',
+                        'market': market,
+                        'success': False,
+                        'error': 'キャッシュにデータがありません'
+                    }
+                # force_refresh=trueの場合のみ外部APIを呼び出す
                 logger.warning(f"⚠️ Stock: キャッシュデータが見つかりません。外部APIを呼び出します (market: {market})")
                 return self._fetch_trending_stocks(market, limit)
                 

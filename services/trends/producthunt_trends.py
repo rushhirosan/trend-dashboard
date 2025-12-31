@@ -107,6 +107,17 @@ class ProductHuntTrendsManager:
                     'sort': sort
                 }
             else:
+                # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
+                if not force_refresh:
+                    logger.warning("⚠️ Product Hunt: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
+                    return {
+                        'data': [],
+                        'status': 'cache_not_found',
+                        'source': 'database_cache',
+                        'success': False,
+                        'error': 'キャッシュにデータがありません'
+                    }
+                # force_refresh=trueの場合のみ外部APIを呼び出す
                 logger.warning("⚠️ Product Hunt: キャッシュデータが見つかりません。外部APIを呼び出します")
                 # APIを呼び出してデータを取得
                 api_result = self.get_popular_products(limit, sort)

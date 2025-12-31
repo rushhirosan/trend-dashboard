@@ -76,6 +76,17 @@ class RakutenTrendsManager:
                     'cache_info': cache_info
                 }
             
+            # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
+            if not force_refresh:
+                logger.warning(f"⚠️ 楽天: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません (genre_id: {genre_id})")
+                return {
+                    'data': [],
+                    'status': 'cache_not_found',
+                    'genre_id': genre_id,
+                    'success': False,
+                    'error': 'キャッシュにデータがありません'
+                }
+            # force_refresh=trueの場合のみ外部APIを呼び出す
             logger.warning(f"⚠️ 楽天: キャッシュ未使用のため外部APIを呼び出します")
             api_result = self._get_rakuten_ranking(genre_id, limit)
             if api_result and api_result.get('data'):

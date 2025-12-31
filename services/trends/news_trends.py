@@ -66,6 +66,18 @@ class NewsTrendsManager:
                     'country': country.upper(),
                     'category': category
                 }
+            # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
+            if not force_refresh:
+                logger.warning(f"⚠️ News: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません (country: {country}, category: {category})")
+                return {
+                    'data': [],
+                    'status': 'cache_not_found',
+                    'country': country.upper(),
+                    'category': category,
+                    'success': False,
+                    'error': 'キャッシュにデータがありません'
+                }
+            # force_refresh=trueの場合のみ外部APIを呼び出す
             logger.warning(f"⚠️ News: キャッシュ未使用のため外部APIを呼び出します")
             trends_data = self._get_news_trends(country, category, page_size)
             if trends_data:

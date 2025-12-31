@@ -501,7 +501,7 @@ function loadMovieTrendsFromCacheUS() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    fetchWithRetry('/api/movie-trends?country=US', { signal: controller.signal })
+    fetchWithRetry('/api/movie-trends?country=US&force_refresh=false', { signal: controller.signal })
         .then(response => {
             clearTimeout(timeoutId);
             if (!response.ok) {
@@ -549,7 +549,7 @@ function loadBookTrendsFromCacheUS() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    fetchWithRetry('/api/book-trends?country=US&limit=25', { signal: controller.signal })
+    fetchWithRetry('/api/book-trends?country=US&limit=25&force_refresh=false', { signal: controller.signal })
         .then(response => {
             clearTimeout(timeoutId);
             if (!response.ok) {
@@ -934,7 +934,7 @@ function loadCachedDataUS() {
 function loadGoogleTrendsFromCacheUS() {
     console.log('📊 Google Trends cache data loading for US');
     
-    fetchWithRetry('/api/google-trends?country=US')
+    fetchWithRetry('/api/google-trends?country=US&force_refresh=false')
         .then(response => {
             console.log('Google Trends API response:', response.status, response.ok);
             if (!response.ok) {
@@ -962,7 +962,7 @@ function loadGoogleTrendsFromCacheUS() {
 function loadYouTubeTrendsFromCacheUS() {
     console.log('📊 YouTube Trends cache data loading for US');
     
-    fetchWithRetry('/api/youtube-trends?region=US')
+    fetchWithRetry('/api/youtube-trends?region=US&force_refresh=false')
         .then(response => {
             console.log('YouTube Trends API response:', response.status, response.ok);
             if (!response.ok) {
@@ -1018,7 +1018,7 @@ function loadYouTubeRisingTrendsFromCacheUS() {
 function loadWorldNewsFromCacheUS() {
     console.log('📊 World News cache data loading for US');
     
-    fetchWithRetry('/api/worldnews-trends?country=us&category=general')
+    fetchWithRetry('/api/worldnews-trends?country=us&category=general&force_refresh=false')
         .then(response => {
             console.log('World News API response:', response.status, response.ok);
             if (!response.ok) {
@@ -1046,7 +1046,7 @@ function loadWorldNewsFromCacheUS() {
 function loadSpotifyFromCacheUS() {
     console.log('📊 Spotify cache data loading for US');
     
-    fetchWithRetry('/api/music-trends?service=spotify&region=US')
+    fetchWithRetry('/api/music-trends?service=spotify&region=US&force_refresh=false')
         .then(response => {
             console.log('Spotify API response:', response.status, response.ok);
             if (!response.ok) {
@@ -1195,7 +1195,7 @@ function showSpotifyError(message) {
 function loadRedditFromCacheUS() {
     console.log('📊 Reddit cache data loading for US');
     
-    fetchWithRetry('/api/reddit-trends?subreddit=all&limit=25')
+    fetchWithRetry('/api/reddit-trends?subreddit=all&limit=25&force_refresh=false')
         .then(response => {
             console.log('Reddit API response:', response.status, response.ok);
             if (!response.ok) {
@@ -1472,7 +1472,7 @@ function showPodcastError(message) {
 function loadTwitchFromCacheUS(type = 'games') {
     console.log(`📊 Twitch cache data loading for US (type: ${type})`);
     
-    fetch(`/api/twitch-trends?type=${type}&limit=25`)
+    fetch(`/api/twitch-trends?type=${type}&limit=25&force_refresh=false`)
         .then(response => {
             console.log('Twitch API response:', response.status, response.ok);
             return response.json();
@@ -1579,7 +1579,7 @@ function showTwitchError(message) {
 function loadHackerNewsFromCacheUS() {
     console.log('📊 Hacker News cache data loading for US');
     
-    fetchWithRetry('/api/hackernews-trends?type=top&limit=25')
+    fetchWithRetry('/api/hackernews-trends?type=top&limit=25&force_refresh=false')
         .then(response => {
             console.log('Hacker News API response:', response.status, response.ok);
             if (!response.ok) {
@@ -1681,7 +1681,7 @@ function loadStockTrendsFromCacheUS() {
     if (loadingElement) loadingElement.style.display = 'block';
     if (resultsElement) resultsElement.style.display = 'none';
     
-    fetchWithRetry('/api/stock-trends?market=US&limit=25')
+    fetchWithRetry('/api/stock-trends?market=US&limit=25&force_refresh=false')
         .then(response => {
             console.log('Stock API response:', response.status, response.ok);
             if (!response.ok) {
@@ -1718,7 +1718,7 @@ function loadCryptoTrendsFromCacheUS() {
     if (loadingElement) loadingElement.style.display = 'block';
     if (resultsElement) resultsElement.style.display = 'none';
     
-    fetchWithRetry('/api/crypto-trends?limit=25')
+    fetchWithRetry('/api/crypto-trends?limit=25&force_refresh=false')
         .then(response => {
             console.log('Crypto API response:', response.status, response.ok);
             if (!response.ok) {
@@ -1761,7 +1761,7 @@ function loadCNNFromCacheUS() {
     if (loadingElement) loadingElement.style.display = 'block';
     if (resultsElement) resultsElement.style.display = 'none';
     
-    fetchWithRetry('/api/cnn-trends?limit=25')
+    fetchWithRetry('/api/cnn-trends?limit=25&force_refresh=false')
         .then(response => {
             console.log('CNN API response:', response.status, response.ok);
             if (!response.ok) {
@@ -1853,7 +1853,7 @@ function loadProductHuntFromCacheUS() {
     if (loadingElement) loadingElement.style.display = 'block';
     if (resultsElement) resultsElement.style.display = 'none';
     
-    fetchWithRetry('/api/producthunt-trends?limit=25&sort=votes')
+    fetchWithRetry('/api/producthunt-trends?limit=25&sort=votes&force_refresh=false')
         .then(response => {
             console.log('Product Hunt API response:', response.status, response.ok);
             return response.json().then(data => {

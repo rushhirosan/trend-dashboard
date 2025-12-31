@@ -84,6 +84,17 @@ class MovieTrendsManager:
                     'source': 'database_cache'
                 }
             else:
+                # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
+                if not force_refresh:
+                    logger.warning(f"⚠️ Movie: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません (country: {country})")
+                    return {
+                        'data': [],
+                        'status': 'cache_not_found',
+                        'source': 'database_cache',
+                        'success': False,
+                        'error': 'キャッシュにデータがありません'
+                    }
+                # force_refresh=trueの場合のみ外部APIを呼び出す
                 logger.warning(f"⚠️ Movie: キャッシュデータが見つかりません。外部APIを呼び出します (country: {country})")
                 return self._fetch_trending_movies(country, time_window, limit)
                 

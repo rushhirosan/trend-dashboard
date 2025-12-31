@@ -96,6 +96,18 @@ class BookTrendsManager:
                     'country': 'JP'
                 }
             else:
+                # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
+                if not force_refresh:
+                    logger.warning("⚠️ Book (楽天): キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
+                    return {
+                        'data': [],
+                        'status': 'cache_not_found',
+                        'source': 'database_cache',
+                        'country': 'JP',
+                        'success': False,
+                        'error': 'キャッシュにデータがありません'
+                    }
+                # force_refresh=trueの場合のみ外部APIを呼び出す
                 logger.warning("⚠️ Book (楽天): キャッシュデータが見つかりません。外部APIを呼び出します")
                 return self._fetch_rakuten_books_trends(limit)
                 
@@ -287,6 +299,18 @@ class BookTrendsManager:
                     'country': 'US'
                 }
             else:
+                # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
+                if not force_refresh:
+                    logger.warning("⚠️ Book (Google): キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
+                    return {
+                        'data': [],
+                        'status': 'cache_not_found',
+                        'source': 'database_cache',
+                        'country': 'US',
+                        'success': False,
+                        'error': 'キャッシュにデータがありません'
+                    }
+                # force_refresh=trueの場合のみ外部APIを呼び出す
                 logger.warning("⚠️ Book (Google): キャッシュデータが見つかりません。外部APIを呼び出します")
                 return self._fetch_google_books_trends(limit)
                 

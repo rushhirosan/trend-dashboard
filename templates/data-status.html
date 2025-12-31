@@ -1091,7 +1091,9 @@
                             });
                             
                             // フォールバック: 直接APIエンドポイントを呼び出してデータを確認
-                            fetch(endpoint)
+                            // すべてのトレンドでforce_refresh=falseを追加（外部APIを呼び出さないようにする）
+                            const forceRefreshParam = endpoint.includes('?') ? '&force_refresh=false' : '?force_refresh=false';
+                            fetch(endpoint + forceRefreshParam)
                                 .then(response => response.json())
                                 .then(apiData => {
                                     if (apiData.success && apiData.data && apiData.data.length > 0) {

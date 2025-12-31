@@ -52,6 +52,17 @@ class QiitaTrendsManager:
                     'sort': sort
                 }
             else:
+                # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
+                if not force_refresh:
+                    logger.warning("⚠️ Qiita: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
+                    return {
+                        'success': False,
+                        'data': [],
+                        'status': 'cache_not_found',
+                        'source': 'database_cache',
+                        'error': 'キャッシュにデータがありません'
+                    }
+                # force_refresh=trueの場合のみ外部APIを呼び出す
                 logger.warning("⚠️ Qiita: キャッシュデータが見つかりません。外部APIを呼び出します")
                 return self.get_popular_items(limit, sort)
                 

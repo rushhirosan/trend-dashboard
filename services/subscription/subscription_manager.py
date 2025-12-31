@@ -386,6 +386,8 @@ class SubscriptionManager:
     
     def send_trends_summary(self):
         """トレンドサマリー配信を実行"""
+        import psycopg2
+        
         try:
             logger.info("=" * 60)
             logger.info("📧 トレンドサマリー配信開始")
@@ -393,12 +395,25 @@ class SubscriptionManager:
             
             # アクティブなサブスクリプションを取得
             logger.info("🔍 アクティブなサブスクリプションを取得中...")
-            active_subscriptions = self._get_active_subscriptions()
-            logger.info(f"📊 取得結果: {len(active_subscriptions)}件のアクティブなサブスクリプション")
+            try:
+                active_subscriptions = self._get_active_subscriptions()
+                logger.info(f"📊 取得結果: {len(active_subscriptions)}件のアクティブなサブスクリプション")
+            except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+                # データベース接続エラーの場合、メール送信をスキップ
+                logger.error("=" * 60)
+                logger.error("❌ データベース接続エラーのため、メール送信をスキップします")
+                logger.error(f"   エラー詳細: {type(e).__name__}: {e}")
+                logger.error("=" * 60)
+                # エラーを再スローして、上位のエラーハンドリングで処理
+                raise
+            except Exception as e:
+                # その他のエラーも再スロー
+                logger.error(f"❌ サブスクリプション取得エラー: {e}", exc_info=True)
+                raise
             
             if not active_subscriptions:
-                logger.warning("⚠️ アクティブなサブスクリプションがありません")
-                logger.warning("   メール送信はスキップされます")
+                logger.info("ℹ️ アクティブなサブスクリプションがありません（正常）")
+                logger.info("   メール送信はスキップされます")
                 logger.info("=" * 60)
                 return
             
@@ -480,32 +495,98 @@ class SubscriptionManager:
             logger.error("=" * 60)
     
     def _get_active_subscriptions(self):
-        """アクティブなサブスクリプションを取得"""
-        try:
-            with self.db.get_connection() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("""
-                        SELECT email, frequency, categories, unsubscribe_token 
-                        FROM subscriptions 
-                        WHERE is_active = true
-                    """)
-                    results = cursor.fetchall()
-                    
-                    subscriptions = []
-                    for row in results:
-                        subscriptions.append({
-                            'email': row[0],
-                            'frequency': row[1],
-                            'categories': row[2] if row[2] else [],
-                            'unsubscribe_token': row[3] if len(row) > 3 else None
-                        })
-                    
-                    logger.info(f"   ✅ データベースから{len(subscriptions)}件のアクティブなサブスクリプションを取得")
-                    return subscriptions
-                    
-        except Exception as e:
-            logger.error(f"❌ アクティブサブスクリプション取得エラー: {e}", exc_info=True)
-            return []
+        """アクティブなサブスクリプションを取得（接続エラー時はリトライ）
+        
+        Returns:
+            list: アクティブなサブスクリプションのリスト。エラーが発生した場合は例外を再スローする。
+        
+        Raises:
+            psycopg2.InterfaceError: データベース接続エラー（リトライ後も失敗）
+            psycopg2.OperationalError: データベース操作エラー（リトライ後も失敗）
+            Exception: その他の予期しないエラー
+        """
+        import psycopg2
+        import time
+        
+        max_retries = 3
+        retry_delay = 1.0  # 1秒
+        last_error = None
+        
+        for attempt in range(max_retries):
+            try:
+                # 接続を強制的にリセット（接続が閉じられている場合に備えて）
+                if attempt > 0:
+                    logger.info(f"🔄 サブスクリプション取得をリトライします（試行 {attempt + 1}/{max_retries}）")
+                    # 接続をリセット
+                    if hasattr(self.db, 'connection'):
+                        self.db.connection = None
+                    time.sleep(retry_delay)
+                
+                with self.db.get_connection() as conn:
+                    with conn.cursor() as cursor:
+                        # デバッグ用: 全サブスクリプション数を確認（is_activeに関係なく）
+                        cursor.execute("SELECT COUNT(*) FROM subscriptions")
+                        total_count = cursor.fetchone()[0]
+                        logger.info(f"   📊 subscriptionsテーブルの全レコード数: {total_count}件")
+                        
+                        # アクティブなサブスクリプションのみを取得
+                        cursor.execute("""
+                            SELECT email, frequency, categories, unsubscribe_token 
+                            FROM subscriptions 
+                            WHERE is_active = true
+                        """)
+                        results = cursor.fetchall()
+                        
+                        subscriptions = []
+                        for row in results:
+                            subscriptions.append({
+                                'email': row[0],
+                                'frequency': row[1],
+                                'categories': row[2] if row[2] else [],
+                                'unsubscribe_token': row[3] if len(row) > 3 else None
+                            })
+                        
+                        logger.info(f"   ✅ データベースから{len(subscriptions)}件のアクティブなサブスクリプションを取得（全{total_count}件中）")
+                        
+                        # デバッグ用: アクティブでないサブスクリプションも確認
+                        if total_count > 0 and len(subscriptions) == 0:
+                            cursor.execute("SELECT email, is_active FROM subscriptions LIMIT 5")
+                            inactive_results = cursor.fetchall()
+                            logger.warning(f"   ⚠️ サブスクリプションが存在しますが、すべてis_active=falseの可能性があります")
+                            logger.warning(f"   サンプル: {inactive_results}")
+                        
+                        return subscriptions
+                        
+            except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+                # 接続エラーの場合はリトライ
+                last_error = e
+                logger.warning(f"⚠️ データベース接続エラー（試行 {attempt + 1}/{max_retries}）: {e}")
+                if attempt < max_retries - 1:
+                    # 接続をリセットして再試行
+                    if hasattr(self.db, 'connection'):
+                        self.db.connection = None
+                    continue
+                else:
+                    # 全てのリトライが失敗した場合、エラーを再スロー
+                    logger.error("=" * 60)
+                    logger.error(f"❌ アクティブサブスクリプション取得に失敗しました（最大試行回数: {max_retries}回）")
+                    logger.error(f"   エラー: {type(e).__name__}: {e}")
+                    logger.error("   データベース接続が確立できないため、メール送信をスキップします")
+                    logger.error("   データベースサーバーの状態を確認してください")
+                    logger.error("=" * 60)
+                    # エラーを再スローして、上位で処理させる
+                    raise
+            except Exception as e:
+                # 接続エラー以外のエラーも再スロー
+                logger.error("=" * 60)
+                logger.error(f"❌ アクティブサブスクリプション取得エラー: {type(e).__name__}: {e}")
+                logger.error("=" * 60)
+                raise
+        
+        # 通常はここには到達しないが、念のため
+        if last_error:
+            raise last_error
+        raise Exception("アクティブサブスクリプション取得に失敗しました（不明なエラー）")
     
     def _get_all_trends_data(self, categories=None):
         """選択されたカテゴリのトレンドデータを取得

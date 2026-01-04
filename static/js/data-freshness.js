@@ -196,9 +196,9 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                     statusElement.textContent = status;
                     statusElement.className = fetchedCount > 0 ? 'badge bg-success' : 'badge bg-secondary';
                     
-                    // 株価トレンドのみ表示件数と取得件数を分けて表示
-                    if (platform === 'stock' && fetchedCount > 0 && apiEndpoint) {
-                        // 株価トレンドの場合はAPIを呼び出して表示件数を取得
+                    // すべてのトレンドで表示件数と取得件数を分けて表示
+                    if (fetchedCount > 0 && apiEndpoint) {
+                        // APIを呼び出して表示件数を取得
                         const forceRefreshParam = params.includes('?') ? '&force_refresh=false' : '?force_refresh=false';
                         const fullEndpoint = apiEndpoint + params + forceRefreshParam;
                         
@@ -214,8 +214,8 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                                     // 表示件数と取得件数が同じ場合は取得件数のみ表示
                                     dataCountElement.textContent = `${fetchedCount}件`;
                                 } else {
-                                    // 表示件数と取得件数が異なる場合は「表示件数 (取得件数)」の形式で表示
-                                    dataCountElement.textContent = `${displayCount}件 (${fetchedCount}件)`;
+                                    // 表示件数と取得件数が異なる場合は「表示件数25件 (取得件数60件)」の形式で表示
+                                    dataCountElement.textContent = `表示件数${displayCount}件 (取得件数${fetchedCount}件)`;
                                 }
                                 
                                 console.log(`✅ ${platformName} キャッシュデータ表示完了:`, {
@@ -236,7 +236,7 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                                 });
                             });
                     } else {
-                        // 他のトレンドは従来通り取得件数のみ表示
+                        // APIエンドポイントがない場合や取得件数が0の場合は取得件数のみ表示
                         dataCountElement.textContent = `${fetchedCount}件`;
                         console.log(`✅ ${platformName} キャッシュデータ表示完了:`, {
                             lastUpdate,

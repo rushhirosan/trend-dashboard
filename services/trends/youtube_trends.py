@@ -4,6 +4,7 @@ YouTube Trends関連の処理を管理するモジュール
 
 import os
 from datetime import datetime, timezone, timedelta
+import pytz
 from googleapiclient.discovery import build
 from database_config import TrendsCache
 from utils.logger_config import get_logger
@@ -36,6 +37,13 @@ class YouTubeTrendsManager:
                 # ランキングを再設定
                 for i, item in enumerate(cached_data, 1):
                     item['rank'] = i
+                
+                # キャッシュデータを使用する場合でも、cache_statusを更新（スケジューラー実行時の時刻を統一するため）
+                if force_refresh:
+                    try:
+                        self._update_cache_status('youtube_trends', len(cached_data))
+                    except Exception as e:
+                        logger.warning(f"⚠️ YouTube: cache_status更新エラー（処理は継続）: {e}")
                 
                 logger.info(f"✅ YouTube: キャッシュデータを使用し、視聴回数でソートしました ({len(cached_data)}件)")
                 return {
@@ -295,7 +303,10 @@ class YouTubeTrendsManager:
         """cache_statusテーブルを更新"""
         try:
             from datetime import datetime
-            now = datetime.now()
+            import pytz
+            # 日本時間で現在時刻を取得
+            jst = pytz.timezone('Asia/Tokyo')
+            now = datetime.now(jst)
             
             with self.db.get_connection() as conn:
                 with conn.cursor() as cursor:

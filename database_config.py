@@ -647,9 +647,12 @@ class TrendsCache:
                         )
                 
                 # キャッシュステータスを更新
+                import pytz
+                jst = pytz.timezone('Asia/Tokyo')
+                now_jst = datetime.now(jst)
                 cursor.execute(
                     "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                    (cache_key, datetime.now(), len(data), datetime.now(), len(data))
+                    (cache_key, now_jst, len(data), now_jst, len(data))
                 )
                 
                 conn.commit()
@@ -1471,6 +1474,78 @@ class TrendsCache:
             logger.error(f"❌ 最終更新時刻取得エラー: {e}", exc_info=True)
             return None
     
+    def update_all_trends_timestamp(self, timestamp):
+        """全トレンドの更新時刻を一括で設定（スケジューラー実行時の時刻を統一するため）"""
+        try:
+            conn = self.get_connection()
+            if not conn:
+                logger.warning("⚠️ データベース接続が取得できませんでした。更新時刻の一括設定をスキップします")
+                return False
+            
+            # 主要なトレンドのcache_keyリスト
+            cache_keys = [
+                'google_trends', 'youtube_trends', 'music_trends', 'worldnews_trends',
+                'podcast_trends', 'rakuten_trends', 'hatena_trends', 'twitch_trends',
+                'nhk_trends', 'qiita_trends', 'stock_trends', 'crypto_trends',
+                'movie_trends', 'book_trends', 'cnn_trends', 'producthunt_trends',
+                'reddit_trends', 'hackernews_trends'
+            ]
+            
+            with conn.cursor() as cursor:
+                # 各cache_keyに対して、既存のレコードがあれば更新時刻を設定
+                # データ件数は変更せず、更新時刻のみを更新
+                for cache_key in cache_keys:
+                    cursor.execute("""
+                        UPDATE cache_status 
+                        SET last_updated = %s
+                        WHERE cache_key = %s
+                    """, (timestamp, cache_key))
+                    
+                conn.commit()
+                logger.info(f"✅ 全トレンドの更新時刻を一括設定しました: {timestamp.strftime('%Y-%m-%d %H:%M:%S JST')}")
+                return True
+                
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ 更新時刻一括設定中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ 全トレンド更新時刻一括設定エラー: {e}", exc_info=True)
+            return False
+    
+    def update_cache_status(self, cache_key, data_count, timestamp=None):
+        """特定のトレンドのcache_statusを更新"""
+        try:
+            import pytz
+            if timestamp is None:
+                jst = pytz.timezone('Asia/Tokyo')
+                timestamp = datetime.now(jst)
+            
+            conn = self.get_connection()
+            if not conn:
+                logger.warning(f"⚠️ データベース接続が取得できませんでした。cache_status更新をスキップします (cache_key: {cache_key})")
+                return False
+            
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO cache_status (cache_key, last_updated, data_count)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (cache_key) DO UPDATE SET
+                        last_updated = EXCLUDED.last_updated,
+                        data_count = EXCLUDED.data_count
+                """, (cache_key, timestamp, data_count))
+                conn.commit()
+                return True
+                
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ cache_status更新中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ cache_status更新エラー: {e}", exc_info=True)
+            return False(f"❌ 全トレンド更新時刻一括設定エラー: {e}", exc_info=True)
+            return False
+    
     def clear_all_cache(self):
         """全キャッシュをクリア"""
         try:
@@ -1786,15 +1861,16 @@ class TrendsCache:
                     ))
                 
                 # cache_statusテーブルを更新
-                from datetime import datetime
-                now = datetime.now()
+                import pytz
+                jst = pytz.timezone('Asia/Tokyo')
+                now_jst = datetime.now(jst)
                 cursor.execute("""
                     INSERT INTO cache_status (cache_key, last_updated, data_count)
                     VALUES (%s, %s, %s)
                     ON CONFLICT (cache_key) DO UPDATE SET
                         last_updated = EXCLUDED.last_updated,
                         data_count = EXCLUDED.data_count
-                """, ('hackernews_trends', now, len(data)))
+                """, ('hackernews_trends', now_jst, len(data)))
                 
                 conn.commit()
                 logger.info(f"✅ hackernews_trendsキャッシュを保存しました (type: {story_type}, {len(data)}件)")
@@ -2028,9 +2104,12 @@ class TrendsCache:
                     ))
                 
                 # キャッシュステータスを更新
+                import pytz
+                jst = pytz.timezone('Asia/Tokyo')
+                now_jst = datetime.now(jst)
                 cursor.execute(
                     "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                    ('nhk_trends', datetime.now(), len(data), datetime.now(), len(data))
+                    ('nhk_trends', now_jst, len(data), now_jst, len(data))
                 )
                 
                 conn.commit()
@@ -2130,9 +2209,12 @@ class TrendsCache:
                     ))
                 
                 # キャッシュステータスを更新
+                import pytz
+                jst = pytz.timezone('Asia/Tokyo')
+                now_jst = datetime.now(jst)
                 cursor.execute(
                     "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                    ('cnn_trends', datetime.now(), len(data), datetime.now(), len(data))
+                    ('cnn_trends', now_jst, len(data), now_jst, len(data))
                 )
                 
                 conn.commit()
@@ -2247,15 +2329,16 @@ class TrendsCache:
                     ))
                 
                 # cache_statusテーブルを更新
-                from datetime import datetime
-                now = datetime.now()
+                import pytz
+                jst = pytz.timezone('Asia/Tokyo')
+                now_jst = datetime.now(jst)
                 cursor.execute("""
                     INSERT INTO cache_status (cache_key, last_updated, data_count)
                     VALUES (%s, %s, %s)
                     ON CONFLICT (cache_key) DO UPDATE SET
                         last_updated = EXCLUDED.last_updated,
                         data_count = EXCLUDED.data_count
-                """, ('producthunt_trends', now, len(data)))
+                """, ('producthunt_trends', now_jst, len(data)))
                 
                 conn.commit()
                 logger.info(f"✅ producthunt_trendsキャッシュを保存しました ({len(data)}件)")
@@ -2656,8 +2739,9 @@ class TrendsCache:
                         item.get('updated_at')
                     ))
                 # cache_statusテーブルを更新
-                from datetime import datetime
-                now = datetime.now()
+                import pytz
+                jst = pytz.timezone('Asia/Tokyo')
+                now_jst = datetime.now(jst)
                 cache_key = f'movie_trends_{country}'
                 cursor.execute("""
                     INSERT INTO cache_status (cache_key, last_updated, data_count)
@@ -2665,7 +2749,7 @@ class TrendsCache:
                     ON CONFLICT (cache_key) DO UPDATE SET
                         last_updated = EXCLUDED.last_updated,
                         data_count = EXCLUDED.data_count
-                """, (cache_key, now, len(data)))
+                """, (cache_key, now_jst, len(data)))
                 
                 conn.commit()
                 logger.info(f"✅ movie_trendsのキャッシュを保存しました (country: {country}, {len(data)}件)")
@@ -2823,15 +2907,16 @@ class TrendsCache:
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, params)
                 # cache_statusテーブルを更新
-                from datetime import datetime
-                now = datetime.now()
+                import pytz
+                jst = pytz.timezone('Asia/Tokyo')
+                now_jst = datetime.now(jst)
                 cursor.execute("""
                     INSERT INTO cache_status (cache_key, last_updated, data_count)
                     VALUES (%s, %s, %s)
                     ON CONFLICT (cache_key) DO UPDATE SET
                         last_updated = EXCLUDED.last_updated,
                         data_count = EXCLUDED.data_count
-                """, (f'book_trends_{country}', now, len(data)))
+                """, (f'book_trends_{country}', now_jst, len(data)))
                 
                 conn.commit()
                 logger.info(f"✅ book_trendsのキャッシュを保存しました ({country}, {len(data)}件)")

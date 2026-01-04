@@ -98,6 +98,13 @@ class ProductHuntTrendsManager:
             cached_data = self.db.get_producthunt_trends_from_cache()
             
             if cached_data:
+                # キャッシュデータを使用する場合でも、cache_statusを更新（スケジューラー実行時の時刻を統一するため）
+                if force_refresh:
+                    try:
+                        self.db.update_cache_status('producthunt_trends', len(cached_data))
+                    except Exception as e:
+                        logger.warning(f"⚠️ Product Hunt: cache_status更新エラー（処理は継続）: {e}")
+                
                 logger.info(f"✅ Product Hunt: キャッシュから{len(cached_data)}件のデータを取得しました")
                 return {
                     'success': True,

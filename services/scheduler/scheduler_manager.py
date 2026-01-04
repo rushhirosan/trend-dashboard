@@ -248,6 +248,14 @@ class TrendsScheduler:
             logger.info(f"✅ 自動トレンド取得完了: {success_count}/{total_count} 成功")
             logger.info(f"⏱️ 実行時間: {duration:.2f}秒")
             
+            # 全トレンド取得完了後、すべてのトレンドに対して同じ更新時刻を設定
+            # これにより、更新時刻のバラつきを防ぐ
+            try:
+                logger.info(f"🔄 全トレンドの更新時刻を統一します（開始時刻: {start_time.strftime('%Y-%m-%d %H:%M:%S JST')}）")
+                self.db.update_all_trends_timestamp(start_time)
+            except Exception as e:
+                logger.warning(f"⚠️ 全トレンド更新時刻の統一に失敗しました（処理は継続）: {e}", exc_info=True)
+            
             # 実行日付を記録（7時のジョブが実行されたことを記録）
             now_jst = datetime.now(jst)
             today = now_jst.date()

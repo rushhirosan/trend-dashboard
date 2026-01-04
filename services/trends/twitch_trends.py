@@ -2,6 +2,7 @@ import os
 import requests
 import json
 from datetime import datetime, timedelta
+import pytz
 from database_config import TrendsCache
 from utils.logger_config import get_logger
 from utils.rate_limiter import get_rate_limiter
@@ -637,7 +638,10 @@ class TwitchTrendsManager:
         """cache_statusテーブルを更新"""
         try:
             from datetime import datetime
-            now = datetime.now()
+            import pytz
+            # 日本時間で現在時刻を取得
+            jst = pytz.timezone('Asia/Tokyo')
+            now = datetime.now(jst)
             
             conn = self.db.get_connection()
             if not conn:

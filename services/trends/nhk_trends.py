@@ -47,6 +47,14 @@ class NHKTrendsManager:
             if cached_data:
                 # キャッシュから取得したデータにも重複排除を適用
                 cached_data = self._remove_duplicates(cached_data)
+                
+                # キャッシュデータを使用する場合でも、cache_statusを更新（スケジューラー実行時の時刻を統一するため）
+                if force_refresh:
+                    try:
+                        self.db.update_cache_status('nhk_trends', len(cached_data))
+                    except Exception as e:
+                        logger.warning(f"⚠️ NHK: cache_status更新エラー（処理は継続）: {e}")
+                
                 logger.info(f"✅ NHK: キャッシュから{len(cached_data)}件のデータを取得しました（重複排除後）")
                 return {
                     'success': True,

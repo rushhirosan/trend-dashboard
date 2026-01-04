@@ -87,6 +87,13 @@ class BookTrendsManager:
                 # ランキング順でソート
                 cached_data.sort(key=lambda x: x.get('rank', 999999))
                 
+                # キャッシュデータを使用する場合でも、cache_statusを更新（スケジューラー実行時の時刻を統一するため）
+                if force_refresh:
+                    try:
+                        self.db.update_cache_status(f'book_trends_JP', len(cached_data))
+                    except Exception as e:
+                        logger.warning(f"⚠️ Book (楽天): cache_status更新エラー（処理は継続）: {e}")
+                
                 logger.info(f"✅ Book (楽天): キャッシュから{len(cached_data)}件のデータを取得しました")
                 return {
                     'success': True,
@@ -289,6 +296,13 @@ class BookTrendsManager:
             if cached_data:
                 # ランキング順でソート
                 cached_data.sort(key=lambda x: x.get('rank', 999999))
+                
+                # キャッシュデータを使用する場合でも、cache_statusを更新（スケジューラー実行時の時刻を統一するため）
+                if force_refresh:
+                    try:
+                        self.db.update_cache_status(f'book_trends_US', len(cached_data))
+                    except Exception as e:
+                        logger.warning(f"⚠️ Book (Google): cache_status更新エラー（処理は継続）: {e}")
                 
                 logger.info(f"✅ Book (Google): キャッシュから{len(cached_data)}件のデータを取得しました")
                 return {

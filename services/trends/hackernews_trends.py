@@ -38,6 +38,13 @@ class HackerNewsTrendsManager:
                 for i, item in enumerate(cached_data, 1):
                     item['rank'] = i
                 
+                # キャッシュデータを使用する場合でも、cache_statusを更新（スケジューラー実行時の時刻を統一するため）
+                if force_refresh:
+                    try:
+                        self.db.update_cache_status('hackernews_trends', len(cached_data))
+                    except Exception as e:
+                        logger.warning(f"⚠️ Hacker News: cache_status更新エラー（処理は継続）: {e}")
+                
                 logger.info(f"✅ Hacker News: キャッシュから{len(cached_data)}件のデータを取得し、スコアでソートしました")
                 return {
                     'success': True,

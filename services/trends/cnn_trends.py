@@ -67,6 +67,13 @@ class CNNTrendsManager:
                 # 公開日でソート（新しい順）
                 filtered_cached_data.sort(key=lambda x: x.get('published_date') or '', reverse=True)
                 
+                # キャッシュデータを使用する場合でも、cache_statusを更新（スケジューラー実行時の時刻を統一するため）
+                if force_refresh:
+                    try:
+                        self.db.update_cache_status('cnn_trends', len(filtered_cached_data))
+                    except Exception as e:
+                        logger.warning(f"⚠️ CNN: cache_status更新エラー（処理は継続）: {e}")
+                
                 logger.info(f"✅ CNN: キャッシュから{len(filtered_cached_data)}件のデータを取得しました（重複排除・日付フィルタリング後）")
                 return {
                     'success': True,

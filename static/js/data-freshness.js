@@ -209,13 +209,13 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                                     ? apiData.data.length 
                                     : fetchedCount;
                                 
-                                // 表示件数と取得件数を分けて表示
+                                // 表示件数と取得件数を分けて表示（日英併記）
                                 if (displayCount === fetchedCount) {
-                                    // 表示件数と取得件数が同じ場合は取得件数のみ表示
-                                    dataCountElement.textContent = `${fetchedCount}件`;
+                                    // 表示件数と取得件数が同じ場合は取得件数のみ表示（日英併記）
+                                    dataCountElement.textContent = `${fetchedCount}件 / ${fetchedCount}`;
                                 } else {
-                                    // 表示件数と取得件数が異なる場合は「表示件数25件 (取得件数60件)」の形式で表示
-                                    dataCountElement.textContent = `表示件数${displayCount}件 (取得件数${fetchedCount}件)`;
+                                    // 表示件数と取得件数が異なる場合は「表示件数25件 (取得件数60件) / Display: 25 (Fetched: 60)」の形式で表示
+                                    dataCountElement.textContent = `表示件数${displayCount}件 (取得件数${fetchedCount}件) / Display: ${displayCount} (Fetched: ${fetchedCount})`;
                                 }
                                 
                                 console.log(`✅ ${platformName} キャッシュデータ表示完了:`, {
@@ -227,8 +227,8 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                             })
                             .catch(error => {
                                 console.warn(`⚠️ ${platformName} 表示件数取得エラー:`, error);
-                                // エラー時は取得件数のみ表示
-                                dataCountElement.textContent = `${fetchedCount}件`;
+                                // エラー時は取得件数のみ表示（日英併記）
+                                dataCountElement.textContent = `${fetchedCount}件 / ${fetchedCount}`;
                                 console.log(`✅ ${platformName} キャッシュデータ表示完了（エラー時）:`, {
                                     lastUpdate,
                                     dataCount: fetchedCount,
@@ -236,8 +236,8 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                                 });
                             });
                     } else {
-                        // APIエンドポイントがない場合や取得件数が0の場合は取得件数のみ表示
-                        dataCountElement.textContent = `${fetchedCount}件`;
+                        // APIエンドポイントがない場合や取得件数が0の場合は取得件数のみ表示（日英併記）
+                        dataCountElement.textContent = `${fetchedCount}件 / ${fetchedCount}`;
                         console.log(`✅ ${platformName} キャッシュデータ表示完了:`, {
                             lastUpdate,
                             dataCount: fetchedCount,
@@ -265,13 +265,13 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                                 if (apiData.success && apiData.data && apiData.data.length > 0) {
                                     const apiDataCount = apiData.data.length;
                                     lastUpdateElement.textContent = 'データあり（キャッシュ情報なし）';
-                                    dataCountElement.textContent = `${apiDataCount}件`;
+                                    dataCountElement.textContent = `${apiDataCount}件 / ${apiDataCount}`;
                                     statusElement.textContent = '取得済み';
                                     statusElement.className = 'badge bg-success';
                                     console.log(`✅ ${platformName}: APIから${apiDataCount}件のデータを確認`);
                                 } else {
                                     lastUpdateElement.textContent = 'データなし';
-                                    dataCountElement.textContent = '0件';
+                                    dataCountElement.textContent = '0件 / 0';
                                     statusElement.textContent = '未取得';
                                     statusElement.className = 'badge bg-secondary';
                                     console.log(`⚠️ ${platformName}: APIからもデータが見つかりません`);
@@ -280,13 +280,13 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                             .catch(error => {
                                 console.error(`❌ ${platformName} API呼び出しエラー:`, error);
                                 lastUpdateElement.textContent = 'データなし';
-                                dataCountElement.textContent = '0件';
+                                dataCountElement.textContent = '0件 / 0';
                                 statusElement.textContent = '未取得';
                                 statusElement.className = 'badge bg-secondary';
                             });
                     } else {
                         lastUpdateElement.textContent = 'データなし';
-                        dataCountElement.textContent = '0件';
+                        dataCountElement.textContent = '0件 / 0';
                         statusElement.textContent = '未取得';
                         statusElement.className = 'badge bg-secondary';
                     }
@@ -311,13 +311,13 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                             if (apiData.success && apiData.data && apiData.data.length > 0) {
                                 const apiDataCount = apiData.data.length;
                                 lastUpdateElement.textContent = 'データあり（キャッシュ情報なし）';
-                                dataCountElement.textContent = `${apiDataCount}件`;
+                                dataCountElement.textContent = `${apiDataCount}件 / ${apiDataCount}`;
                                 statusElement.textContent = '取得済み';
                                 statusElement.className = 'badge bg-success';
                                 console.log(`✅ ${platformName}: APIから${apiDataCount}件のデータを確認`);
                             } else {
                                 lastUpdateElement.textContent = 'エラー';
-                                dataCountElement.textContent = '0件';
+                                dataCountElement.textContent = '0件 / 0';
                                 statusElement.textContent = 'エラー';
                                 statusElement.className = 'badge bg-danger';
                                 console.log(`⚠️ ${platformName}: APIからもデータが見つかりません`);
@@ -326,13 +326,13 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                         .catch(error => {
                             console.error(`❌ ${platformName} API呼び出しエラー:`, error);
                             lastUpdateElement.textContent = 'エラー';
-                            dataCountElement.textContent = '0件';
+                            dataCountElement.textContent = '0件 / 0';
                             statusElement.textContent = 'エラー';
                             statusElement.className = 'badge bg-danger';
                         });
                 } else {
                     lastUpdateElement.textContent = 'エラー';
-                    dataCountElement.textContent = '0件';
+                    dataCountElement.textContent = '0件 / 0';
                     statusElement.textContent = 'エラー';
                     statusElement.className = 'badge bg-danger';
                 }
@@ -341,7 +341,7 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
         .catch(error => {
             console.error(`❌ ${platformName} キャッシュ情報取得エラー:`, error);
             lastUpdateElement.textContent = 'エラー';
-            dataCountElement.textContent = '0件';
+            dataCountElement.textContent = '0件 / 0';
             statusElement.textContent = 'エラー';
             statusElement.className = 'badge bg-danger';
         });

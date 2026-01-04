@@ -188,20 +188,62 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                                lastUpdate = '不明';
                            }
                        }
-                    const actualDataCount = cacheInfo.data_count || 0;
-                    const status = actualDataCount > 0 ? '取得済み' : '未取得';
+                    const fetchedCount = cacheInfo.data_count || 0; // 取得件数
+                    const status = fetchedCount > 0 ? '取得済み' : '未取得';
                     
                     // DOM要素を更新
                     lastUpdateElement.textContent = lastUpdate;
-                    dataCountElement.textContent = `${actualDataCount}件`;
                     statusElement.textContent = status;
-                    statusElement.className = actualDataCount > 0 ? 'badge bg-success' : 'badge bg-secondary';
+                    statusElement.className = fetchedCount > 0 ? 'badge bg-success' : 'badge bg-secondary';
                     
-                    console.log(`✅ ${platformName} キャッシュデータ表示完了:`, {
-                        lastUpdate,
-                        dataCount: actualDataCount,
-                        status
-                    });
+                    // 株価トレンドのみ表示件数と取得件数を分けて表示
+                    if (platform === 'stock' && fetchedCount > 0 && apiEndpoint) {
+                        // 株価トレンドの場合はAPIを呼び出して表示件数を取得
+                        const forceRefreshParam = params.includes('?') ? '&force_refresh=false' : '?force_refresh=false';
+                        const fullEndpoint = apiEndpoint + params + forceRefreshParam;
+                        
+                        fetch(fullEndpoint)
+                            .then(response => response.json())
+                            .then(apiData => {
+                                const displayCount = (apiData.success && apiData.data && Array.isArray(apiData.data)) 
+                                    ? apiData.data.length 
+                                    : fetchedCount;
+                                
+                                // 表示件数と取得件数を分けて表示
+                                if (displayCount === fetchedCount) {
+                                    // 表示件数と取得件数が同じ場合は取得件数のみ表示
+                                    dataCountElement.textContent = `${fetchedCount}件`;
+                                } else {
+                                    // 表示件数と取得件数が異なる場合は「表示件数 (取得件数)」の形式で表示
+                                    dataCountElement.textContent = `${displayCount}件 (${fetchedCount}件)`;
+                                }
+                                
+                                console.log(`✅ ${platformName} キャッシュデータ表示完了:`, {
+                                    lastUpdate,
+                                    displayCount,
+                                    fetchedCount,
+                                    status
+                                });
+                            })
+                            .catch(error => {
+                                console.warn(`⚠️ ${platformName} 表示件数取得エラー:`, error);
+                                // エラー時は取得件数のみ表示
+                                dataCountElement.textContent = `${fetchedCount}件`;
+                                console.log(`✅ ${platformName} キャッシュデータ表示完了（エラー時）:`, {
+                                    lastUpdate,
+                                    dataCount: fetchedCount,
+                                    status
+                                });
+                            });
+                    } else {
+                        // 他のトレンドは従来通り取得件数のみ表示
+                        dataCountElement.textContent = `${fetchedCount}件`;
+                        console.log(`✅ ${platformName} キャッシュデータ表示完了:`, {
+                            lastUpdate,
+                            dataCount: fetchedCount,
+                            status
+                        });
+                    }
                 } else {
                     // キャッシュ情報が見つからない場合
                     console.warn(`⚠️ ${platformName}: キャッシュ情報が見つかりません`, {

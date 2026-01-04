@@ -1543,7 +1543,10 @@ class TrendsCache:
             return False
         except Exception as e:
             logger.error(f"❌ cache_status更新エラー: {e}", exc_info=True)
-            return False(f"❌ 全トレンド更新時刻一括設定エラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
             return False
     
     def clear_all_cache(self):

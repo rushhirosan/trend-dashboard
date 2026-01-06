@@ -50,11 +50,12 @@ class AppStoreTrendsManager:
                 if not force_refresh:
                     logger.warning("⚠️ App Store: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
                     return {
-                        'success': False,
+                        'success': True,  # エラーではなく、データがない状態として扱う
                         'data': [],
                         'status': 'cache_not_found',
                         'source': 'database_cache',
-                        'error': 'キャッシュにデータがありません'
+                        'country': country,
+                        'category': category
                     }
                 # force_refresh=trueの場合のみ外部APIを呼び出す
                 logger.warning("⚠️ App Store: キャッシュデータが見つかりません。外部APIを呼び出します")

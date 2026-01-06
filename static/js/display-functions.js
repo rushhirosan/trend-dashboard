@@ -278,7 +278,9 @@ function displayAppStoreResults(data) {
     
     // テーブルを更新
     tableBody.innerHTML = '';
+    console.log('📊 App Store: データ件数:', data.data ? data.data.length : 0);
     if (data.data && data.data.length > 0) {
+        console.log('📊 App Store: データ表示開始（全' + data.data.length + '件）');
         data.data.forEach((item, index) => {
             const row = document.createElement('tr');
             row.className = 'trend-card';
@@ -298,7 +300,13 @@ function displayAppStoreResults(data) {
                 <td>${rating !== 'N/A' ? `⭐ ${rating}` : 'N/A'}</td>
             `;
             tableBody.appendChild(row);
+            if (index < 3) {
+                console.log(`📊 App Store: 行${index + 1}追加完了 (${item.name}, 評価: ${rating})`);
+            }
         });
+        console.log('📊 App Store: 全' + data.data.length + '件のデータをテーブルに追加しました');
+    } else {
+        console.warn('📊 App Store: 表示するデータがありません');
     }
     
     // 結果セクションを表示

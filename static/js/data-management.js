@@ -1016,4 +1016,104 @@ function loadBookTrendsFromCache() {
         });
 }
 
+// GitHubトレンドキャッシュデータの読み込み
+function loadGitHubTrendsFromCache() {
+    console.log('📊 GitHub Trends キャッシュデータ読み込み');
+    // AbortControllerを使用したタイムアウト処理（30秒）
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    
+    // キャッシュデータを取得して表示（force_refresh=falseで明示的にキャッシュのみを使用）
+    fetchWithRetry('/api/github-trends?limit=25&force_refresh=false', { signal: controller.signal })
+        .then(response => {
+            clearTimeout(timeoutId);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            console.log('GitHub Trends API レスポンス:', response.status, response.ok);
+            return response.json();
+        })
+        .then(data => {
+            console.log('GitHub Trends API データ:', data);
+            if (data.data && data.data.length > 0) {
+                console.log('GitHub Trends データ表示開始');
+                if (typeof displayGitHubResults === 'function') {
+                    displayGitHubResults(data);
+                } else {
+                    console.error('displayGitHubResults関数が見つかりません');
+                }
+            } else {
+                console.log('GitHub Trends データなしまたはエラー:', data);
+            }
+            // 結果エリアを表示
+            const resultsElement = document.getElementById('githubResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error('GitHub Trends キャッシュ読み込みエラー: タイムアウト（30秒）');
+            } else {
+                console.error('GitHub Trends キャッシュ読み込みエラー:', error);
+            }
+            // エラー時でも結果エリアを表示（空でも）
+            const resultsElement = document.getElementById('githubResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        });
+}
+
+// App Storeトレンドキャッシュデータの読み込み
+function loadAppStoreTrendsFromCache() {
+    console.log('📊 App Store Trends キャッシュデータ読み込み');
+    // AbortControllerを使用したタイムアウト処理（30秒）
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    
+    // キャッシュデータを取得して表示（force_refresh=falseで明示的にキャッシュのみを使用）
+    fetchWithRetry('/api/appstore-trends?country=JP&limit=25&force_refresh=false', { signal: controller.signal })
+        .then(response => {
+            clearTimeout(timeoutId);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            console.log('App Store Trends API レスポンス:', response.status, response.ok);
+            return response.json();
+        })
+        .then(data => {
+            console.log('App Store Trends API データ:', data);
+            if (data.data && data.data.length > 0) {
+                console.log('App Store Trends データ表示開始');
+                if (typeof displayAppStoreResults === 'function') {
+                    displayAppStoreResults(data);
+                } else {
+                    console.error('displayAppStoreResults関数が見つかりません');
+                }
+            } else {
+                console.log('App Store Trends データなしまたはエラー:', data);
+            }
+            // 結果エリアを表示
+            const resultsElement = document.getElementById('appstoreResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error('App Store Trends キャッシュ読み込みエラー: タイムアウト（30秒）');
+            } else {
+                console.error('App Store Trends キャッシュ読み込みエラー:', error);
+            }
+            // エラー時でも結果エリアを表示（空でも）
+            const resultsElement = document.getElementById('appstoreResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        });
+}
+
 

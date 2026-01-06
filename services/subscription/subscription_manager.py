@@ -93,11 +93,8 @@ class SubscriptionManager:
             
             # デフォルトカテゴリ設定
             if categories is None or len(categories) == 0:
-                categories = [
-                    'google_trends', 'youtube_trends', 'music_trends', 'stock_trends', 'crypto_trends', 
-                    'worldnews_trends', 'podcast_trends', 'rakuten_trends',
-                    'hatena_trends', 'twitch_trends'
-                ]
+                # サブスクリプションページと同じ順序（JP/US含む）
+                categories = self._get_category_order()
             
             # 登録解除トークン生成
             unsubscribe_token = str(uuid.uuid4())
@@ -646,6 +643,10 @@ class SubscriptionManager:
             from services.trends.hackernews_trends import HackerNewsTrendsManager
             from services.trends.stock_trends import StockTrendsManager
             from services.trends.crypto_trends import CryptoTrendsManager
+            from services.trends.movie_trends import MovieTrendsManager
+            from services.trends.book_trends import BookTrendsManager
+            from services.trends.github_trends import GitHubTrendsManager
+            from services.trends.appstore_trends import AppStoreTrendsManager
             
             # 各マネージャーのインスタンスを作成
             managers = {
@@ -665,7 +666,11 @@ class SubscriptionManager:
                 'reddit_trends': RedditTrendsManager(),
                 'hackernews_trends': HackerNewsTrendsManager(),
                 'stock_trends': StockTrendsManager(),
-                'crypto_trends': CryptoTrendsManager()
+                'crypto_trends': CryptoTrendsManager(),
+                'movie_trends': MovieTrendsManager(),
+                'book_trends': BookTrendsManager(),
+                'github_trends': GitHubTrendsManager(),
+                'appstore_trends': AppStoreTrendsManager(),
             }
             
             trends_data = {}
@@ -720,6 +725,18 @@ class SubscriptionManager:
                     elif normalized_cat == 'crypto_trends':
                         # 仮想通貨: リージョンに関係なく同じデータ
                         result = manager.get_trends(limit=25, force_refresh=False)
+                    elif normalized_cat == 'movie_trends':
+                        # 映画: countryパラメータでJP/USを指定
+                        result = manager.get_trends(country=region, time_window='day', limit=25, force_refresh=False)
+                    elif normalized_cat == 'book_trends':
+                        # 本: countryパラメータでJP/USを指定
+                        result = manager.get_trends(country=region, limit=25, force_refresh=False)
+                    elif normalized_cat == 'github_trends':
+                        # GitHub: リージョンに関係なく同じデータ
+                        result = manager.get_trends(language='all', limit=25, force_refresh=False)
+                    elif normalized_cat == 'appstore_trends':
+                        # App Store: countryパラメータでJP/USを指定
+                        result = manager.get_trends(country=region, category='all', limit=25, force_refresh=False)
                     else:
                         logger.warning(f"   ⚠️ {original_cat}: 未対応のカテゴリです")
                         result = None
@@ -919,9 +936,17 @@ class SubscriptionManager:
             'music_trends_jp',
             # 10. ポッドキャストトレンド
             'podcast_trends_jp',
-            # 11. 楽天商品トレンド
+            # 11. 映画トレンド
+            'movie_trends_jp',
+            # 12. 本トレンド
+            'book_trends_jp',
+            # 13. GitHub
+            'github_trends_jp',
+            # 14. App Store
+            'appstore_trends_jp',
+            # 15. 楽天商品トレンド
             'rakuten_trends_jp',
-            # 12. Twitchゲームトレンド
+            # 16. Twitchゲームトレンド
             'twitch_trends_jp',
             # USのトレンド（トレンドページの順序通り）
             # 1. CNN News
@@ -944,9 +969,17 @@ class SubscriptionManager:
             'music_trends_us',
             # 10. ポッドキャストトレンド
             'podcast_trends_us',
-            # 11. Reddit
+            # 11. 映画トレンド (US)
+            'movie_trends_us',
+            # 12. 本トレンド (US)
+            'book_trends_us',
+            # 13. GitHub (US)
+            'github_trends_us',
+            # 14. App Store (US)
+            'appstore_trends_us',
+            # 15. Reddit
             'reddit_trends_us',
-            # 12. Twitchゲームトレンド
+            # 16. Twitchゲームトレンド
             'twitch_trends_us',
         ]
     
@@ -1354,6 +1387,10 @@ class SubscriptionManager:
             'rakuten_trends_jp': '楽天商品トレンド (日本)',
             'hatena_trends_jp': 'はてなブックマークトレンド (日本)',
             'twitch_trends_jp': 'Twitchゲームトレンド (日本)',
+            'movie_trends_jp': '映画トレンド (日本)',
+            'book_trends_jp': '本トレンド (日本)',
+            'github_trends_jp': 'GitHubトレンド (日本)',
+            'appstore_trends_jp': 'App Storeトレンド (日本)',
             # USのカテゴリ
             'google_trends_us': 'Google Trends (US)',
             'youtube_trends_us': 'YouTube トレンド (US)',
@@ -1365,6 +1402,10 @@ class SubscriptionManager:
             'hackernews_trends_us': 'Hacker News (US)',
             'cnn_trends_us': 'CNN News (US)',
             'producthunt_trends_us': 'Product Hunt (US)',
+            'movie_trends_us': '映画トレンド (US)',
+            'book_trends_us': '本トレンド (US)',
+            'github_trends_us': 'GitHub (US)',
+            'appstore_trends_us': 'App Store (US)',
             # 日本のカテゴリ（追加）
             'nhk_trends_jp': 'NHK ニュース (日本)',
             'qiita_trends_jp': 'Qiita トレンド (日本)',

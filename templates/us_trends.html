@@ -777,7 +777,95 @@
             </div>
         </div>
 
-        <!-- Row 6: Reddit Popular Posts + Twitch Trends -->
+        <!-- Row 6: GitHub Trends + App Store Trends -->
+        <div class="row g-3 mb-3">
+            <!-- Left: GitHub Trends -->
+            <div class="col-12 col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-dark text-white">
+                        <h5><i class="fab fa-github"></i> GitHub Trends</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="loading text-center py-5" id="githubLoading" style="display: none;">
+                            <div class="spinner-border text-dark" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Loading GitHub trends...</p>
+                        </div>
+                        <div id="githubResults" style="display: none;">
+                            <div class="alert alert-success status-message" id="githubStatusMessage" style="display: none;">
+                                <!-- Status messages will be displayed here -->
+                            </div>
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                                    <div class="trend-table-container">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover trend-table" id="githubTrendsTable">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>Rank</th>
+                                                        <th>Repository</th>
+                                                        <th>Language</th>
+                                                        <th>Stars</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="githubTrendsTableBody">
+                                                    <!-- GitHub data will be displayed here -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Right: App Store Trends -->
+            <div class="col-12 col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-success text-white">
+                        <h5><i class="fab fa-apple"></i> App Store Trends</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="loading text-center py-5" id="appstoreLoading" style="display: none;">
+                            <div class="spinner-border text-success" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Loading App Store trends...</p>
+                        </div>
+                        <div id="appstoreResults" style="display: none;">
+                            <div class="alert alert-success status-message" id="appstoreStatusMessage" style="display: none;">
+                                <!-- Status messages will be displayed here -->
+                            </div>
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                                    <div class="trend-table-container">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover trend-table" id="appstoreTrendsTable">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>Rank</th>
+                                                        <th>App Name</th>
+                                                        <th>Developer</th>
+                                                        <th>Rating</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="appstoreTrendsTableBody">
+                                                    <!-- App Store data will be displayed here -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 7: Reddit Popular Posts + Twitch Trends -->
         <div class="row g-3 mb-3">
             <!-- Left: Reddit Popular Posts -->
             <div class="col-12 col-md-6">

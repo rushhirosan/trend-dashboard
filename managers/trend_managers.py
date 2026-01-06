@@ -22,6 +22,8 @@ from services.trends.stock_trends import StockTrendsManager
 from services.trends.crypto_trends import CryptoTrendsManager
 from services.trends.movie_trends import MovieTrendsManager
 from services.trends.book_trends import BookTrendsManager
+from services.trends.github_trends import GitHubTrendsManager
+from services.trends.appstore_trends import AppStoreTrendsManager
 from utils.logger_config import get_logger
 
 # ロガーの初期化
@@ -48,6 +50,8 @@ MANAGER_CONFIGS = [
     ('crypto', CryptoTrendsManager, 'Crypto'),
     ('movie', MovieTrendsManager, 'Movie'),
     ('book', BookTrendsManager, 'Book'),
+    ('github', GitHubTrendsManager, 'GitHub'),
+    ('appstore', AppStoreTrendsManager, 'App Store'),
 ]
 
 
@@ -160,6 +164,8 @@ def refresh_all_trends(managers, force_refresh=True):
     call_manager('crypto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP')
     call_manager('movie', lambda m: m.get_trends(country='JP', time_window='day', limit=25, force_refresh=force_refresh), 'JP')
     call_manager('book', lambda m: m.get_trends(country='JP', limit=25, force_refresh=force_refresh), 'JP')
+    call_manager('github', lambda m: m.get_trends(language='all', limit=25, force_refresh=force_refresh), 'JP')
+    call_manager('appstore', lambda m: m.get_trends(country='JP', category='all', limit=25, force_refresh=force_refresh), 'JP')
     
     # USのデータを更新
     logger.info("🇺🇸 USのデータを更新中...")
@@ -177,6 +183,8 @@ def refresh_all_trends(managers, force_refresh=True):
     call_manager('crypto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
     call_manager('movie', lambda m: m.get_trends(country='US', time_window='day', limit=25, force_refresh=force_refresh), 'US')
     call_manager('book', lambda m: m.get_trends(country='US', limit=25, force_refresh=force_refresh), 'US')
+    call_manager('github', lambda m: m.get_trends(language='all', limit=25, force_refresh=force_refresh), 'US')
+    call_manager('appstore', lambda m: m.get_trends(country='US', category='all', limit=25, force_refresh=force_refresh), 'US')
     
     overall_success = all(result.get('success') for result in results.values())
     

@@ -71,6 +71,14 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
             apiEndpoint = '/api/book-trends';
             params = '?country=JP';
             break;
+        case 'github':
+            apiEndpoint = '/api/github-trends';
+            params = '?language=all&limit=25';
+            break;
+        case 'appstore':
+            apiEndpoint = '/api/appstore-trends';
+            params = '?country=JP&category=all&limit=25';
+            break;
         case 'cnn':
             apiEndpoint = '/api/cnn-trends';
             params = '?limit=25';
@@ -126,6 +134,8 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                     'Podcast': 'Podcast',
                     '映画トレンド': '映画トレンド',
                     '本トレンド': '本トレンド',
+                    'GitHub': 'GitHub',
+                    'App Store': 'App Store',
                     '楽天': '楽天',
                     'Twitch': 'Twitch'
                 };
@@ -459,6 +469,12 @@ function refreshDataFreshnessExternal() {
     
     console.log('🔄 本トレンドのステータスを更新中（キャッシュのみ）...');
     updatePlatformStatusExternal('book', '本トレンド');
+    
+    console.log('🔄 GitHubトレンドのステータスを更新中（キャッシュのみ）...');
+    updatePlatformStatusExternal('github', 'GitHub');
+    
+    console.log('🔄 App Storeトレンドのステータスを更新中（キャッシュのみ）...');
+    updatePlatformStatusExternal('appstore', 'App Store');
     
     console.log('🔄 楽天のステータスを更新中（キャッシュのみ）...');
     updatePlatformStatusExternal('rakuten', '楽天');

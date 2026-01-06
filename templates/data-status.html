@@ -416,6 +416,59 @@
                                 </div>
 
                                 <div class="row g-3 mt-2">
+                                    <!-- 6行目: GitHub + App Store -->
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-3">
+                                                    <i class="fab fa-github text-dark fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">GitHubトレンド</h6>
+                                                </div>
+                                                <div class="row text-center">
+                                                    <div class="col-4">
+                                                        <small class="text-muted">最終更新/Last updated</small>
+                                                        <div class="fw-bold" id="githubLastUpdate">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">データ件数/Data count</small>
+                                                        <div class="fw-bold" id="githubDataCount">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">ステータス/Status</small>
+                                                        <div><span class="badge bg-secondary" id="githubStatus">-</span></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-3">
+                                                    <i class="fab fa-apple text-success fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">App Storeトレンド</h6>
+                                                </div>
+                                                <div class="row text-center">
+                                                    <div class="col-4">
+                                                        <small class="text-muted">最終更新/Last updated</small>
+                                                        <div class="fw-bold" id="appstoreLastUpdate">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">データ件数/Data count</small>
+                                                        <div class="fw-bold" id="appstoreDataCount">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">ステータス/Status</small>
+                                                        <div><span class="badge bg-secondary" id="appstoreStatus">-</span></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mt-2">
                                     <!-- 7行目: 楽天 + Twitch -->
                                     <div class="col-md-6">
                                         <div class="card h-100">
@@ -791,6 +844,59 @@
                                     </div>
 
                                     <div class="row g-3 mt-2">
+                                        <!-- US 6行目: GitHub + App Store -->
+                                        <div class="col-md-6">
+                                            <div class="card h-100">
+                                                <div class="card-body">
+                                                    <div class="d-flex align-items-center mb-3">
+                                                        <i class="fab fa-github text-dark fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">GitHub Trends</h6>
+                                                    </div>
+                                                    <div class="row text-center">
+                                                        <div class="col-4">
+                                                            <small class="text-muted">最終更新/Last updated</small>
+                                                            <div class="fw-bold" id="githubUSLastUpdate">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">データ件数/Data count</small>
+                                                            <div class="fw-bold" id="githubUSDataCount">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">ステータス/Status</small>
+                                                            <div><span class="badge bg-secondary" id="githubUSStatus">-</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-md-6">
+                                            <div class="card h-100">
+                                                <div class="card-body">
+                                                    <div class="d-flex align-items-center mb-3">
+                                                        <i class="fab fa-apple text-success fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">App Store Trends</h6>
+                                                    </div>
+                                                    <div class="row text-center">
+                                                        <div class="col-4">
+                                                            <small class="text-muted">最終更新/Last updated</small>
+                                                            <div class="fw-bold" id="appstoreUSLastUpdate">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">データ件数/Data count</small>
+                                                            <div class="fw-bold" id="appstoreUSDataCount">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">ステータス/Status</small>
+                                                            <div><span class="badge bg-secondary" id="appstoreUSStatus">-</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-3 mt-2">
                                         <!-- US 7行目: Reddit + Twitch -->
                                         <div class="col-md-6">
                                             <div class="card h-100">
@@ -956,6 +1062,8 @@
                 { id: 'podcastUS', name: 'Podcast', endpoint: '/api/podcast-trends?region=us' },
                 { id: 'movieUS', name: 'Movie Trends', endpoint: '/api/movie-trends?country=US' },
                 { id: 'bookUS', name: 'Book Trends', endpoint: '/api/book-trends?country=US' },
+                { id: 'githubUS', name: 'GitHub Trends', endpoint: '/api/github-trends?language=all&limit=25' },
+                { id: 'appstoreUS', name: 'App Store Trends', endpoint: '/api/appstore-trends?country=US&category=all&limit=25' },
                 { id: 'redditUS', name: 'Reddit', endpoint: '/api/reddit-trends?subreddit=all' },
                 { id: 'twitchUS', name: 'Twitch', endpoint: '/api/twitch-trends?type=games' }
             ];
@@ -1007,6 +1115,8 @@
                             'Podcast': 'Podcast',
                             'Movie Trends': '映画トレンド',  // 日本のセクションではmovie_trends_JP、USセクションではmovie_trends_USを取得
                             'Book Trends': '本トレンド',  // 日本のセクションではbook_trends_JP、USセクションではbook_trends_USを取得
+                            'GitHub Trends': 'GitHub',
+                            'App Store Trends': 'App Store',
                             'Reddit': 'Reddit',
                             'Twitch': 'Twitch'
                         };

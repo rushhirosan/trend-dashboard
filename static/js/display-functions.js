@@ -212,6 +212,103 @@ function displayBookResults(data) {
     console.log('✅ Book Results表示完了');
 }
 
+// GitHubトレンド結果表示関数
+function displayGitHubResults(data) {
+    console.log('📊 GitHub Results表示開始', data);
+    const tableBody = document.getElementById('githubTrendsTableBody');
+    const statusMessage = document.getElementById('githubStatusMessage');
+    
+    if (!tableBody) {
+        console.error('❌ GitHub DOM要素が見つかりません');
+        return;
+    }
+    
+    // ステータスメッセージは非表示のまま
+    if (statusMessage) {
+        statusMessage.style.display = 'none !important';
+    }
+    
+    // テーブルを更新
+    tableBody.innerHTML = '';
+    if (data.data && data.data.length > 0) {
+        data.data.forEach((item, index) => {
+            const row = document.createElement('tr');
+            row.className = 'trend-card';
+            
+            const stars = item.stars_count ? item.stars_count.toLocaleString() : '0';
+            const language = item.language || 'N/A';
+            const repoUrl = item.url || '#';
+            
+            row.innerHTML = `
+                <td><span class="badge bg-dark">${item.rank || index + 1}</span></td>
+                <td>
+                    <strong><a href="${repoUrl}" target="_blank">${item.full_name || item.name || 'N/A'}</a></strong>
+                    ${item.description ? `<br><small class="text-muted">${item.description}</small>` : ''}
+                </td>
+                <td>${language}</td>
+                <td>⭐ ${stars}</td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+    
+    // 結果セクションを表示
+    const resultsElement = document.getElementById('githubResults');
+    if (resultsElement) {
+        resultsElement.style.display = 'block';
+    }
+    console.log('✅ GitHub Results表示完了');
+}
+
+// App Storeトレンド結果表示関数
+function displayAppStoreResults(data) {
+    console.log('📊 App Store Results表示開始', data);
+    const tableBody = document.getElementById('appstoreTrendsTableBody');
+    const statusMessage = document.getElementById('appstoreStatusMessage');
+    
+    if (!tableBody) {
+        console.error('❌ App Store DOM要素が見つかりません');
+        return;
+    }
+    
+    // ステータスメッセージは非表示のまま
+    if (statusMessage) {
+        statusMessage.style.display = 'none !important';
+    }
+    
+    // テーブルを更新
+    tableBody.innerHTML = '';
+    if (data.data && data.data.length > 0) {
+        data.data.forEach((item, index) => {
+            const row = document.createElement('tr');
+            row.className = 'trend-card';
+            
+            const rating = item.average_user_rating ? (typeof item.average_user_rating === 'number' ? item.average_user_rating.toFixed(1) : parseFloat(item.average_user_rating).toFixed(1)) : 'N/A';
+            const developer = item.artist_name || 'N/A';
+            const appUrl = item.url || '#';
+            const iconUrl = item.artwork_url_100 || item.artwork_url_60 || '';
+            
+            row.innerHTML = `
+                <td><span class="badge bg-success">${item.rank || index + 1}</span></td>
+                <td>
+                    ${iconUrl ? `<img src="${iconUrl}" alt="${item.name}" style="width: 50px; height: 50px; object-fit: cover; margin-right: 10px; float: left; border-radius: 10px;">` : ''}
+                    <strong><a href="${appUrl}" target="_blank">${item.name || 'N/A'}</a></strong>
+                </td>
+                <td>${developer}</td>
+                <td>${rating !== 'N/A' ? `⭐ ${rating}` : 'N/A'}</td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+    
+    // 結果セクションを表示
+    const resultsElement = document.getElementById('appstoreResults');
+    if (resultsElement) {
+        resultsElement.style.display = 'block';
+    }
+    console.log('✅ App Store Results表示完了');
+}
+
 // World News結果表示関数
 function displayWorldNewsResults(data) {
     console.log('📊 World News Results表示開始', data);

@@ -285,6 +285,53 @@ class TrendsCache:
                     cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
+                CREATE TABLE IF NOT EXISTS github_trends_cache (
+                    id SERIAL PRIMARY KEY,
+                    repo_id VARCHAR(255) NOT NULL,
+                    name VARCHAR(255) NOT NULL,
+                    full_name VARCHAR(500) NOT NULL,
+                    description TEXT,
+                    url TEXT,
+                    language VARCHAR(100),
+                    stars_count INTEGER DEFAULT 0,
+                    forks_count INTEGER DEFAULT 0,
+                    watchers_count INTEGER DEFAULT 0,
+                    open_issues_count INTEGER DEFAULT 0,
+                    created_at VARCHAR(100),
+                    updated_at VARCHAR(100),
+                    pushed_at VARCHAR(100),
+                    owner_login VARCHAR(255),
+                    owner_avatar_url TEXT,
+                    rank INTEGER DEFAULT 0,
+                    cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                
+                CREATE TABLE IF NOT EXISTS appstore_trends_cache (
+                    id SERIAL PRIMARY KEY,
+                    app_id VARCHAR(255) NOT NULL,
+                    name VARCHAR(500) NOT NULL,
+                    bundle_id VARCHAR(255),
+                    description TEXT,
+                    url TEXT,
+                    artist_name VARCHAR(255),
+                    artist_id VARCHAR(255),
+                    price DECIMAL(10, 2) DEFAULT 0,
+                    currency VARCHAR(10),
+                    category VARCHAR(100),
+                    genre_ids TEXT,
+                    average_user_rating DECIMAL(3, 2) DEFAULT 0,
+                    user_rating_count INTEGER DEFAULT 0,
+                    release_date VARCHAR(100),
+                    current_version_release_date VARCHAR(100),
+                    artwork_url_60 TEXT,
+                    artwork_url_100 TEXT,
+                    artwork_url_512 TEXT,
+                    screenshot_urls TEXT,
+                    country VARCHAR(10) NOT NULL DEFAULT 'JP',
+                    rank INTEGER DEFAULT 0,
+                    cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                
                 CREATE TABLE IF NOT EXISTS nhk_trends_cache (
                     id SERIAL PRIMARY KEY,
                     title TEXT NOT NULL,
@@ -431,9 +478,41 @@ class TrendsCache:
                 CREATE TABLE IF NOT EXISTS subscriptions (
                     id SERIAL PRIMARY KEY,
                     email VARCHAR(255) NOT NULL UNIQUE,
+                    frequency VARCHAR(20) NOT NULL DEFAULT 'daily',
+                    categories TEXT[],
+                    is_active BOOLEAN DEFAULT TRUE,
+                    unsubscribe_token VARCHAR(255) UNIQUE,
                     subscribed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    is_active BOOLEAN DEFAULT TRUE
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
+
+                -- subscriptionsテーブルのマイグレーション（既存テーブルにカラムがない場合は追加）
+                DO $$ 
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'subscriptions' AND column_name = 'frequency') THEN
+                        ALTER TABLE subscriptions ADD COLUMN frequency VARCHAR(20) NOT NULL DEFAULT 'daily';
+                    END IF;
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'subscriptions' AND column_name = 'categories') THEN
+                        ALTER TABLE subscriptions ADD COLUMN categories TEXT[];
+                    END IF;
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'subscriptions' AND column_name = 'unsubscribe_token') THEN
+                        ALTER TABLE subscriptions ADD COLUMN unsubscribe_token VARCHAR(255);
+                    END IF;
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'subscriptions' AND column_name = 'created_at') THEN
+                        ALTER TABLE subscriptions ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+                    END IF;
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'subscriptions' AND column_name = 'updated_at') THEN
+                        ALTER TABLE subscriptions ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+                    END IF;
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'subscriptions' AND column_name = 'subscribed_at') THEN
+                        ALTER TABLE subscriptions ADD COLUMN subscribed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+                    END IF;
+                END $$;
+
+                CREATE INDEX IF NOT EXISTS idx_subscriptions_email ON subscriptions(email);
+                CREATE INDEX IF NOT EXISTS idx_subscriptions_active ON subscriptions(is_active);
+                CREATE INDEX IF NOT EXISTS idx_subscriptions_token ON subscriptions(unsubscribe_token);
                 """
                 
                 cursor.execute(create_tables_sql)
@@ -2072,6 +2151,289 @@ class TrendsCache:
             return False
         except Exception as e:
             logger.error(f"❌ qiita_trendsキャッシュクリアエラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
+            return False
+    
+    # GitHub Trends キャッシュメソッド
+    def save_github_trends_to_cache(self, data):
+        """GitHub Trendsデータをキャッシュに保存"""
+        if not data:
+            return False
+        
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return False
+        except Exception as e:
+            logger.error(f"❌ github_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
+            return False
+        
+        try:
+            with conn.cursor() as cursor:
+                # 既存のデータを削除
+                cursor.execute("""
+                    DELETE FROM github_trends_cache
+                """)
+                
+                # 新しいデータを挿入
+                for item in data:
+                    cursor.execute("""
+                        INSERT INTO github_trends_cache 
+                        (repo_id, name, full_name, description, url, language, stars_count, forks_count,
+                         watchers_count, open_issues_count, created_at, updated_at, pushed_at,
+                         owner_login, owner_avatar_url, rank)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        item.get('repo_id', ''),
+                        item.get('name', ''),
+                        item.get('full_name', ''),
+                        item.get('description', ''),
+                        item.get('url', ''),
+                        item.get('language', ''),
+                        item.get('stars_count', 0),
+                        item.get('forks_count', 0),
+                        item.get('watchers_count', 0),
+                        item.get('open_issues_count', 0),
+                        item.get('created_at', ''),
+                        item.get('updated_at', ''),
+                        item.get('pushed_at', ''),
+                        item.get('owner_login', ''),
+                        item.get('owner_avatar_url', ''),
+                        item.get('rank', 0)
+                    ))
+                
+                # キャッシュステータスを更新
+                from datetime import datetime
+                import pytz
+                jst = pytz.timezone('Asia/Tokyo')
+                cursor.execute(
+                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                    ('github_trends', datetime.now(jst), len(data), datetime.now(jst), len(data))
+                )
+                
+                conn.commit()
+                logger.info(f"✅ github_trendsキャッシュを保存しました ({len(data)}件)")
+                return True
+                
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ github_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ github_trendsキャッシュ保存エラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
+            return False
+    
+    def get_github_trends_from_cache(self):
+        """GitHub Trendsデータをキャッシュから取得"""
+        def query_func(conn):
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT repo_id, name, full_name, description, url, language, stars_count, forks_count,
+                           watchers_count, open_issues_count, created_at, updated_at, pushed_at,
+                           owner_login, owner_avatar_url, rank, cached_at
+                    FROM github_trends_cache 
+                    ORDER BY rank
+                """)
+                data = cursor.fetchall()
+                
+                # RealDictCursorの結果を辞書のリストに変換
+                result = []
+                for row in data:
+                    result.append(dict(row))
+                
+                return result
+        
+        try:
+            return self._execute_with_retry(query_func)
+        except Exception as e:
+            logger.error(f"❌ GitHub Trendsキャッシュ取得エラー: {e}", exc_info=True)
+            return None
+    
+    def clear_github_trends_cache(self):
+        """GitHub Trendsキャッシュをクリア"""
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return False
+        except Exception as e:
+            logger.error(f"❌ github_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
+            return False
+        
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    DELETE FROM github_trends_cache
+                """)
+                conn.commit()
+                logger.info(f"✅ github_trendsのキャッシュをクリアしました")
+                return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ github_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ github_trendsキャッシュクリアエラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
+            return False
+    
+    # App Store Trends キャッシュメソッド
+    def save_appstore_trends_to_cache(self, data, country='JP'):
+        """App Store Trendsデータをキャッシュに保存"""
+        if not data:
+            return False
+        
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return False
+        except Exception as e:
+            logger.error(f"❌ appstore_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
+            return False
+        
+        try:
+            with conn.cursor() as cursor:
+                # 既存のデータを削除（国別）
+                cursor.execute("""
+                    DELETE FROM appstore_trends_cache WHERE country = %s
+                """, (country,))
+                
+                # 新しいデータを挿入
+                for item in data:
+                    # 配列をJSON文字列に変換
+                    genre_ids_json = json.dumps(item.get('genre_ids', []), ensure_ascii=False)
+                    screenshot_urls_json = json.dumps(item.get('screenshot_urls', []), ensure_ascii=False)
+                    
+                    cursor.execute("""
+                        INSERT INTO appstore_trends_cache 
+                        (app_id, name, bundle_id, description, url, artist_name, artist_id, price, currency,
+                         category, genre_ids, average_user_rating, user_rating_count, release_date,
+                         current_version_release_date, artwork_url_60, artwork_url_100, artwork_url_512,
+                         screenshot_urls, country, rank)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        item.get('app_id', ''),
+                        item.get('name', ''),
+                        item.get('bundle_id', ''),
+                        item.get('description', ''),
+                        item.get('url', ''),
+                        item.get('artist_name', ''),
+                        item.get('artist_id', ''),
+                        item.get('price', 0),
+                        item.get('currency', ''),
+                        item.get('category', ''),
+                        genre_ids_json,
+                        item.get('average_user_rating', 0),
+                        item.get('user_rating_count', 0),
+                        item.get('release_date', ''),
+                        item.get('current_version_release_date', ''),
+                        item.get('artwork_url_60', ''),
+                        item.get('artwork_url_100', ''),
+                        item.get('artwork_url_512', ''),
+                        screenshot_urls_json,
+                        country,
+                        item.get('rank', 0)
+                    ))
+                
+                # キャッシュステータスを更新
+                from datetime import datetime
+                import pytz
+                jst = pytz.timezone('Asia/Tokyo')
+                cache_key = f'appstore_trends_{country}'
+                cursor.execute(
+                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                    (cache_key, datetime.now(jst), len(data), datetime.now(jst), len(data))
+                )
+                
+                conn.commit()
+                logger.info(f"✅ appstore_trendsキャッシュを保存しました ({len(data)}件, country={country})")
+                return True
+                
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ appstore_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ appstore_trendsキャッシュ保存エラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
+            return False
+    
+    def get_appstore_trends_from_cache(self, country='JP'):
+        """App Store Trendsデータをキャッシュから取得"""
+        def query_func(conn):
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT app_id, name, bundle_id, description, url, artist_name, artist_id, price, currency,
+                           category, genre_ids, average_user_rating, user_rating_count, release_date,
+                           current_version_release_date, artwork_url_60, artwork_url_100, artwork_url_512,
+                           screenshot_urls, country, rank, cached_at
+                    FROM appstore_trends_cache 
+                    WHERE country = %s
+                    ORDER BY rank
+                """, (country,))
+                data = cursor.fetchall()
+                
+                # RealDictCursorの結果を辞書のリストに変換
+                result = []
+                for row in data:
+                    item = dict(row)
+                    # JSON文字列を配列に変換
+                    if item.get('genre_ids'):
+                        try:
+                            item['genre_ids'] = json.loads(item['genre_ids'])
+                        except:
+                            item['genre_ids'] = []
+                    if item.get('screenshot_urls'):
+                        try:
+                            item['screenshot_urls'] = json.loads(item['screenshot_urls'])
+                        except:
+                            item['screenshot_urls'] = []
+                    result.append(item)
+                
+                return result
+        
+        try:
+            return self._execute_with_retry(query_func)
+        except Exception as e:
+            logger.error(f"❌ App Store Trendsキャッシュ取得エラー: {e}", exc_info=True)
+            return None
+    
+    def clear_appstore_trends_cache(self, country='JP'):
+        """App Store Trendsキャッシュをクリア"""
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return False
+        except Exception as e:
+            logger.error(f"❌ appstore_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
+            return False
+        
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    DELETE FROM appstore_trends_cache WHERE country = %s
+                """, (country,))
+                conn.commit()
+                logger.info(f"✅ appstore_trendsのキャッシュをクリアしました (country={country})")
+                return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ appstore_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ appstore_trendsキャッシュクリアエラー: {e}", exc_info=True)
             try:
                 conn.rollback()
             except:

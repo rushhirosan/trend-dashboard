@@ -911,6 +911,12 @@ function loadCachedDataUS() {
     // Load Book Trends from cache
     loadBookTrendsFromCacheUS();
     
+    // Load GitHub Trends from cache
+    loadGitHubTrendsFromCacheUS();
+    
+    // Load App Store Trends from cache
+    loadAppStoreTrendsFromCacheUS();
+    
     // Load Reddit from cache (エラーでもレイアウトを崩さないように先に実行)
     loadRedditFromCacheUS();
     

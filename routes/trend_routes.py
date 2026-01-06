@@ -410,6 +410,39 @@ def get_qiita_trends(manager):
     except Exception as e:
         return handle_api_error('Qiitaトレンド', e)
 
+
+@trend_bp.route('/github-trends')
+@require_manager('github')
+def get_github_trends(manager):
+    """GitHub Trends APIエンドポイント"""
+    try:
+        language = request.args.get('language', 'all')
+        limit = int(request.args.get('limit', 25))
+        force_refresh = get_force_refresh()
+        
+        result = manager.get_trends(language=language, limit=limit, force_refresh=force_refresh)
+        return handle_trend_response(result, 'GitHubトレンド', 'GitHub API', language=language)
+        
+    except Exception as e:
+        return handle_api_error('GitHubトレンド', e)
+
+
+@trend_bp.route('/appstore-trends')
+@require_manager('appstore')
+def get_appstore_trends(manager):
+    """App Store Trends APIエンドポイント"""
+    try:
+        country = request.args.get('country', 'JP')
+        category = request.args.get('category', 'all')
+        limit = int(request.args.get('limit', 25))
+        force_refresh = get_force_refresh()
+        
+        result = manager.get_trends(country=country, category=category, limit=limit, force_refresh=force_refresh)
+        return handle_trend_response(result, 'App Storeトレンド', 'App Store API', country=country, category=category)
+        
+    except Exception as e:
+        return handle_api_error('App Storeトレンド', e)
+
 @trend_bp.route('/nhk-trends')
 @require_manager('nhk')
 def get_nhk_trends(manager):

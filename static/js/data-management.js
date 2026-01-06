@@ -38,6 +38,8 @@ function loadCachedDataExternal() {
         loadPodcastTrendsFromCache,
         loadMovieTrendsFromCache,
         loadBookTrendsFromCache,
+        loadGitHubTrendsFromCache,
+        loadAppStoreTrendsFromCache,
         loadRakutenTrendsFromCache,
         loadHatenaTrendsFromCache,
         loadTwitchTrendsFromCache,

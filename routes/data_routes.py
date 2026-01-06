@@ -75,7 +75,9 @@ def get_data_freshness():
             ('cnn_trends', 'CNN News'),
             ('producthunt_trends', 'Product Hunt'),
             ('reddit_trends', 'Reddit'),
-            ('hackernews_trends', 'Hacker News')
+            ('hackernews_trends', 'Hacker News'),
+            ('github_trends', 'GitHub'),
+            ('appstore_trends', 'App Store')
         ]
         
         cache_instance = get_cache()
@@ -102,6 +104,13 @@ def get_data_freshness():
                         # フォールバック: もう一方の国のデータをチェック
                         fallback_country = 'US' if country == 'JP' else 'JP'
                         cache_info = cache_instance.get_cache_info(f'book_trends_{fallback_country}')
+                elif cache_key == 'appstore_trends':
+                    # App Storeトレンドは国別のキャッシュキーを使用
+                    cache_info = cache_instance.get_cache_info(f'appstore_trends_{country}')
+                    if not cache_info:
+                        # フォールバック: もう一方の国のデータをチェック
+                        fallback_country = 'US' if country == 'JP' else 'JP'
+                        cache_info = cache_instance.get_cache_info(f'appstore_trends_{fallback_country}')
                 else:
                     cache_info = cache_instance.get_cache_info(cache_key)
                 

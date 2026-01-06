@@ -32,4 +32,4 @@ pandas-gbq>=0.19.0
 pytrends==4.7.3
 yfinance>=0.2.0
 yahooquery>=2.4.0
-feedparser==6.0.10
+feedparser==6.0.12

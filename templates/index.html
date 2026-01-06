@@ -686,7 +686,95 @@
                     </article>
                 </div>
 
-                <!-- 6行目: 楽天 + Twitch -->
+                <!-- 6行目: GitHub + App Store -->
+                <div class="row g-3 mb-3">
+                    <!-- 左側: GitHubトレンド -->
+                    <article class="col-12 col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                                <h2 class="h5 mb-0"><i class="fab fa-github" aria-hidden="true"></i> GitHubトレンド</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="loading text-center py-5" id="githubLoading" style="display: none;">
+                                    <div class="spinner-border text-dark" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-3">GitHubトレンドデータを取得中...</p>
+                                </div>
+                                <div id="githubResults">
+                                    <div class="alert alert-success status-message" id="githubStatusMessage" style="display: none !important;">
+                                        <!-- ステータスメッセージがここに表示されます -->
+                                    </div>
+                                    <div class="card trend-table category-card">
+                                        <div class="card-body">
+                                            <div class="trend-table-container">
+                                                <div class="table-responsive">
+                                                    <table class="table table-hover trend-table" id="githubTrendsTable">
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>順位</th>
+                                                                <th>リポジトリ名</th>
+                                                                <th>言語</th>
+                                                                <th>スター数</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="githubTrendsTableBody">
+                                                            <!-- GitHubデータがここに表示されます -->
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                    <!-- 右側: App Storeトレンド -->
+                    <article class="col-12 col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                                <h2 class="h5 mb-0"><i class="fab fa-apple" aria-hidden="true"></i> App Storeトレンド</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="loading text-center py-5" id="appstoreLoading" style="display: none;">
+                                    <div class="spinner-border text-success" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-3">App Storeトレンドデータを取得中...</p>
+                                </div>
+                                <div id="appstoreResults">
+                                    <div class="alert alert-success status-message" id="appstoreStatusMessage" style="display: none !important;">
+                                        <!-- ステータスメッセージがここに表示されます -->
+                                    </div>
+                                    <div class="card trend-table category-card">
+                                        <div class="card-body">
+                                            <div class="trend-table-container">
+                                                <div class="table-responsive">
+                                                    <table class="table table-hover trend-table" id="appstoreTrendsTable">
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>順位</th>
+                                                                <th>アプリ名</th>
+                                                                <th>開発者</th>
+                                                                <th>評価</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="appstoreTrendsTableBody">
+                                                            <!-- App Storeデータがここに表示されます -->
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+
+                <!-- 7行目: 楽天 + Twitch -->
                 <div class="row g-3 mb-3">
                     <!-- 左側: 楽天商品トレンド -->
                     <article class="col-12 col-md-6">

@@ -141,8 +141,9 @@ class AppStoreTrendsManager:
                 if not isinstance(entries, list):
                     entries = [entries] if entries else []
                 
-                # データを整形
+                # データを整形（まずRSS Feedから基本情報を取得）
                 formatted_data = []
+                app_ids = []
                 for i, entry in enumerate(entries[:limit], 1):
                     # RSS Feedの構造から必要な情報を抽出
                     # entryは辞書で、'im:name', 'im:artist', 'im:image'などのキーを持つ
@@ -176,13 +177,6 @@ class AppStoreTrendsManager:
                         price = float(price_info.get('amount', 0)) if price_info.get('amount') else 0
                         currency = price_info.get('currency', '')
                         
-                        # 評価情報
-                        rating_info = entry.get('im:rating', {}) if isinstance(entry.get('im:rating'), dict) else {}
-                        average_user_rating = float(rating_info.get('label', 0)) if rating_info.get('label') else 0
-                        
-                        rating_count_info = entry.get('im:ratingCount', {}) if isinstance(entry.get('im:ratingCount'), dict) else {}
-                        user_rating_count = int(rating_count_info.get('label', 0)) if rating_count_info.get('label') else 0
-                        
                         # リリース日
                         release_date = entry.get('im:releaseDate', {}).get('label', '') if isinstance(entry.get('im:releaseDate'), dict) else ''
                         
@@ -201,8 +195,8 @@ class AppStoreTrendsManager:
                             'currency': currency,
                             'category': category_name,
                             'genre_ids': genre_id_list,
-                            'average_user_rating': average_user_rating,
-                            'user_rating_count': user_rating_count,
+                            'average_user_rating': 0,  # 後でLookup APIで取得
+                            'user_rating_count': 0,  # 後でLookup APIで取得
                             'release_date': release_date,
                             'current_version_release_date': release_date,
                             'artwork_url_60': artwork_url_100,  # RSS Feedには60pxがないので100pxを使用
@@ -212,9 +206,56 @@ class AppStoreTrendsManager:
                             'rank': i
                         }
                         formatted_data.append(formatted_item)
+                        if app_id:
+                            app_ids.append(app_id)
                     except Exception as e:
                         logger.warning(f"App Store エントリ処理エラー (rank {i}): {e}")
                         continue
+                
+                # iTunes Lookup APIで評価情報を取得（バッチ処理：最大200件まで一度に取得可能）
+                if app_ids:
+                    try:
+                        logger.info(f"📊 App Store: {len(app_ids)}件のアプリの評価情報を取得中...")
+                        # レート制限をチェック
+                        self.rate_limiter.wait_if_needed()
+                        
+                        # 複数のapp_idをカンマ区切りで指定
+                        lookup_url = f"{self.base_url}/lookup"
+                        lookup_params = {
+                            'id': ','.join(app_ids[:200])  # iTunes APIの最大制限は200
+                        }
+                        
+                        lookup_response = requests.get(lookup_url, params=lookup_params, timeout=15)
+                        
+                        if lookup_response.status_code == 200:
+                            lookup_data = lookup_response.json()
+                            lookup_results = lookup_data.get('results', [])
+                            
+                            # app_idをキーとした辞書を作成
+                            rating_dict = {}
+                            for result in lookup_results:
+                                app_id_key = str(result.get('trackId', ''))
+                                rating_dict[app_id_key] = {
+                                    'average_user_rating': result.get('averageUserRating', 0),
+                                    'user_rating_count': result.get('userRatingCount', 0),
+                                    'average_user_rating_for_current_version': result.get('averageUserRatingForCurrentVersion', 0),
+                                    'user_rating_count_for_current_version': result.get('userRatingCountForCurrentVersion', 0)
+                                }
+                            
+                            # 評価情報をformatted_dataに反映
+                            for item in formatted_data:
+                                app_id_key = item.get('app_id', '')
+                                if app_id_key in rating_dict:
+                                    rating_info = rating_dict[app_id_key]
+                                    item['average_user_rating'] = float(rating_info.get('average_user_rating', 0)) or 0
+                                    item['user_rating_count'] = int(rating_info.get('user_rating_count', 0)) or 0
+                            
+                            logger.info(f"✅ App Store: {len(rating_dict)}件のアプリの評価情報を取得しました")
+                        else:
+                            logger.warning(f"⚠️ App Store: 評価情報の取得に失敗しました (status: {lookup_response.status_code})")
+                    except Exception as e:
+                        logger.warning(f"⚠️ App Store: 評価情報取得エラー: {e}")
+                        # 評価情報が取得できなくても続行
                 
                 # データベースにキャッシュ
                 if formatted_data:

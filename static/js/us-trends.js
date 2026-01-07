@@ -1444,15 +1444,12 @@ function displayPodcastResults(data) {
         row.className = 'trend-card';
         const title = item.title || 'N/A';
         const publisher = item.publisher || 'N/A';
-        // genreフィールドがない場合はcountryやlanguageを使用
-        const genre = item.genre || item.country || item.language || 'N/A';
         const url = item.url || item.listennotes_url || '#';
         
         row.innerHTML = `
             <td><span class="badge" style="background-color: #8b5cf6; color: white;">${index + 1}</span></td>
             <td><a href="${url}" target="_blank"><strong>${title}</strong></a></td>
             <td>${publisher}</td>
-            <td><span class="badge bg-secondary">${genre}</span></td>
         `;
         tableBody.appendChild(row);
     });

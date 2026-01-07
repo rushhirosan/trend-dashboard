@@ -86,7 +86,7 @@ class CNNTrendsManager:
                 if not force_refresh:
                     logger.warning("⚠️ CNN: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
                     return {
-                        'success': False,
+                        'success': True,  # エラーではなく、データがない状態として扱う
                         'data': [],
                         'status': 'cache_not_found',
                         'source': 'database_cache',

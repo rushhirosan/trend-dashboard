@@ -111,7 +111,7 @@ class BookTrendsManager:
                         'status': 'cache_not_found',
                         'source': 'database_cache',
                         'country': 'JP',
-                        'success': False,
+                        'success': True,  # エラーではなく、データがない状態として扱う
                         'error': 'キャッシュにデータがありません'
                     }
                 # force_refresh=trueの場合のみ外部APIを呼び出す
@@ -321,7 +321,7 @@ class BookTrendsManager:
                         'status': 'cache_not_found',
                         'source': 'database_cache',
                         'country': 'US',
-                        'success': False,
+                        'success': True,  # エラーではなく、データがない状態として扱う
                         'error': 'キャッシュにデータがありません'
                     }
                 # force_refresh=trueの場合のみ外部APIを呼び出す

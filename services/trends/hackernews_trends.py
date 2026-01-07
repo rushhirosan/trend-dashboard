@@ -58,7 +58,7 @@ class HackerNewsTrendsManager:
                 if not force_refresh:
                     logger.warning("⚠️ Hacker News: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
                     return {
-                        'success': False,
+                        'success': True,  # エラーではなく、データがない状態として扱う
                         'data': [],
                         'status': 'cache_not_found',
                         'source': 'database_cache',

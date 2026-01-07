@@ -14,8 +14,8 @@ class HackerNewsTrendsManager:
         """初期化"""
         self.base_url = "https://hacker-news.firebaseio.com/v0"
         self.db = TrendsCache()
-        # レート制限: Hacker News APIは特に制限なしだが、保守的に10リクエスト/分に設定
-        self.rate_limiter = get_rate_limiter('hackernews', max_requests=10, window_seconds=60)
+        # レート制限: Hacker News APIは特に制限なしだが、25件取得するために26リクエスト必要なので30リクエスト/分に設定
+        self.rate_limiter = get_rate_limiter('hackernews', max_requests=30, window_seconds=60)
         
         logger.info(f"Hacker News Trends Manager初期化:")
         logger.info(f"  Base URL: {self.base_url}")

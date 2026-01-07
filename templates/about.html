@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- SEO Meta Tags -->
+    <title>このサイトについて - トレンドダッシュボード</title>
+    <meta name="description" content="日本と米国の最新トレンド情報を表示するシンプルなトレンドダッシュボード。Google Trends、YouTube、GitHub、ニュースRSSフィード、セキュリティ注意喚起などの公開データを集約。1日2回更新。">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://trends-dashboard.fly.dev/about">
+    
+    <!-- Performance Optimization: Preconnect -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin>
+    
+    <!-- Google Analytics (GA4) -->
+    {% if config.get('GOOGLE_ANALYTICS_ID') %}
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ config.GOOGLE_ANALYTICS_ID }}"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', '{{ config.GOOGLE_ANALYTICS_ID }}');
+    </script>
+    {% endif %}
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-bottom" id="mainHeader">
+        <div class="container-fluid px-3">
+            <div class="d-flex align-items-center justify-content-between py-2">
+                <div class="header-title">
+                    <i class="fas fa-info-circle header-title-icon"></i>
+                    <h1 class="h4 mb-0 header-title-text">このサイトについて</h1>
+                </div>
+                <div class="d-flex align-items-center">
+                    <a href="/" class="btn header-nav-btn">
+                        <i class="fas fa-chart-line"></i> 日本トレンド
+                    </a>
+                    <a href="/us" class="btn header-nav-btn">
+                        <i class="fas fa-chart-line"></i> USトレンド
+                    </a>
+                    <a href="/data-status" class="btn header-nav-btn">
+                        <i class="fas fa-clock"></i> データ鮮度
+                    </a>
+                    <a href="/subscription" class="btn header-nav-btn">
+                        <i class="fas fa-envelope"></i> サブスク
+                    </a>
+                    <a href="/about" class="btn header-nav-btn active">
+                        <i class="fas fa-info-circle"></i> About
+                    </a>
+                    <a href="/about-en" class="btn header-nav-btn">
+                        <i class="fas fa-globe"></i> English
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container-fluid py-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card shadow-sm">
+                    <div class="card-body p-4">
+                        <!-- 1. このサイトは何か -->
+                        <section class="mb-5">
+                            <h2 class="h4 mb-3">
+                                <i class="fas fa-question-circle text-primary me-2"></i>
+                                このサイトは何か
+                            </h2>
+                            <p class="lead">
+                                このサイトは、現在 <strong>日本と米国</strong> で人気のトレンド情報を表示するシンプルな<strong>トレンドダッシュボード</strong>です。
+                            </p>
+                        </section>
+
+                        <!-- 2. 何を表示しているか -->
+                        <section class="mb-5">
+                            <h2 class="h4 mb-3">
+                                <i class="fas fa-database text-info me-2"></i>
+                                何を表示しているか
+                            </h2>
+                            <p class="mb-3">
+                                以下のソースから<strong>公開データ</strong>を集約しています：
+                            </p>
+                            <ul class="list-unstyled ms-3">
+                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i> Google Trends</li>
+                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i> YouTube</li>
+                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i> GitHub</li>
+                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i> ニュース・メディアのRSSフィード</li>
+                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i> <strong>セキュリティトレンド</strong>（CISA、IPA、JPCERT/CC）</li>
+                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i> App Store / Play Store</li>
+                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i> 株価・仮想通貨市場</li>
+                            </ul>
+                            <p class="mb-0">
+                                データは <strong>1日2回更新</strong> されます（7時と14時 JST）。
+                            </p>
+                        </section>
+
+                        <!-- 3. どう使えばいいか -->
+                        <section class="mb-5">
+                            <h2 class="h4 mb-3">
+                                <i class="fas fa-lightbulb text-warning me-2"></i>
+                                どう使えばいいか
+                            </h2>
+                            <p>
+                                この<strong>トレンドダッシュボード</strong>は、素早い発見と概要把握を目的としています。
+                                網羅的またはリアルタイムのデータ提供を目指すものではありません。
+                            </p>
+                        </section>
+
+                        <!-- 4. 運営者について -->
+                        <section class="mb-0">
+                            <h2 class="h4 mb-3">
+                                <i class="fas fa-user text-secondary me-2"></i>
+                                運営者について
+                            </h2>
+                            <p class="mb-0">
+                                これは個人の独立プロジェクトです。
+                                ご利用いただき、フィードバックやサポートをいただければ幸いです。
+                            </p>
+                        </section>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white border-top mt-5 py-4">
+        <div class="container-fluid px-3">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5 class="h6 mb-3">トレンドダッシュボード</h5>
+                    <p class="text-muted small mb-2">日本と米国の最新トレンド情報を表示するシンプルなトレンドダッシュボード。1日2回更新され、様々なソースからの公開データを提供します。</p>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="h6 mb-3">主要ページ</h6>
+                    <ul class="list-unstyled small">
+                        <li class="mb-2"><a href="/" class="text-decoration-none text-muted">🇯🇵 日本トレンド</a></li>
+                        <li class="mb-2"><a href="/us" class="text-decoration-none text-muted">🇺🇸 USトレンド</a></li>
+                        <li class="mb-2"><a href="/data-status" class="text-decoration-none text-muted">📊 データ鮮度情報</a></li>
+                        <li class="mb-2"><a href="/subscription" class="text-decoration-none text-muted">📧 メールサブスクリプション</a></li>
+                        <li class="mb-2"><a href="/about" class="text-decoration-none text-muted">ℹ️ このサイトについて</a></li>
+                    </ul>
+                </div>
+            </div>
+            <hr class="my-3">
+            <div class="text-center text-muted small">
+                <p class="mb-0">&copy; 2025 トレンドダッシュボード. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
+

@@ -215,6 +215,34 @@ def create_app():
         logger.error(f"❌ /data-status ルート定義エラー: {e}", exc_info=True)
     
     try:
+        @app.route('/about')
+        def about():
+            """Aboutページ（日本語版）"""
+            try:
+                # Google Analytics IDをテンプレートに渡す
+                ga_id = app.config.get('GOOGLE_ANALYTICS_ID')
+                return render_template('about.html', config={'GOOGLE_ANALYTICS_ID': ga_id})
+            except Exception as e:
+                logger.error(f"❌ Aboutページレンダリングエラー: {e}", exc_info=True)
+                return f"Error rendering about page: {e}", 500
+    except Exception as e:
+        logger.error(f"❌ /about ルート定義エラー: {e}", exc_info=True)
+    
+    try:
+        @app.route('/about-en')
+        def about_en():
+            """Aboutページ（英語版）"""
+            try:
+                # Google Analytics IDをテンプレートに渡す
+                ga_id = app.config.get('GOOGLE_ANALYTICS_ID')
+                return render_template('about-en.html', config={'GOOGLE_ANALYTICS_ID': ga_id})
+            except Exception as e:
+                logger.error(f"❌ About-enページレンダリングエラー: {e}", exc_info=True)
+                return f"Error rendering about-en page: {e}", 500
+    except Exception as e:
+        logger.error(f"❌ /about-en ルート定義エラー: {e}", exc_info=True)
+    
+    try:
         @app.route('/robots.txt')
         def robots_txt():
             """robots.txtを返す"""

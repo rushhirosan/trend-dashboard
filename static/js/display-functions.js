@@ -1,5 +1,27 @@
 // 結果表示関数群に関するJavaScriptファイル
 
+// 共通の日時フォーマット関数（USトレンドページでも使用）
+function formatDate(dateString, locale = 'ja-JP') {
+    if (!dateString) return 'N/A';
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return dateString;
+        return new Intl.DateTimeFormat(locale, {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        }).format(date);
+    } catch (e) {
+        return dateString;
+    }
+}
+
+// 共通のテキスト切り詰め関数（USトレンドページでも使用）
+function truncateText(text, maxLength = 100) {
+    if (!text) return '';
+    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+}
+
 // はてなブックマーク結果表示関数
 function displayHatenaResults(data) {
     console.log('📊 Hatena Results表示開始', data);

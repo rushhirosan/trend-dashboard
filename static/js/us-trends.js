@@ -1955,6 +1955,88 @@ function showProductHuntError(message) {
     }
 }
 
+// GitHub Trends cache data loading for US
+function loadGitHubTrendsFromCacheUS() {
+    console.log('📊 GitHub Trends cache data loading for US');
+    
+    const loadingElement = document.getElementById('githubLoading');
+    const resultsElement = document.getElementById('githubResults');
+    
+    if (loadingElement) loadingElement.style.display = 'block';
+    if (resultsElement) resultsElement.style.display = 'none';
+    
+    fetchWithRetry('/api/github-trends?limit=25&force_refresh=false')
+        .then(response => {
+            console.log('GitHub Trends API response:', response.status, response.ok);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('GitHub Trends API data:', data);
+            if (loadingElement) loadingElement.style.display = 'none';
+            if (resultsElement) resultsElement.style.display = 'block';
+            
+            if (data.success && data.data && data.data.length > 0) {
+                console.log('GitHub Trends data display starting');
+                if (typeof displayGitHubResults === 'function') {
+                    displayGitHubResults(data);
+                } else {
+                    console.error('displayGitHubResults function not found');
+                }
+            } else {
+                console.log('GitHub Trends data not found or error:', data);
+            }
+        })
+        .catch(error => {
+            console.error('GitHub Trends cache loading error:', error);
+            if (loadingElement) loadingElement.style.display = 'none';
+            if (resultsElement) resultsElement.style.display = 'block';
+        });
+}
+
+// App Store Trends cache data loading for US
+function loadAppStoreTrendsFromCacheUS() {
+    console.log('📊 App Store Trends cache data loading for US');
+    
+    const loadingElement = document.getElementById('appstoreLoading');
+    const resultsElement = document.getElementById('appstoreResults');
+    
+    if (loadingElement) loadingElement.style.display = 'block';
+    if (resultsElement) resultsElement.style.display = 'none';
+    
+    fetchWithRetry('/api/appstore-trends?country=US&limit=25&force_refresh=false')
+        .then(response => {
+            console.log('App Store Trends API response:', response.status, response.ok);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('App Store Trends API data:', data);
+            if (loadingElement) loadingElement.style.display = 'none';
+            if (resultsElement) resultsElement.style.display = 'block';
+            
+            if (data.success && data.data && data.data.length > 0) {
+                console.log('App Store Trends data display starting');
+                if (typeof displayAppStoreResults === 'function') {
+                    displayAppStoreResults(data);
+                } else {
+                    console.error('displayAppStoreResults function not found');
+                }
+            } else {
+                console.log('App Store Trends data not found or error:', data);
+            }
+        })
+        .catch(error => {
+            console.error('App Store Trends cache loading error:', error);
+            if (loadingElement) loadingElement.style.display = 'none';
+            if (resultsElement) resultsElement.style.display = 'block';
+        });
+}
+
 // Page initialization
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🇺🇸 US Trends page initialization');

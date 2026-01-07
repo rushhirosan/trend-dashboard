@@ -1,7 +1,7 @@
 import os
 import re
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from database_config import TrendsCache
 from utils.logger_config import get_logger
 from utils.rate_limiter import get_rate_limiter
@@ -38,10 +38,10 @@ class CNNTrendsManager:
                 # キャッシュから取得したデータにも重複排除を適用
                 cached_data = self._remove_duplicates(cached_data)
                 
-                # 古いデータをフィルタリング（2024年以降のデータのみ）
-                # 注: CNN RSSフィードが2023年の古いデータを返すことがあるため、2024年以降のデータのみを表示
-                # 2023年以前のデータは除外
-                min_year = 2024
+                # 古いデータをフィルタリング（過去7日間のデータのみ）
+                # 最新の記事のみを表示するため、過去7日間のデータのみをフィルタリング
+                today = datetime.now()
+                cutoff_date = today - timedelta(days=7)
                 filtered_cached_data = []
                 for item in cached_data:
                     published_date_str = item.get('published_date')
@@ -52,8 +52,8 @@ class CNNTrendsManager:
                                 published_date = datetime.fromisoformat(published_date_str.replace('Z', '+00:00'))
                                 # タイムゾーン情報を削除して比較
                                 published_date = published_date.replace(tzinfo=None)
-                                # 2024年以降のデータのみを表示
-                                if published_date.year >= min_year:
+                                # 過去7日間のデータのみを表示
+                                if published_date >= cutoff_date:
                                     filtered_cached_data.append(item)
                         except Exception as e:
                             logger.debug(f"⚠️ キャッシュデータの日付パースエラー: {published_date_str} - {e}")
@@ -61,7 +61,7 @@ class CNNTrendsManager:
                             continue
                 
                 if len(filtered_cached_data) == 0:
-                    logger.warning(f"⚠️ CNN: キャッシュに{min_year}年以降の記事がありません。NewsAPIを呼び出します")
+                    logger.warning(f"⚠️ CNN: キャッシュに過去7日間の記事がありません。NewsAPIを呼び出します")
                     return self._fetch_cnn_trends(limit)
                 
                 # 公開日でソート（新しい順）
@@ -116,6 +116,11 @@ class CNNTrendsManager:
         try:
             logger.info(f"📰 NewsAPIからCNN記事を取得開始")
             
+            # 最新の記事を取得するため、日付フィルタを追加
+            # 過去7日間の記事を取得（最新データを確実に取得）
+            today = datetime.now()
+            from_date = today - timedelta(days=7)
+            
             # NewsAPIのeverythingエンドポイントでCNNソースを指定
             # 英語版のCNN記事を優先的に取得
             url = f"{self.news_api_base_url}/everything"
@@ -124,6 +129,8 @@ class CNNTrendsManager:
                 'pageSize': limit,
                 'sortBy': 'publishedAt',
                 'language': 'en',  # 英語版を優先
+                'from': from_date.strftime('%Y-%m-%dT%H:%M:%S'),  # 過去7日間の開始日
+                'to': today.strftime('%Y-%m-%dT%H:%M:%S'),  # 今日まで
                 'apiKey': self.news_api_key
             }
             

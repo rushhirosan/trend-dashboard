@@ -405,6 +405,94 @@ function displayJPCERTResults(data) {
     console.log('✅ JPCERT/CC Results表示完了');
 }
 
+// Zenn結果表示関数
+function displayZennResults(data) {
+    console.log('📊 Zenn Results表示開始', data);
+    const tableBody = document.getElementById('zennTrendsTableBody');
+    const statusMessage = document.getElementById('zennStatusMessage');
+    
+    if (!tableBody) {
+        console.error('❌ Zenn DOM要素が見つかりません');
+        return;
+    }
+    
+    if (statusMessage) {
+        statusMessage.style.display = 'none !important';
+    }
+    
+    tableBody.innerHTML = '';
+    if (data.data && data.data.length > 0) {
+        data.data.forEach((item, index) => {
+            const row = document.createElement('tr');
+            row.className = 'trend-card';
+            
+            const title = item.title || 'N/A';
+            const url = item.url || '#';
+            const publishedDate = item.published_date ? formatDate(item.published_date) : 'N/A';
+            
+            row.innerHTML = `
+                <td><span class="badge bg-primary">${item.rank || index + 1}</span></td>
+                <td>
+                    <strong><a href="${url}" target="_blank">${title}</a></strong>
+                    ${item.description ? `<br><small class="text-muted">${truncateText(item.description, 100)}</small>` : ''}
+                </td>
+                <td>${publishedDate}</td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+    
+    const resultsElement = document.getElementById('zennResults');
+    if (resultsElement) {
+        resultsElement.style.display = 'block';
+    }
+    console.log('✅ Zenn Results表示完了');
+}
+
+// Note結果表示関数
+function displayNoteResults(data) {
+    console.log('📊 Note Results表示開始', data);
+    const tableBody = document.getElementById('noteTrendsTableBody');
+    const statusMessage = document.getElementById('noteStatusMessage');
+    
+    if (!tableBody) {
+        console.error('❌ Note DOM要素が見つかりません');
+        return;
+    }
+    
+    if (statusMessage) {
+        statusMessage.style.display = 'none !important';
+    }
+    
+    tableBody.innerHTML = '';
+    if (data.data && data.data.length > 0) {
+        data.data.forEach((item, index) => {
+            const row = document.createElement('tr');
+            row.className = 'trend-card';
+            
+            const title = item.title || 'N/A';
+            const url = item.url || '#';
+            const publishedDate = item.published_date ? formatDate(item.published_date) : 'N/A';
+            
+            row.innerHTML = `
+                <td><span class="badge bg-secondary">${item.rank || index + 1}</span></td>
+                <td>
+                    <strong><a href="${url}" target="_blank">${title}</a></strong>
+                    ${item.description ? `<br><small class="text-muted">${truncateText(item.description, 100)}</small>` : ''}
+                </td>
+                <td>${publishedDate}</td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+    
+    const resultsElement = document.getElementById('noteResults');
+    if (resultsElement) {
+        resultsElement.style.display = 'block';
+    }
+    console.log('✅ Note Results表示完了');
+}
+
 // CISA KEV結果表示関数
 function displayCISAKEVResults(data) {
     console.log('📊 CISA KEV Results表示開始', data);

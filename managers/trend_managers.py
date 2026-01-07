@@ -29,6 +29,8 @@ from services.trends.thehackernews_trends import TheHackerNewsTrendsManager
 from services.trends.ipa_trends import IPATrendsManager
 from services.trends.jpcert_trends import JPCERTTrendsManager
 from services.trends.hackernoon_trends import HackerNoonTrendsManager
+from services.trends.zenn_trends import ZennTrendsManager
+from services.trends.note_trends import NoteTrendsManager
 from utils.logger_config import get_logger
 
 # ロガーの初期化
@@ -62,6 +64,8 @@ MANAGER_CONFIGS = [
     ('ipa', IPATrendsManager, 'IPA'),
     ('jpcert', JPCERTTrendsManager, 'JPCERT/CC'),
     ('hackernoon', HackerNoonTrendsManager, 'Hacker Noon'),
+    ('zenn', ZennTrendsManager, 'Zenn'),
+    ('note', NoteTrendsManager, 'Note'),
 ]
 
 
@@ -178,6 +182,8 @@ def refresh_all_trends(managers, force_refresh=True):
     call_manager('appstore', lambda m: m.get_trends(country='JP', category='all', limit=25, force_refresh=force_refresh), 'JP')
     call_manager('ipa', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP')
     call_manager('jpcert', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP')
+    call_manager('zenn', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP')
+    call_manager('note', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP')
     
     # USのデータを更新
     logger.info("🇺🇸 USのデータを更新中...")

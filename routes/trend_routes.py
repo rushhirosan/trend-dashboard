@@ -620,3 +620,31 @@ def get_hackernoon_trends(manager):
         
     except Exception as e:
         return handle_api_error('Hacker Noon Trends', e)
+
+@trend_bp.route('/zenn-trends')
+@require_manager('zenn')
+def get_zenn_trends(manager):
+    """Zenn Trends APIエンドポイント"""
+    try:
+        limit = int(request.args.get('limit', 25))
+        force_refresh = get_force_refresh()
+        
+        result = manager.get_trends(limit=limit, force_refresh=force_refresh)
+        return handle_trend_response(result, 'Zenn', 'Zenn RSS')
+        
+    except Exception as e:
+        return handle_api_error('Zenn Trends', e)
+
+@trend_bp.route('/note-trends')
+@require_manager('note')
+def get_note_trends(manager):
+    """Note Trends APIエンドポイント"""
+    try:
+        limit = int(request.args.get('limit', 25))
+        force_refresh = get_force_refresh()
+        
+        result = manager.get_trends(limit=limit, force_refresh=force_refresh)
+        return handle_trend_response(result, 'Note', 'Note RSS')
+        
+    except Exception as e:
+        return handle_api_error('Note Trends', e)

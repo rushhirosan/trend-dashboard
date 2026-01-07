@@ -40,6 +40,8 @@ function loadCachedDataExternal() {
         loadBookTrendsFromCache,
         loadIPATrendsFromCache,
         loadJPCERTTrendsFromCache,
+        loadZennTrendsFromCache,
+        loadNoteTrendsFromCache,
         loadGitHubTrendsFromCache,
         loadAppStoreTrendsFromCache,
         loadRakutenTrendsFromCache,
@@ -1226,6 +1228,120 @@ function loadJPCERTTrendsFromCache() {
                 loadingElement.style.display = 'none';
             }
             const resultsElement = document.getElementById('jpcertResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        });
+}
+
+// Zennキャッシュデータの読み込み
+function loadZennTrendsFromCache() {
+    console.log('📊 Zenn Trends キャッシュデータ読み込み');
+    const loadingElement = document.getElementById('zennLoading');
+    if (loadingElement) {
+        loadingElement.style.display = 'block';
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    fetchWithRetry('/api/zenn-trends?limit=25&force_refresh=false', { signal: controller.signal })
+        .then(response => {
+            clearTimeout(timeoutId);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            console.log('Zenn Trends API レスポンス:', response.status, response.ok);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Zenn Trends API データ:', data);
+            if (data.data && data.data.length > 0) {
+                console.log('Zenn Trends データ表示開始');
+                if (typeof displayZennResults === 'function') {
+                    displayZennResults(data);
+                } else {
+                    console.error('displayZennResults関数が見つかりません');
+                }
+            } else {
+                console.log('Zenn Trends データなしまたはエラー:', data);
+            }
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            const resultsElement = document.getElementById('zennResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error('Zenn Trends キャッシュ読み込みエラー: タイムアウト（30秒）');
+            } else {
+                console.error('Zenn Trends キャッシュ読み込みエラー:', error);
+            }
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            const resultsElement = document.getElementById('zennResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        });
+}
+
+// Noteキャッシュデータの読み込み
+function loadNoteTrendsFromCache() {
+    console.log('📊 Note Trends キャッシュデータ読み込み');
+    const loadingElement = document.getElementById('noteLoading');
+    if (loadingElement) {
+        loadingElement.style.display = 'block';
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    fetchWithRetry('/api/note-trends?limit=25&force_refresh=false', { signal: controller.signal })
+        .then(response => {
+            clearTimeout(timeoutId);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            console.log('Note Trends API レスポンス:', response.status, response.ok);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Note Trends API データ:', data);
+            if (data.data && data.data.length > 0) {
+                console.log('Note Trends データ表示開始');
+                if (typeof displayNoteResults === 'function') {
+                    displayNoteResults(data);
+                } else {
+                    console.error('displayNoteResults関数が見つかりません');
+                }
+            } else {
+                console.log('Note Trends データなしまたはエラー:', data);
+            }
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            const resultsElement = document.getElementById('noteResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error('Note Trends キャッシュ読み込みエラー: タイムアウト（30秒）');
+            } else {
+                console.error('Note Trends キャッシュ読み込みエラー:', error);
+            }
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            const resultsElement = document.getElementById('noteResults');
             if (resultsElement) {
                 resultsElement.style.display = 'block';
             }

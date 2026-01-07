@@ -38,6 +38,8 @@ function loadCachedDataExternal() {
         loadPodcastTrendsFromCache,
         loadMovieTrendsFromCache,
         loadBookTrendsFromCache,
+        loadIPATrendsFromCache,
+        loadJPCERTTrendsFromCache,
         loadGitHubTrendsFromCache,
         loadAppStoreTrendsFromCache,
         loadRakutenTrendsFromCache,
@@ -1110,6 +1112,120 @@ function loadAppStoreTrendsFromCache() {
             }
             // エラー時でも結果エリアを表示（空でも）
             const resultsElement = document.getElementById('appstoreResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        });
+}
+
+// IPA注意喚起キャッシュデータの読み込み
+function loadIPATrendsFromCache() {
+    console.log('📊 IPA Trends キャッシュデータ読み込み');
+    const loadingElement = document.getElementById('ipaLoading');
+    if (loadingElement) {
+        loadingElement.style.display = 'block';
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    fetchWithRetry('/api/ipa-trends?limit=25&force_refresh=false', { signal: controller.signal })
+        .then(response => {
+            clearTimeout(timeoutId);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            console.log('IPA Trends API レスポンス:', response.status, response.ok);
+            return response.json();
+        })
+        .then(data => {
+            console.log('IPA Trends API データ:', data);
+            if (data.data && data.data.length > 0) {
+                console.log('IPA Trends データ表示開始');
+                if (typeof displayIPAResults === 'function') {
+                    displayIPAResults(data);
+                } else {
+                    console.error('displayIPAResults関数が見つかりません');
+                }
+            } else {
+                console.log('IPA Trends データなしまたはエラー:', data);
+            }
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            const resultsElement = document.getElementById('ipaResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error('IPA Trends キャッシュ読み込みエラー: タイムアウト（30秒）');
+            } else {
+                console.error('IPA Trends キャッシュ読み込みエラー:', error);
+            }
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            const resultsElement = document.getElementById('ipaResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        });
+}
+
+// JPCERT/CCキャッシュデータの読み込み
+function loadJPCERTTrendsFromCache() {
+    console.log('📊 JPCERT/CC Trends キャッシュデータ読み込み');
+    const loadingElement = document.getElementById('jpcertLoading');
+    if (loadingElement) {
+        loadingElement.style.display = 'block';
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    fetchWithRetry('/api/jpcert-trends?limit=25&force_refresh=false', { signal: controller.signal })
+        .then(response => {
+            clearTimeout(timeoutId);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            console.log('JPCERT/CC Trends API レスポンス:', response.status, response.ok);
+            return response.json();
+        })
+        .then(data => {
+            console.log('JPCERT/CC Trends API データ:', data);
+            if (data.data && data.data.length > 0) {
+                console.log('JPCERT/CC Trends データ表示開始');
+                if (typeof displayJPCERTResults === 'function') {
+                    displayJPCERTResults(data);
+                } else {
+                    console.error('displayJPCERTResults関数が見つかりません');
+                }
+            } else {
+                console.log('JPCERT/CC Trends データなしまたはエラー:', data);
+            }
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            const resultsElement = document.getElementById('jpcertResults');
+            if (resultsElement) {
+                resultsElement.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error('JPCERT/CC Trends キャッシュ読み込みエラー: タイムアウト（30秒）');
+            } else {
+                console.error('JPCERT/CC Trends キャッシュ読み込みエラー:', error);
+            }
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            const resultsElement = document.getElementById('jpcertResults');
             if (resultsElement) {
                 resultsElement.style.display = 'block';
             }

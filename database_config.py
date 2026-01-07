@@ -69,11 +69,13 @@ class TrendsCache:
                 # Fly.ioのPostgreSQLは接続を閉じる可能性があるため、より積極的なキープアライブ設定を使用
                 self.connection = psycopg2.connect(
                     database_url,
-                    connect_timeout=10,  # 10秒に延長（並列リクエスト時の接続確立時間を考慮）
+                    connect_timeout=15,  # 15秒に延長（データベース再起動時の接続確立時間を考慮）
                     keepalives=1,
-                    keepalives_idle=10,  # 10秒でキープアライブを開始
-                    keepalives_interval=5,  # 5秒間隔でキープアライブを送信
-                    keepalives_count=5  # 5回失敗まで許容
+                    keepalives_idle=30,  # 30秒でキープアライブを開始（Fly.ioの接続タイムアウトを考慮）
+                    keepalives_interval=10,  # 10秒間隔でキープアライブを送信
+                    keepalives_count=3,  # 3回失敗まで許容
+                    # 接続プールの設定
+                    options='-c statement_timeout=30000'  # 30秒でタイムアウト
                 )
                 # 自動コミットを無効化（トランザクション制御のため）
                 self.connection.autocommit = False
@@ -456,6 +458,66 @@ class TrendsCache:
                     large TEXT,
                     rank INTEGER,
                     updated_at TIMESTAMP,
+                    cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                
+                CREATE TABLE IF NOT EXISTS cisa_kev_trends_cache (
+                    id SERIAL PRIMARY KEY,
+                    cve_id VARCHAR(100) NOT NULL,
+                    vendor_project VARCHAR(255),
+                    product VARCHAR(255),
+                    vulnerability_name TEXT,
+                    date_added VARCHAR(50),
+                    date_required VARCHAR(50),
+                    due_date VARCHAR(50),
+                    short_description TEXT,
+                    required_action TEXT,
+                    notes TEXT,
+                    rank INTEGER DEFAULT 0,
+                    cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                
+                CREATE TABLE IF NOT EXISTS thehackernews_trends_cache (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    url TEXT,
+                    published_date TIMESTAMP WITH TIME ZONE,
+                    description TEXT,
+                    author VARCHAR(255),
+                    rank INTEGER DEFAULT 0,
+                    cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                
+                CREATE TABLE IF NOT EXISTS ipa_trends_cache (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    url TEXT,
+                    published_date TIMESTAMP WITH TIME ZONE,
+                    description TEXT,
+                    author VARCHAR(255),
+                    rank INTEGER DEFAULT 0,
+                    cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                
+                CREATE TABLE IF NOT EXISTS jpcert_trends_cache (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    url TEXT,
+                    published_date TIMESTAMP WITH TIME ZONE,
+                    description TEXT,
+                    author VARCHAR(255),
+                    rank INTEGER DEFAULT 0,
+                    cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                
+                CREATE TABLE IF NOT EXISTS hackernoon_trends_cache (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    url TEXT,
+                    published_date TIMESTAMP WITH TIME ZONE,
+                    description TEXT,
+                    author VARCHAR(255),
+                    rank INTEGER DEFAULT 0,
                     cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
@@ -894,16 +956,33 @@ class TrendsCache:
         max_retries = 3  # リトライ回数を3に増加（並列リクエスト時の接続確立を考慮）
         retry_delay = 0.5  # 待機時間を0.5秒に設定（接続確立の余裕を持たせる）
 
-        # 接続が既に存在し、閉じられていない場合は即座に返す（ロック不要、SELECT 1チェックも省略）
-        # 接続が無効な場合は、クエリ実行時にエラーが発生するので、その時点で再接続する
+        # 接続が既に存在する場合でも、有効性を確認（接続が予期せず閉じられる問題に対応）
         if self.connection and not self.connection.closed:
-            return self.connection
+            try:
+                # 接続が有効かどうかを簡単なクエリで確認（ブロッキングを最小限に）
+                with self.connection.cursor() as cursor:
+                    cursor.execute("SELECT 1")
+                    cursor.fetchone()
+                return self.connection
+            except (psycopg2.InterfaceError, psycopg2.OperationalError, AttributeError):
+                # 接続が無効な場合は再接続
+                logger.warning("⚠️ データベース接続が無効です。再接続します")
+                self.connection = None
 
         # ロックを取得して、同時アクセスを防ぐ（再接続時のみ）
         with _connection_lock:
             # ロック取得後、再度チェック（他のスレッドが既に接続を確立した可能性がある）
             if self.connection and not self.connection.closed:
-                return self.connection
+                # 接続が有効かどうかを簡単なクエリで確認
+                try:
+                    with self.connection.cursor() as cursor:
+                        cursor.execute("SELECT 1")
+                        cursor.fetchone()
+                    return self.connection
+                except (psycopg2.InterfaceError, psycopg2.OperationalError, AttributeError):
+                    # 接続が無効な場合は再接続
+                    logger.warning("⚠️ データベース接続が無効です。再接続します")
+                    self.connection = None
 
             for attempt in range(max_retries):
                 try:
@@ -915,17 +994,18 @@ class TrendsCache:
                             # 接続が閉じられているか確認
                             if self.connection.closed:
                                 self.connect()
-                            # 接続が有効かどうかは、実際のクエリ実行時にエラーが発生したら再接続する
-                            # SELECT 1による事前確認は削除（ブロッキングの原因となるため）
+                            # 接続が有効かどうかを簡単なクエリで確認
+                            with self.connection.cursor() as cursor:
+                                cursor.execute("SELECT 1")
+                                cursor.fetchone()
                         except (psycopg2.InterfaceError, psycopg2.OperationalError, AttributeError) as e:
                             # 接続エラーの場合は再接続
                             logger.warning(f"⚠️ データベース接続エラー検出、再接続します: {e}")
+                            self.connection = None
                             self.connect()
                     
-                    # 接続が確立されたか確認（SELECT 1による確認は削除）
+                    # 接続が確立されたか確認
                     if self.connection and not self.connection.closed:
-                        # 接続が有効かどうかは、実際のクエリ実行時にエラーが発生したら再接続する
-                        # 事前確認を削除することで、ブロッキングを防ぐ
                         return self.connection
                 except Exception as e:
                     # 予期しないエラーの場合も再試行
@@ -971,7 +1051,9 @@ class TrendsCache:
                 self.connection = None
                 if attempt < max_retries - 1:
                     import time
-                    time.sleep(0.3)  # 短い待機時間を入れてから再接続を試みる
+                    # 待機時間を段階的に増やす（1回目: 0.5秒、2回目: 1秒）
+                    wait_time = 0.5 * (attempt + 1)
+                    time.sleep(wait_time)
                     continue
                 else:
                     logger.error(f"❌ データベース接続エラー（最大試行回数）: {e}")
@@ -3377,6 +3459,514 @@ class TrendsCache:
                 pass
             return False
     
+    # CISA KEV Trends キャッシュメソッド
+    def save_cisa_kev_trends_to_cache(self, data):
+        """CISA KEV Trendsデータをキャッシュに保存"""
+        if not data:
+            return False
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return False
+        except Exception as e:
+            logger.error(f"❌ cisa_kev_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
+            return False
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM cisa_kev_trends_cache")
+                for item in data:
+                    cursor.execute("""
+                        INSERT INTO cisa_kev_trends_cache 
+                        (cve_id, vendor_project, product, vulnerability_name, date_added, date_required, 
+                         due_date, short_description, required_action, notes, rank)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        item.get('cve_id', ''),
+                        item.get('vendor_project', ''),
+                        item.get('product', ''),
+                        item.get('vulnerability_name', ''),
+                        item.get('date_added', ''),
+                        item.get('date_required', ''),
+                        item.get('due_date', ''),
+                        item.get('short_description', ''),
+                        item.get('required_action', ''),
+                        item.get('notes', ''),
+                        item.get('rank', 0)
+                    ))
+                
+                # キャッシュステータスを更新
+                import pytz
+                jst = pytz.timezone('Asia/Tokyo')
+                now_jst = datetime.now(jst)
+                cursor.execute(
+                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                    ('cisa_kev_trends', now_jst, len(data), now_jst, len(data))
+                )
+                
+                conn.commit()
+                logger.info(f"✅ cisa_kev_trendsキャッシュを保存しました ({len(data)}件)")
+                return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ cisa_kev_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ cisa_kev_trendsキャッシュ保存エラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
+            return False
+
+    def get_cisa_kev_trends_from_cache(self):
+        """CISA KEV Trendsデータをキャッシュから取得"""
+        def query_func(conn):
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT cve_id, vendor_project, product, vulnerability_name, date_added, date_required,
+                           due_date, short_description, required_action, notes, rank, cached_at
+                    FROM cisa_kev_trends_cache 
+                    ORDER BY rank
+                """)
+                return [dict(row) for row in cursor.fetchall()]
+        
+        return self._execute_with_retry(query_func)
+
+    def clear_cisa_kev_trends_cache(self):
+        """CISA KEV Trendsキャッシュをクリア"""
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return False
+        except Exception as e:
+            logger.error(f"❌ cisa_kev_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
+            return False
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM cisa_kev_trends_cache")
+                conn.commit()
+                logger.info(f"✅ cisa_kev_trendsのキャッシュをクリアしました")
+                return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ cisa_kev_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ cisa_kev_trendsキャッシュクリアエラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
+            return False
+
+    # The Hacker News Trends キャッシュメソッド
+    def save_thehackernews_trends_to_cache(self, data):
+        """The Hacker News Trendsデータをキャッシュに保存"""
+        if not data:
+            return False
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return False
+        except Exception as e:
+            logger.error(f"❌ thehackernews_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
+            return False
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM thehackernews_trends_cache")
+                for item in data:
+                    cursor.execute("""
+                        INSERT INTO thehackernews_trends_cache 
+                        (title, url, published_date, description, author, rank)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (
+                        item.get('title', ''),
+                        item.get('url', ''),
+                        item.get('published_date'),
+                        item.get('description', ''),
+                        item.get('author', ''),
+                        item.get('rank', 0)
+                    ))
+                
+                # キャッシュステータスを更新
+                import pytz
+                jst = pytz.timezone('Asia/Tokyo')
+                now_jst = datetime.now(jst)
+                cursor.execute(
+                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                    ('thehackernews_trends', now_jst, len(data), now_jst, len(data))
+                )
+                
+                conn.commit()
+                logger.info(f"✅ thehackernews_trendsキャッシュを保存しました ({len(data)}件)")
+                return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ thehackernews_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ thehackernews_trendsキャッシュ保存エラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
+            return False
+
+    def get_thehackernews_trends_from_cache(self):
+        """The Hacker News Trendsデータをキャッシュから取得"""
+        def query_func(conn):
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT title, url, published_date, description, author, rank, cached_at
+                    FROM thehackernews_trends_cache 
+                    ORDER BY rank
+                """)
+                data = cursor.fetchall()
+                result = []
+                for row in data:
+                    row_dict = dict(row)
+                    # published_dateをISO形式の文字列に変換
+                    if row_dict.get('published_date'):
+                        if isinstance(row_dict['published_date'], datetime):
+                            row_dict['published_date'] = row_dict['published_date'].isoformat()
+                    result.append(row_dict)
+                return result
+        
+        return self._execute_with_retry(query_func)
+
+    def clear_thehackernews_trends_cache(self):
+        """The Hacker News Trendsキャッシュをクリア"""
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return False
+        except Exception as e:
+            logger.error(f"❌ thehackernews_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
+            return False
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM thehackernews_trends_cache")
+                conn.commit()
+                logger.info(f"✅ thehackernews_trendsのキャッシュをクリアしました")
+                return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ thehackernews_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ thehackernews_trendsキャッシュクリアエラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
+            return False
+
+    # IPA Trends キャッシュメソッド
+    def save_ipa_trends_to_cache(self, data):
+        """IPA Trendsデータをキャッシュに保存"""
+        if not data:
+            return False
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return False
+        except Exception as e:
+            logger.error(f"❌ ipa_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
+            return False
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM ipa_trends_cache")
+                for item in data:
+                    cursor.execute("""
+                        INSERT INTO ipa_trends_cache 
+                        (title, url, published_date, description, author, rank)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (
+                        item.get('title', ''),
+                        item.get('url', ''),
+                        item.get('published_date'),
+                        item.get('description', ''),
+                        item.get('author', ''),
+                        item.get('rank', 0)
+                    ))
+                
+                # キャッシュステータスを更新
+                import pytz
+                jst = pytz.timezone('Asia/Tokyo')
+                now_jst = datetime.now(jst)
+                cursor.execute(
+                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                    ('ipa_trends', now_jst, len(data), now_jst, len(data))
+                )
+                
+                conn.commit()
+                logger.info(f"✅ ipa_trendsキャッシュを保存しました ({len(data)}件)")
+                return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ ipa_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ ipa_trendsキャッシュ保存エラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
+            return False
+
+    def get_ipa_trends_from_cache(self):
+        """IPA Trendsデータをキャッシュから取得"""
+        def query_func(conn):
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT title, url, published_date, description, author, rank, cached_at
+                    FROM ipa_trends_cache 
+                    ORDER BY rank
+                """)
+                data = cursor.fetchall()
+                result = []
+                for row in data:
+                    row_dict = dict(row)
+                    # published_dateをISO形式の文字列に変換
+                    if row_dict.get('published_date'):
+                        if isinstance(row_dict['published_date'], datetime):
+                            row_dict['published_date'] = row_dict['published_date'].isoformat()
+                    result.append(row_dict)
+                return result
+        
+        return self._execute_with_retry(query_func)
+
+    def clear_ipa_trends_cache(self):
+        """IPA Trendsキャッシュをクリア"""
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return False
+        except Exception as e:
+            logger.error(f"❌ ipa_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
+            return False
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM ipa_trends_cache")
+                conn.commit()
+                logger.info(f"✅ ipa_trendsのキャッシュをクリアしました")
+                return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ ipa_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ ipa_trendsキャッシュクリアエラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
+            return False
+
+    # JPCERT/CC Trends キャッシュメソッド
+    def save_jpcert_trends_to_cache(self, data):
+        """JPCERT/CC Trendsデータをキャッシュに保存"""
+        if not data:
+            return False
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return False
+        except Exception as e:
+            logger.error(f"❌ jpcert_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
+            return False
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM jpcert_trends_cache")
+                for item in data:
+                    cursor.execute("""
+                        INSERT INTO jpcert_trends_cache 
+                        (title, url, published_date, description, author, rank)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (
+                        item.get('title', ''),
+                        item.get('url', ''),
+                        item.get('published_date'),
+                        item.get('description', ''),
+                        item.get('author', ''),
+                        item.get('rank', 0)
+                    ))
+                
+                # キャッシュステータスを更新
+                import pytz
+                jst = pytz.timezone('Asia/Tokyo')
+                now_jst = datetime.now(jst)
+                cursor.execute(
+                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                    ('jpcert_trends', now_jst, len(data), now_jst, len(data))
+                )
+                
+                conn.commit()
+                logger.info(f"✅ jpcert_trendsキャッシュを保存しました ({len(data)}件)")
+                return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ jpcert_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ jpcert_trendsキャッシュ保存エラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
+            return False
+
+    def get_jpcert_trends_from_cache(self):
+        """JPCERT/CC Trendsデータをキャッシュから取得"""
+        def query_func(conn):
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT title, url, published_date, description, author, rank, cached_at
+                    FROM jpcert_trends_cache 
+                    ORDER BY rank
+                """)
+                data = cursor.fetchall()
+                result = []
+                for row in data:
+                    row_dict = dict(row)
+                    # published_dateをISO形式の文字列に変換
+                    if row_dict.get('published_date'):
+                        if isinstance(row_dict['published_date'], datetime):
+                            row_dict['published_date'] = row_dict['published_date'].isoformat()
+                    result.append(row_dict)
+                return result
+        
+        return self._execute_with_retry(query_func)
+
+    def clear_jpcert_trends_cache(self):
+        """JPCERT/CC Trendsキャッシュをクリア"""
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return False
+        except Exception as e:
+            logger.error(f"❌ jpcert_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
+            return False
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM jpcert_trends_cache")
+                conn.commit()
+                logger.info(f"✅ jpcert_trendsのキャッシュをクリアしました")
+                return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ jpcert_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ jpcert_trendsキャッシュクリアエラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
+            return False
+
+    # Hacker Noon Trends キャッシュメソッド
+    def save_hackernoon_trends_to_cache(self, data):
+        """Hacker Noon Trendsデータをキャッシュに保存"""
+        if not data:
+            return False
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return False
+        except Exception as e:
+            logger.error(f"❌ hackernoon_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
+            return False
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM hackernoon_trends_cache")
+                for item in data:
+                    cursor.execute("""
+                        INSERT INTO hackernoon_trends_cache 
+                        (title, url, published_date, description, author, rank)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (
+                        item.get('title', ''),
+                        item.get('url', ''),
+                        item.get('published_date'),
+                        item.get('description', ''),
+                        item.get('author', ''),
+                        item.get('rank', 0)
+                    ))
+                
+                # キャッシュステータスを更新
+                import pytz
+                jst = pytz.timezone('Asia/Tokyo')
+                now_jst = datetime.now(jst)
+                cursor.execute(
+                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                    ('hackernoon_trends', now_jst, len(data), now_jst, len(data))
+                )
+                
+                conn.commit()
+                logger.info(f"✅ hackernoon_trendsキャッシュを保存しました ({len(data)}件)")
+                return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ hackernoon_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ hackernoon_trendsキャッシュ保存エラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
+            return False
+
+    def get_hackernoon_trends_from_cache(self):
+        """Hacker Noon Trendsデータをキャッシュから取得"""
+        def query_func(conn):
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT title, url, published_date, description, author, rank, cached_at
+                    FROM hackernoon_trends_cache 
+                    ORDER BY rank
+                """)
+                data = cursor.fetchall()
+                result = []
+                for row in data:
+                    row_dict = dict(row)
+                    # published_dateをISO形式の文字列に変換
+                    if row_dict.get('published_date'):
+                        if isinstance(row_dict['published_date'], datetime):
+                            row_dict['published_date'] = row_dict['published_date'].isoformat()
+                    result.append(row_dict)
+                return result
+        
+        return self._execute_with_retry(query_func)
+
+    def clear_hackernoon_trends_cache(self):
+        """Hacker Noon Trendsキャッシュをクリア"""
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return False
+        except Exception as e:
+            logger.error(f"❌ hackernoon_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
+            return False
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM hackernoon_trends_cache")
+                conn.commit()
+                logger.info(f"✅ hackernoon_trendsのキャッシュをクリアしました")
+                return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ hackernoon_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ hackernoon_trendsキャッシュクリアエラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
+            return False
+
     def close(self):
         """データベース接続を閉じる"""
         if self.connection:

@@ -911,14 +911,20 @@ function loadCachedDataUS() {
     // Load Book Trends from cache
     loadBookTrendsFromCacheUS();
     
+    // Load CISA KEV from cache
+    loadCISAKEVTrendsFromCacheUS();
+    
+    // Load The Hacker News from cache
+    loadTheHackerNewsTrendsFromCacheUS();
+    
     // Load GitHub Trends from cache
     loadGitHubTrendsFromCacheUS();
     
     // Load App Store Trends from cache
     loadAppStoreTrendsFromCacheUS();
     
-    // Load Reddit from cache (エラーでもレイアウトを崩さないように先に実行)
-    loadRedditFromCacheUS();
+    // Load Hacker Noon from cache
+    loadHackerNoonTrendsFromCacheUS();
     
     // Load Podcast from cache (Redditと独立して表示)
     loadPodcastFromCacheUS();
@@ -2032,6 +2038,126 @@ function loadAppStoreTrendsFromCacheUS() {
         })
         .catch(error => {
             console.error('App Store Trends cache loading error:', error);
+            if (loadingElement) loadingElement.style.display = 'none';
+            if (resultsElement) resultsElement.style.display = 'block';
+        });
+}
+
+// CISA KEV cache data loading for US
+function loadCISAKEVTrendsFromCacheUS() {
+    console.log('📊 CISA KEV cache data loading for US');
+    const loadingElement = document.getElementById('cisaKevLoading');
+    const resultsElement = document.getElementById('cisaKevResults');
+    
+    if (loadingElement) loadingElement.style.display = 'block';
+    if (resultsElement) resultsElement.style.display = 'none';
+    
+    fetchWithRetry('/api/cisa-kev-trends?limit=25&force_refresh=false')
+        .then(response => {
+            console.log('CISA KEV API response:', response.status, response.ok);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('CISA KEV API data:', data);
+            if (loadingElement) loadingElement.style.display = 'none';
+            if (resultsElement) resultsElement.style.display = 'block';
+            
+            if (data.success && data.data && data.data.length > 0) {
+                console.log('CISA KEV data display starting');
+                if (typeof displayCISAKEVResults === 'function') {
+                    displayCISAKEVResults(data);
+                } else {
+                    console.error('displayCISAKEVResults function not found');
+                }
+            } else {
+                console.log('CISA KEV data not found or error:', data);
+            }
+        })
+        .catch(error => {
+            console.error('CISA KEV cache loading error:', error);
+            if (loadingElement) loadingElement.style.display = 'none';
+            if (resultsElement) resultsElement.style.display = 'block';
+        });
+}
+
+// The Hacker News cache data loading for US
+function loadTheHackerNewsTrendsFromCacheUS() {
+    console.log('📊 The Hacker News cache data loading for US');
+    const loadingElement = document.getElementById('thehackernewsLoading');
+    const resultsElement = document.getElementById('thehackernewsResults');
+    
+    if (loadingElement) loadingElement.style.display = 'block';
+    if (resultsElement) resultsElement.style.display = 'none';
+    
+    fetchWithRetry('/api/thehackernews-trends?limit=25&force_refresh=false')
+        .then(response => {
+            console.log('The Hacker News API response:', response.status, response.ok);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('The Hacker News API data:', data);
+            if (loadingElement) loadingElement.style.display = 'none';
+            if (resultsElement) resultsElement.style.display = 'block';
+            
+            if (data.success && data.data && data.data.length > 0) {
+                console.log('The Hacker News data display starting');
+                if (typeof displayTheHackerNewsResults === 'function') {
+                    displayTheHackerNewsResults(data);
+                } else {
+                    console.error('displayTheHackerNewsResults function not found');
+                }
+            } else {
+                console.log('The Hacker News data not found or error:', data);
+            }
+        })
+        .catch(error => {
+            console.error('The Hacker News cache loading error:', error);
+            if (loadingElement) loadingElement.style.display = 'none';
+            if (resultsElement) resultsElement.style.display = 'block';
+        });
+}
+
+// Hacker Noon cache data loading for US
+function loadHackerNoonTrendsFromCacheUS() {
+    console.log('📊 Hacker Noon cache data loading for US');
+    const loadingElement = document.getElementById('hackernoonLoading');
+    const resultsElement = document.getElementById('hackernoonResults');
+    
+    if (loadingElement) loadingElement.style.display = 'block';
+    if (resultsElement) resultsElement.style.display = 'none';
+    
+    fetchWithRetry('/api/hackernoon-trends?limit=25&force_refresh=false')
+        .then(response => {
+            console.log('Hacker Noon API response:', response.status, response.ok);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Hacker Noon API data:', data);
+            if (loadingElement) loadingElement.style.display = 'none';
+            if (resultsElement) resultsElement.style.display = 'block';
+            
+            if (data.success && data.data && data.data.length > 0) {
+                console.log('Hacker Noon data display starting');
+                if (typeof displayHackerNoonResults === 'function') {
+                    displayHackerNoonResults(data);
+                } else {
+                    console.error('displayHackerNoonResults function not found');
+                }
+            } else {
+                console.log('Hacker Noon data not found or error:', data);
+            }
+        })
+        .catch(error => {
+            console.error('Hacker Noon cache loading error:', error);
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
         });

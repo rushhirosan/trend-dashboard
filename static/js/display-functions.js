@@ -317,6 +317,227 @@ function displayAppStoreResults(data) {
     console.log('✅ App Store Results表示完了');
 }
 
+// IPA注意喚起結果表示関数
+function displayIPAResults(data) {
+    console.log('📊 IPA Results表示開始', data);
+    const tableBody = document.getElementById('ipaTrendsTableBody');
+    const statusMessage = document.getElementById('ipaStatusMessage');
+    
+    if (!tableBody) {
+        console.error('❌ IPA DOM要素が見つかりません');
+        return;
+    }
+    
+    if (statusMessage) {
+        statusMessage.style.display = 'none !important';
+    }
+    
+    tableBody.innerHTML = '';
+    if (data.data && data.data.length > 0) {
+        data.data.forEach((item, index) => {
+            const row = document.createElement('tr');
+            row.className = 'trend-card';
+            
+            const title = item.title || 'N/A';
+            const url = item.url || '#';
+            const publishedDate = item.published_date ? formatDate(item.published_date) : 'N/A';
+            
+            row.innerHTML = `
+                <td><span class="badge bg-danger">${item.rank || index + 1}</span></td>
+                <td>
+                    <strong><a href="${url}" target="_blank">${title}</a></strong>
+                    ${item.description ? `<br><small class="text-muted">${truncateText(item.description, 100)}</small>` : ''}
+                </td>
+                <td>${publishedDate}</td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+    
+    const resultsElement = document.getElementById('ipaResults');
+    if (resultsElement) {
+        resultsElement.style.display = 'block';
+    }
+    console.log('✅ IPA Results表示完了');
+}
+
+// JPCERT/CC結果表示関数
+function displayJPCERTResults(data) {
+    console.log('📊 JPCERT/CC Results表示開始', data);
+    const tableBody = document.getElementById('jpcertTrendsTableBody');
+    const statusMessage = document.getElementById('jpcertStatusMessage');
+    
+    if (!tableBody) {
+        console.error('❌ JPCERT/CC DOM要素が見つかりません');
+        return;
+    }
+    
+    if (statusMessage) {
+        statusMessage.style.display = 'none !important';
+    }
+    
+    tableBody.innerHTML = '';
+    if (data.data && data.data.length > 0) {
+        data.data.forEach((item, index) => {
+            const row = document.createElement('tr');
+            row.className = 'trend-card';
+            
+            const title = item.title || 'N/A';
+            const url = item.url || '#';
+            const publishedDate = item.published_date ? formatDate(item.published_date) : 'N/A';
+            
+            row.innerHTML = `
+                <td><span class="badge bg-warning">${item.rank || index + 1}</span></td>
+                <td>
+                    <strong><a href="${url}" target="_blank">${title}</a></strong>
+                    ${item.description ? `<br><small class="text-muted">${truncateText(item.description, 100)}</small>` : ''}
+                </td>
+                <td>${publishedDate}</td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+    
+    const resultsElement = document.getElementById('jpcertResults');
+    if (resultsElement) {
+        resultsElement.style.display = 'block';
+    }
+    console.log('✅ JPCERT/CC Results表示完了');
+}
+
+// CISA KEV結果表示関数
+function displayCISAKEVResults(data) {
+    console.log('📊 CISA KEV Results表示開始', data);
+    const tableBody = document.getElementById('cisaKevTrendsTableBody');
+    const statusMessage = document.getElementById('cisaKevStatusMessage');
+    
+    if (!tableBody) {
+        console.error('❌ CISA KEV DOM要素が見つかりません');
+        return;
+    }
+    
+    if (statusMessage) {
+        statusMessage.style.display = 'none !important';
+    }
+    
+    tableBody.innerHTML = '';
+    if (data.data && data.data.length > 0) {
+        data.data.forEach((item, index) => {
+            const row = document.createElement('tr');
+            row.className = 'trend-card';
+            
+            const cveId = item.cve_id || 'N/A';
+            const product = item.product || 'N/A';
+            const dateAdded = item.date_added ? formatDate(item.date_added) : 'N/A';
+            const cveUrl = cveId !== 'N/A' ? `https://cve.mitre.org/cgi-bin/cvename.cgi?name=${cveId}` : '#';
+            
+            row.innerHTML = `
+                <td><span class="badge bg-danger">${item.rank || index + 1}</span></td>
+                <td><strong><a href="${cveUrl}" target="_blank">${cveId}</a></strong></td>
+                <td>${product}</td>
+                <td>${dateAdded}</td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+    
+    const resultsElement = document.getElementById('cisaKevResults');
+    if (resultsElement) {
+        resultsElement.style.display = 'block';
+    }
+    console.log('✅ CISA KEV Results表示完了');
+}
+
+// The Hacker News結果表示関数
+function displayTheHackerNewsResults(data) {
+    console.log('📊 The Hacker News Results表示開始', data);
+    const tableBody = document.getElementById('thehackernewsTrendsTableBody');
+    const statusMessage = document.getElementById('thehackernewsStatusMessage');
+    
+    if (!tableBody) {
+        console.error('❌ The Hacker News DOM要素が見つかりません');
+        return;
+    }
+    
+    if (statusMessage) {
+        statusMessage.style.display = 'none !important';
+    }
+    
+    tableBody.innerHTML = '';
+    if (data.data && data.data.length > 0) {
+        data.data.forEach((item, index) => {
+            const row = document.createElement('tr');
+            row.className = 'trend-card';
+            
+            const title = item.title || 'N/A';
+            const url = item.url || '#';
+            const publishedDate = item.published_date ? formatDate(item.published_date) : 'N/A';
+            
+            row.innerHTML = `
+                <td><span class="badge bg-info">${item.rank || index + 1}</span></td>
+                <td>
+                    <strong><a href="${url}" target="_blank">${title}</a></strong>
+                    ${item.description ? `<br><small class="text-muted">${truncateText(item.description, 100)}</small>` : ''}
+                </td>
+                <td>${publishedDate}</td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+    
+    const resultsElement = document.getElementById('thehackernewsResults');
+    if (resultsElement) {
+        resultsElement.style.display = 'block';
+    }
+    console.log('✅ The Hacker News Results表示完了');
+}
+
+// Hacker Noon結果表示関数
+function displayHackerNoonResults(data) {
+    console.log('📊 Hacker Noon Results表示開始', data);
+    const tableBody = document.getElementById('hackernoonTrendsTableBody');
+    const statusMessage = document.getElementById('hackernoonStatusMessage');
+    
+    if (!tableBody) {
+        console.error('❌ Hacker Noon DOM要素が見つかりません');
+        return;
+    }
+    
+    if (statusMessage) {
+        statusMessage.style.display = 'none !important';
+    }
+    
+    tableBody.innerHTML = '';
+    if (data.data && data.data.length > 0) {
+        data.data.forEach((item, index) => {
+            const row = document.createElement('tr');
+            row.className = 'trend-card';
+            
+            const title = item.title || 'N/A';
+            const url = item.url || '#';
+            const author = item.author || 'N/A';
+            const publishedDate = item.published_date ? formatDate(item.published_date) : 'N/A';
+            
+            row.innerHTML = `
+                <td><span class="badge bg-primary">${item.rank || index + 1}</span></td>
+                <td>
+                    <strong><a href="${url}" target="_blank">${title}</a></strong>
+                    ${item.description ? `<br><small class="text-muted">${truncateText(item.description, 100)}</small>` : ''}
+                </td>
+                <td>${author}</td>
+                <td>${publishedDate}</td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+    
+    const resultsElement = document.getElementById('hackernoonResults');
+    if (resultsElement) {
+        resultsElement.style.display = 'block';
+    }
+    console.log('✅ Hacker Noon Results表示完了');
+}
+
 // World News結果表示関数
 function displayWorldNewsResults(data) {
     console.log('📊 World News Results表示開始', data);

@@ -778,6 +778,93 @@
             </div>
         </div>
 
+        <!-- Row 5.5: CISA KEV + The Hacker News -->
+        <div class="row g-3 mb-3">
+            <!-- Left: CISA KEV -->
+            <div class="col-12 col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-danger text-white">
+                        <h5><i class="fas fa-shield-alt"></i> CISA KEV</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="loading text-center py-5" id="cisaKevLoading" style="display: none;">
+                            <div class="spinner-border text-danger" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Loading CISA KEV data...</p>
+                        </div>
+                        <div id="cisaKevResults" style="display: none;">
+                            <div class="alert alert-success status-message" id="cisaKevStatusMessage" style="display: none;">
+                                <!-- Status messages will be displayed here -->
+                            </div>
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                                    <div class="trend-table-container">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover trend-table" id="cisaKevTrendsTable">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>Rank</th>
+                                                        <th>CVE ID</th>
+                                                        <th>Product</th>
+                                                        <th>Date Added</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="cisaKevTrendsTableBody">
+                                                    <!-- CISA KEV data will be displayed here -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Right: The Hacker News -->
+            <div class="col-12 col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-info text-white">
+                        <h5><i class="fas fa-newspaper"></i> The Hacker News</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="loading text-center py-5" id="thehackernewsLoading" style="display: none;">
+                            <div class="spinner-border text-info" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Loading The Hacker News data...</p>
+                        </div>
+                        <div id="thehackernewsResults" style="display: none;">
+                            <div class="alert alert-success status-message" id="thehackernewsStatusMessage" style="display: none;">
+                                <!-- Status messages will be displayed here -->
+                            </div>
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                                    <div class="trend-table-container">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover trend-table" id="thehackernewsTrendsTable">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>Rank</th>
+                                                        <th>Title</th>
+                                                        <th>Published</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="thehackernewsTrendsTableBody">
+                                                    <!-- The Hacker News data will be displayed here -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Row 6: GitHub Trends + App Store Trends -->
         <div class="row g-3 mb-3">
             <!-- Left: GitHub Trends -->
@@ -866,53 +953,52 @@
             </div>
         </div>
 
-        <!-- Row 7: Reddit Popular Posts + Twitch Trends -->
+        <!-- Row 7: Hacker Noon + Twitch Trends -->
         <div class="row g-3 mb-3">
-            <!-- Left: Reddit Popular Posts -->
+            <!-- Left: Hacker Noon -->
             <div class="col-12 col-md-6">
                 <div class="card h-100">
-                    <div class="card-header bg-warning text-dark">
-                        <h5><i class="fab fa-reddit"></i> Reddit Popular Posts</h5>
+                    <div class="card-header bg-primary text-white">
+                        <h5><i class="fas fa-code"></i> Hacker Noon</h5>
                     </div>
                     <div class="card-body">
                         
-                        <!-- Reddit Data Display -->
-                        <div class="loading text-center py-5" id="redditLoading" style="display: none;">
-                            <div class="spinner-border text-warning" role="status">
+                        <!-- Hacker Noon Data Display -->
+                        <div class="loading text-center py-5" id="hackernoonLoading" style="display: none;">
+                            <div class="spinner-border text-primary" role="status">
                                 <span class="visually-hidden">Loading...</span>
                             </div>
-                            <p class="mt-3">Loading Reddit data...</p>
+                            <p class="mt-3">Loading Hacker Noon data...</p>
                         </div>
 
-                        <!-- Reddit Results Display Area -->
-                        <div id="redditResults" style="display: none;">
+                        <!-- Hacker Noon Results Display Area -->
+                        <div id="hackernoonResults" style="display: none;">
                             <!-- Status Display -->
-                            <div class="alert alert-success status-message" id="redditStatusMessage" style="display: none;">
+                            <div class="alert alert-success status-message" id="hackernoonStatusMessage" style="display: none;">
                                 <!-- Status messages will be displayed here -->
                             </div>
                             
                             <!-- Error Messages -->
-                            <div class="alert alert-danger" id="redditErrorMessage" style="display: none;">
-                                <!-- Reddit error messages will be displayed here -->
+                            <div class="alert alert-danger" id="hackernoonErrorMessage" style="display: none;">
+                                <!-- Hacker Noon error messages will be displayed here -->
                             </div>
 
-                            <!-- Reddit Table -->
+                            <!-- Hacker Noon Table -->
                             <div class="card trend-table category-card">
                                 <div class="card-body">
                                     <div class="trend-table-container">
                             <div class="table-responsive">
-                                <table class="table table-hover trend-table" id="redditTrendsTable">
+                                <table class="table table-hover trend-table" id="hackernoonTrendsTable">
                                     <thead class="table-dark">
                                         <tr>
                                             <th>Rank</th>
                                             <th>Title</th>
-                                            <th>Subreddit</th>
-                                            <th>Score</th>
-                                            <th>Comments</th>
+                                            <th>Author</th>
+                                            <th>Published</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="redditTrendsTableBody">
-                                        <!-- Reddit data will be displayed here -->
+                                    <tbody id="hackernoonTrendsTableBody">
+                                        <!-- Hacker Noon data will be displayed here -->
                                     </tbody>
                                 </table>
                                         </div>
@@ -1018,7 +1104,7 @@
         #podcastResults,
         #movieResults,
         #bookResults,
-        #redditResults,
+        #hackernoonResults,
         #twitchResults {
             display: block !important;
             visibility: visible !important;

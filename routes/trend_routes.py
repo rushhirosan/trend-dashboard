@@ -638,12 +638,19 @@ def get_zenn_trends(manager):
 @trend_bp.route('/note-trends')
 @require_manager('note')
 def get_note_trends(manager):
-    """Note Trends APIエンドポイント"""
+    """Note Trends APIエンドポイント（カテゴリ対応）"""
     try:
         limit = int(request.args.get('limit', 25))
+        category = request.args.get('category', 'all')
         force_refresh = get_force_refresh()
+        fetch_all_categories = request.args.get('fetch_all_categories', 'false').lower() == 'true'
         
-        result = manager.get_trends(limit=limit, force_refresh=force_refresh)
+        result = manager.get_trends(
+            category=category,
+            limit=limit,
+            force_refresh=force_refresh,
+            fetch_all_categories=fetch_all_categories
+        )
         return handle_trend_response(result, 'Note', 'Note RSS')
         
     except Exception as e:

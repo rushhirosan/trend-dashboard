@@ -1291,9 +1291,13 @@ function loadZennTrendsFromCache() {
         });
 }
 
-// Noteキャッシュデータの読み込み
+// Noteキャッシュデータの読み込み（カテゴリ対応）
 function loadNoteTrendsFromCache() {
-    console.log('📊 Note Trends キャッシュデータ読み込み');
+    // 選択されたカテゴリーを取得
+    const categorySelect = document.getElementById('noteCategorySelect');
+    const selectedCategory = categorySelect ? categorySelect.value : 'all';
+    
+    console.log(`📊 Note Trends キャッシュデータ読み込み (category: ${selectedCategory})`);
     const loadingElement = document.getElementById('noteLoading');
     if (loadingElement) {
         loadingElement.style.display = 'block';
@@ -1302,7 +1306,7 @@ function loadNoteTrendsFromCache() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    fetchWithRetry('/api/note-trends?limit=25&force_refresh=false', { signal: controller.signal })
+    fetchWithRetry(`/api/note-trends?category=${selectedCategory}&limit=25&force_refresh=false`, { signal: controller.signal })
         .then(response => {
             clearTimeout(timeoutId);
             if (!response.ok) {

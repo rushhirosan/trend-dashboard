@@ -4086,102 +4086,22 @@ class TrendsCache:
                 pass
             return False
 
-    # Note Trends キャッシュメソッド
-    def save_note_trends_to_cache(self, data):
-        """Note Trendsデータをキャッシュに保存"""
-        if not data:
-            return False
-        try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ note_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM note_trends_cache")
-                for item in data:
-                    cursor.execute("""
-                        INSERT INTO note_trends_cache 
-                        (title, url, published_date, description, author, rank)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                    """, (
-                        item.get('title', ''),
-                        item.get('url', ''),
-                        item.get('published_date'),
-                        item.get('description', ''),
-                        item.get('author', ''),
-                        item.get('rank', 0)
-                    ))
-                import pytz
-                jst = pytz.timezone('Asia/Tokyo')
-                now_jst = datetime.now(jst)
-                cursor.execute(
-                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                    ('note_trends', now_jst, len(data), now_jst, len(data))
-                )
-                conn.commit()
-                logger.info(f"✅ note_trendsキャッシュを保存しました ({len(data)}件)")
-                return True
-        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-            logger.warning(f"⚠️ note_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
-            self.connection = None
-            return False
-        except Exception as e:
-            logger.error(f"❌ note_trendsキャッシュ保存エラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
-            return False
-
-    def get_note_trends_from_cache(self):
-        """Note Trendsデータをキャッシュから取得"""
-        def query_func(conn):
-            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("""
-                    SELECT title, url, published_date, description, author, rank, cached_at
-                    FROM note_trends_cache 
-                    ORDER BY rank
-                """)
-                data = cursor.fetchall()
-                result = []
-                for row in data:
-                    row_dict = dict(row)
-                    if row_dict.get('published_date'):
-                        if isinstance(row_dict['published_date'], datetime):
-                            row_dict['published_date'] = row_dict['published_date'].isoformat()
-                    result.append(row_dict)
-                return result
-        return self._execute_with_retry(query_func)
-
-    def clear_note_trends_cache(self):
-        """Note Trendsキャッシュをクリア"""
-        try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ note_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM note_trends_cache")
-                conn.commit()
-                logger.info(f"✅ note_trendsのキャッシュをクリアしました")
-                return True
-        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-            logger.warning(f"⚠️ note_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
-            self.connection = None
-            return False
-        except Exception as e:
-            logger.error(f"❌ note_trendsキャッシュクリアエラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
-            return False
+    # Note Trends キャッシュメソッド（カテゴリ対応）
+    def save_note_trends_to_cache(self, data, category='all'):
+        """Note Trendsデータをキャッシュに保存（カテゴリ別）"""
+        return self.save_to_cache(data, 'note_trends', category)
+    
+    def get_note_trends_from_cache(self, category='all'):
+        """Note Trendsデータをキャッシュから取得（カテゴリ別）"""
+        return self.get_from_cache('note_trends', category)
+    
+    def clear_note_trends_cache(self, category='all'):
+        """Note Trendsキャッシュをクリア（カテゴリ別）"""
+        return self.clear_cache('note_trends', category)
+    
+    def is_note_cache_valid(self, category='all'):
+        """Note Trendsキャッシュが有効かどうかを確認"""
+        return self.is_cache_valid('note_trends', category, 24)
 
     def close(self):
         """データベース接続を閉じる"""

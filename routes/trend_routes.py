@@ -70,8 +70,8 @@ def handle_trend_response(result, error_message, default_source=None, **extra_fi
         default_source: デフォルトのソース名
         **extra_fields: レスポンスに追加するフィールド
     """
-    # エラーが含まれている場合（status_codeが指定されている場合はそれを使用）
-    if isinstance(result, dict) and 'error' in result:
+    # エラーが含まれている場合（success: Falseの場合のみエラーとして扱う）
+    if isinstance(result, dict) and 'error' in result and not result.get('success', False):
         error_response = {
             'success': False,
             'error': result['error']

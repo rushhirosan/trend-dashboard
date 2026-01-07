@@ -63,8 +63,7 @@ class IPATrendsManager:
                         'success': True,
                         'data': [],
                         'status': 'cache_not_found',
-                        'source': 'database_cache',
-                        'error': 'キャッシュにデータがありません'
+                        'source': 'database_cache'
                     }
                 # force_refresh=trueの場合のみ外部APIを呼び出す
                 logger.warning("⚠️ IPA: キャッシュデータが見つかりません。外部APIを呼び出します")

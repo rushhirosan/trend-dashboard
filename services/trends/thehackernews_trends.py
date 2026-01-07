@@ -57,13 +57,12 @@ class TheHackerNewsTrendsManager:
                 # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
                 if not force_refresh:
                     logger.warning("⚠️ The Hacker News: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
-                    return {
-                        'success': True,
-                        'data': [],
-                        'status': 'cache_not_found',
-                        'source': 'database_cache',
-                        'error': 'キャッシュにデータがありません'
-                    }
+                        return {
+                            'success': True,
+                            'data': [],
+                            'status': 'cache_not_found',
+                            'source': 'database_cache'
+                        }
                 # force_refresh=trueの場合のみ外部APIを呼び出す
                 logger.warning("⚠️ The Hacker News: キャッシュデータが見つかりません。外部APIを呼び出します")
                 return self._fetch_thehackernews_trends(limit)

@@ -24,6 +24,11 @@ from services.trends.movie_trends import MovieTrendsManager
 from services.trends.book_trends import BookTrendsManager
 from services.trends.github_trends import GitHubTrendsManager
 from services.trends.appstore_trends import AppStoreTrendsManager
+from services.trends.cisa_kev_trends import CISAKEVTrendsManager
+from services.trends.thehackernews_trends import TheHackerNewsTrendsManager
+from services.trends.ipa_trends import IPATrendsManager
+from services.trends.jpcert_trends import JPCERTTrendsManager
+from services.trends.hackernoon_trends import HackerNoonTrendsManager
 from utils.logger_config import get_logger
 
 # ロガーの初期化
@@ -52,6 +57,11 @@ MANAGER_CONFIGS = [
     ('book', BookTrendsManager, 'Book'),
     ('github', GitHubTrendsManager, 'GitHub'),
     ('appstore', AppStoreTrendsManager, 'App Store'),
+    ('cisa_kev', CISAKEVTrendsManager, 'CISA KEV'),
+    ('thehackernews', TheHackerNewsTrendsManager, 'The Hacker News'),
+    ('ipa', IPATrendsManager, 'IPA'),
+    ('jpcert', JPCERTTrendsManager, 'JPCERT/CC'),
+    ('hackernoon', HackerNoonTrendsManager, 'Hacker Noon'),
 ]
 
 
@@ -166,6 +176,8 @@ def refresh_all_trends(managers, force_refresh=True):
     call_manager('book', lambda m: m.get_trends(country='JP', limit=25, force_refresh=force_refresh), 'JP')
     call_manager('github', lambda m: m.get_trends(language='all', limit=25, force_refresh=force_refresh), 'JP')
     call_manager('appstore', lambda m: m.get_trends(country='JP', category='all', limit=25, force_refresh=force_refresh), 'JP')
+    call_manager('ipa', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP')
+    call_manager('jpcert', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP')
     
     # USのデータを更新
     logger.info("🇺🇸 USのデータを更新中...")
@@ -185,6 +197,9 @@ def refresh_all_trends(managers, force_refresh=True):
     call_manager('book', lambda m: m.get_trends(country='US', limit=25, force_refresh=force_refresh), 'US')
     call_manager('github', lambda m: m.get_trends(language='all', limit=25, force_refresh=force_refresh), 'US')
     call_manager('appstore', lambda m: m.get_trends(country='US', category='all', limit=25, force_refresh=force_refresh), 'US')
+    call_manager('cisa_kev', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
+    call_manager('thehackernews', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
+    call_manager('hackernoon', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
     
     overall_success = all(result.get('success') for result in results.values())
     

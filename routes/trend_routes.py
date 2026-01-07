@@ -550,3 +550,73 @@ def get_book_trends(manager):
         
     except Exception as e:
         return handle_api_error('Book Trends', e)
+
+@trend_bp.route('/cisa-kev-trends')
+@require_manager('cisa_kev')
+def get_cisa_kev_trends(manager):
+    """CISA KEV Trends APIエンドポイント"""
+    try:
+        limit = int(request.args.get('limit', 25))
+        force_refresh = get_force_refresh()
+        
+        result = manager.get_trends(limit=limit, force_refresh=force_refresh)
+        return handle_trend_response(result, 'CISA KEV', 'CISA KEV API')
+        
+    except Exception as e:
+        return handle_api_error('CISA KEV Trends', e)
+
+@trend_bp.route('/thehackernews-trends')
+@require_manager('thehackernews')
+def get_thehackernews_trends(manager):
+    """The Hacker News Trends APIエンドポイント"""
+    try:
+        limit = int(request.args.get('limit', 25))
+        force_refresh = get_force_refresh()
+        
+        result = manager.get_trends(limit=limit, force_refresh=force_refresh)
+        return handle_trend_response(result, 'The Hacker News', 'The Hacker News RSS')
+        
+    except Exception as e:
+        return handle_api_error('The Hacker News Trends', e)
+
+@trend_bp.route('/ipa-trends')
+@require_manager('ipa')
+def get_ipa_trends(manager):
+    """IPA注意喚起 Trends APIエンドポイント"""
+    try:
+        limit = int(request.args.get('limit', 25))
+        force_refresh = get_force_refresh()
+        
+        result = manager.get_trends(limit=limit, force_refresh=force_refresh)
+        return handle_trend_response(result, 'IPA注意喚起', 'IPA RSS')
+        
+    except Exception as e:
+        return handle_api_error('IPA Trends', e)
+
+@trend_bp.route('/jpcert-trends')
+@require_manager('jpcert')
+def get_jpcert_trends(manager):
+    """JPCERT/CC Trends APIエンドポイント"""
+    try:
+        limit = int(request.args.get('limit', 25))
+        force_refresh = get_force_refresh()
+        
+        result = manager.get_trends(limit=limit, force_refresh=force_refresh)
+        return handle_trend_response(result, 'JPCERT/CC', 'JPCERT/CC RSS')
+        
+    except Exception as e:
+        return handle_api_error('JPCERT/CC Trends', e)
+
+@trend_bp.route('/hackernoon-trends')
+@require_manager('hackernoon')
+def get_hackernoon_trends(manager):
+    """Hacker Noon Trends APIエンドポイント"""
+    try:
+        limit = int(request.args.get('limit', 25))
+        force_refresh = get_force_refresh()
+        
+        result = manager.get_trends(limit=limit, force_refresh=force_refresh)
+        return handle_trend_response(result, 'Hacker Noon', 'Hacker Noon RSS')
+        
+    except Exception as e:
+        return handle_api_error('Hacker Noon Trends', e)

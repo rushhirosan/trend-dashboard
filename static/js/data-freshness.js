@@ -128,14 +128,20 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                     'YouTube': 'YouTube',
                     'はてなブックマーク': 'はてなブックマーク',
                     'Qiita トレンド': 'Qiita トレンド',
-                    '株価トレンド': '株価トレンド',
-                    '仮想通貨トレンド': '仮想通貨トレンド',
-                    'Spotify': 'Spotify',
-                    'Podcast': 'Podcast',
-                    '映画トレンド': '映画トレンド',
-                    '本トレンド': '本トレンド',
+                    'Zenn': 'Zenn',
+                    'Note': 'Note (総合)',  // data_routes.pyでは'Note (総合)'として登録
+                    'Note (総合)': 'Note (総合)',
+                    'IPA': 'IPA',
+                    'IPA注意喚起': 'IPA',
+                    'JPCERT/CC': 'JPCERT/CC',
                     'GitHub': 'GitHub',
                     'App Store': 'App Store',
+                    '株価トレンド': '株価トレンド',
+                    '仮想通貨トレンド': '仮想通貨トレンド',
+                    '映画トレンド': '映画トレンド',
+                    '本トレンド': '本トレンド',
+                    'Spotify': 'Spotify',
+                    'Podcast': 'Podcast',
                     '楽天': '楽天',
                     'Twitch': 'Twitch'
                 };
@@ -487,7 +493,8 @@ function refreshDataFreshnessExternal() {
         // テキスト要素を強制的に表示
         setTimeout(() => {
             console.log('🔧 テキスト要素の表示を強制設定中...');
-            const platforms = ['google', 'youtube', 'spotify', 'news', 'podcast', 'movie', 'book', 'rakuten', 'hatena', 'twitch', 'nhk', 'qiita', 'stock', 'crypto'];
+            // 日本トレンドページの順序に合わせる
+            const platforms = ['nhk', 'news', 'google', 'youtube', 'hatena', 'qiita', 'zenn', 'note', 'ipa', 'jpcert', 'github', 'appstore', 'stock', 'crypto', 'movie', 'book', 'spotify', 'podcast', 'rakuten', 'twitch'];
             platforms.forEach(platform => {
             const lastUpdateElement = document.getElementById(`${platform}LastUpdate`);
             const dataCountElement = document.getElementById(`${platform}DataCount`);

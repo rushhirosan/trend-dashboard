@@ -235,26 +235,26 @@
                                 </div>
 
                                 <div class="row g-3 mt-2">
-                                    <!-- 4行目: 株価 + 仮想通貨 -->
+                                    <!-- 4行目: Zenn + Note -->
                                     <div class="col-md-6">
                                         <div class="card h-100">
                                             <div class="card-body">
                                                 <div class="d-flex align-items-center mb-3">
-                                                    <i class="fas fa-chart-line text-danger fs-4 me-3"></i>
-                                                    <h6 class="card-title mb-0">株価トレンド</h6>
+                                                    <i class="fas fa-pen-nib text-primary fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">Zenn</h6>
                                                 </div>
                                                 <div class="row text-center">
                                                     <div class="col-4">
                                                         <small class="text-muted">最終更新/Last updated</small>
-                                                        <div class="fw-bold" id="stockLastUpdate">-</div>
+                                                        <div class="fw-bold" id="zennLastUpdate">-</div>
                                                     </div>
                                                     <div class="col-4">
                                                         <small class="text-muted">データ件数/Data count</small>
-                                                        <div class="fw-bold" id="stockDataCount">-</div>
+                                                        <div class="fw-bold" id="zennDataCount">-</div>
                                                     </div>
                                                     <div class="col-4">
                                                         <small class="text-muted">ステータス/Status</small>
-                                                        <div><span class="badge bg-secondary" id="stockStatus">-</span></div>
+                                                        <div><span class="badge bg-secondary" id="zennStatus">-</span></div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -265,21 +265,21 @@
                                         <div class="card h-100">
                                             <div class="card-body">
                                                 <div class="d-flex align-items-center mb-3">
-                                                    <i class="fab fa-bitcoin text-warning fs-4 me-3"></i>
-                                                    <h6 class="card-title mb-0">仮想通貨トレンド</h6>
+                                                    <i class="far fa-sticky-note text-secondary fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">Note</h6>
                                                 </div>
                                                 <div class="row text-center">
                                                     <div class="col-4">
                                                         <small class="text-muted">最終更新/Last updated</small>
-                                                        <div class="fw-bold" id="cryptoLastUpdate">-</div>
+                                                        <div class="fw-bold" id="noteLastUpdate">-</div>
                                                     </div>
                                                     <div class="col-4">
                                                         <small class="text-muted">データ件数/Data count</small>
-                                                        <div class="fw-bold" id="cryptoDataCount">-</div>
+                                                        <div class="fw-bold" id="noteDataCount">-</div>
                                                     </div>
                                                     <div class="col-4">
                                                         <small class="text-muted">ステータス/Status</small>
-                                                        <div><span class="badge bg-secondary" id="cryptoStatus">-</span></div>
+                                                        <div><span class="badge bg-secondary" id="noteStatus">-</span></div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -288,26 +288,26 @@
                                 </div>
 
                                 <div class="row g-3 mt-2">
-                                    <!-- 5行目: Spotify + Podcast -->
+                                    <!-- 5行目: IPA注意喚起 + JPCERT/CC -->
                                     <div class="col-md-6">
                                         <div class="card h-100">
                                             <div class="card-body">
                                                 <div class="d-flex align-items-center mb-3">
-                                                    <i class="fab fa-spotify text-success fs-4 me-3"></i>
-                                                    <h6 class="card-title mb-0">Spotify</h6>
+                                                    <i class="fas fa-shield-alt text-danger fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">IPA注意喚起</h6>
                                                 </div>
                                                 <div class="row text-center">
                                                     <div class="col-4">
                                                         <small class="text-muted">最終更新/Last updated</small>
-                                                        <div class="fw-bold" id="spotifyLastUpdate">-</div>
+                                                        <div class="fw-bold" id="ipaLastUpdate">-</div>
                                                     </div>
                                                     <div class="col-4">
                                                         <small class="text-muted">データ件数/Data count</small>
-                                                        <div class="fw-bold" id="spotifyDataCount">-</div>
+                                                        <div class="fw-bold" id="ipaDataCount">-</div>
                                                     </div>
                                                     <div class="col-4">
                                                         <small class="text-muted">ステータス/Status</small>
-                                                        <div><span class="badge bg-secondary" id="spotifyStatus">-</span></div>
+                                                        <div><span class="badge bg-secondary" id="ipaStatus">-</span></div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -318,74 +318,21 @@
                                         <div class="card h-100">
                                             <div class="card-body">
                                                 <div class="d-flex align-items-center mb-3">
-                                                    <i class="fas fa-podcast text-warning fs-4 me-3"></i>
-                                                    <h6 class="card-title mb-0">Podcast</h6>
+                                                    <i class="fas fa-exclamation-triangle text-warning fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">JPCERT/CC</h6>
                                                 </div>
                                                 <div class="row text-center">
                                                     <div class="col-4">
                                                         <small class="text-muted">最終更新/Last updated</small>
-                                                        <div class="fw-bold" id="podcastLastUpdate">-</div>
+                                                        <div class="fw-bold" id="jpcertLastUpdate">-</div>
                                                     </div>
                                                     <div class="col-4">
                                                         <small class="text-muted">データ件数/Data count</small>
-                                                        <div class="fw-bold" id="podcastDataCount">-</div>
+                                                        <div class="fw-bold" id="jpcertDataCount">-</div>
                                                     </div>
                                                     <div class="col-4">
                                                         <small class="text-muted">ステータス/Status</small>
-                                                        <div><span class="badge bg-secondary" id="podcastStatus">-</span></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="row g-3 mt-2">
-                                    <!-- 6行目: 映画 + 本 -->
-                                    <div class="col-md-6">
-                                        <div class="card h-100">
-                                            <div class="card-body">
-                                                <div class="d-flex align-items-center mb-3">
-                                                    <i class="fas fa-film text-primary fs-4 me-3"></i>
-                                                    <h6 class="card-title mb-0">映画トレンド</h6>
-                                                </div>
-                                                <div class="row text-center">
-                                                    <div class="col-4">
-                                                        <small class="text-muted">最終更新/Last updated</small>
-                                                        <div class="fw-bold" id="movieLastUpdate">-</div>
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <small class="text-muted">データ件数/Data count</small>
-                                                        <div class="fw-bold" id="movieDataCount">-</div>
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <small class="text-muted">ステータス/Status</small>
-                                                        <div><span class="badge bg-secondary" id="movieStatus">-</span></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="col-md-6">
-                                        <div class="card h-100">
-                                            <div class="card-body">
-                                                <div class="d-flex align-items-center mb-3">
-                                                    <i class="fas fa-book text-info fs-4 me-3"></i>
-                                                    <h6 class="card-title mb-0">本トレンド</h6>
-                                                </div>
-                                                <div class="row text-center">
-                                                    <div class="col-4">
-                                                        <small class="text-muted">最終更新/Last updated</small>
-                                                        <div class="fw-bold" id="bookLastUpdate">-</div>
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <small class="text-muted">データ件数/Data count</small>
-                                                        <div class="fw-bold" id="bookDataCount">-</div>
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <small class="text-muted">ステータス/Status</small>
-                                                        <div><span class="badge bg-secondary" id="bookStatus">-</span></div>
+                                                        <div><span class="badge bg-secondary" id="jpcertStatus">-</span></div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -447,7 +394,166 @@
                                 </div>
 
                                 <div class="row g-3 mt-2">
-                                    <!-- 7行目: 楽天 + Twitch -->
+                                    <!-- 7行目: 株価 + 仮想通貨 -->
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-3">
+                                                    <i class="fas fa-chart-line text-danger fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">株価トレンド</h6>
+                                                </div>
+                                                <div class="row text-center">
+                                                    <div class="col-4">
+                                                        <small class="text-muted">最終更新/Last updated</small>
+                                                        <div class="fw-bold" id="stockLastUpdate">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">データ件数/Data count</small>
+                                                        <div class="fw-bold" id="stockDataCount">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">ステータス/Status</small>
+                                                        <div><span class="badge bg-secondary" id="stockStatus">-</span></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-3">
+                                                    <i class="fab fa-bitcoin text-warning fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">仮想通貨トレンド</h6>
+                                                </div>
+                                                <div class="row text-center">
+                                                    <div class="col-4">
+                                                        <small class="text-muted">最終更新/Last updated</small>
+                                                        <div class="fw-bold" id="cryptoLastUpdate">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">データ件数/Data count</small>
+                                                        <div class="fw-bold" id="cryptoDataCount">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">ステータス/Status</small>
+                                                        <div><span class="badge bg-secondary" id="cryptoStatus">-</span></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mt-2">
+                                    <!-- 8行目: 映画 + 本 -->
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-3">
+                                                    <i class="fas fa-film text-primary fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">映画トレンド</h6>
+                                                </div>
+                                                <div class="row text-center">
+                                                    <div class="col-4">
+                                                        <small class="text-muted">最終更新/Last updated</small>
+                                                        <div class="fw-bold" id="movieLastUpdate">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">データ件数/Data count</small>
+                                                        <div class="fw-bold" id="movieDataCount">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">ステータス/Status</small>
+                                                        <div><span class="badge bg-secondary" id="movieStatus">-</span></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-3">
+                                                    <i class="fas fa-book text-info fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">本トレンド</h6>
+                                                </div>
+                                                <div class="row text-center">
+                                                    <div class="col-4">
+                                                        <small class="text-muted">最終更新/Last updated</small>
+                                                        <div class="fw-bold" id="bookLastUpdate">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">データ件数/Data count</small>
+                                                        <div class="fw-bold" id="bookDataCount">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">ステータス/Status</small>
+                                                        <div><span class="badge bg-secondary" id="bookStatus">-</span></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mt-2">
+                                    <!-- 9行目: Spotify + Podcast -->
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-3">
+                                                    <i class="fab fa-spotify text-success fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">Spotify</h6>
+                                                </div>
+                                                <div class="row text-center">
+                                                    <div class="col-4">
+                                                        <small class="text-muted">最終更新/Last updated</small>
+                                                        <div class="fw-bold" id="spotifyLastUpdate">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">データ件数/Data count</small>
+                                                        <div class="fw-bold" id="spotifyDataCount">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">ステータス/Status</small>
+                                                        <div><span class="badge bg-secondary" id="spotifyStatus">-</span></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-3">
+                                                    <i class="fas fa-podcast text-warning fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">Podcast</h6>
+                                                </div>
+                                                <div class="row text-center">
+                                                    <div class="col-4">
+                                                        <small class="text-muted">最終更新/Last updated</small>
+                                                        <div class="fw-bold" id="podcastLastUpdate">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">データ件数/Data count</small>
+                                                        <div class="fw-bold" id="podcastDataCount">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">ステータス/Status</small>
+                                                        <div><span class="badge bg-secondary" id="podcastStatus">-</span></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mt-2">
+                                    <!-- 10行目: 楽天 + Twitch -->
                                     <div class="col-md-6">
                                         <div class="card h-100">
                                             <div class="card-body">
@@ -663,26 +769,26 @@
                                     </div>
 
                                     <div class="row g-3 mt-2">
-                                        <!-- US 4行目: Stock Trends + Crypto Trends -->
+                                        <!-- US 4行目: CISA KEV + The Hacker News -->
                                         <div class="col-md-6">
                                             <div class="card h-100">
                                                 <div class="card-body">
                                                     <div class="d-flex align-items-center mb-3">
-                                                        <i class="fas fa-chart-line text-danger fs-4 me-3"></i>
-                                                        <h6 class="card-title mb-0">Stock Trends</h6>
+                                                        <i class="fas fa-shield-alt text-danger fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">CISA KEV</h6>
                                                     </div>
                                                     <div class="row text-center">
                                                         <div class="col-4">
                                                             <small class="text-muted">最終更新/Last updated</small>
-                                                            <div class="fw-bold" id="stockUSLastUpdate">-</div>
+                                                            <div class="fw-bold" id="cisakevUSLastUpdate">-</div>
                                                         </div>
                                                         <div class="col-4">
                                                             <small class="text-muted">データ件数/Data count</small>
-                                                            <div class="fw-bold" id="stockUSDataCount">-</div>
+                                                            <div class="fw-bold" id="cisakevUSDataCount">-</div>
                                                         </div>
                                                         <div class="col-4">
                                                             <small class="text-muted">ステータス/Status</small>
-                                                            <div><span class="badge bg-secondary" id="stockUSStatus">-</span></div>
+                                                            <div><span class="badge bg-secondary" id="cisakevUSStatus">-</span></div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -693,21 +799,21 @@
                                             <div class="card h-100">
                                                 <div class="card-body">
                                                     <div class="d-flex align-items-center mb-3">
-                                                        <i class="fab fa-bitcoin text-warning fs-4 me-3"></i>
-                                                        <h6 class="card-title mb-0">Cryptocurrency Trends</h6>
+                                                        <i class="fas fa-bug text-warning fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">The Hacker News</h6>
                                                     </div>
                                                     <div class="row text-center">
                                                         <div class="col-4">
                                                             <small class="text-muted">最終更新/Last updated</small>
-                                                            <div class="fw-bold" id="cryptoUSLastUpdate">-</div>
+                                                            <div class="fw-bold" id="thehackernewsUSLastUpdate">-</div>
                                                         </div>
                                                         <div class="col-4">
                                                             <small class="text-muted">データ件数/Data count</small>
-                                                            <div class="fw-bold" id="cryptoUSDataCount">-</div>
+                                                            <div class="fw-bold" id="thehackernewsUSDataCount">-</div>
                                                         </div>
                                                         <div class="col-4">
                                                             <small class="text-muted">ステータス/Status</small>
-                                                            <div><span class="badge bg-secondary" id="cryptoUSStatus">-</span></div>
+                                                            <div><span class="badge bg-secondary" id="thehackernewsUSStatus">-</span></div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -716,113 +822,7 @@
                                     </div>
 
                                     <div class="row g-3 mt-2">
-                                        <!-- US 5行目: Spotify + Podcast -->
-                                        <div class="col-md-6">
-                                            <div class="card h-100">
-                                                <div class="card-body">
-                                                    <div class="d-flex align-items-center mb-3">
-                                                        <i class="fas fa-music text-success fs-4 me-3"></i>
-                                                        <h6 class="card-title mb-0">Spotify (Global)</h6>
-                                                    </div>
-                                                    <div class="row text-center">
-                                                        <div class="col-4">
-                                                            <small class="text-muted">最終更新/Last updated</small>
-                                                            <div class="fw-bold" id="spotifyUSLastUpdate">-</div>
-                                                        </div>
-                                                        <div class="col-4">
-                                                            <small class="text-muted">データ件数/Data count</small>
-                                                            <div class="fw-bold" id="spotifyUSDataCount">-</div>
-                                                        </div>
-                                                        <div class="col-4">
-                                                            <small class="text-muted">ステータス/Status</small>
-                                                            <div><span class="badge bg-secondary" id="spotifyUSStatus">-</span></div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="col-md-6">
-                                            <div class="card h-100">
-                                                <div class="card-body">
-                                                    <div class="d-flex align-items-center mb-3">
-                                                        <i class="fas fa-podcast text-warning fs-4 me-3"></i>
-                                                        <h6 class="card-title mb-0">Podcast</h6>
-                                                    </div>
-                                                    <div class="row text-center">
-                                                        <div class="col-4">
-                                                            <small class="text-muted">最終更新/Last updated</small>
-                                                            <div class="fw-bold" id="podcastUSLastUpdate">-</div>
-                                                        </div>
-                                                        <div class="col-4">
-                                                            <small class="text-muted">データ件数/Data count</small>
-                                                            <div class="fw-bold" id="podcastUSDataCount">-</div>
-                                                        </div>
-                                                        <div class="col-4">
-                                                            <small class="text-muted">ステータス/Status</small>
-                                                            <div><span class="badge bg-secondary" id="podcastUSStatus">-</span></div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="row g-3 mt-2">
-                                        <!-- US 6行目: 映画 + 本 -->
-                                        <div class="col-md-6">
-                                            <div class="card h-100">
-                                                <div class="card-body">
-                                                    <div class="d-flex align-items-center mb-3">
-                                                        <i class="fas fa-film text-primary fs-4 me-3"></i>
-                                                        <h6 class="card-title mb-0">Movie Trends</h6>
-                                                    </div>
-                                                    <div class="row text-center">
-                                                        <div class="col-4">
-                                                            <small class="text-muted">最終更新/Last updated</small>
-                                                            <div class="fw-bold" id="movieUSLastUpdate">-</div>
-                                                        </div>
-                                                        <div class="col-4">
-                                                            <small class="text-muted">データ件数/Data count</small>
-                                                            <div class="fw-bold" id="movieUSDataCount">-</div>
-                                                        </div>
-                                                        <div class="col-4">
-                                                            <small class="text-muted">ステータス/Status</small>
-                                                            <div><span class="badge bg-secondary" id="movieUSStatus">-</span></div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="col-md-6">
-                                            <div class="card h-100">
-                                                <div class="card-body">
-                                                    <div class="d-flex align-items-center mb-3">
-                                                        <i class="fas fa-book text-info fs-4 me-3"></i>
-                                                        <h6 class="card-title mb-0">Book Trends</h6>
-                                                    </div>
-                                                    <div class="row text-center">
-                                                        <div class="col-4">
-                                                            <small class="text-muted">最終更新/Last updated</small>
-                                                            <div class="fw-bold" id="bookUSLastUpdate">-</div>
-                                                        </div>
-                                                        <div class="col-4">
-                                                            <small class="text-muted">データ件数/Data count</small>
-                                                            <div class="fw-bold" id="bookUSDataCount">-</div>
-                                                        </div>
-                                                        <div class="col-4">
-                                                            <small class="text-muted">ステータス/Status</small>
-                                                            <div><span class="badge bg-secondary" id="bookUSStatus">-</span></div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="row g-3 mt-2">
-                                        <!-- US 6行目: GitHub + App Store -->
+                                        <!-- US 5行目: GitHub Trends + App Store Trends -->
                                         <div class="col-md-6">
                                             <div class="card h-100">
                                                 <div class="card-body">
@@ -875,26 +875,185 @@
                                     </div>
 
                                     <div class="row g-3 mt-2">
-                                        <!-- US 7行目: Reddit + Twitch -->
+                                        <!-- US 6行目: Stock Trends + Crypto Trends -->
                                         <div class="col-md-6">
                                             <div class="card h-100">
                                                 <div class="card-body">
                                                     <div class="d-flex align-items-center mb-3">
-                                                        <i class="fab fa-reddit text-danger fs-4 me-3"></i>
-                                                        <h6 class="card-title mb-0">Reddit</h6>
+                                                        <i class="fas fa-chart-line text-danger fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">Stock Trends</h6>
                                                     </div>
                                                     <div class="row text-center">
                                                         <div class="col-4">
                                                             <small class="text-muted">最終更新/Last updated</small>
-                                                            <div class="fw-bold" id="redditUSLastUpdate">-</div>
+                                                            <div class="fw-bold" id="stockUSLastUpdate">-</div>
                                                         </div>
                                                         <div class="col-4">
                                                             <small class="text-muted">データ件数/Data count</small>
-                                                            <div class="fw-bold" id="redditUSDataCount">-</div>
+                                                            <div class="fw-bold" id="stockUSDataCount">-</div>
                                                         </div>
                                                         <div class="col-4">
                                                             <small class="text-muted">ステータス/Status</small>
-                                                            <div><span class="badge bg-secondary" id="redditUSStatus">-</span></div>
+                                                            <div><span class="badge bg-secondary" id="stockUSStatus">-</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-md-6">
+                                            <div class="card h-100">
+                                                <div class="card-body">
+                                                    <div class="d-flex align-items-center mb-3">
+                                                        <i class="fab fa-bitcoin text-warning fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">Cryptocurrency Trends</h6>
+                                                    </div>
+                                                    <div class="row text-center">
+                                                        <div class="col-4">
+                                                            <small class="text-muted">最終更新/Last updated</small>
+                                                            <div class="fw-bold" id="cryptoUSLastUpdate">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">データ件数/Data count</small>
+                                                            <div class="fw-bold" id="cryptoUSDataCount">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">ステータス/Status</small>
+                                                            <div><span class="badge bg-secondary" id="cryptoUSStatus">-</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-3 mt-2">
+                                        <!-- US 7行目: Movie Trends + Book Trends -->
+                                        <div class="col-md-6">
+                                            <div class="card h-100">
+                                                <div class="card-body">
+                                                    <div class="d-flex align-items-center mb-3">
+                                                        <i class="fas fa-film text-primary fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">Movie Trends</h6>
+                                                    </div>
+                                                    <div class="row text-center">
+                                                        <div class="col-4">
+                                                            <small class="text-muted">最終更新/Last updated</small>
+                                                            <div class="fw-bold" id="movieUSLastUpdate">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">データ件数/Data count</small>
+                                                            <div class="fw-bold" id="movieUSDataCount">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">ステータス/Status</small>
+                                                            <div><span class="badge bg-secondary" id="movieUSStatus">-</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-md-6">
+                                            <div class="card h-100">
+                                                <div class="card-body">
+                                                    <div class="d-flex align-items-center mb-3">
+                                                        <i class="fas fa-book text-info fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">Book Trends</h6>
+                                                    </div>
+                                                    <div class="row text-center">
+                                                        <div class="col-4">
+                                                            <small class="text-muted">最終更新/Last updated</small>
+                                                            <div class="fw-bold" id="bookUSLastUpdate">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">データ件数/Data count</small>
+                                                            <div class="fw-bold" id="bookUSDataCount">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">ステータス/Status</small>
+                                                            <div><span class="badge bg-secondary" id="bookUSStatus">-</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-3 mt-2">
+                                        <!-- US 8行目: Spotify Music + Podcast Trends -->
+                                        <div class="col-md-6">
+                                            <div class="card h-100">
+                                                <div class="card-body">
+                                                    <div class="d-flex align-items-center mb-3">
+                                                        <i class="fas fa-music text-success fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">Spotify (Global)</h6>
+                                                    </div>
+                                                    <div class="row text-center">
+                                                        <div class="col-4">
+                                                            <small class="text-muted">最終更新/Last updated</small>
+                                                            <div class="fw-bold" id="spotifyUSLastUpdate">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">データ件数/Data count</small>
+                                                            <div class="fw-bold" id="spotifyUSDataCount">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">ステータス/Status</small>
+                                                            <div><span class="badge bg-secondary" id="spotifyUSStatus">-</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-md-6">
+                                            <div class="card h-100">
+                                                <div class="card-body">
+                                                    <div class="d-flex align-items-center mb-3">
+                                                        <i class="fas fa-podcast text-warning fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">Podcast</h6>
+                                                    </div>
+                                                    <div class="row text-center">
+                                                        <div class="col-4">
+                                                            <small class="text-muted">最終更新/Last updated</small>
+                                                            <div class="fw-bold" id="podcastUSLastUpdate">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">データ件数/Data count</small>
+                                                            <div class="fw-bold" id="podcastUSDataCount">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">ステータス/Status</small>
+                                                            <div><span class="badge bg-secondary" id="podcastUSStatus">-</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-3 mt-2">
+                                        <!-- US 9行目: Hacker Noon + Twitch Trends -->
+                                        <div class="col-md-6">
+                                            <div class="card h-100">
+                                                <div class="card-body">
+                                                    <div class="d-flex align-items-center mb-3">
+                                                        <i class="fas fa-newspaper text-info fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">Hacker Noon</h6>
+                                                    </div>
+                                                    <div class="row text-center">
+                                                        <div class="col-4">
+                                                            <small class="text-muted">最終更新/Last updated</small>
+                                                            <div class="fw-bold" id="hackernoonUSLastUpdate">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">データ件数/Data count</small>
+                                                            <div class="fw-bold" id="hackernoonUSDataCount">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">ステータス/Status</small>
+                                                            <div><span class="badge bg-secondary" id="hackernoonUSStatus">-</span></div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1034,15 +1193,17 @@
                 { id: 'youtubeUS', name: 'YouTube', endpoint: '/api/youtube-trends?region=US' },
                 { id: 'hackernewsUS', name: 'Hacker News', endpoint: '/api/hackernews-trends?type=top' },
                 { id: 'producthuntUS', name: 'Product Hunt', endpoint: '/api/producthunt-trends?limit=25&sort=votes' },
-                { id: 'stockUS', name: 'Stock Trends', endpoint: '/api/stock-trends?market=US&limit=25' },
-                { id: 'cryptoUS', name: 'Cryptocurrency Trends', endpoint: '/api/crypto-trends?limit=25' },
-                { id: 'spotifyUS', name: 'Spotify', endpoint: '/api/music-trends?service=spotify&region=US' },
-                { id: 'podcastUS', name: 'Podcast', endpoint: '/api/podcast-trends?region=us' },
-                { id: 'movieUS', name: 'Movie Trends', endpoint: '/api/movie-trends?country=US' },
-                { id: 'bookUS', name: 'Book Trends', endpoint: '/api/book-trends?country=US' },
+                { id: 'cisakevUS', name: 'CISA KEV', endpoint: '/api/cisa-kev-trends?limit=25' },
+                { id: 'thehackernewsUS', name: 'The Hacker News', endpoint: '/api/thehackernews-trends?limit=25' },
                 { id: 'githubUS', name: 'GitHub Trends', endpoint: '/api/github-trends?language=all&limit=25' },
                 { id: 'appstoreUS', name: 'App Store Trends', endpoint: '/api/appstore-trends?country=US&category=all&limit=25' },
-                { id: 'redditUS', name: 'Reddit', endpoint: '/api/reddit-trends?subreddit=all' },
+                { id: 'stockUS', name: 'Stock Trends', endpoint: '/api/stock-trends?market=US&limit=25' },
+                { id: 'cryptoUS', name: 'Cryptocurrency Trends', endpoint: '/api/crypto-trends?limit=25' },
+                { id: 'movieUS', name: 'Movie Trends', endpoint: '/api/movie-trends?country=US' },
+                { id: 'bookUS', name: 'Book Trends', endpoint: '/api/book-trends?country=US' },
+                { id: 'spotifyUS', name: 'Spotify', endpoint: '/api/music-trends?service=spotify&region=US' },
+                { id: 'podcastUS', name: 'Podcast', endpoint: '/api/podcast-trends?region=us' },
+                { id: 'hackernoonUS', name: 'Hacker Noon', endpoint: '/api/hackernoon-trends?limit=25' },
                 { id: 'twitchUS', name: 'Twitch', endpoint: '/api/twitch-trends?type=games' }
             ];
             
@@ -1087,15 +1248,17 @@
                             'YouTube': 'YouTube',
                             'Hacker News': 'Hacker News',
                             'Product Hunt': 'Product Hunt',
-                            'Stock Trends': '株価トレンド',  // data_routes.pyでは'株価トレンド'として登録
-                            'Cryptocurrency Trends': '仮想通貨トレンド',  // data_routes.pyでは'仮想通貨トレンド'として登録
-                            'Spotify': 'Spotify',
-                            'Podcast': 'Podcast',
-                            'Movie Trends': '映画トレンド',  // 日本のセクションではmovie_trends_JP、USセクションではmovie_trends_USを取得
-                            'Book Trends': '本トレンド',  // 日本のセクションではbook_trends_JP、USセクションではbook_trends_USを取得
+                            'CISA KEV': 'CISA KEV',
+                            'The Hacker News': 'The Hacker News',
                             'GitHub Trends': 'GitHub',
                             'App Store Trends': 'App Store',
-                            'Reddit': 'Reddit',
+                            'Stock Trends': '株価トレンド',  // data_routes.pyでは'株価トレンド'として登録
+                            'Cryptocurrency Trends': '仮想通貨トレンド',  // data_routes.pyでは'仮想通貨トレンド'として登録
+                            'Movie Trends': '映画トレンド',  // 日本のセクションではmovie_trends_JP、USセクションではmovie_trends_USを取得
+                            'Book Trends': '本トレンド',  // 日本のセクションではbook_trends_JP、USセクションではbook_trends_USを取得
+                            'Spotify': 'Spotify',
+                            'Podcast': 'Podcast',
+                            'Hacker Noon': 'Hacker Noon',
                             'Twitch': 'Twitch'
                         };
                         

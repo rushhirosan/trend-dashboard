@@ -468,19 +468,25 @@ async function fetchBookTrendsUS() {
 // Display Book Results (US)
 function displayBookResultsUS(data) {
     console.log('📊 Book Results display started', data);
+    console.log('📊 Book data structure:', JSON.stringify(data, null, 2));
     const tableBody = document.getElementById('bookTrendsTableBody');
     const resultsElement = document.getElementById('bookResults');
     
     if (!tableBody || !resultsElement) {
-        console.error('❌ Book DOM elements not found');
+        console.error('❌ Book DOM elements not found', { tableBody: !!tableBody, resultsElement: !!resultsElement });
         return;
     }
     
     // Clear table
     tableBody.innerHTML = '';
     
-    if (data.data && data.data.length > 0) {
-        data.data.forEach((item, index) => {
+    // データ構造を確認
+    const bookData = data.data || data.books || data;
+    console.log('📊 Book data array:', bookData, 'Length:', Array.isArray(bookData) ? bookData.length : 'not an array');
+    
+    if (bookData && Array.isArray(bookData) && bookData.length > 0) {
+        console.log('📊 Processing', bookData.length, 'book items');
+        bookData.forEach((item, index) => {
             const row = document.createElement('tr');
             row.className = 'trend-card';
             
@@ -507,6 +513,10 @@ function displayBookResultsUS(data) {
             `;
             tableBody.appendChild(row);
         });
+        console.log('📊 Added', bookData.length, 'rows to table');
+    } else {
+        console.warn('📊 No book data to display', { bookData, isArray: Array.isArray(bookData), length: Array.isArray(bookData) ? bookData.length : 'N/A' });
+        tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">データがありません</td></tr>';
     }
     
     // Display results
@@ -609,7 +619,16 @@ function loadBookTrendsFromCacheUS() {
                 return;
             }
             
-            if (data.data && data.data.length > 0) {
+            console.log('📊 Book Trends API response:', data);
+            console.log('📊 Book data check:', { 
+                hasData: !!data.data, 
+                dataLength: data.data ? data.data.length : 0,
+                dataType: typeof data.data,
+                isArray: Array.isArray(data.data)
+            });
+            
+            if (data.data && Array.isArray(data.data) && data.data.length > 0) {
+                console.log('📊 Calling displayBookResultsUS with', data.data.length, 'items');
                 displayBookResultsUS(data);
                 if (statusMessage) {
                     statusMessage.style.display = 'none';

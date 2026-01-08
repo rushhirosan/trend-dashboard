@@ -420,451 +420,7 @@
                     </article>
                 </div>
 
-                <!-- 4行目: 株価 + 仮想通貨 -->
-                <div class="row g-3 mb-3">
-                    <!-- 左側: 株価トレンド（日本） -->
-                    <article class="col-12 col-md-6" id="stockTrends">
-                        <div class="card h-100">
-                            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
-                                <h2 class="h5 mb-0"><i class="fas fa-chart-line" aria-hidden="true"></i> 株価トレンド（日本）</h2>
-                            </div>
-                            <div class="card-body">
-                                <div class="loading text-center py-5" id="stockLoading" style="display: none;">
-                                    <div class="spinner-border text-info" role="status">
-                                        <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                    <p class="mt-3">株価データを取得中...</p>
-                                </div>
-                                <div id="stockResults">
-                                    <div class="alert alert-success status-message" id="stockStatusMessage" style="display: none !important;">
-                                        <!-- ステータスメッセージがここに表示されます -->
-                                    </div>
-                                    <div class="alert alert-danger" id="stockErrorMessage" style="display: none;">
-                                        <!-- 株価トレンドエラーメッセージがここに表示されます -->
-                                    </div>
-                                    <div class="card trend-table category-card">
-                                        <div class="card-body">
-                                            <div class="trend-table-container">
-                                                <div class="table-responsive">
-                                                    <table class="table table-hover trend-table" id="stockTrendsTable">
-                                                        <thead class="table-dark">
-                                                            <tr>
-                                                                <th>順位</th>
-                                                                <th>銘柄名</th>
-                                                                <th>現在値</th>
-                                                                <th>変動率</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody id="stockTrendsTableBody">
-                                                            <!-- 株価データがここに表示されます -->
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </article>
-                    <!-- 右側: 仮想通貨トレンド -->
-                    <article class="col-12 col-md-6">
-                        <div class="card h-100">
-                            <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
-                                <h2 class="h5 mb-0"><i class="fab fa-bitcoin" aria-hidden="true"></i> 仮想通貨トレンド</h2>
-                            </div>
-                            <div class="card-body">
-                                <div class="loading text-center py-5" id="cryptoLoading" style="display: none;">
-                                    <div class="spinner-border text-warning" role="status">
-                                        <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                    <p class="mt-3">仮想通貨データを取得中...</p>
-                                </div>
-                                <div id="cryptoResults">
-                                    <div class="alert alert-success status-message" id="cryptoStatusMessage" style="display: none !important;">
-                                        <!-- ステータスメッセージがここに表示されます -->
-                                    </div>
-                                    <div class="alert alert-danger" id="cryptoErrorMessage" style="display: none;">
-                                        <!-- 仮想通貨トレンドエラーメッセージがここに表示されます -->
-                                    </div>
-                                    <div class="card trend-table category-card">
-                                        <div class="card-body">
-                                            <div class="trend-table-container">
-                                                <div class="table-responsive">
-                                                    <table class="table table-hover trend-table" id="cryptoTrendsTable">
-                                                        <thead class="table-dark">
-                                                            <tr>
-                                                                <th>順位</th>
-                                                                <th>通貨名</th>
-                                                                <th>価格（USD）</th>
-                                                                <th>24h変動率</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody id="cryptoTrendsTableBody">
-                                                            <!-- 仮想通貨データがここに表示されます -->
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </article>
-                </div>
-
-                <!-- 5行目: Spotify + Podcast -->
-                <div class="row g-3 mb-3">
-                    <!-- 左側: 音楽トレンド -->
-                    <article class="col-12 col-md-6" id="musicTrends">
-                        <div class="card h-100">
-                            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                                <h2 class="h5 mb-0"><i class="fas fa-music" aria-hidden="true"></i> Spotify 音楽トレンド</h2>
-                            </div>
-                            <div class="card-body">
-                                <div id="musicResults">
-                                    <div class="alert alert-success status-message" id="musicStatusMessage" style="display: none !important;">
-                                        <!-- ステータスメッセージがここに表示されます -->
-                                    </div>
-                                    <div class="alert alert-danger" id="musicErrorMessage" style="display: none;">
-                                        <!-- 音楽トレンドエラーメッセージがここに表示されます -->
-                                    </div>
-                                    <div class="card trend-table category-card">
-                                        <div class="card-body">
-                                            <div class="trend-table-container">
-                                                <div class="table-responsive">
-                                                    <table class="table table-hover trend-table" id="musicTrendsTable">
-                                                        <thead class="table-dark">
-                                                            <tr>
-                                                                <th>順位</th>
-                                                                <th>曲名</th>
-                                                                <th>アーティスト</th>
-                                                                <th>再生回数</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody id="musicTrendsTableBody">
-                                                            <!-- 音楽トレンドデータがここに表示されます -->
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </article>
-                    <!-- 右側: Podcast トレンド -->
-                    <article class="col-12 col-md-6">
-                        <div class="card h-100">
-                            <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
-                                <h2 class="h5 mb-0"><i class="fas fa-podcast" aria-hidden="true"></i> Podcast トレンド</h2>
-                            </div>
-                            <div class="card-body">
-                                <div class="loading text-center py-5" id="podcastLoading" style="display: none;">
-                                    <div class="spinner-border text-warning" role="status">
-                                        <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                    <p class="mt-3">Podcast トレンドデータを取得中...</p>
-                                </div>
-                                <div id="podcastResults">
-                                    <div class="alert alert-success status-message" id="podcastStatusMessage" style="display: none !important;">
-                                        <!-- ステータスメッセージがここに表示されます -->
-                                    </div>
-                                    <div class="alert alert-danger" id="podcastErrorMessage" style="display: none;">
-                                        <!-- Podcastトレンドエラーメッセージがここに表示されます -->
-                                    </div>
-                                    <div class="card trend-table category-card">
-                                        <div class="card-body">
-                                            <div class="trend-table-container">
-                                                <div class="table-responsive">
-                                                    <table class="table table-hover trend-table" id="podcastTrendsTable">
-                                                        <thead class="table-dark">
-                                                            <tr>
-                                                                <th>順位</th>
-                                                                <th>タイトル</th>
-                                                                <th>配信者</th>
-                                                                <th>スコア</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody id="podcastTrendsTableBody">
-                                                            <!-- Podcastデータがここに表示されます -->
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </article>
-                </div>
-
-                <!-- 5行目: 映画 + 本 -->
-                <div class="row g-3 mb-3">
-                    <!-- 左側: 映画トレンド -->
-                    <article class="col-12 col-md-6">
-                        <div class="card h-100">
-                            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                                <h2 class="h5 mb-0"><i class="fas fa-film" aria-hidden="true"></i> 映画トレンド</h2>
-                            </div>
-                            <div class="card-body">
-                                <div class="loading text-center py-5" id="movieLoading" style="display: none;">
-                                    <div class="spinner-border text-primary" role="status">
-                                        <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                    <p class="mt-3">映画トレンドデータを取得中...</p>
-                                </div>
-                                <div id="movieResults">
-                                    <div class="alert alert-success status-message" id="movieStatusMessage" style="display: none !important;">
-                                        <!-- ステータスメッセージがここに表示されます -->
-                                    </div>
-                                    <div class="card trend-table category-card">
-                                        <div class="card-body">
-                                            <div class="trend-table-container">
-                                                <div class="table-responsive">
-                                                    <table class="table table-hover trend-table" id="movieTrendsTable">
-                                                        <thead class="table-dark">
-                                                            <tr>
-                                                                <th>順位</th>
-                                                                <th>タイトル</th>
-                                                                <th>評価</th>
-                                                                <th>公開日</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody id="movieTrendsTableBody">
-                                                            <!-- 映画データがここに表示されます -->
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </article>
-                    <!-- 右側: 本トレンド -->
-                    <article class="col-12 col-md-6">
-                        <div class="card h-100">
-                            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
-                                <h2 class="h5 mb-0"><i class="fas fa-book" aria-hidden="true"></i> 本トレンド</h2>
-                            </div>
-                            <div class="card-body">
-                                <div class="loading text-center py-5" id="bookLoading" style="display: none;">
-                                    <div class="spinner-border text-info" role="status">
-                                        <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                    <p class="mt-3">本トレンドデータを取得中...</p>
-                                </div>
-                                <div id="bookResults">
-                                    <div class="alert alert-success status-message" id="bookStatusMessage" style="display: none !important;">
-                                        <!-- ステータスメッセージがここに表示されます -->
-                                    </div>
-                                    <div class="card trend-table category-card">
-                                        <div class="card-body">
-                                            <div class="trend-table-container">
-                                                <div class="table-responsive">
-                                                    <table class="table table-hover trend-table" id="bookTrendsTable">
-                                                        <thead class="table-dark">
-                                                            <tr>
-                                                                <th>順位</th>
-                                                                <th>タイトル</th>
-                                                                <th>著者</th>
-                                                                <th>価格</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody id="bookTrendsTableBody">
-                                                            <!-- 本データがここに表示されます -->
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </article>
-                </div>
-
-                <!-- 5.5行目: IPA注意喚起 + JPCERT/CC -->
-                <div class="row g-3 mb-3">
-                    <!-- 左側: IPA注意喚起 -->
-                    <article class="col-12 col-md-6">
-                        <div class="card h-100">
-                            <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
-                                <h2 class="h5 mb-0"><i class="fas fa-shield-alt" aria-hidden="true"></i> IPA注意喚起</h2>
-                            </div>
-                            <div class="card-body">
-                                <div class="loading text-center py-5" id="ipaLoading" style="display: none;">
-                                    <div class="spinner-border text-danger" role="status">
-                                        <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                    <p class="mt-3">IPA注意喚起データを取得中...</p>
-                                </div>
-                                <div id="ipaResults">
-                                    <div class="alert alert-success status-message" id="ipaStatusMessage" style="display: none !important;">
-                                        <!-- ステータスメッセージがここに表示されます -->
-                                    </div>
-                                    <div class="card trend-table category-card">
-                                        <div class="card-body">
-                                            <div class="trend-table-container">
-                                                <div class="table-responsive">
-                                                    <table class="table table-hover trend-table" id="ipaTrendsTable">
-                                                        <thead class="table-dark">
-                                                            <tr>
-                                                                <th>順位</th>
-                                                                <th>タイトル</th>
-                                                                <th>公開日</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody id="ipaTrendsTableBody">
-                                                            <!-- IPAデータがここに表示されます -->
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </article>
-                    <!-- 右側: JPCERT/CC -->
-                    <article class="col-12 col-md-6">
-                        <div class="card h-100">
-                            <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
-                                <h2 class="h5 mb-0"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i> JPCERT/CC</h2>
-                            </div>
-                            <div class="card-body">
-                                <div class="loading text-center py-5" id="jpcertLoading" style="display: none;">
-                                    <div class="spinner-border text-warning" role="status">
-                                        <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                    <p class="mt-3">JPCERT/CCデータを取得中...</p>
-                                </div>
-                                <div id="jpcertResults">
-                                    <div class="alert alert-success status-message" id="jpcertStatusMessage" style="display: none !important;">
-                                        <!-- ステータスメッセージがここに表示されます -->
-                                    </div>
-                                    <div class="card trend-table category-card">
-                                        <div class="card-body">
-                                            <div class="trend-table-container">
-                                                <div class="table-responsive">
-                                                    <table class="table table-hover trend-table" id="jpcertTrendsTable">
-                                                        <thead class="table-dark">
-                                                            <tr>
-                                                                <th>順位</th>
-                                                                <th>タイトル</th>
-                                                                <th>公開日</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody id="jpcertTrendsTableBody">
-                                                            <!-- JPCERT/CCデータがここに表示されます -->
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </article>
-                </div>
-
-                <!-- 6行目: GitHub + App Store -->
-                <div class="row g-3 mb-3">
-                    <!-- 左側: GitHubトレンド -->
-                    <article class="col-12 col-md-6">
-                        <div class="card h-100">
-                            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                                <h2 class="h5 mb-0"><i class="fab fa-github" aria-hidden="true"></i> GitHubトレンド</h2>
-                            </div>
-                            <div class="card-body">
-                                <div class="loading text-center py-5" id="githubLoading" style="display: none;">
-                                    <div class="spinner-border text-dark" role="status">
-                                        <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                    <p class="mt-3">GitHubトレンドデータを取得中...</p>
-                                </div>
-                                <div id="githubResults">
-                                    <div class="alert alert-success status-message" id="githubStatusMessage" style="display: none !important;">
-                                        <!-- ステータスメッセージがここに表示されます -->
-                                    </div>
-                                    <div class="card trend-table category-card">
-                                        <div class="card-body">
-                                            <div class="trend-table-container">
-                                                <div class="table-responsive">
-                                                    <table class="table table-hover trend-table" id="githubTrendsTable">
-                                                        <thead class="table-dark">
-                                                            <tr>
-                                                                <th>順位</th>
-                                                                <th>リポジトリ名</th>
-                                                                <th>言語</th>
-                                                                <th>スター数</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody id="githubTrendsTableBody">
-                                                            <!-- GitHubデータがここに表示されます -->
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </article>
-                    <!-- 右側: App Storeトレンド -->
-                    <article class="col-12 col-md-6">
-                        <div class="card h-100">
-                            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                                <h2 class="h5 mb-0"><i class="fab fa-apple" aria-hidden="true"></i> App Storeトレンド</h2>
-                            </div>
-                            <div class="card-body">
-                                <div class="loading text-center py-5" id="appstoreLoading" style="display: none;">
-                                    <div class="spinner-border text-success" role="status">
-                                        <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                    <p class="mt-3">App Storeトレンドデータを取得中...</p>
-                                </div>
-                                <div id="appstoreResults">
-                                    <div class="alert alert-success status-message" id="appstoreStatusMessage" style="display: none !important;">
-                                        <!-- ステータスメッセージがここに表示されます -->
-                                    </div>
-                                    <div class="card trend-table category-card">
-                                        <div class="card-body">
-                                            <div class="trend-table-container">
-                                                <div class="table-responsive">
-                                                    <table class="table table-hover trend-table" id="appstoreTrendsTable">
-                                                        <thead class="table-dark">
-                                                            <tr>
-                                                                <th>順位</th>
-                                                                <th>アプリ名</th>
-                                                                <th>開発者</th>
-                                                                <th>評価</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody id="appstoreTrendsTableBody">
-                                                            <!-- App Storeデータがここに表示されます -->
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </article>
-                </div>
-
-                <!-- 6.5行目: Zenn + Note -->
+                <!-- 4行目: Zenn + Note -->
                 <div class="row g-3 mb-3">
                     <!-- 左側: Zenn -->
                     <article class="col-12 col-md-6">
@@ -962,7 +518,451 @@
                     </article>
                 </div>
 
-                <!-- 7行目: 楽天 + Twitch -->
+                <!-- 5行目: IPA注意喚起 + JPCERT/CC -->
+                <div class="row g-3 mb-3">
+                    <!-- 左側: IPA注意喚起 -->
+                    <article class="col-12 col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                                <h2 class="h5 mb-0"><i class="fas fa-shield-alt" aria-hidden="true"></i> IPA注意喚起</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="loading text-center py-5" id="ipaLoading" style="display: none;">
+                                    <div class="spinner-border text-danger" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-3">IPA注意喚起データを取得中...</p>
+                                </div>
+                                <div id="ipaResults">
+                                    <div class="alert alert-success status-message" id="ipaStatusMessage" style="display: none !important;">
+                                        <!-- ステータスメッセージがここに表示されます -->
+                                    </div>
+                                    <div class="card trend-table category-card">
+                                        <div class="card-body">
+                                            <div class="trend-table-container">
+                                                <div class="table-responsive">
+                                                    <table class="table table-hover trend-table" id="ipaTrendsTable">
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>順位</th>
+                                                                <th>タイトル</th>
+                                                                <th>公開日</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="ipaTrendsTableBody">
+                                                            <!-- IPAデータがここに表示されます -->
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                    <!-- 右側: JPCERT/CC -->
+                    <article class="col-12 col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                                <h2 class="h5 mb-0"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i> JPCERT/CC</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="loading text-center py-5" id="jpcertLoading" style="display: none;">
+                                    <div class="spinner-border text-warning" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-3">JPCERT/CCデータを取得中...</p>
+                                </div>
+                                <div id="jpcertResults">
+                                    <div class="alert alert-success status-message" id="jpcertStatusMessage" style="display: none !important;">
+                                        <!-- ステータスメッセージがここに表示されます -->
+                                    </div>
+                                    <div class="card trend-table category-card">
+                                        <div class="card-body">
+                                            <div class="trend-table-container">
+                                                <div class="table-responsive">
+                                                    <table class="table table-hover trend-table" id="jpcertTrendsTable">
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>順位</th>
+                                                                <th>タイトル</th>
+                                                                <th>公開日</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="jpcertTrendsTableBody">
+                                                            <!-- JPCERT/CCデータがここに表示されます -->
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+
+                <!-- 6行目: GitHub + App Store -->
+                <div class="row g-3 mb-3">
+                    <!-- 左側: 映画トレンド -->
+                    <article class="col-12 col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                <h2 class="h5 mb-0"><i class="fas fa-film" aria-hidden="true"></i> 映画トレンド</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="loading text-center py-5" id="movieLoading" style="display: none;">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-3">映画トレンドデータを取得中...</p>
+                                </div>
+                                <div id="movieResults">
+                                    <div class="alert alert-success status-message" id="movieStatusMessage" style="display: none !important;">
+                                        <!-- ステータスメッセージがここに表示されます -->
+                                    </div>
+                                    <div class="card trend-table category-card">
+                                        <div class="card-body">
+                                            <div class="trend-table-container">
+                                                <div class="table-responsive">
+                                                    <table class="table table-hover trend-table" id="movieTrendsTable">
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>順位</th>
+                                                                <th>タイトル</th>
+                                                                <th>評価</th>
+                                                                <th>公開日</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="movieTrendsTableBody">
+                                                            <!-- 映画データがここに表示されます -->
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                    <!-- 右側: 本トレンド -->
+                    <article class="col-12 col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                                <h2 class="h5 mb-0"><i class="fas fa-book" aria-hidden="true"></i> 本トレンド</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="loading text-center py-5" id="bookLoading" style="display: none;">
+                                    <div class="spinner-border text-info" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-3">本トレンドデータを取得中...</p>
+                                </div>
+                                <div id="bookResults">
+                                    <div class="alert alert-success status-message" id="bookStatusMessage" style="display: none !important;">
+                                        <!-- ステータスメッセージがここに表示されます -->
+                                    </div>
+                                    <div class="card trend-table category-card">
+                                        <div class="card-body">
+                                            <div class="trend-table-container">
+                                                <div class="table-responsive">
+                                                    <table class="table table-hover trend-table" id="bookTrendsTable">
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>順位</th>
+                                                                <th>タイトル</th>
+                                                                <th>著者</th>
+                                                                <th>価格</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="bookTrendsTableBody">
+                                                            <!-- 本データがここに表示されます -->
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+
+                <!-- 7行目: 株価 + 仮想通貨 -->
+                <div class="row g-3 mb-3">
+                    <!-- 左側: 株価トレンド（日本） -->
+                    <article class="col-12 col-md-6" id="stockTrends">
+                        <div class="card h-100">
+                            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                                <h2 class="h5 mb-0"><i class="fas fa-chart-line" aria-hidden="true"></i> 株価トレンド（日本）</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="loading text-center py-5" id="stockLoading" style="display: none;">
+                                    <div class="spinner-border text-info" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-3">株価データを取得中...</p>
+                                </div>
+                                <div id="stockResults">
+                                    <div class="alert alert-success status-message" id="stockStatusMessage" style="display: none !important;">
+                                        <!-- ステータスメッセージがここに表示されます -->
+                                    </div>
+                                    <div class="alert alert-danger" id="stockErrorMessage" style="display: none;">
+                                        <!-- 株価トレンドエラーメッセージがここに表示されます -->
+                                    </div>
+                                    <div class="card trend-table category-card">
+                                        <div class="card-body">
+                                            <div class="trend-table-container">
+                                                <div class="table-responsive">
+                                                    <table class="table table-hover trend-table" id="stockTrendsTable">
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>順位</th>
+                                                                <th>銘柄名</th>
+                                                                <th>現在値</th>
+                                                                <th>変動率</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="stockTrendsTableBody">
+                                                            <!-- 株価データがここに表示されます -->
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                    <!-- 右側: 仮想通貨トレンド -->
+                    <article class="col-12 col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                                <h2 class="h5 mb-0"><i class="fab fa-bitcoin" aria-hidden="true"></i> 仮想通貨トレンド</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="loading text-center py-5" id="cryptoLoading" style="display: none;">
+                                    <div class="spinner-border text-warning" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-3">仮想通貨データを取得中...</p>
+                                </div>
+                                <div id="cryptoResults">
+                                    <div class="alert alert-success status-message" id="cryptoStatusMessage" style="display: none !important;">
+                                        <!-- ステータスメッセージがここに表示されます -->
+                                    </div>
+                                    <div class="alert alert-danger" id="cryptoErrorMessage" style="display: none;">
+                                        <!-- 仮想通貨トレンドエラーメッセージがここに表示されます -->
+                                    </div>
+                                    <div class="card trend-table category-card">
+                                        <div class="card-body">
+                                            <div class="trend-table-container">
+                                                <div class="table-responsive">
+                                                    <table class="table table-hover trend-table" id="cryptoTrendsTable">
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>順位</th>
+                                                                <th>通貨名</th>
+                                                                <th>価格（USD）</th>
+                                                                <th>24h変動率</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="cryptoTrendsTableBody">
+                                                            <!-- 仮想通貨データがここに表示されます -->
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+
+                <!-- 8行目: 映画 + 本 -->
+                <div class="row g-3 mb-3">
+                    <!-- 左側: 映画トレンド -->
+                    <article class="col-12 col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                <h2 class="h5 mb-0"><i class="fas fa-film" aria-hidden="true"></i> 映画トレンド</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="loading text-center py-5" id="movieLoading" style="display: none;">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-3">映画トレンドデータを取得中...</p>
+                                </div>
+                                <div id="movieResults">
+                                    <div class="alert alert-success status-message" id="movieStatusMessage" style="display: none !important;">
+                                        <!-- ステータスメッセージがここに表示されます -->
+                                    </div>
+                                    <div class="card trend-table category-card">
+                                        <div class="card-body">
+                                            <div class="trend-table-container">
+                                                <div class="table-responsive">
+                                                    <table class="table table-hover trend-table" id="movieTrendsTable">
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>順位</th>
+                                                                <th>タイトル</th>
+                                                                <th>評価</th>
+                                                                <th>公開日</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="movieTrendsTableBody">
+                                                            <!-- 映画データがここに表示されます -->
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                    <!-- 右側: 本トレンド -->
+                    <article class="col-12 col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                                <h2 class="h5 mb-0"><i class="fas fa-book" aria-hidden="true"></i> 本トレンド</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="loading text-center py-5" id="bookLoading" style="display: none;">
+                                    <div class="spinner-border text-info" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-3">本トレンドデータを取得中...</p>
+                                </div>
+                                <div id="bookResults">
+                                    <div class="alert alert-success status-message" id="bookStatusMessage" style="display: none !important;">
+                                        <!-- ステータスメッセージがここに表示されます -->
+                                    </div>
+                                    <div class="card trend-table category-card">
+                                        <div class="card-body">
+                                            <div class="trend-table-container">
+                                                <div class="table-responsive">
+                                                    <table class="table table-hover trend-table" id="bookTrendsTable">
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>順位</th>
+                                                                <th>タイトル</th>
+                                                                <th>著者</th>
+                                                                <th>価格</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="bookTrendsTableBody">
+                                                            <!-- 本データがここに表示されます -->
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+
+                <!-- 9行目: Spotify + Podcast -->
+                <div class="row g-3 mb-3">
+                    <!-- 左側: 音楽トレンド -->
+                    <article class="col-12 col-md-6" id="musicTrends">
+                        <div class="card h-100">
+                            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                                <h2 class="h5 mb-0"><i class="fas fa-music" aria-hidden="true"></i> Spotify 音楽トレンド</h2>
+                            </div>
+                            <div class="card-body">
+                                <div id="musicResults">
+                                    <div class="alert alert-success status-message" id="musicStatusMessage" style="display: none !important;">
+                                        <!-- ステータスメッセージがここに表示されます -->
+                                    </div>
+                                    <div class="alert alert-danger" id="musicErrorMessage" style="display: none;">
+                                        <!-- 音楽トレンドエラーメッセージがここに表示されます -->
+                                    </div>
+                                    <div class="card trend-table category-card">
+                                        <div class="card-body">
+                                            <div class="trend-table-container">
+                                                <div class="table-responsive">
+                                                    <table class="table table-hover trend-table" id="musicTrendsTable">
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>順位</th>
+                                                                <th>曲名</th>
+                                                                <th>アーティスト</th>
+                                                                <th>再生回数</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="musicTrendsTableBody">
+                                                            <!-- 音楽トレンドデータがここに表示されます -->
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                    <!-- 右側: Podcast トレンド -->
+                    <article class="col-12 col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                                <h2 class="h5 mb-0"><i class="fas fa-podcast" aria-hidden="true"></i> Podcast トレンド</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="loading text-center py-5" id="podcastLoading" style="display: none;">
+                                    <div class="spinner-border text-warning" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-3">Podcast トレンドデータを取得中...</p>
+                                </div>
+                                <div id="podcastResults">
+                                    <div class="alert alert-success status-message" id="podcastStatusMessage" style="display: none !important;">
+                                        <!-- ステータスメッセージがここに表示されます -->
+                                    </div>
+                                    <div class="alert alert-danger" id="podcastErrorMessage" style="display: none;">
+                                        <!-- Podcastトレンドエラーメッセージがここに表示されます -->
+                                    </div>
+                                    <div class="card trend-table category-card">
+                                        <div class="card-body">
+                                            <div class="trend-table-container">
+                                                <div class="table-responsive">
+                                                    <table class="table table-hover trend-table" id="podcastTrendsTable">
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th>順位</th>
+                                                                <th>タイトル</th>
+                                                                <th>配信者</th>
+                                                                <th>スコア</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="podcastTrendsTableBody">
+                                                            <!-- Podcastデータがここに表示されます -->
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+
+                <!-- 10行目: 楽天 + Twitch -->
                 <div class="row g-3 mb-3">
                     <!-- 左側: 楽天商品トレンド -->
                     <article class="col-12 col-md-6">

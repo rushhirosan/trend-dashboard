@@ -621,23 +621,36 @@ function loadBookTrendsFromCacheUS() {
             
             console.log('📊 Book Trends API response:', data);
             console.log('📊 Book data check:', { 
+                success: data.success,
                 hasData: !!data.data, 
                 dataLength: data.data ? data.data.length : 0,
                 dataType: typeof data.data,
-                isArray: Array.isArray(data.data)
+                isArray: Array.isArray(data.data),
+                dataKeys: data.data ? Object.keys(data.data[0] || {}) : [],
+                fullData: JSON.stringify(data, null, 2)
             });
             
-            if (data.data && Array.isArray(data.data) && data.data.length > 0) {
+            // データが存在するかチェック
+            if (data.success && data.data && Array.isArray(data.data) && data.data.length > 0) {
                 console.log('📊 Calling displayBookResultsUS with', data.data.length, 'items');
                 displayBookResultsUS(data);
                 if (statusMessage) {
                     statusMessage.style.display = 'none';
                 }
+                if (resultsElement) {
+                    resultsElement.style.display = 'block';
+                }
             } else {
-                console.warn('Book Trends: No data available');
+                console.warn('Book Trends: No data available', {
+                    success: data.success,
+                    hasData: !!data.data,
+                    dataLength: data.data ? data.data.length : 0,
+                    isArray: Array.isArray(data.data),
+                    error: data.error
+                });
                 if (statusMessage) {
                     statusMessage.className = 'alert alert-info status-message';
-                    statusMessage.textContent = 'ℹ️ データがありません。しばらく待ってから再度お試しください。';
+                    statusMessage.textContent = data.error ? `⚠️ ${data.error}` : 'ℹ️ データがありません。しばらく待ってから再度お試しください。';
                     statusMessage.style.display = 'block';
                 }
                 if (tableBody) {

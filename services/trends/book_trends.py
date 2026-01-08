@@ -293,7 +293,12 @@ class BookTrendsManager:
             # キャッシュからデータを取得
             cached_data = self.db.get_book_trends_from_cache('US')
             
-            logger.info(f"🔍 Book (Google): キャッシュ取得結果 - cached_data: {cached_data is not None}, length: {len(cached_data) if cached_data else 0}")
+            # Noneの場合は空配列に変換
+            if cached_data is None:
+                cached_data = []
+                logger.warning("⚠️ Book (Google): get_book_trends_from_cacheがNoneを返しました")
+            
+            logger.info(f"🔍 Book (Google): キャッシュ取得結果 - cached_data is None: {cached_data is None}, length: {len(cached_data) if cached_data else 0}")
             
             if cached_data and len(cached_data) > 0:
                 # ランキング順でソート

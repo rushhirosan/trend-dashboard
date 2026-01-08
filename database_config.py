@@ -3452,7 +3452,7 @@ class TrendsCache:
                 """, (country,))
                 data = cursor.fetchall()
                 
-                logger.debug(f"🔍 Book Trends キャッシュ取得: country={country}, 取得件数={len(data)}")
+                logger.info(f"🔍 Book Trends キャッシュ取得: country={country}, 取得件数={len(data)}")
                 
                 # RealDictCursorの結果を辞書のリストに変換
                 result = []

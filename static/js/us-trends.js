@@ -394,6 +394,7 @@ async function fetchBookTrendsUS() {
     
     const loadingElement = document.getElementById('bookLoading');
     const resultsElement = document.getElementById('bookResults');
+    const statusMessage = document.getElementById('bookStatusMessage');
     const tableBody = document.getElementById('bookTrendsTableBody');
     
     if (!resultsElement || !tableBody) {
@@ -407,10 +408,18 @@ async function fetchBookTrendsUS() {
             loadingElement.style.display = 'block';
         }
         resultsElement.style.display = 'none';
+        if (statusMessage) {
+            statusMessage.style.display = 'none';
+        }
         
         // API call (US books)
         const response = await fetchWithRetry('/api/book-trends?country=US&limit=25');
         const data = await response.json();
+        
+        // Hide loading
+        if (loadingElement) {
+            loadingElement.style.display = 'none';
+        }
         
         if (!response.ok) {
             throw new Error(data.error || `HTTP ${response.status}`);
@@ -424,9 +433,15 @@ async function fetchBookTrendsUS() {
             throw new Error('Data format is incorrect');
         }
         
-        // Hide loading
-        if (loadingElement) {
-            loadingElement.style.display = 'none';
+        if (data.data.length === 0) {
+            if (statusMessage) {
+                statusMessage.className = 'alert alert-info status-message';
+                statusMessage.textContent = 'ℹ️ データがありません。しばらく待ってから再度お試しください。';
+                statusMessage.style.display = 'block';
+            }
+            tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">データがありません</td></tr>';
+            resultsElement.style.display = 'block';
+            return;
         }
         
         // Display data
@@ -436,6 +451,15 @@ async function fetchBookTrendsUS() {
         console.error('Book Trends fetch error:', error);
         if (loadingElement) {
             loadingElement.style.display = 'none';
+        }
+        
+        if (statusMessage) {
+            statusMessage.className = 'alert alert-danger status-message';
+            statusMessage.textContent = `❌ エラー: ${error.message || 'データの取得に失敗しました'}`;
+            statusMessage.style.display = 'block';
+        }
+        if (tableBody) {
+            tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">エラー: ${error.message || 'データの取得に失敗しました'}</td></tr>`;
         }
         resultsElement.style.display = 'block';
     }
@@ -542,8 +566,15 @@ function loadMovieTrendsFromCacheUS() {
 function loadBookTrendsFromCacheUS() {
     console.log('📊 Book Trends cache data loading (US)');
     const loadingElement = document.getElementById('bookLoading');
+    const resultsElement = document.getElementById('bookResults');
+    const statusMessage = document.getElementById('bookStatusMessage');
+    const tableBody = document.getElementById('bookTrendsTableBody');
+    
     if (loadingElement) {
         loadingElement.style.display = 'block';
+    }
+    if (resultsElement) {
+        resultsElement.style.display = 'none';
     }
 
     const controller = new AbortController();
@@ -558,28 +589,69 @@ function loadBookTrendsFromCacheUS() {
             return response.json();
         })
         .then(data => {
-            if (data.data && data.data.length > 0) {
-                displayBookResultsUS(data);
-            }
             if (loadingElement) {
                 loadingElement.style.display = 'none';
             }
-            const resultsElement = document.getElementById('bookResults');
-            if (resultsElement) {
-                resultsElement.style.display = 'block';
+            
+            if (data.error) {
+                console.error('Book Trends API error:', data.error);
+                if (statusMessage) {
+                    statusMessage.className = 'alert alert-warning status-message';
+                    statusMessage.textContent = `⚠️ ${data.error}`;
+                    statusMessage.style.display = 'block';
+                }
+                if (tableBody) {
+                    tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">データが取得できませんでした</td></tr>';
+                }
+                if (resultsElement) {
+                    resultsElement.style.display = 'block';
+                }
+                return;
+            }
+            
+            if (data.data && data.data.length > 0) {
+                displayBookResultsUS(data);
+                if (statusMessage) {
+                    statusMessage.style.display = 'none';
+                }
+            } else {
+                console.warn('Book Trends: No data available');
+                if (statusMessage) {
+                    statusMessage.className = 'alert alert-info status-message';
+                    statusMessage.textContent = 'ℹ️ データがありません。しばらく待ってから再度お試しください。';
+                    statusMessage.style.display = 'block';
+                }
+                if (tableBody) {
+                    tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">データがありません</td></tr>';
+                }
+                if (resultsElement) {
+                    resultsElement.style.display = 'block';
+                }
             }
         })
         .catch(error => {
             clearTimeout(timeoutId);
-            if (error.name === 'AbortError') {
-                console.error('Book Trends cache loading error: Timeout (30s)');
-            } else {
-                console.error('Book Trends cache loading error:', error);
-            }
             if (loadingElement) {
                 loadingElement.style.display = 'none';
             }
-            const resultsElement = document.getElementById('bookResults');
+            
+            let errorMessage = 'データの取得に失敗しました';
+            if (error.name === 'AbortError') {
+                errorMessage = 'タイムアウト: データの取得に時間がかかりすぎました';
+                console.error('Book Trends cache loading error: Timeout (30s)');
+            } else {
+                console.error('Book Trends cache loading error:', error);
+                errorMessage = `エラー: ${error.message || '不明なエラー'}`;
+            }
+            
+            if (statusMessage) {
+                statusMessage.className = 'alert alert-danger status-message';
+                statusMessage.textContent = `❌ ${errorMessage}`;
+                statusMessage.style.display = 'block';
+            }
+            if (tableBody) {
+                tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">${errorMessage}</td></tr>`;
+            }
             if (resultsElement) {
                 resultsElement.style.display = 'block';
             }

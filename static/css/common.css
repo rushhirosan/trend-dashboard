@@ -22,6 +22,7 @@ h6, .h6 { font-size: 0.9rem; }
     border-bottom: 2px solid #e9ecef;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     padding: 0.25rem 0; /* ヘッダーを狭める */
+    transition: all 0.3s ease;
 }
 
 /* ナビゲーション共通スタイル */

@@ -1,15 +1,6 @@
-ヘッダーのスタイル
-header {
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    background-color: #ffffff !important; /* 確実に背景色を設定 */
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1); /* スクロール時の視認性向上 */
-    transition: all 0.3s ease;
-    padding: 0.25rem 0; /* py-2 → py-1相当 */
-}
+/* ヘッダーのスタイルは common.css で統一管理 */
 
-header .nav-pills {
+#mainHeader .nav-pills {
     display: flex !important;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
@@ -18,20 +9,20 @@ header .nav-pills {
     padding: 0 !important;
 }
 
-header .nav-pills .nav-item {
+#mainHeader .nav-pills .nav-item {
     display: inline-block !important;
     margin-right: 0.5rem !important;
     float: left !important;
 }
 
-header .nav-pills .nav-link {
+#mainHeader .nav-pills .nav-link {
     font-size: 0.85rem;
     padding: 0.4rem 0.8rem;
     white-space: nowrap;
     display: inline-block !important;
 }
 
-header .nav-pills .nav-link small {
+#mainHeader .nav-pills .nav-link small {
     font-size: 0.7rem;
 }
 

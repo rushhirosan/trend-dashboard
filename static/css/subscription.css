@@ -7,20 +7,54 @@
     border: 1px solid #e9ecef;
 }
 
-.subscription-options .form-check {
+/* スクロール可能なエリア */
+.subscription-options-scrollable {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    border: 1px solid #e9ecef;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+/* スクロールバーのスタイリング */
+.subscription-options-scrollable::-webkit-scrollbar {
+    width: 8px;
+}
+
+.subscription-options-scrollable::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.subscription-options-scrollable::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.subscription-options-scrollable::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+.subscription-options .form-check,
+.subscription-options-scrollable .form-check {
     margin-bottom: 0.5rem;
 }
 
-.subscription-options .form-check:last-child {
+.subscription-options .form-check:last-child,
+.subscription-options-scrollable .form-check:last-child {
     margin-bottom: 0;
 }
 
-.subscription-options .form-check-label {
+.subscription-options .form-check-label,
+.subscription-options-scrollable .form-check-label {
     font-size: 0.9rem;
     color: #495057;
+    cursor: pointer;
 }
 
-.subscription-options .form-check-input:checked {
+.subscription-options .form-check-input:checked,
+.subscription-options-scrollable .form-check-input:checked {
     background-color: #0d6efd;
     border-color: #0d6efd;
 }

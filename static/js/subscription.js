@@ -16,6 +16,30 @@ function initSubscription() {
         unsubscribeBtn.addEventListener('click', handleUnsubscribe);
     }
     
+    // 一括選択ボタンイベントリスナー
+    const selectAllBtn = document.getElementById('selectAllBtn');
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', function() {
+            const checkboxes = document.querySelectorAll('.subscription-options-scrollable .form-check-input');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = true;
+            });
+            console.log('✅ すべてのチェックボックスを選択しました');
+        });
+    }
+    
+    // 一括解除ボタンイベントリスナー
+    const deselectAllBtn = document.getElementById('deselectAllBtn');
+    if (deselectAllBtn) {
+        deselectAllBtn.addEventListener('click', function() {
+            const checkboxes = document.querySelectorAll('.subscription-options-scrollable .form-check-input');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            console.log('✅ すべてのチェックボックスを解除しました');
+        });
+    }
+    
     // 既存のサブスクリプション状態をチェック
     checkSubscriptionStatus();
 }

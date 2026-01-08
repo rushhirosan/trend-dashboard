@@ -540,8 +540,17 @@ class TrendsCache:
                     description TEXT,
                     author VARCHAR(255),
                     rank INTEGER DEFAULT 0,
+                    category VARCHAR(50) DEFAULT 'all',
                     cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
+                
+                -- note_trends_cacheテーブルにcategoryカラムを追加（既存テーブル用）
+                DO $$ 
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'note_trends_cache' AND column_name = 'category') THEN
+                        ALTER TABLE note_trends_cache ADD COLUMN category VARCHAR(50) DEFAULT 'all';
+                    END IF;
+                END $$;
                 
                 CREATE TABLE IF NOT EXISTS cache_status (
                     id SERIAL PRIMARY KEY,
@@ -724,6 +733,13 @@ class TrendsCache:
                     else:
                         # regionが空の場合は全データを削除
                         cursor.execute(f"DELETE FROM {table_name}")
+                elif cache_key == 'note_trends':
+                    # note_trendsの場合はcategoryで削除
+                    if region and region != '':
+                        cursor.execute(f"DELETE FROM {table_name} WHERE category = %s", (region,))
+                    else:
+                        # regionが空の場合は全データを削除
+                        cursor.execute(f"DELETE FROM {table_name}")
                 else:
                     delete_column = delete_column_map.get(cache_key, 'region')
                     if delete_column and region is not None:
@@ -808,6 +824,11 @@ class TrendsCache:
                             "INSERT INTO twitch_trends_cache (category, title, game_name, viewer_count, view_count, user_name, creator_name, thumbnail_url, url, rank, box_art_url, game_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                             (region, item.get('title', ''), item.get('game_name', '') or item.get('name', ''), item.get('viewer_count', 0), item.get('view_count', 0), item.get('user_name', ''), item.get('creator_name', ''), item.get('thumbnail_url', ''), item.get('url', ''), item.get('rank', 0), item.get('box_art_url', ''), item.get('id', '') or item.get('game_id', ''))
                         )
+                    elif cache_key == 'note_trends':
+                        cursor.execute(
+                            "INSERT INTO note_trends_cache (title, url, published_date, description, author, rank, category) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                            (item.get('title', ''), item.get('url', ''), item.get('published_date') or None, item.get('description', ''), item.get('author', ''), item.get('rank', 0), item.get('category', region) or region or 'all')
+                        )
                 
                 # キャッシュステータスを更新
                 import pytz
@@ -860,7 +881,7 @@ class TrendsCache:
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 table_name = f"{cache_key}_cache"
                 
-                # hatena_trendsとtwitch_trendsの場合はcategoryでフィルタリング
+                # hatena_trends、twitch_trends、note_trendsの場合はcategoryでフィルタリング
                 if cache_key == 'hatena_trends':
                     if region and region != '':
                         cursor.execute(f"SELECT * FROM {table_name} WHERE category = %s ORDER BY rank ASC, created_at DESC", (region,))
@@ -871,6 +892,11 @@ class TrendsCache:
                         cursor.execute(f"SELECT * FROM {table_name} WHERE category = %s ORDER BY rank ASC, created_at DESC", (region,))
                     else:
                         cursor.execute(f"SELECT * FROM {table_name} ORDER BY rank ASC, created_at DESC")
+                elif cache_key == 'note_trends':
+                    if region and region != '':
+                        cursor.execute(f"SELECT * FROM {table_name} WHERE category = %s ORDER BY rank ASC, cached_at DESC", (region,))
+                    else:
+                        cursor.execute(f"SELECT * FROM {table_name} ORDER BY rank ASC, cached_at DESC")
                 # rakuten_trendsの場合はgenre_idでフィルタリング（regionパラメータがgenre_idとして渡される）
                 elif cache_key == 'rakuten_trends':
                     if region and region != '':

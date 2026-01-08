@@ -3,8 +3,10 @@ header {
     position: sticky;
     top: 0;
     z-index: 1000;
+    background-color: #ffffff !important; /* 確実に背景色を設定 */
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1); /* スクロール時の視認性向上 */
     transition: all 0.3s ease;
-    padding: 0.5rem 0;
+    padding: 0.25rem 0; /* py-2 → py-1相当 */
 }
 
 header .nav-pills {
@@ -41,10 +43,10 @@ header .nav-pills .nav-link small {
     display: inline-flex !important;
     align-items: center;
     justify-content: center;
-    gap: 0.4rem;
+    gap: 0.35rem; /* 0.4rem → 0.35rem */
     font-weight: 600;
-    min-width: 170px;
-    padding: 0.45rem 1.2rem;
+    min-width: 150px; /* 170px → 150px */
+    padding: 0.35rem 1rem; /* 0.45rem 1.2rem → 0.35rem 1rem */
     border-radius: 999px;
     border: 2px solid #0d6efd;
     color: #0d6efd !important;
@@ -52,10 +54,11 @@ header .nav-pills .nav-link small {
     box-shadow: none !important;
     transition: all 0.2s ease-in-out;
     text-decoration: none !important;
+    font-size: 0.85rem; /* 少し小さく */
 }
 
 #mainHeader .header-nav-btn i {
-    font-size: 1rem;
+    font-size: 0.9rem; /* 1rem → 0.9rem */
 }
 
 #mainHeader .header-nav-btn:hover,
@@ -87,7 +90,7 @@ header .nav-pills .nav-link small {
 }
 
 #mainHeader .header-title .header-title-icon {
-    font-size: 1.5rem;
+    font-size: 1.3rem; /* 1.5rem → 1.3rem */
 }
 
 #mainHeader .header-title .header-title-text {

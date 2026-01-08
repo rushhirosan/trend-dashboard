@@ -17,7 +17,7 @@ h6, .h6 { font-size: 0.9rem; }
 #mainHeader {
     border-bottom: 2px solid #e9ecef;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    padding: 0.5rem 0;
+    padding: 0.25rem 0; /* ヘッダーを狭める */
 }
 
 /* ナビゲーション共通スタイル */

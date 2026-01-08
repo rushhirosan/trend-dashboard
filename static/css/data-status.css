@@ -1,7 +1,9 @@
 /* データ鮮度情報専用スタイル */
 
 /* コンパクトなレイアウト */
-.container-fluid {
+/* ヘッダーには影響しないように、main内のcontainer-fluidのみに適用 */
+main .container-fluid,
+#mainContent .container-fluid {
     padding: 0.5rem;
 }
 

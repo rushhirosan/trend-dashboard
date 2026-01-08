@@ -21,8 +21,16 @@ h6, .h6 { font-size: 0.9rem; }
     background-color: #ffffff !important;
     border-bottom: 2px solid #e9ecef;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    padding: 0.25rem 0; /* ヘッダーを狭める */
+    padding: 0.25rem 0 !important; /* ヘッダーを狭める - 全ページで統一 */
     transition: all 0.3s ease;
+}
+
+/* ヘッダー内のcontainer-fluidのpaddingを統一 */
+#mainHeader .container-fluid {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
 }
 
 /* ナビゲーション共通スタイル */
@@ -123,7 +131,7 @@ h6, .h6 { font-size: 0.9rem; }
     
     /* ヘッダーのモバイル対応 */
     #mainHeader .container-fluid {
-        padding: 0.5rem;
+        padding: 0 0.5rem !important; /* 上下のpaddingは0.25remを維持 */
     }
     
     #mainHeader .d-flex.justify-content-between {

@@ -3448,9 +3448,11 @@ class TrendsCache:
                            thumbnail, small_thumbnail, medium, large, rank, updated_at, cached_at
                     FROM book_trends_cache 
                     WHERE country = %s
-                    ORDER BY rank
+                    ORDER BY rank ASC, cached_at DESC
                 """, (country,))
                 data = cursor.fetchall()
+                
+                logger.debug(f"🔍 Book Trends キャッシュ取得: country={country}, 取得件数={len(data)}")
                 
                 # RealDictCursorの結果を辞書のリストに変換
                 result = []

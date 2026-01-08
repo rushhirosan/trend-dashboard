@@ -293,7 +293,9 @@ class BookTrendsManager:
             # キャッシュからデータを取得
             cached_data = self.db.get_book_trends_from_cache('US')
             
-            if cached_data:
+            logger.info(f"🔍 Book (Google): キャッシュ取得結果 - cached_data: {cached_data is not None}, length: {len(cached_data) if cached_data else 0}")
+            
+            if cached_data and len(cached_data) > 0:
                 # ランキング順でソート
                 cached_data.sort(key=lambda x: x.get('rank', 999999))
                 

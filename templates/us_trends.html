@@ -92,35 +92,11 @@
 </head>
 <body class="bg-light">
     <!-- ヘッダー -->
-    <header class="bg-white shadow-sm border-bottom" id="mainHeader">
-        <div class="container-fluid px-3">
-            <div class="d-flex align-items-center justify-content-between py-1">
-                <!-- Left: Logo and Title -->
-                <div class="header-title">
-                    <i class="fas fa-chart-line header-title-icon"></i>
-                    <h1 class="h4 mb-0 header-title-text">Trends Dashboard</h1>
-                </div>
-                <!-- Right: Navigation -->
-                <div class="d-flex align-items-center">
-                    <a href="/" class="btn header-nav-btn">
-                        <i class="fas fa-chart-line"></i> Japan Trends
-                    </a>
-                    <a href="/us" class="btn header-nav-btn active">
-                        <i class="fas fa-chart-line"></i> US Trends
-                    </a>
-                    <a href="/data-status" class="btn header-nav-btn">
-                        <i class="fas fa-clock"></i> Data Status
-                    </a>
-                    <a href="/subscription" class="btn header-nav-btn">
-                        <i class="fas fa-envelope"></i> Subscription
-                    </a>
-                    <a href="/about" class="btn header-nav-btn">
-                        <i class="fas fa-info-circle"></i> About
-                    </a>
-                </div>
-            </div>
-        </div>
-    </header>
+    {% set page_title = 'Trends Dashboard' %}
+    {% set page_icon = 'fas fa-chart-line' %}
+    {% set active_page = 'us' %}
+    {% set lang = 'en' %}
+    {% include 'partials/header.html' with context %}
 
     <div class="container-fluid py-4">
 

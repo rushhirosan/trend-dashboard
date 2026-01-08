@@ -94,35 +94,10 @@
 </head>
 <body class="bg-light">
     <!-- ヘッダー -->
-    <header class="bg-white shadow-sm border-bottom" id="mainHeader">
-        <div class="container-fluid px-3">
-            <div class="d-flex align-items-center justify-content-between py-1">
-                <!-- 左側: ロゴとタイトル -->
-                <div class="header-title">
-                    <i class="fas fa-chart-line header-title-icon"></i>
-                    <h1 class="h4 mb-0 header-title-text">トレンド一覧</h1>
-                </div>
-                <!-- 右側: ナビゲーション -->
-                <div class="d-flex align-items-center">
-                    <a href="/" class="btn header-nav-btn active">
-                        <i class="fas fa-chart-line"></i> 日本トレンド
-                    </a>
-                    <a href="/us" class="btn header-nav-btn">
-                        <i class="fas fa-chart-line"></i> US Trends
-                    </a>
-                    <a href="/data-status" class="btn header-nav-btn">
-                        <i class="fas fa-clock"></i> データ鮮度
-                    </a>
-                    <a href="/subscription" class="btn header-nav-btn">
-                        <i class="fas fa-envelope"></i> サブスク
-                    </a>
-                    <a href="/about" class="btn header-nav-btn">
-                        <i class="fas fa-info-circle"></i> About
-                    </a>
-                </div>
-            </div>
-        </div>
-    </header>
+    {% set page_title = 'トレンド一覧' %}
+    {% set page_icon = 'fas fa-chart-line' %}
+    {% set active_page = 'index' %}
+    {% include 'partials/header.html' with context %}
 
     <main class="container-fluid py-4">
         <div id="mainContent">

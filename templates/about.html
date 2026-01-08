@@ -31,34 +31,11 @@
     <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
 </head>
 <body class="bg-light">
-    <!-- Header -->
-    <header class="bg-white shadow-sm border-bottom" id="mainHeader">
-        <div class="container-fluid px-3">
-            <div class="d-flex align-items-center justify-content-between py-1">
-                <div class="header-title">
-                    <i class="fas fa-info-circle header-title-icon"></i>
-                    <h1 class="h4 mb-0 header-title-text">このサイトについて / About</h1>
-                </div>
-                <div class="d-flex align-items-center">
-                    <a href="/" class="btn header-nav-btn">
-                        <i class="fas fa-chart-line"></i> 日本トレンド
-                    </a>
-                    <a href="/us" class="btn header-nav-btn">
-                        <i class="fas fa-chart-line"></i> US Trends
-                    </a>
-                    <a href="/data-status" class="btn header-nav-btn">
-                        <i class="fas fa-clock"></i> データ鮮度
-                    </a>
-                    <a href="/subscription" class="btn header-nav-btn">
-                        <i class="fas fa-envelope"></i> サブスク
-                    </a>
-                    <a href="/about" class="btn header-nav-btn active">
-                        <i class="fas fa-info-circle"></i> About
-                    </a>
-                </div>
-            </div>
-        </div>
-    </header>
+    <!-- ヘッダー -->
+    {% set page_title = 'このサイトについて / About' %}
+    {% set page_icon = 'fas fa-info-circle' %}
+    {% set active_page = 'about' %}
+    {% include 'partials/header.html' with context %}
 
     <div class="container-fluid py-5">
         <div class="row justify-content-center">

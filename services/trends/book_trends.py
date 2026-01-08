@@ -320,6 +320,16 @@ class BookTrendsManager:
                     'country': 'US'
                 }
             else:
+                # キャッシュがない場合、データ鮮度情報を確認
+                # cache_statusテーブルにデータが存在する場合は、データが存在する可能性がある
+                try:
+                    cache_info = self.db.get_cache_info('book_trends_US')
+                    if cache_info and cache_info.get('data_count', 0) > 0:
+                        logger.warning(f"⚠️ Book (Google): キャッシュにデータがありませんが、cache_statusには{cache_info.get('data_count')}件の記録があります。外部APIを呼び出してデータを取得します")
+                        return self._fetch_google_books_trends(limit)
+                except Exception as e:
+                    logger.warning(f"⚠️ Book (Google): cache_status確認エラー（処理は継続）: {e}")
+                
                 # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
                 if not force_refresh:
                     logger.warning("⚠️ Book (Google): キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")

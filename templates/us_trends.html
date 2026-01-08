@@ -469,7 +469,182 @@
             </div>
         </div>
 
-        <!-- Row 4: Stock Trends + Crypto Trends -->
+        <!-- Row 4: CISA KEV + The Hacker News -->
+        <div class="row g-3 mb-3">
+            <!-- Left: CISA KEV -->
+            <div class="col-12 col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-danger text-white">
+                        <h5><i class="fas fa-shield-alt"></i> CISA KEV</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="loading text-center py-5" id="cisaKevLoading" style="display: none;">
+                            <div class="spinner-border text-danger" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Loading CISA KEV data...</p>
+                        </div>
+                        <div id="cisaKevResults" style="display: none;">
+                            <div class="alert alert-success status-message" id="cisaKevStatusMessage" style="display: none;">
+                                <!-- Status messages will be displayed here -->
+                            </div>
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                                    <div class="trend-table-container">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover trend-table" id="cisaKevTrendsTable">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>Rank</th>
+                                                        <th>CVE ID</th>
+                                                        <th>Product</th>
+                                                        <th>Date Added</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="cisaKevTrendsTableBody">
+                                                    <!-- CISA KEV data will be displayed here -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Right: The Hacker News -->
+            <div class="col-12 col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-info text-white">
+                        <h5><i class="fas fa-newspaper"></i> The Hacker News</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="loading text-center py-5" id="thehackernewsLoading" style="display: none;">
+                            <div class="spinner-border text-info" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Loading The Hacker News data...</p>
+                        </div>
+                        <div id="thehackernewsResults" style="display: none;">
+                            <div class="alert alert-success status-message" id="thehackernewsStatusMessage" style="display: none;">
+                                <!-- Status messages will be displayed here -->
+                            </div>
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                                    <div class="trend-table-container">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover trend-table" id="thehackernewsTrendsTable">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>Rank</th>
+                                                        <th>Title</th>
+                                                        <th>Published</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="thehackernewsTrendsTableBody">
+                                                    <!-- The Hacker News data will be displayed here -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 5: GitHub Trends + App Store Trends -->
+        <div class="row g-3 mb-3">
+            <!-- Left: GitHub Trends -->
+            <div class="col-12 col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-dark text-white">
+                        <h5><i class="fab fa-github"></i> GitHub Trends</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="loading text-center py-5" id="githubLoading" style="display: none;">
+                            <div class="spinner-border text-dark" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Loading GitHub trends...</p>
+                        </div>
+                        <div id="githubResults" style="display: none;">
+                            <div class="alert alert-success status-message" id="githubStatusMessage" style="display: none;">
+                                <!-- Status messages will be displayed here -->
+                            </div>
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                                    <div class="trend-table-container">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover trend-table" id="githubTrendsTable">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>Rank</th>
+                                                        <th>Repository</th>
+                                                        <th>Language</th>
+                                                        <th>Stars</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="githubTrendsTableBody">
+                                                    <!-- GitHub data will be displayed here -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Right: App Store Trends -->
+            <div class="col-12 col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-success text-white">
+                        <h5><i class="fab fa-apple"></i> App Store Trends</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="loading text-center py-5" id="appstoreLoading" style="display: none;">
+                            <div class="spinner-border text-success" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Loading App Store trends...</p>
+                        </div>
+                        <div id="appstoreResults" style="display: none;">
+                            <div class="alert alert-success status-message" id="appstoreStatusMessage" style="display: none;">
+                                <!-- Status messages will be displayed here -->
+                            </div>
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                                    <div class="trend-table-container">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover trend-table" id="appstoreTrendsTable">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>Rank</th>
+                                                        <th>App Name</th>
+                                                        <th>Developer</th>
+                                                        <th>Rating</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="appstoreTrendsTableBody">
+                                                    <!-- App Store data will be displayed here -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 6: Stock Trends + Crypto Trends -->
         <div class="row g-3 mb-3">
             <!-- Left: Stock Trends (US) -->
             <div class="col-12 col-md-6" id="stockTrends">
@@ -580,7 +755,95 @@
             </div>
         </div>
 
-        <!-- Row 5: Spotify Music + Podcast Trends -->
+        <!-- Row 7: Movie Trends + Book Trends -->
+        <div class="row g-3 mb-3">
+            <!-- Left: Movie Trends -->
+            <div class="col-12 col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5><i class="fas fa-film"></i> Movie Trends</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="loading text-center py-5" id="movieLoading" style="display: none;">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Loading movie trends...</p>
+                        </div>
+                        <div id="movieResults" style="display: none;">
+                            <div class="alert alert-success status-message" id="movieStatusMessage" style="display: none;">
+                                <!-- Status messages will be displayed here -->
+                            </div>
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                                    <div class="trend-table-container">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover trend-table" id="movieTrendsTable">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>Rank</th>
+                                                        <th>Title</th>
+                                                        <th>Rating</th>
+                                                        <th>Release Date</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="movieTrendsTableBody">
+                                                    <!-- Movie data will be displayed here -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Right: Book Trends -->
+            <div class="col-12 col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-info text-white">
+                        <h5><i class="fas fa-book"></i> Book Trends</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="loading text-center py-5" id="bookLoading" style="display: none;">
+                            <div class="spinner-border text-info" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Loading book trends...</p>
+                        </div>
+                        <div id="bookResults" style="display: none;">
+                            <div class="alert alert-success status-message" id="bookStatusMessage" style="display: none;">
+                                <!-- Status messages will be displayed here -->
+                            </div>
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                                    <div class="trend-table-container">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover trend-table" id="bookTrendsTable">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>Rank</th>
+                                                        <th>Title</th>
+                                                        <th>Author</th>
+                                                        <th>Rating</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="bookTrendsTableBody">
+                                                    <!-- Book data will be displayed here -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 8: Spotify Music + Podcast Trends -->
         <div class="row g-3 mb-3">
             <!-- Left: Spotify Music -->
             <div class="col-12 col-md-6" id="spotifyTrends">
@@ -692,270 +955,7 @@
             </div>
         </div>
 
-        <!-- Row 5: Movie Trends + Book Trends -->
-        <div class="row g-3 mb-3">
-            <!-- Left: Movie Trends -->
-            <div class="col-12 col-md-6">
-                <div class="card h-100">
-                    <div class="card-header bg-primary text-white">
-                        <h5><i class="fas fa-film"></i> Movie Trends</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="loading text-center py-5" id="movieLoading" style="display: none;">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <p class="mt-3">Loading movie trends...</p>
-                        </div>
-                        <div id="movieResults" style="display: none;">
-                            <div class="alert alert-success status-message" id="movieStatusMessage" style="display: none;">
-                                <!-- Status messages will be displayed here -->
-                            </div>
-                            <div class="card trend-table category-card">
-                                <div class="card-body">
-                                    <div class="trend-table-container">
-                                        <div class="table-responsive">
-                                            <table class="table table-hover trend-table" id="movieTrendsTable">
-                                                <thead class="table-dark">
-                                                    <tr>
-                                                        <th>Rank</th>
-                                                        <th>Title</th>
-                                                        <th>Rating</th>
-                                                        <th>Release Date</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody id="movieTrendsTableBody">
-                                                    <!-- Movie data will be displayed here -->
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!-- Right: Book Trends -->
-            <div class="col-12 col-md-6">
-                <div class="card h-100">
-                    <div class="card-header bg-info text-white">
-                        <h5><i class="fas fa-book"></i> Book Trends</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="loading text-center py-5" id="bookLoading" style="display: none;">
-                            <div class="spinner-border text-info" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <p class="mt-3">Loading book trends...</p>
-                        </div>
-                        <div id="bookResults" style="display: none;">
-                            <div class="alert alert-success status-message" id="bookStatusMessage" style="display: none;">
-                                <!-- Status messages will be displayed here -->
-                            </div>
-                            <div class="card trend-table category-card">
-                                <div class="card-body">
-                                    <div class="trend-table-container">
-                                        <div class="table-responsive">
-                                            <table class="table table-hover trend-table" id="bookTrendsTable">
-                                                <thead class="table-dark">
-                                                    <tr>
-                                                        <th>Rank</th>
-                                                        <th>Title</th>
-                                                        <th>Author</th>
-                                                        <th>Rating</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody id="bookTrendsTableBody">
-                                                    <!-- Book data will be displayed here -->
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Row 5.5: CISA KEV + The Hacker News -->
-        <div class="row g-3 mb-3">
-            <!-- Left: CISA KEV -->
-            <div class="col-12 col-md-6">
-                <div class="card h-100">
-                    <div class="card-header bg-danger text-white">
-                        <h5><i class="fas fa-shield-alt"></i> CISA KEV</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="loading text-center py-5" id="cisaKevLoading" style="display: none;">
-                            <div class="spinner-border text-danger" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <p class="mt-3">Loading CISA KEV data...</p>
-                        </div>
-                        <div id="cisaKevResults" style="display: none;">
-                            <div class="alert alert-success status-message" id="cisaKevStatusMessage" style="display: none;">
-                                <!-- Status messages will be displayed here -->
-                            </div>
-                            <div class="card trend-table category-card">
-                                <div class="card-body">
-                                    <div class="trend-table-container">
-                                        <div class="table-responsive">
-                                            <table class="table table-hover trend-table" id="cisaKevTrendsTable">
-                                                <thead class="table-dark">
-                                                    <tr>
-                                                        <th>Rank</th>
-                                                        <th>CVE ID</th>
-                                                        <th>Product</th>
-                                                        <th>Date Added</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody id="cisaKevTrendsTableBody">
-                                                    <!-- CISA KEV data will be displayed here -->
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!-- Right: The Hacker News -->
-            <div class="col-12 col-md-6">
-                <div class="card h-100">
-                    <div class="card-header bg-info text-white">
-                        <h5><i class="fas fa-newspaper"></i> The Hacker News</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="loading text-center py-5" id="thehackernewsLoading" style="display: none;">
-                            <div class="spinner-border text-info" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <p class="mt-3">Loading The Hacker News data...</p>
-                        </div>
-                        <div id="thehackernewsResults" style="display: none;">
-                            <div class="alert alert-success status-message" id="thehackernewsStatusMessage" style="display: none;">
-                                <!-- Status messages will be displayed here -->
-                            </div>
-                            <div class="card trend-table category-card">
-                                <div class="card-body">
-                                    <div class="trend-table-container">
-                                        <div class="table-responsive">
-                                            <table class="table table-hover trend-table" id="thehackernewsTrendsTable">
-                                                <thead class="table-dark">
-                                                    <tr>
-                                                        <th>Rank</th>
-                                                        <th>Title</th>
-                                                        <th>Published</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody id="thehackernewsTrendsTableBody">
-                                                    <!-- The Hacker News data will be displayed here -->
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Row 6: GitHub Trends + App Store Trends -->
-        <div class="row g-3 mb-3">
-            <!-- Left: GitHub Trends -->
-            <div class="col-12 col-md-6">
-                <div class="card h-100">
-                    <div class="card-header bg-dark text-white">
-                        <h5><i class="fab fa-github"></i> GitHub Trends</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="loading text-center py-5" id="githubLoading" style="display: none;">
-                            <div class="spinner-border text-dark" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <p class="mt-3">Loading GitHub trends...</p>
-                        </div>
-                        <div id="githubResults" style="display: none;">
-                            <div class="alert alert-success status-message" id="githubStatusMessage" style="display: none;">
-                                <!-- Status messages will be displayed here -->
-                            </div>
-                            <div class="card trend-table category-card">
-                                <div class="card-body">
-                                    <div class="trend-table-container">
-                                        <div class="table-responsive">
-                                            <table class="table table-hover trend-table" id="githubTrendsTable">
-                                                <thead class="table-dark">
-                                                    <tr>
-                                                        <th>Rank</th>
-                                                        <th>Repository</th>
-                                                        <th>Language</th>
-                                                        <th>Stars</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody id="githubTrendsTableBody">
-                                                    <!-- GitHub data will be displayed here -->
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!-- Right: App Store Trends -->
-            <div class="col-12 col-md-6">
-                <div class="card h-100">
-                    <div class="card-header bg-success text-white">
-                        <h5><i class="fab fa-apple"></i> App Store Trends</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="loading text-center py-5" id="appstoreLoading" style="display: none;">
-                            <div class="spinner-border text-success" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <p class="mt-3">Loading App Store trends...</p>
-                        </div>
-                        <div id="appstoreResults" style="display: none;">
-                            <div class="alert alert-success status-message" id="appstoreStatusMessage" style="display: none;">
-                                <!-- Status messages will be displayed here -->
-                            </div>
-                            <div class="card trend-table category-card">
-                                <div class="card-body">
-                                    <div class="trend-table-container">
-                                        <div class="table-responsive">
-                                            <table class="table table-hover trend-table" id="appstoreTrendsTable">
-                                                <thead class="table-dark">
-                                                    <tr>
-                                                        <th>Rank</th>
-                                                        <th>App Name</th>
-                                                        <th>Developer</th>
-                                                        <th>Rating</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody id="appstoreTrendsTableBody">
-                                                    <!-- App Store data will be displayed here -->
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Row 7: Hacker Noon + Twitch Trends -->
+        <!-- Row 9: Hacker Noon + Twitch Trends -->
         <div class="row g-3 mb-3">
             <!-- Left: Hacker Noon -->
             <div class="col-12 col-md-6">

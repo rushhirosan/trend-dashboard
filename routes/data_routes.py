@@ -49,36 +49,10 @@ def handle_data_error(operation_name, error, status_code=500):
 
 @data_bp.route('/cache/data-freshness')
 def get_data_freshness():
-    """データ更新情報タブ用の統一的キャッシュ情報を取得"""
+    """データ更新情報タブ用の統一的キャッシュ情報を取得（最適化版：1回のクエリで全データ取得）"""
     try:
         # 国コードを取得（デフォルトはJP）
         country = request.args.get('country', 'JP').upper()
-        
-        freshness_info = {}
-        
-        # 各カテゴリのキャッシュ情報を取得
-        categories = [
-            ('google_trends', 'Google Trends'),
-            ('youtube_trends', 'YouTube'),
-            ('music_trends', 'Spotify'),
-            ('worldnews_trends', 'World News'),
-            ('podcast_trends', 'Podcast'),
-            ('movie_trends', '映画トレンド'),
-            ('book_trends', '本トレンド'),
-            ('rakuten_trends', '楽天'),
-            ('hatena_trends', 'はてなブックマーク'),
-            ('twitch_trends', 'Twitch'),
-            ('nhk_trends', 'NHK ニュース'),
-            ('qiita_trends', 'Qiita トレンド'),
-            ('stock_trends', '株価トレンド'),
-            ('crypto_trends', '仮想通貨トレンド'),
-            ('cnn_trends', 'CNN News'),
-            ('producthunt_trends', 'Product Hunt'),
-            ('reddit_trends', 'Reddit'),
-            ('hackernews_trends', 'Hacker News'),
-            ('github_trends', 'GitHub'),
-            ('appstore_trends', 'App Store')
-        ]
         
         cache_instance = get_cache()
         if not cache_instance:
@@ -87,37 +61,71 @@ def get_data_freshness():
                 'error': 'キャッシュシステムが初期化されていません'
             }), 500
         
-        for cache_key, display_name in categories:
+        # 1回のクエリで全キャッシュ情報を取得（最適化）
+        all_cache_status = cache_instance.get_all_cache_status()
+        
+        # カテゴリマッピング（cache_key -> display_name）
+        cache_key_map = {
+            'google_trends': 'Google Trends',
+            'youtube_trends': 'YouTube',
+            'music_trends': 'Spotify',
+            'worldnews_trends': 'World News',
+            'podcast_trends': 'Podcast',
+            'movie_trends': '映画トレンド',
+            'book_trends': '本トレンド',
+            'rakuten_trends': '楽天',
+            'hatena_trends': 'はてなブックマーク',
+            'twitch_trends': 'Twitch',
+            'nhk_trends': 'NHK ニュース',
+            'qiita_trends': 'Qiita トレンド',
+            'stock_trends': '株価トレンド',
+            'crypto_trends': '仮想通貨トレンド',
+            'cnn_trends': 'CNN News',
+            'producthunt_trends': 'Product Hunt',
+            'hackernews_trends': 'Hacker News',
+            'github_trends': 'GitHub',
+            'appstore_trends': 'App Store',
+            # 新しく追加されたセキュリティトレンド
+            'ipa_trends': 'IPA',
+            'jpcert_trends': 'JPCERT/CC',
+            'cisa_kev_trends': 'CISA KEV',
+            'thehackernews_trends': 'The Hacker News',
+            'hackernoon_trends': 'Hacker Noon',
+            # 新しく追加されたトレンド
+            'zenn_trends': 'Zenn',
+            'note_trends_all': 'Note (総合)',
+            'note_trends_tech': 'Note (テクノロジー)',
+            'note_trends_business': 'Note (ビジネス)',
+            'note_trends_lifestyle': 'Note (ライフスタイル)',
+            'note_trends_entertainment': 'Note (エンタメ)',
+        }
+        
+        freshness_info = {}
+        
+        for cache_key, display_name in cache_key_map.items():
             try:
-                # 映画と本トレンドは国別のキャッシュキーを使用
-                if cache_key == 'movie_trends':
-                    # 指定された国の映画トレンドを取得
-                    cache_info = cache_instance.get_cache_info(f'movie_trends_{country}')
+                cache_info = None
+                
+                # 国別のキャッシュキーを処理
+                if cache_key in ['movie_trends', 'book_trends', 'appstore_trends']:
+                    cache_key_with_country = f'{cache_key}_{country}'
+                    cache_info = all_cache_status.get(cache_key_with_country)
                     if not cache_info:
                         # フォールバック: もう一方の国のデータをチェック
                         fallback_country = 'US' if country == 'JP' else 'JP'
-                        cache_info = cache_instance.get_cache_info(f'movie_trends_{fallback_country}')
-                elif cache_key == 'book_trends':
-                    # 指定された国の本トレンドを取得
-                    cache_info = cache_instance.get_cache_info(f'book_trends_{country}')
-                    if not cache_info:
-                        # フォールバック: もう一方の国のデータをチェック
-                        fallback_country = 'US' if country == 'JP' else 'JP'
-                        cache_info = cache_instance.get_cache_info(f'book_trends_{fallback_country}')
-                elif cache_key == 'appstore_trends':
-                    # App Storeトレンドは国別のキャッシュキーを使用
-                    cache_info = cache_instance.get_cache_info(f'appstore_trends_{country}')
-                    if not cache_info:
-                        # フォールバック: もう一方の国のデータをチェック
-                        fallback_country = 'US' if country == 'JP' else 'JP'
-                        cache_info = cache_instance.get_cache_info(f'appstore_trends_{fallback_country}')
+                        cache_info = all_cache_status.get(f'{cache_key}_{fallback_country}')
                 else:
-                    cache_info = cache_instance.get_cache_info(cache_key)
+                    cache_info = all_cache_status.get(cache_key)
                 
                 if cache_info:
+                    # last_updatedがdatetimeオブジェクトの場合はisoformatに変換
+                    last_updated = cache_info.get('last_updated')
+                    if last_updated and hasattr(last_updated, 'isoformat'):
+                        last_updated = last_updated.isoformat()
+                    
                     freshness_info[display_name] = {
-                        'last_updated': cache_info.get('last_updated'),
-                        'data_count': cache_info.get('data_count'),
+                        'last_updated': last_updated,
+                        'data_count': cache_info.get('data_count', 0),
                         'status': '取得済み'
                     }
                 else:
@@ -127,6 +135,7 @@ def get_data_freshness():
                         'status': 'データなし'
                     }
             except Exception as e:
+                logger.warning(f"⚠️ {display_name} キャッシュ情報取得エラー: {e}")
                 freshness_info[display_name] = {
                     'last_updated': None,
                     'data_count': 0,
@@ -139,10 +148,11 @@ def get_data_freshness():
         })
         
     except Exception as e:
+        logger.error(f"❌ データ鮮度情報取得エラー: {e}", exc_info=True)
         return jsonify({
             'success': False,
             'error': str(e)
-        })
+        }), 500
 
 
 @data_bp.route('/cache/clear')

@@ -15,8 +15,12 @@ h6, .h6 { font-size: 0.9rem; }
 
 /* ヘッダー共通スタイル */
 #mainHeader {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 1000 !important;
+    background-color: #ffffff !important;
     border-bottom: 2px solid #e9ecef;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     padding: 0.25rem 0; /* ヘッダーを狭める */
 }
 

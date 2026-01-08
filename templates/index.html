@@ -606,38 +606,38 @@
 
                 <!-- 6行目: GitHub + App Store -->
                 <div class="row g-3 mb-3">
-                    <!-- 左側: 映画トレンド -->
+                    <!-- 左側: GitHub Trends -->
                     <article class="col-12 col-md-6">
                         <div class="card h-100">
-                            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                                <h2 class="h5 mb-0"><i class="fas fa-film" aria-hidden="true"></i> 映画トレンド</h2>
+                            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                                <h2 class="h5 mb-0"><i class="fab fa-github" aria-hidden="true"></i> GitHub Trends</h2>
                             </div>
                             <div class="card-body">
-                                <div class="loading text-center py-5" id="movieLoading" style="display: none;">
-                                    <div class="spinner-border text-primary" role="status">
+                                <div class="loading text-center py-5" id="githubLoading" style="display: none;">
+                                    <div class="spinner-border text-dark" role="status">
                                         <span class="visually-hidden">Loading...</span>
                                     </div>
-                                    <p class="mt-3">映画トレンドデータを取得中...</p>
+                                    <p class="mt-3">GitHub Trendsデータを取得中...</p>
                                 </div>
-                                <div id="movieResults">
-                                    <div class="alert alert-success status-message" id="movieStatusMessage" style="display: none !important;">
+                                <div id="githubResults" style="display: none;">
+                                    <div class="alert alert-success status-message" id="githubStatusMessage" style="display: none !important;">
                                         <!-- ステータスメッセージがここに表示されます -->
                                     </div>
                                     <div class="card trend-table category-card">
                                         <div class="card-body">
                                             <div class="trend-table-container">
                                                 <div class="table-responsive">
-                                                    <table class="table table-hover trend-table" id="movieTrendsTable">
+                                                    <table class="table table-hover trend-table" id="githubTrendsTable">
                                                         <thead class="table-dark">
                                                             <tr>
                                                                 <th>順位</th>
-                                                                <th>タイトル</th>
-                                                                <th>評価</th>
-                                                                <th>公開日</th>
+                                                                <th>リポジトリ</th>
+                                                                <th>言語</th>
+                                                                <th>スター数</th>
                                                             </tr>
                                                         </thead>
-                                                        <tbody id="movieTrendsTableBody">
-                                                            <!-- 映画データがここに表示されます -->
+                                                        <tbody id="githubTrendsTableBody">
+                                                            <!-- GitHubデータがここに表示されます -->
                                                         </tbody>
                                                     </table>
                                                 </div>
@@ -648,38 +648,38 @@
                             </div>
                         </div>
                     </article>
-                    <!-- 右側: 本トレンド -->
+                    <!-- 右側: App Store Trends -->
                     <article class="col-12 col-md-6">
                         <div class="card h-100">
-                            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
-                                <h2 class="h5 mb-0"><i class="fas fa-book" aria-hidden="true"></i> 本トレンド</h2>
+                            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                                <h2 class="h5 mb-0"><i class="fab fa-apple" aria-hidden="true"></i> App Store Trends</h2>
                             </div>
                             <div class="card-body">
-                                <div class="loading text-center py-5" id="bookLoading" style="display: none;">
-                                    <div class="spinner-border text-info" role="status">
+                                <div class="loading text-center py-5" id="appstoreLoading" style="display: none;">
+                                    <div class="spinner-border text-success" role="status">
                                         <span class="visually-hidden">Loading...</span>
                                     </div>
-                                    <p class="mt-3">本トレンドデータを取得中...</p>
+                                    <p class="mt-3">App Store Trendsデータを取得中...</p>
                                 </div>
-                                <div id="bookResults">
-                                    <div class="alert alert-success status-message" id="bookStatusMessage" style="display: none !important;">
+                                <div id="appstoreResults" style="display: none;">
+                                    <div class="alert alert-success status-message" id="appstoreStatusMessage" style="display: none !important;">
                                         <!-- ステータスメッセージがここに表示されます -->
                                     </div>
                                     <div class="card trend-table category-card">
                                         <div class="card-body">
                                             <div class="trend-table-container">
                                                 <div class="table-responsive">
-                                                    <table class="table table-hover trend-table" id="bookTrendsTable">
+                                                    <table class="table table-hover trend-table" id="appstoreTrendsTable">
                                                         <thead class="table-dark">
                                                             <tr>
                                                                 <th>順位</th>
-                                                                <th>タイトル</th>
-                                                                <th>著者</th>
-                                                                <th>価格</th>
+                                                                <th>アプリ名</th>
+                                                                <th>開発者</th>
+                                                                <th>評価</th>
                                                             </tr>
                                                         </thead>
-                                                        <tbody id="bookTrendsTableBody">
-                                                            <!-- 本データがここに表示されます -->
+                                                        <tbody id="appstoreTrendsTableBody">
+                                                            <!-- App Storeデータがここに表示されます -->
                                                         </tbody>
                                                     </table>
                                                 </div>

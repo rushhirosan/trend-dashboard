@@ -306,14 +306,11 @@ class StockTrendsManager:
             dict: トレンドデータ
         """
         try:
-            if force_refresh:
-                logger.info(f"🔄 Stock force_refresh: キャッシュをクリアします (market: {market})")
-                self.db.clear_stock_trends_cache(market)
-            
             # キャッシュからデータを取得
             cached_data = self.db.get_stock_trends_from_cache(market)
             
-            if cached_data:
+            # force_refresh=Falseの場合、キャッシュがあればそれを返す
+            if not force_refresh and cached_data:
                 # 変動率でソート（降順）
                 cached_data.sort(key=lambda x: abs(x.get('change_percent', 0)), reverse=True)
                 
@@ -333,22 +330,47 @@ class StockTrendsManager:
                     'market': market,
                     'total_count': len(cached_data)  # キャッシュの全件数を返す
                 }
-            else:
-                # キャッシュデータがない場合
-                # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
-                if not force_refresh:
-                    logger.warning(f"⚠️ Stock: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません (market: {market})")
+            
+            # force_refresh=True、またはキャッシュがない場合
+            if force_refresh:
+                logger.info(f"🔄 Stock force_refresh: 外部APIから最新データを取得します (market: {market})")
+                # 外部APIからデータを取得（成功時のみキャッシュを更新、失敗時は既存キャッシュを保持）
+                api_result = self._fetch_trending_stocks(market, limit)
+                
+                # APIからデータが正常に取得できた場合、その結果を返す
+                # データが取得できなかった場合（週末・市場休場など）、既存のキャッシュがあればそれを返す
+                if api_result.get('success') and api_result.get('data') and len(api_result.get('data', [])) > 0:
+                    return api_result
+                elif cached_data:
+                    # API取得失敗時、既存のキャッシュがあればそれを返す（キャッシュは削除しない）
+                    logger.info(f"⚠️ Stock: 外部APIからデータが取得できませんでしたが、既存のキャッシュデータを使用します (market: {market}, {len(cached_data)}件)")
+                    cached_data.sort(key=lambda x: abs(x.get('change_percent', 0)), reverse=True)
+                    for i, item in enumerate(cached_data, 1):
+                        item['rank'] = i
+                    return_data = cached_data[:limit]
                     return {
-                        'data': [],
-                        'status': 'cache_not_found',
+                        'success': True,
+                        'data': return_data,
+                        'status': 'cached',  # 既存キャッシュを使用
                         'source': 'database_cache',
                         'market': market,
-                        'success': True,  # エラーではなく、データがない状態として扱う
-                        'error': 'キャッシュにデータがありません'
+                        'total_count': len(cached_data),
+                        'message': '最新データの取得に失敗しましたが、既存のキャッシュデータを表示しています'
                     }
-                # force_refresh=trueの場合のみ外部APIを呼び出す
-                logger.warning(f"⚠️ Stock: キャッシュデータが見つかりません。外部APIを呼び出します (market: {market})")
-                return self._fetch_trending_stocks(market, limit)
+                else:
+                    # API取得失敗かつキャッシュもない場合
+                    return api_result
+            else:
+                # force_refresh=False かつ キャッシュがない場合
+                logger.warning(f"⚠️ Stock: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません (market: {market})")
+                return {
+                    'data': [],
+                    'status': 'cache_not_found',
+                    'source': 'database_cache',
+                    'market': market,
+                    'success': True,  # エラーではなく、データがない状態として扱う
+                    'error': 'キャッシュにデータがありません'
+                }
                 
         except Exception as e:
             logger.error(f"❌ Stock トレンド取得エラー: {e}", exc_info=True)

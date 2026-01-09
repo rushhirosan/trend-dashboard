@@ -3239,3 +3239,68 @@ body.data-status-active #data-status .card-body {
     }
 }
 
+/* ============================================
+   スケルトンUI - データ読み込み中のプレースホルダー
+   ============================================ */
+
+.skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s ease-in-out infinite;
+    border-radius: 4px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.skeleton-text {
+    width: 60%;
+    height: 1em;
+    margin: 0.25em 0;
+}
+
+.skeleton-text-long {
+    width: 90%;
+}
+
+.skeleton-text-short {
+    width: 40%;
+}
+
+.skeleton-badge {
+    width: 3em;
+    height: 1.5em;
+    border-radius: 0.25rem;
+}
+
+.skeleton-row {
+    animation: skeleton-fade-in 0.3s ease-in;
+}
+
+@keyframes skeleton-loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+@keyframes skeleton-fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* スケルトン行が残っている場合は表示 */
+.trend-table tbody tr.skeleton-row {
+    display: table-row;
+}
+
+/* データ行が来たらスケルトンを非表示にする（JSで削除するので通常は不要だが、念のため） */
+.trend-table tbody:has(tr:not(.skeleton-row)) tr.skeleton-row {
+    display: none;
+}
+

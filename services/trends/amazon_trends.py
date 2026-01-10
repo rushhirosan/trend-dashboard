@@ -14,76 +14,164 @@ class AmazonTrendsManager:
 
     def __init__(self):
         """初期化"""
-        # 環境変数からRSS URLを取得（AmaranRSSなどで生成したRSS URL）
-        # 複数のRSS URLをカンマ区切りで指定可能
-        rss_urls_env = os.getenv('AMAZON_RSS_URLS', '').strip()
+        # カテゴリー別RSS URLを環境変数から取得（AmaranRSSなどで生成したRSS URL）
+        # カテゴリーごとに個別の環境変数を設定可能
+        self.rss_urls_by_category = {
+            'books': os.getenv('AMAZON_RSS_URL_BOOKS', '').strip(),
+            'electronics': os.getenv('AMAZON_RSS_URL_ELECTRONICS', '').strip(),
+            'computers': os.getenv('AMAZON_RSS_URL_COMPUTERS', '').strip(),
+        }
         
-        if rss_urls_env:
-            # カンマ区切りで分割し、空白を削除
-            self.rss_urls = [url.strip() for url in rss_urls_env.split(',') if url.strip()]
-        else:
-            # 環境変数が設定されていない場合は空のリスト
-            self.rss_urls = []
-            logger.warning("⚠️ AMAZON_RSS_URLS環境変数が設定されていません。AmaranRSS等で生成したRSS URLを設定してください。")
+        # 空の環境変数をフィルタリング
+        self.rss_urls_by_category = {
+            category: url for category, url in self.rss_urls_by_category.items() if url
+        }
+        
+        # 後方互換性のため、AMAZON_RSS_URLS（カンマ区切り）もサポート
+        rss_urls_env = os.getenv('AMAZON_RSS_URLS', '').strip()
+        if rss_urls_env and not self.rss_urls_by_category:
+            # カンマ区切りで分割し、順番にbooks, electronics, computersに割り当て
+            urls = [url.strip() for url in rss_urls_env.split(',') if url.strip()]
+            categories = ['books', 'electronics', 'computers']
+            for i, url in enumerate(urls):
+                if i < len(categories):
+                    self.rss_urls_by_category[categories[i]] = url
+        
+        if not self.rss_urls_by_category:
+            logger.warning("⚠️ Amazon RSS URL環境変数が設定されていません。AmaranRSS等で生成したRSS URLを設定してください。")
         
         self.db = TrendsCache()
         # レート制限: AmaranRSSの推奨に従い、1時間に1回（3600秒）に設定
         self.rate_limiter = get_rate_limiter('amazon', max_requests=1, window_seconds=3600)
 
         logger.info("Amazon Best Sellers Trends Manager初期化:")
-        logger.info(f"  RSS URLs: {self.rss_urls if self.rss_urls else '(未設定 - AMAZON_RSS_URLS環境変数を設定してください)'}")
+        logger.info(f"  カテゴリー別RSS URLs: {self.rss_urls_by_category if self.rss_urls_by_category else '(未設定)'}")
+        
+        # 利用可能なカテゴリー一覧を取得する関数
+        self.available_categories = list(self.rss_urls_by_category.keys()) if self.rss_urls_by_category else []
 
-    def get_trends(self, limit=25, force_refresh=False):
-        """Amazon Best Sellersトレンドを取得（キャッシュ優先）"""
+    def get_trends(self, category='books', limit=25, force_refresh=False):
+        """Amazon Best Sellersトレンドを取得（キャッシュ優先）
+        
+        Args:
+            category (str): カテゴリー ('books', 'electronics', 'computers')
+            limit (int): 取得件数
+            force_refresh (bool): キャッシュを無視して取得するかどうか
+        """
         try:
+            # カテゴリーのバリデーション
+            if category not in self.rss_urls_by_category:
+                available = ', '.join(self.available_categories) if self.available_categories else '(なし)'
+                error_msg = f"カテゴリー '{category}' は利用できません。利用可能なカテゴリー: {available}"
+                logger.warning(f"⚠️ Amazon: {error_msg}")
+                return {
+                    'success': False,
+                    'data': [],
+                    'status': 'invalid_category',
+                    'error': error_msg,
+                    'available_categories': self.available_categories
+                }
+            
             if force_refresh:
-                logger.info("🔄 Amazon force_refresh: キャッシュをクリアします")
+                logger.info(f"🔄 Amazon ({category}) force_refresh: キャッシュをクリアします")
                 self.db.clear_amazon_trends_cache()
 
-            cached_data = self.db.get_amazon_trends_from_cache()
+            cached_data = self.db.get_amazon_trends_from_cache(category)
             if cached_data:
+                # カテゴリーでフィルタリング（データにcategoryフィールドがある場合）
+                filtered_data = [item for item in cached_data if item.get('category') == category]
+                if not filtered_data:
+                    # categoryフィールドがない場合は全データを使用（後方互換性）
+                    filtered_data = cached_data
+                
                 # ランキングでソート（昇順）
-                cached_data.sort(key=lambda x: x.get('rank', 999), reverse=False)
-                logger.info(f"✅ Amazon: キャッシュから{len(cached_data)}件のデータを取得しました")
+                filtered_data.sort(key=lambda x: x.get('rank', 999), reverse=False)
+                logger.info(f"✅ Amazon ({category}): キャッシュから{len(filtered_data)}件のデータを取得しました")
                 return {
                     'success': True,
-                    'data': cached_data[:limit],
+                    'data': filtered_data[:limit],
                     'status': 'cached',
-                    'source': 'database_cache'
+                    'source': 'database_cache',
+                    'category': category
                 }
             else:
                 if not force_refresh:
-                    logger.warning("⚠️ Amazon: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
+                    logger.warning(f"⚠️ Amazon ({category}): キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
                     return {
                         'success': True,
                         'data': [],
                         'status': 'cache_not_found',
-                        'source': 'database_cache'
+                        'source': 'database_cache',
+                        'category': category
                     }
-                logger.warning("⚠️ Amazon: キャッシュデータが見つかりません。外部APIを呼び出します")
-                return self._fetch_amazon_trends(limit)
+                logger.warning(f"⚠️ Amazon ({category}): キャッシュデータが見つかりません。外部APIを呼び出します")
+                return self._fetch_amazon_trends(category, limit)
 
         except Exception as e:
             logger.error(f"❌ Amazon トレンド取得エラー: {e}", exc_info=True)
             return {'error': f'Amazon Best Sellersトレンドの取得に失敗しました: {str(e)}', 'success': False}
 
-    def _fetch_amazon_trends(self, limit=25):
-        """Amazon Best Sellers RSSフィードからトレンドデータを取得（非公式RSS：AmaranRSS等）"""
+    def get_available_categories(self):
+        """利用可能なカテゴリー一覧を取得"""
+        return self.available_categories if self.available_categories else []
+    
+    def _fetch_amazon_trends(self, category='books', limit=25):
+        """Amazon Best Sellers RSSフィードからトレンドデータを取得（非公式RSS：AmaranRSS等）
+        
+        Args:
+            category (str): カテゴリー ('books', 'electronics', 'computers')
+            limit (int): 取得件数
+        """
         try:
-            if not self.rss_urls:
-                logger.warning("⚠️ Amazon Best Sellers: RSS URLが設定されていません。AMAZON_RSS_URLS環境変数を設定してください。")
+            rss_url = self.rss_urls_by_category.get(category)
+            if not rss_url:
+                logger.warning(f"⚠️ Amazon Best Sellers ({category}): RSS URLが設定されていません。環境変数を設定してください。")
                 return {
                     'success': True,
                     'data': [],
                     'status': 'rss_url_not_configured',
                     'source': 'amazon_rss',
-                    'error': 'RSS URLが設定されていません。AMAZON_RSS_URLS環境変数を設定してください。'
+                    'category': category,
+                    'error': f'RSS URLが設定されていません。{category}用の環境変数を設定してください。'
                 }
             
             self.rate_limiter.wait_if_needed()
 
             all_entries = []
-            for rss_url in self.rss_urls:
+            try:
+                logger.info(f"Amazon Best Sellers RSS呼び出し開始 ({category}): {rss_url}")
+                
+                # requestsでタイムアウトを設定して取得
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+                response = requests.get(rss_url, headers=headers, timeout=10)
+                logger.info(f"📊 Amazon RSS({category}): HTTP status={response.status_code}")
+                
+                if response.status_code != 200:
+                    logger.warning(f"⚠️ Amazon RSS({category}): HTTP {response.status_code} - {response.text[:200]}")
+                    return {
+                        'success': True,
+                        'data': [],
+                        'status': 'rss_fetch_failed',
+                        'source': 'amazon_rss',
+                        'category': category,
+                        'error': f'RSS取得に失敗しました: HTTP {response.status_code}'
+                    }
+                
+                # feedparserで解析
+                feed = feedparser.parse(response.content)
+                logger.info(f"📊 Amazon RSS({category}): feed status={feed.get('status', 'N/A')}, bozo={feed.get('bozo', False)}, bozo_exception={str(feed.get('bozo_exception', None))[:100] if feed.get('bozo_exception') else None}")
+                
+                if feed.entries:
+                    logger.info(f"✅ Amazon RSS({category}): {len(feed.entries)}件のエントリーを取得")
+                    if len(feed.entries) > 0:
+                        logger.debug(f"📋 最初のエントリー: {feed.entries[0].get('title', 'N/A')}")
+                    all_entries.extend(feed.entries)
+                else:
+                    logger.warning(f"⚠️ Amazon RSS({category}): エントリーが空です。feed keys: {list(feed.keys())[:5]}")
+                    if hasattr(feed, 'feed') and feed.feed:
+                        logger.info(f"📋 feed.feed keys: {list(feed.feed.keys())[:5]}")
                 try:
                     logger.info(f"Amazon Best Sellers RSS呼び出し開始: {rss_url}")
                     
@@ -111,21 +199,46 @@ class AmazonTrendsManager:
                         logger.warning(f"⚠️ Amazon RSS({rss_url}): エントリーが空です。feed keys: {list(feed.keys())[:5]}")
                         if hasattr(feed, 'feed') and feed.feed:
                             logger.info(f"📋 feed.feed keys: {list(feed.feed.keys())[:5]}")
-                except requests.exceptions.Timeout:
-                    logger.warning(f"❌ Amazon RSS({rss_url}) タイムアウト（10秒）")
-                except requests.exceptions.RequestException as e:
-                    logger.warning(f"❌ Amazon RSS({rss_url}) リクエストエラー: {e}")
-                except Exception as e:
-                    logger.warning(f"❌ Amazon RSS({rss_url}) エラー: {e}", exc_info=True)
+            except requests.exceptions.Timeout:
+                logger.warning(f"❌ Amazon RSS({category}) タイムアウト（10秒）")
+                return {
+                    'success': True,
+                    'data': [],
+                    'status': 'timeout',
+                    'source': 'amazon_rss',
+                    'category': category,
+                    'error': 'RSS取得タイムアウト'
+                }
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"❌ Amazon RSS({category}) リクエストエラー: {e}")
+                return {
+                    'success': True,
+                    'data': [],
+                    'status': 'request_error',
+                    'source': 'amazon_rss',
+                    'category': category,
+                    'error': f'RSSリクエストエラー: {str(e)}'
+                }
+            except Exception as e:
+                logger.warning(f"❌ Amazon RSS({category}) エラー: {e}", exc_info=True)
+                return {
+                    'success': True,
+                    'data': [],
+                    'status': 'error',
+                    'source': 'amazon_rss',
+                    'category': category,
+                    'error': f'RSS取得エラー: {str(e)}'
+                }
 
-            logger.info(f"📊 Amazon RSS 合計エントリー数: {len(all_entries)}")
+            logger.info(f"📊 Amazon RSS ({category}) 合計エントリー数: {len(all_entries)}")
             if not all_entries:
-                logger.warning(f"⚠️ Amazon Best Sellers: すべてのRSSフィードからエントリーを取得できませんでした")
+                logger.warning(f"⚠️ Amazon Best Sellers ({category}): エントリーを取得できませんでした")
                 return {
                     'success': True,
                     'data': [],
                     'status': 'no_entries',
-                    'source': 'amazon_rss'
+                    'source': 'amazon_rss',
+                    'category': category
                 }
 
             # 重複を除去（タイトルベース）
@@ -177,7 +290,8 @@ class AmazonTrendsManager:
                         'asin': asin,
                         'published_date': published_date.isoformat() if published_date else None,
                         'description': description[:200] if description else '',  # 説明は200文字に制限
-                        'source': 'Amazon Best Sellers'
+                        'source': 'Amazon Best Sellers',
+                        'category': category  # カテゴリー情報を追加
                     })
                 except Exception as e:
                     logger.warning(f"⚠️ Amazon エントリーパースエラー: {e}")
@@ -189,12 +303,13 @@ class AmazonTrendsManager:
                 self.db.save_amazon_trends_to_cache(final_data)
                 self.db.update_cache_status('amazon_trends', len(final_data))
 
-            logger.info(f"✅ Amazon: {len(final_data)}件のベストセラーを取得しました")
+            logger.info(f"✅ Amazon ({category}): {len(final_data)}件のベストセラーを取得しました")
             return {
                 'success': True,
                 'data': final_data,
                 'status': 'api_fetched',
                 'source': 'amazon_rss',
+                'category': category,
                 'total_count': len(final_data)
             }
         except requests.exceptions.Timeout:

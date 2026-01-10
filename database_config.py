@@ -560,6 +560,7 @@ class TrendsCache:
                     published_date TIMESTAMP WITH TIME ZONE,
                     description TEXT,
                     rank INTEGER DEFAULT 0,
+                    category TEXT DEFAULT 'books',
                     cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
@@ -4169,19 +4170,22 @@ class TrendsCache:
             return False
         try:
             with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM amazon_trends_cache")
+                # カテゴリーでフィルタリングして削除（同じカテゴリーのデータのみ削除）
+                category = data[0].get('category', 'books') if data else 'books'
+                cursor.execute("DELETE FROM amazon_trends_cache WHERE category = %s", (category,))
                 for item in data:
                     cursor.execute("""
                         INSERT INTO amazon_trends_cache 
-                        (title, url, asin, published_date, description, rank)
-                        VALUES (%s, %s, %s, %s, %s, %s)
+                        (title, url, asin, published_date, description, rank, category)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
                     """, (
                         item.get('title', ''),
                         item.get('url', ''),
                         item.get('asin'),
                         item.get('published_date'),
                         item.get('description', ''),
-                        item.get('rank', 0)
+                        item.get('rank', 0),
+                        item.get('category', 'books')
                     ))
                 import pytz
                 jst = pytz.timezone('Asia/Tokyo')
@@ -4205,15 +4209,20 @@ class TrendsCache:
                 pass
             return False
 
-    def get_amazon_trends_from_cache(self):
-        """Amazon Best Sellers Trendsデータをキャッシュから取得"""
+    def get_amazon_trends_from_cache(self, category='books'):
+        """Amazon Best Sellers Trendsデータをキャッシュから取得
+        
+        Args:
+            category (str): カテゴリー ('books', 'electronics', 'computers')
+        """
         def query_func(conn):
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute("""
-                    SELECT title, url, asin, published_date, description, rank, cached_at
+                    SELECT title, url, asin, published_date, description, rank, category, cached_at
                     FROM amazon_trends_cache 
+                    WHERE category = %s
                     ORDER BY rank
-                """)
+                """, (category,))
                 data = cursor.fetchall()
                 result = []
                 for row in data:

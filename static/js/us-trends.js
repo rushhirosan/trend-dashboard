@@ -1019,8 +1019,8 @@ function loadCachedDataUS() {
     // Load Medium from cache
     loadMediumFromCacheUS();
     
-    // Load Amazon Best Sellers from cache
-    loadAmazonFromCacheUS();
+    // Load Amazon Best Sellers from cache (default: books)
+    loadAmazonFromCacheUS('books');
     
     // Load Twitch from cache
     loadTwitchFromCacheUS();
@@ -2314,7 +2314,7 @@ function loadMediumFromCacheUS() {
 }
 
 // Amazon Best Sellers cache data loading for US
-function loadAmazonFromCacheUS() {
+function loadAmazonFromCacheUS(category = 'books') {
     const loadingElement = document.getElementById('amazonLoading');
     const resultsElement = document.getElementById('amazonResults');
     
@@ -2326,7 +2326,7 @@ function loadAmazonFromCacheUS() {
     if (loadingElement) loadingElement.style.display = 'block';
     if (resultsElement) resultsElement.style.display = 'none';
     
-    fetchWithRetry('/api/amazon-trends?limit=25&force_refresh=false')
+    fetchWithRetry(`/api/amazon-trends?category=${category}&limit=25&force_refresh=false`)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2336,7 +2336,7 @@ function loadAmazonFromCacheUS() {
         .then(data => {
             // キャッシュが見つからない場合、force_refresh=trueで再取得
             if (data.success && (data.status === 'cache_not_found' || !data.data || data.data.length === 0)) {
-                return fetchWithRetry('/api/amazon-trends?limit=25&force_refresh=true')
+                return fetchWithRetry(`/api/amazon-trends?category=${category}&limit=25&force_refresh=true`)
                     .then(response => {
                         if (!response.ok) {
                             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2351,7 +2351,7 @@ function loadAmazonFromCacheUS() {
             if (resultsElement) resultsElement.style.display = 'block';
             
             if (data.success && data.data && data.data.length > 0) {
-                displayAmazonResults(data);
+                displayAmazonResults(data, category);
             } else {
                 showAmazonError(data.error || 'No data available');
             }
@@ -2455,7 +2455,7 @@ function displayMediumResults(data) {
 }
 
 // Display Amazon Best Sellers Results
-function displayAmazonResults(data) {
+function displayAmazonResults(data, category = 'books') {
     const tableBody = document.getElementById('amazonTrendsTableBody');
     const statusMessage = document.getElementById('amazonStatusMessage');
     const errorElement = document.getElementById('amazonErrorMessage');
@@ -2471,10 +2471,18 @@ function displayAmazonResults(data) {
     if (errorElement) errorElement.style.display = 'none';
     if (statusMessage) statusMessage.style.display = 'none';
     
+    // Show results area
+    resultsElement.style.display = 'block';
+    errorElement.style.display = 'none';
+    
+    // Hide status message
+    statusMessage.style.display = 'none';
+    
+    // Clear table
     tableBody.innerHTML = '';
     
     if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
-        showAmazonError('No data available');
+        showAmazonError(data.error || 'No data available');
         return;
     }
     
@@ -2574,6 +2582,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const selectedType = this.value;
             console.log(`Twitch type changed to: ${selectedType}`);
             loadTwitchFromCacheUS(selectedType);
+        });
+    }
+    
+    // Amazon category selector event listener
+    const amazonCategorySelect = document.getElementById('amazonCategorySelectUS');
+    if (amazonCategorySelect) {
+        amazonCategorySelect.addEventListener('change', function() {
+            const selectedCategory = this.value;
+            console.log(`Amazon category changed to: ${selectedCategory}`);
+            loadAmazonFromCacheUS(selectedCategory);
         });
     }
     

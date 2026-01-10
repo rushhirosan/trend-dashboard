@@ -163,9 +163,9 @@ class TrendsScheduler:
                 else:
                     logger.info("⏭️ 起動時の自動実行をスキップします（デプロイ時の不要なAPI呼び出しを防ぐため）")
                 
-        except Exception as e:
-            logger.error(f"❌ スケジューラー開始エラー: {e}", exc_info=True)
-            self.is_running = False
+            except Exception as e:
+                logger.error(f"❌ スケジューラー開始エラー: {e}", exc_info=True)
+                self.is_running = False
     
     def _fetch_amazon_trends_by_category(self, category):
         """Amazon Best Sellersの特定カテゴリを取得

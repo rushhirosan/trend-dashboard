@@ -655,3 +655,45 @@ def get_note_trends(manager):
         
     except Exception as e:
         return handle_api_error('Note Trends', e)
+
+@trend_bp.route('/amazon-trends')
+@require_manager('amazon')
+def get_amazon_trends(manager):
+    """Amazon Best Sellers Trends APIエンドポイント"""
+    try:
+        limit = int(request.args.get('limit', 25))
+        force_refresh = get_force_refresh()
+        
+        result = manager.get_trends(limit=limit, force_refresh=force_refresh)
+        return handle_trend_response(result, 'Amazon Best Sellers', 'Amazon RSS')
+        
+    except Exception as e:
+        return handle_api_error('Amazon Best Sellers Trends', e)
+
+@trend_bp.route('/medium-trends')
+@require_manager('medium')
+def get_medium_trends(manager):
+    """Medium Trends APIエンドポイント"""
+    try:
+        limit = int(request.args.get('limit', 25))
+        force_refresh = get_force_refresh()
+        
+        result = manager.get_trends(limit=limit, force_refresh=force_refresh)
+        return handle_trend_response(result, 'Medium', 'Medium RSS')
+        
+    except Exception as e:
+        return handle_api_error('Medium Trends', e)
+
+@trend_bp.route('/devto-trends')
+@require_manager('devto')
+def get_devto_trends(manager):
+    """DEV.to Trends APIエンドポイント"""
+    try:
+        limit = int(request.args.get('limit', 25))
+        force_refresh = get_force_refresh()
+        
+        result = manager.get_trends(limit=limit, force_refresh=force_refresh)
+        return handle_trend_response(result, 'DEV.to', 'DEV.to API')
+        
+    except Exception as e:
+        return handle_api_error('DEV.to Trends', e)

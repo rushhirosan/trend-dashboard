@@ -769,7 +769,60 @@
                                     </div>
 
                                     <div class="row g-3 mt-2">
-                                        <!-- US 4行目: CISA KEV + The Hacker News -->
+                                        <!-- US 4行目: DEV.to + Medium -->
+                                        <div class="col-md-6">
+                                            <div class="card h-100">
+                                                <div class="card-body">
+                                                    <div class="d-flex align-items-center mb-3">
+                                                        <i class="fab fa-dev text-dark fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">DEV.to</h6>
+                                                    </div>
+                                                    <div class="row text-center">
+                                                        <div class="col-4">
+                                                            <small class="text-muted">最終更新/Last updated</small>
+                                                            <div class="fw-bold" id="devtoUSLastUpdate">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">データ件数/Data count</small>
+                                                            <div class="fw-bold" id="devtoUSDataCount">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">ステータス/Status</small>
+                                                            <div><span class="badge bg-secondary" id="devtoUSStatus">-</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-md-6">
+                                            <div class="card h-100">
+                                                <div class="card-body">
+                                                    <div class="d-flex align-items-center mb-3">
+                                                        <i class="fab fa-medium text-dark fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">Medium</h6>
+                                                    </div>
+                                                    <div class="row text-center">
+                                                        <div class="col-4">
+                                                            <small class="text-muted">最終更新/Last updated</small>
+                                                            <div class="fw-bold" id="mediumUSLastUpdate">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">データ件数/Data count</small>
+                                                            <div class="fw-bold" id="mediumUSDataCount">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">ステータス/Status</small>
+                                                            <div><span class="badge bg-secondary" id="mediumUSStatus">-</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-3 mt-2">
+                                        <!-- US 5行目: CISA KEV + The Hacker News -->
                                         <div class="col-md-6">
                                             <div class="card h-100">
                                                 <div class="card-body">
@@ -1034,26 +1087,26 @@
                                     </div>
 
                                     <div class="row g-3 mt-2">
-                                        <!-- US 9行目: Hacker Noon + Twitch Trends -->
+                                        <!-- US 10行目: Amazon Best Sellers + Twitch Trends -->
                                         <div class="col-md-6">
                                             <div class="card h-100">
                                                 <div class="card-body">
                                                     <div class="d-flex align-items-center mb-3">
-                                                        <i class="fas fa-newspaper text-info fs-4 me-3"></i>
-                                                        <h6 class="card-title mb-0">Hacker Noon</h6>
+                                                        <i class="fab fa-amazon text-warning fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">Amazon Best Sellers</h6>
                                                     </div>
                                                     <div class="row text-center">
                                                         <div class="col-4">
                                                             <small class="text-muted">最終更新/Last updated</small>
-                                                            <div class="fw-bold" id="hackernoonUSLastUpdate">-</div>
+                                                            <div class="fw-bold" id="amazonUSLastUpdate">-</div>
                                                         </div>
                                                         <div class="col-4">
                                                             <small class="text-muted">データ件数/Data count</small>
-                                                            <div class="fw-bold" id="hackernoonUSDataCount">-</div>
+                                                            <div class="fw-bold" id="amazonUSDataCount">-</div>
                                                         </div>
                                                         <div class="col-4">
                                                             <small class="text-muted">ステータス/Status</small>
-                                                            <div><span class="badge bg-secondary" id="hackernoonUSStatus">-</span></div>
+                                                            <div><span class="badge bg-secondary" id="amazonUSStatus">-</span></div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1193,6 +1246,8 @@
                 { id: 'youtubeUS', name: 'YouTube', endpoint: '/api/youtube-trends?region=US' },
                 { id: 'hackernewsUS', name: 'Hacker News', endpoint: '/api/hackernews-trends?type=top' },
                 { id: 'producthuntUS', name: 'Product Hunt', endpoint: '/api/producthunt-trends?limit=25&sort=votes' },
+                { id: 'devtoUS', name: 'DEV.to', endpoint: '/api/devto-trends?limit=25' },
+                { id: 'mediumUS', name: 'Medium', endpoint: '/api/medium-trends?limit=25' },
                 { id: 'cisakevUS', name: 'CISA KEV', endpoint: '/api/cisa-kev-trends?limit=25' },
                 { id: 'thehackernewsUS', name: 'The Hacker News', endpoint: '/api/thehackernews-trends?limit=25' },
                 { id: 'githubUS', name: 'GitHub Trends', endpoint: '/api/github-trends?language=all&limit=25' },
@@ -1203,7 +1258,7 @@
                 { id: 'bookUS', name: 'Book Trends', endpoint: '/api/book-trends?country=US' },
                 { id: 'spotifyUS', name: 'Spotify', endpoint: '/api/music-trends?service=spotify&region=US' },
                 { id: 'podcastUS', name: 'Podcast', endpoint: '/api/podcast-trends?region=us' },
-                { id: 'hackernoonUS', name: 'Hacker Noon', endpoint: '/api/hackernoon-trends?limit=25' },
+                { id: 'amazonUS', name: 'Amazon Best Sellers', endpoint: '/api/amazon-trends?limit=25' },
                 { id: 'twitchUS', name: 'Twitch', endpoint: '/api/twitch-trends?type=games' }
             ];
             
@@ -1258,7 +1313,9 @@
                             'Book Trends': '本トレンド',  // 日本のセクションではbook_trends_JP、USセクションではbook_trends_USを取得
                             'Spotify': 'Spotify',
                             'Podcast': 'Podcast',
-                            'Hacker Noon': 'Hacker Noon',
+                            'DEV.to': 'DEV.to',
+                            'Medium': 'Medium',
+                            'Amazon Best Sellers': 'Amazon Best Sellers',
                             'Twitch': 'Twitch'
                         };
                         

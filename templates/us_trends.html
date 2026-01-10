@@ -615,7 +615,180 @@
             </div>
         </div>
 
-        <!-- Row 4: CISA KEV + The Hacker News -->
+        <!-- Row 4: DEV.to + Medium -->
+        <div class="row g-3 mb-3">
+            <!-- Left: DEV.to -->
+            <div class="col-12 col-md-6">
+                <div class="card h-100">
+                    <div class="card-header" style="background-color: #0a0e27; color: white;">
+                        <h5><i class="fab fa-dev"></i> DEV.to</h5>
+                    </div>
+                    <div class="card-body">
+                        
+                        <!-- DEV.to Data Display -->
+                        <div class="loading text-center py-5" id="devtoLoading" style="display: none;">
+                            <div class="spinner-border" style="color: #0a0e27;" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Loading DEV.to data...</p>
+                        </div>
+
+                        <!-- DEV.to Results Display Area -->
+                        <div id="devtoResults" style="display: none;">
+                            <!-- Status Display -->
+                            <div class="alert alert-success status-message" id="devtoStatusMessage" style="display: none;">
+                                <!-- Status messages will be displayed here -->
+                            </div>
+                            
+                            <!-- Error Messages -->
+                            <div class="alert alert-danger" id="devtoErrorMessage" style="display: none;">
+                                <!-- DEV.to error messages will be displayed here -->
+                            </div>
+
+                            <!-- DEV.to Table -->
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                                    <div class="trend-table-container">
+                            <div class="table-responsive">
+                                <table class="table table-hover trend-table" id="devtoTrendsTable">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Rank</th>
+                                            <th>Title</th>
+                                            <th>Author</th>
+                                            <th>Reactions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="devtoTrendsTableBody">
+                                        <!-- Skeleton UI: Placeholder before data loads -->
+                                        <tr class="skeleton-row">
+                                            <td><div class="skeleton skeleton-badge"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                        </tr>
+                                        <tr class="skeleton-row">
+                                            <td><div class="skeleton skeleton-badge"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                        </tr>
+                                        <tr class="skeleton-row">
+                                            <td><div class="skeleton skeleton-badge"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                        </tr>
+                                        <tr class="skeleton-row">
+                                            <td><div class="skeleton skeleton-badge"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                        </tr>
+                                        <tr class="skeleton-row">
+                                            <td><div class="skeleton skeleton-badge"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right: Medium -->
+            <div class="col-12 col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-dark text-white">
+                        <h5><i class="fab fa-medium"></i> Medium</h5>
+                    </div>
+                    <div class="card-body">
+                        
+                        <!-- Medium Data Display -->
+                        <div class="loading text-center py-5" id="mediumLoading" style="display: none;">
+                            <div class="spinner-border text-dark" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Loading Medium data...</p>
+                        </div>
+
+                        <!-- Medium Results Display Area -->
+                        <div id="mediumResults" style="display: none;">
+                            <!-- Status Display -->
+                            <div class="alert alert-success status-message" id="mediumStatusMessage" style="display: none;">
+                                <!-- Status messages will be displayed here -->
+                            </div>
+                            
+                            <!-- Error Messages -->
+                            <div class="alert alert-danger" id="mediumErrorMessage" style="display: none;">
+                                <!-- Medium error messages will be displayed here -->
+                            </div>
+
+                            <!-- Medium Table -->
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                                    <div class="trend-table-container">
+                            <div class="table-responsive">
+                                <table class="table table-hover trend-table" id="mediumTrendsTable">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Rank</th>
+                                            <th>Title</th>
+                                            <th>Author</th>
+                                            <th>Published</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="mediumTrendsTableBody">
+                                        <!-- Skeleton UI: Placeholder before data loads -->
+                                        <tr class="skeleton-row">
+                                            <td><div class="skeleton skeleton-badge"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                        </tr>
+                                        <tr class="skeleton-row">
+                                            <td><div class="skeleton skeleton-badge"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                        </tr>
+                                        <tr class="skeleton-row">
+                                            <td><div class="skeleton skeleton-badge"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                        </tr>
+                                        <tr class="skeleton-row">
+                                            <td><div class="skeleton skeleton-badge"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                        </tr>
+                                        <tr class="skeleton-row">
+                                            <td><div class="skeleton skeleton-badge"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                            <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 5: CISA KEV + The Hacker News -->
         <div class="row g-3 mb-3">
             <!-- Left: CISA KEV -->
             <div class="col-12 col-md-6">
@@ -757,7 +930,7 @@
             </div>
         </div>
 
-        <!-- Row 5: GitHub Trends + App Store Trends -->
+        <!-- Row 6: GitHub Trends + App Store Trends -->
         <div class="row g-3 mb-3">
             <!-- Left: GitHub Trends -->
             <div class="col-12 col-md-6">
@@ -905,7 +1078,7 @@
             </div>
         </div>
 
-        <!-- Row 6: Stock Trends + Crypto Trends -->
+        <!-- Row 7: Stock Trends + Crypto Trends -->
         <div class="row g-3 mb-3">
             <!-- Left: Stock Trends (US) -->
             <div class="col-12 col-md-6" id="stockTrends">
@@ -1076,7 +1249,7 @@
             </div>
         </div>
 
-        <!-- Row 7: Movie Trends + Book Trends -->
+        <!-- Row 8: Movie Trends + Book Trends -->
         <div class="row g-3 mb-3">
             <!-- Left: Movie Trends -->
             <div class="col-12 col-md-6">
@@ -1224,7 +1397,7 @@
             </div>
         </div>
 
-        <!-- Row 8: Spotify Music + Podcast Trends -->
+        <!-- Row 9: Spotify Music + Podcast Trends -->
         <div class="row g-3 mb-3">
             <!-- Left: Spotify Music -->
             <div class="col-12 col-md-6" id="spotifyTrends">
@@ -1391,51 +1564,50 @@
             </div>
         </div>
 
-        <!-- Row 9: Hacker Noon + Twitch Trends -->
+        <!-- Row 10: Amazon Best Sellers + Twitch Trends -->
         <div class="row g-3 mb-3">
-            <!-- Left: Hacker Noon -->
+            <!-- Left: Amazon Best Sellers -->
             <div class="col-12 col-md-6">
                 <div class="card h-100">
-                    <div class="card-header bg-primary text-white">
-                        <h5><i class="fas fa-code"></i> Hacker Noon</h5>
+                    <div class="card-header" style="background-color: #ff9900; color: white;">
+                        <h5><i class="fab fa-amazon"></i> Amazon Best Sellers</h5>
                     </div>
                     <div class="card-body">
                         
-                        <!-- Hacker Noon Data Display -->
-                        <div class="loading text-center py-5" id="hackernoonLoading" style="display: none;">
-                            <div class="spinner-border text-primary" role="status">
+                        <!-- Amazon Best Sellers Data Display -->
+                        <div class="loading text-center py-5" id="amazonLoading" style="display: none;">
+                            <div class="spinner-border" style="color: #ff9900;" role="status">
                                 <span class="visually-hidden">Loading...</span>
                             </div>
-                            <p class="mt-3">Loading Hacker Noon data...</p>
+                            <p class="mt-3">Loading Amazon Best Sellers data...</p>
                         </div>
 
-                        <!-- Hacker Noon Results Display Area -->
-                        <div id="hackernoonResults" style="display: none;">
+                        <!-- Amazon Best Sellers Results Display Area -->
+                        <div id="amazonResults" style="display: none;">
                             <!-- Status Display -->
-                            <div class="alert alert-success status-message" id="hackernoonStatusMessage" style="display: none;">
+                            <div class="alert alert-success status-message" id="amazonStatusMessage" style="display: none;">
                                 <!-- Status messages will be displayed here -->
                             </div>
                             
                             <!-- Error Messages -->
-                            <div class="alert alert-danger" id="hackernoonErrorMessage" style="display: none;">
-                                <!-- Hacker Noon error messages will be displayed here -->
+                            <div class="alert alert-danger" id="amazonErrorMessage" style="display: none;">
+                                <!-- Amazon Best Sellers error messages will be displayed here -->
                             </div>
 
-                            <!-- Hacker Noon Table -->
+                            <!-- Amazon Best Sellers Table -->
                             <div class="card trend-table category-card">
                                 <div class="card-body">
                                     <div class="trend-table-container">
                             <div class="table-responsive">
-                                <table class="table table-hover trend-table" id="hackernoonTrendsTable">
+                                <table class="table table-hover trend-table" id="amazonTrendsTable">
                                     <thead class="table-dark">
                                         <tr>
                                             <th>Rank</th>
                                             <th>Title</th>
-                                            <th>Author</th>
                                             <th>Published</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="hackernoonTrendsTableBody">
+                                    <tbody id="amazonTrendsTableBody">
                                         <!-- Skeleton UI: Placeholder before data loads -->
                                         <tr class="skeleton-row">
                                             <td><div class="skeleton skeleton-badge"></div></td>
@@ -1592,7 +1764,9 @@
         #podcastResults,
         #movieResults,
         #bookResults,
-        #hackernoonResults,
+        #devtoResults,
+        #mediumResults,
+        #amazonResults,
         #twitchResults {
             display: block !important;
             visibility: visible !important;

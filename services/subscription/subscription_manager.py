@@ -521,10 +521,8 @@ class SubscriptionManager:
                 
                 with self.db.get_connection() as conn:
                     with conn.cursor() as cursor:
-                        # デバッグ用: 全サブスクリプション数を確認（is_activeに関係なく）
                         cursor.execute("SELECT COUNT(*) FROM subscriptions")
                         total_count = cursor.fetchone()[0]
-                        logger.info(f"   📊 subscriptionsテーブルの全レコード数: {total_count}件")
                         
                         # アクティブなサブスクリプションのみを取得
                         cursor.execute("""
@@ -544,13 +542,6 @@ class SubscriptionManager:
                             })
                         
                         logger.info(f"   ✅ データベースから{len(subscriptions)}件のアクティブなサブスクリプションを取得（全{total_count}件中）")
-                        
-                        # デバッグ用: アクティブでないサブスクリプションも確認
-                        if total_count > 0 and len(subscriptions) == 0:
-                            cursor.execute("SELECT email, is_active FROM subscriptions LIMIT 5")
-                            inactive_results = cursor.fetchall()
-                            logger.warning(f"   ⚠️ サブスクリプションが存在しますが、すべてis_active=falseの可能性があります")
-                            logger.warning(f"   サンプル: {inactive_results}")
                         
                         return subscriptions
                         
@@ -647,6 +638,11 @@ class SubscriptionManager:
             from services.trends.book_trends import BookTrendsManager
             from services.trends.github_trends import GitHubTrendsManager
             from services.trends.appstore_trends import AppStoreTrendsManager
+            from services.trends.cisa_kev_trends import CISAKEVTrendsManager
+            from services.trends.thehackernews_trends import TheHackerNewsTrendsManager
+            from services.trends.devto_trends import DevToTrendsManager
+            from services.trends.medium_trends import MediumTrendsManager
+            from services.trends.amazon_trends import AmazonTrendsManager
             
             # 各マネージャーのインスタンスを作成
             managers = {
@@ -671,6 +667,11 @@ class SubscriptionManager:
                 'book_trends': BookTrendsManager(),
                 'github_trends': GitHubTrendsManager(),
                 'appstore_trends': AppStoreTrendsManager(),
+                'cisa_kev_trends': CISAKEVTrendsManager(),
+                'thehackernews_trends': TheHackerNewsTrendsManager(),
+                'devto_trends': DevToTrendsManager(),
+                'medium_trends': MediumTrendsManager(),
+                'amazon_trends': AmazonTrendsManager(),
             }
             
             trends_data = {}
@@ -737,6 +738,16 @@ class SubscriptionManager:
                     elif normalized_cat == 'appstore_trends':
                         # App Store: countryパラメータでJP/USを指定
                         result = manager.get_trends(country=region, category='all', limit=25, force_refresh=False)
+                    elif normalized_cat == 'cisa_kev_trends':
+                        result = manager.get_trends(limit=25, force_refresh=False)
+                    elif normalized_cat == 'thehackernews_trends':
+                        result = manager.get_trends(limit=25, force_refresh=False)
+                    elif normalized_cat == 'devto_trends':
+                        result = manager.get_trends(limit=25, force_refresh=False)
+                    elif normalized_cat == 'medium_trends':
+                        result = manager.get_trends(limit=25, force_refresh=False)
+                    elif normalized_cat == 'amazon_trends':
+                        result = manager.get_trends(limit=25, force_refresh=False)
                     else:
                         logger.warning(f"   ⚠️ {original_cat}: 未対応のカテゴリです")
                         result = None
@@ -761,15 +772,6 @@ class SubscriptionManager:
                             'error': result.get('error')
                         }
                         continue
-                    
-                    # デバッグ: 結果の構造を確認
-                    if result:
-                        logger.debug(f"   {original_cat} 結果: success={result.get('success')}, data_type={type(result.get('data'))}")
-                        if isinstance(result.get('data'), dict) and 'data' in result.get('data', {}):
-                            data_list = result['data']['data']
-                            logger.debug(f"   {original_cat} データ件数: {len(data_list) if isinstance(data_list, list) else 0}")
-                        elif isinstance(result.get('data'), list):
-                            logger.debug(f"   {original_cat} データ件数: {len(result['data'])}")
                     
                     # データ構造に応じて処理
                     data_list = None
@@ -865,20 +867,10 @@ class SubscriptionManager:
                 categories = matched_categories if matched_categories else list(trends_data.keys())
                 logger.info(f"📊 {email}: カテゴリマッチング結果: {len(categories)}カテゴリ ({categories[:5]}...)")
             
-            # デバッグ: trends_dataの内容を確認
-            logger.debug(f"📊 トレンドデータ確認: {len(trends_data)}カテゴリ")
-            for cat, data in trends_data.items():
-                data_count = len(data.get('data', [])) if isinstance(data, dict) else 0
-                logger.debug(f"   - {cat}: {data_count}件")
-            
             # メール内容を作成
             subject = "📊 トレンドサマリー配信 - " + datetime.now().strftime('%Y年%m月%d日')
             html_content = self._create_trends_summary_html(trends_data, categories, unsubscribe_token)
             text_content = self._create_trends_summary_text(trends_data, categories, unsubscribe_token)
-            
-            # デバッグ: メール内容の長さを確認
-            logger.debug(f"📧 HTMLコンテンツ長: {len(html_content)}文字")
-            logger.debug(f"📧 テキストコンテンツ長: {len(text_content)}文字")
             
             # メール送信
             success = self.email_service._send_email(email, subject, html_content, text_content)
@@ -961,25 +953,33 @@ class SubscriptionManager:
             'hackernews_trends_us',
             # 6. Product Hunt
             'producthunt_trends_us',
-            # 7. Stock Trends
-            'stock_trends_us',
-            # 8. Cryptocurrency Trends
-            'crypto_trends_us',
-            # 9. 音楽トレンド (Spotify)
-            'music_trends_us',
-            # 10. ポッドキャストトレンド
-            'podcast_trends_us',
-            # 11. 映画トレンド (US)
-            'movie_trends_us',
-            # 12. 本トレンド (US)
-            'book_trends_us',
-            # 13. GitHub (US)
+            # 7. DEV.to
+            'devto_trends_us',
+            # 8. Medium
+            'medium_trends_us',
+            # 9. CISA KEV
+            'cisa_kev_trends_us',
+            # 10. The Hacker News
+            'thehackernews_trends_us',
+            # 11. GitHub (US)
             'github_trends_us',
-            # 14. App Store (US)
+            # 12. App Store (US)
             'appstore_trends_us',
-            # 15. Reddit
-            'reddit_trends_us',
-            # 16. Twitchゲームトレンド
+            # 13. Stock Trends
+            'stock_trends_us',
+            # 14. Cryptocurrency Trends
+            'crypto_trends_us',
+            # 15. 映画トレンド (US)
+            'movie_trends_us',
+            # 16. 本トレンド (US)
+            'book_trends_us',
+            # 17. 音楽トレンド (Spotify)
+            'music_trends_us',
+            # 18. ポッドキャストトレンド
+            'podcast_trends_us',
+            # 19. Amazon Best Sellers
+            'amazon_trends_us',
+            # 20. Twitchゲームトレンド
             'twitch_trends_us',
         ]
     
@@ -1060,7 +1060,16 @@ class SubscriptionManager:
                 'nhk_trends': 'NHK ニュース',
                 'qiita_trends': 'Qiita トレンド',
                 'stock_trends': '株価トレンド',
-                'crypto_trends': '仮想通貨トレンド'
+                'crypto_trends': '仮想通貨トレンド',
+                'github_trends': 'GitHub',
+                'appstore_trends': 'App Store',
+                'movie_trends': '映画トレンド',
+                'book_trends': '本トレンド',
+                'cisa_kev_trends': 'CISA KEV',
+                'thehackernews_trends': 'The Hacker News',
+                'devto_trends': 'DEV.to',
+                'medium_trends': 'Medium',
+                'amazon_trends': 'Amazon Best Sellers'
             }
             
             # フロントエンドのカテゴリ形式をtrends_dataのキー形式に変換
@@ -1170,6 +1179,55 @@ class SubscriptionManager:
                                 price_change = item.get('price_change_percentage_24h', 0)
                                 change_symbol = '↑' if price_change >= 0 else '↓'
                                 html += f'<div class="trend-item">{i}. {name} ({symbol}) {change_symbol} {abs(price_change):.2f}%</div>'
+                            elif normalized_category == 'cisa_kev_trends':
+                                title = item.get('title', 'N/A')
+                                html += f'<div class="trend-item">{i}. {title}</div>'
+                            elif normalized_category == 'thehackernews_trends':
+                                title = item.get('title', 'N/A')
+                                html += f'<div class="trend-item">{i}. {title}</div>'
+                            elif normalized_category == 'devto_trends':
+                                title = item.get('title', 'N/A')
+                                author = item.get('author', '')
+                                reactions = item.get('positive_reactions_count', 0)
+                                if author:
+                                    html += f'<div class="trend-item">{i}. {title} by {author} ({reactions} reactions)</div>'
+                                else:
+                                    html += f'<div class="trend-item">{i}. {title} ({reactions} reactions)</div>'
+                            elif normalized_category == 'medium_trends':
+                                title = item.get('title', 'N/A')
+                                author = item.get('author', '')
+                                if author:
+                                    html += f'<div class="trend-item">{i}. {title} by {author}</div>'
+                                else:
+                                    html += f'<div class="trend-item">{i}. {title}</div>'
+                            elif normalized_category == 'amazon_trends':
+                                title = item.get('title', 'N/A')
+                                html += f'<div class="trend-item">{i}. {title}</div>'
+                            elif normalized_category == 'github_trends':
+                                name = item.get('name', 'N/A') or item.get('repo', 'N/A')
+                                stars = item.get('stars', 0) or item.get('stargazers_count', 0)
+                                html += f'<div class="trend-item">{i}. {name} ({stars}⭐)</div>'
+                            elif normalized_category == 'appstore_trends':
+                                name = item.get('name', 'N/A') or item.get('title', 'N/A')
+                                rating = item.get('rating', 0)
+                                if rating:
+                                    html += f'<div class="trend-item">{i}. {name} ({rating}★)</div>'
+                                else:
+                                    html += f'<div class="trend-item">{i}. {name}</div>'
+                            elif normalized_category == 'movie_trends':
+                                title = item.get('title', 'N/A') or item.get('name', 'N/A')
+                                rating = item.get('rating', 0) or item.get('vote_average', 0)
+                                if rating:
+                                    html += f'<div class="trend-item">{i}. {title} ({rating}★)</div>'
+                                else:
+                                    html += f'<div class="trend-item">{i}. {title}</div>'
+                            elif normalized_category == 'book_trends':
+                                title = item.get('title', 'N/A') or item.get('name', 'N/A')
+                                author = item.get('author', '')
+                                if author:
+                                    html += f'<div class="trend-item">{i}. {title} by {author}</div>'
+                                else:
+                                    html += f'<div class="trend-item">{i}. {title}</div>'
                     
                         html += """
                             </div>
@@ -1245,7 +1303,16 @@ class SubscriptionManager:
                 'nhk_trends': 'NHK ニュース',
                 'qiita_trends': 'Qiita トレンド',
                 'stock_trends': '株価トレンド',
-                'crypto_trends': '仮想通貨トレンド'
+                'crypto_trends': '仮想通貨トレンド',
+                'github_trends': 'GitHub',
+                'appstore_trends': 'App Store',
+                'movie_trends': '映画トレンド',
+                'book_trends': '本トレンド',
+                'cisa_kev_trends': 'CISA KEV',
+                'thehackernews_trends': 'The Hacker News',
+                'devto_trends': 'DEV.to',
+                'medium_trends': 'Medium',
+                'amazon_trends': 'Amazon Best Sellers'
             }
             
             # フロントエンドのカテゴリ形式をtrends_dataのキー形式に変換
@@ -1351,6 +1418,55 @@ class SubscriptionManager:
                                 price_change = item.get('price_change_percentage_24h', 0)
                                 change_symbol = '↑' if price_change >= 0 else '↓'
                                 text += f"{i}. {name} ({symbol}) {change_symbol} {abs(price_change):.2f}%\n"
+                            elif normalized_category == 'cisa_kev_trends':
+                                title = item.get('title', 'N/A')
+                                text += f"{i}. {title}\n"
+                            elif normalized_category == 'thehackernews_trends':
+                                title = item.get('title', 'N/A')
+                                text += f"{i}. {title}\n"
+                            elif normalized_category == 'devto_trends':
+                                title = item.get('title', 'N/A')
+                                author = item.get('author', '')
+                                reactions = item.get('positive_reactions_count', 0)
+                                if author:
+                                    text += f"{i}. {title} by {author} ({reactions} reactions)\n"
+                                else:
+                                    text += f"{i}. {title} ({reactions} reactions)\n"
+                            elif normalized_category == 'medium_trends':
+                                title = item.get('title', 'N/A')
+                                author = item.get('author', '')
+                                if author:
+                                    text += f"{i}. {title} by {author}\n"
+                                else:
+                                    text += f"{i}. {title}\n"
+                            elif normalized_category == 'amazon_trends':
+                                title = item.get('title', 'N/A')
+                                text += f"{i}. {title}\n"
+                            elif normalized_category == 'github_trends':
+                                name = item.get('name', 'N/A') or item.get('repo', 'N/A')
+                                stars = item.get('stars', 0) or item.get('stargazers_count', 0)
+                                text += f"{i}. {name} ({stars}⭐)\n"
+                            elif normalized_category == 'appstore_trends':
+                                name = item.get('name', 'N/A') or item.get('title', 'N/A')
+                                rating = item.get('rating', 0)
+                                if rating:
+                                    text += f"{i}. {name} ({rating}★)\n"
+                                else:
+                                    text += f"{i}. {name}\n"
+                            elif normalized_category == 'movie_trends':
+                                title = item.get('title', 'N/A') or item.get('name', 'N/A')
+                                rating = item.get('rating', 0) or item.get('vote_average', 0)
+                                if rating:
+                                    text += f"{i}. {title} ({rating}★)\n"
+                                else:
+                                    text += f"{i}. {title}\n"
+                            elif normalized_category == 'book_trends':
+                                title = item.get('title', 'N/A') or item.get('name', 'N/A')
+                                author = item.get('author', '')
+                                if author:
+                                    text += f"{i}. {title} by {author}\n"
+                                else:
+                                    text += f"{i}. {title}\n"
                     
                         text += "\n"
             
@@ -1400,12 +1516,19 @@ class SubscriptionManager:
             'twitch_trends_us': 'Twitchゲームトレンド (US)',
             'reddit_trends_us': 'Reddit (US)',
             'hackernews_trends_us': 'Hacker News (US)',
-            'cnn_trends_us': 'CNN News (US)',
             'producthunt_trends_us': 'Product Hunt (US)',
-            'movie_trends_us': '映画トレンド (US)',
-            'book_trends_us': '本トレンド (US)',
+            'devto_trends_us': 'DEV.to (US)',
+            'medium_trends_us': 'Medium (US)',
+            'cisa_kev_trends_us': 'CISA KEV (US)',
+            'thehackernews_trends_us': 'The Hacker News (US)',
+            'cnn_trends_us': 'CNN News (US)',
             'github_trends_us': 'GitHub (US)',
             'appstore_trends_us': 'App Store (US)',
+            'stock_trends_us': 'Stock Trends (US)',
+            'crypto_trends_us': 'Cryptocurrency Trends (US)',
+            'movie_trends_us': '映画トレンド (US)',
+            'book_trends_us': '本トレンド (US)',
+            'amazon_trends_us': 'Amazon Best Sellers (US)',
             # 日本のカテゴリ（追加）
             'nhk_trends_jp': 'NHK ニュース (日本)',
             'qiita_trends_jp': 'Qiita トレンド (日本)',
@@ -1516,8 +1639,19 @@ class SubscriptionManager:
             'twitch_trends_us': 'Twitchゲームトレンド (US)',
             'reddit_trends_us': 'Reddit (US)',
             'hackernews_trends_us': 'Hacker News (US)',
-            'cnn_trends_us': 'CNN News (US)',
             'producthunt_trends_us': 'Product Hunt (US)',
+            'devto_trends_us': 'DEV.to (US)',
+            'medium_trends_us': 'Medium (US)',
+            'cisa_kev_trends_us': 'CISA KEV (US)',
+            'thehackernews_trends_us': 'The Hacker News (US)',
+            'cnn_trends_us': 'CNN News (US)',
+            'github_trends_us': 'GitHub (US)',
+            'appstore_trends_us': 'App Store (US)',
+            'stock_trends_us': 'Stock Trends (US)',
+            'crypto_trends_us': 'Cryptocurrency Trends (US)',
+            'movie_trends_us': 'Movie Trends (US)',
+            'book_trends_us': 'Book Trends (US)',
+            'amazon_trends_us': 'Amazon Best Sellers (US)',
             # 日本のカテゴリ（追加）
             'nhk_trends_jp': 'NHK ニュース (日本)',
             'qiita_trends_jp': 'Qiita トレンド (日本)',

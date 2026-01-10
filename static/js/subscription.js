@@ -2,8 +2,6 @@
 
 // サブスクリプション機能の初期化
 function initSubscription() {
-    console.log('📧 サブスクリプション機能を初期化中...');
-    
     // フォーム送信イベントリスナー
     const emailForm = document.getElementById('emailSubscriptionForm');
     if (emailForm) {
@@ -24,7 +22,6 @@ function initSubscription() {
             checkboxes.forEach(checkbox => {
                 checkbox.checked = true;
             });
-            console.log('✅ すべてのチェックボックスを選択しました');
         });
     }
     
@@ -36,7 +33,6 @@ function initSubscription() {
             checkboxes.forEach(checkbox => {
                 checkbox.checked = false;
             });
-            console.log('✅ すべてのチェックボックスを解除しました');
         });
     }
     
@@ -57,8 +53,6 @@ function handleSubscriptionSubmit(e) {
     checkboxes.forEach(checkbox => {
         categories.push(checkbox.value);
     });
-    
-    console.log('📧 サブスクリプション登録:', { email, frequency, categories });
     
     // APIに送信
     fetch('/subscription/api/subscribe', {
@@ -98,8 +92,6 @@ function handleUnsubscribe() {
             showSubscriptionMessage('メールアドレスが見つかりません', 'danger');
             return;
         }
-        
-        console.log('📧 サブスクリプション解除:', { email });
         
         fetch('/subscription/api/unsubscribe', {
             method: 'POST',

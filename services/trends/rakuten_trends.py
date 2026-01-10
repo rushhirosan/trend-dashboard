@@ -26,10 +26,6 @@ class RakutenTrendsManager:
         logger.info(f"Rakuten Trends Manager初期化:")
         logger.info(f"  App ID: {'設定済み' if self.rakuten_app_id else '未設定'}")
         logger.info(f"  Affiliate ID: {'設定済み' if self.rakuten_affiliate_id else '未設定'}")
-        
-        # デバッグ: 環境変数の値を確認
-        logger.debug(f"  App ID値: {self.rakuten_app_id}")
-        logger.debug(f"  Affiliate ID値: {self.rakuten_affiliate_id}")
     
     def get_trends(self, genre_id=None, limit=25, force_refresh=False):
         """楽天トレンドを取得（get_popular_itemsのエイリアス）"""
@@ -141,12 +137,6 @@ class RakutenTrendsManager:
             if response.status_code == 200:
                 data = response.json()
                 items = data.get('Items', [])
-                
-                # デバッグ: 最初のアイテムの全フィールドを確認
-                if items:
-                    first_item = items[0].get('Item', {})
-                    logger.debug(f"楽天APIアイテムフィールド: {list(first_item.keys())}")
-                    logger.debug(f"楽天APIアイテムサンプル: {first_item}")
                 
                 trends_data = []
                 for item in items:

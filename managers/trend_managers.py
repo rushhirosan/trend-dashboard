@@ -31,6 +31,9 @@ from services.trends.jpcert_trends import JPCERTTrendsManager
 from services.trends.hackernoon_trends import HackerNoonTrendsManager
 from services.trends.zenn_trends import ZennTrendsManager
 from services.trends.note_trends import NoteTrendsManager
+from services.trends.amazon_trends import AmazonTrendsManager
+from services.trends.medium_trends import MediumTrendsManager
+from services.trends.devto_trends import DevToTrendsManager
 from utils.logger_config import get_logger
 
 # ロガーの初期化
@@ -66,6 +69,9 @@ MANAGER_CONFIGS = [
     ('hackernoon', HackerNoonTrendsManager, 'Hacker Noon'),
     ('zenn', ZennTrendsManager, 'Zenn'),
     ('note', NoteTrendsManager, 'Note'),
+    ('amazon', AmazonTrendsManager, 'Amazon Best Sellers'),
+    ('medium', MediumTrendsManager, 'Medium'),
+    ('devto', DevToTrendsManager, 'DEV.to'),
 ]
 
 
@@ -206,6 +212,9 @@ def refresh_all_trends(managers, force_refresh=True):
     call_manager('cisa_kev', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
     call_manager('thehackernews', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
     call_manager('hackernoon', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
+    call_manager('amazon', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
+    call_manager('medium', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
+    call_manager('devto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
     
     overall_success = all(result.get('success') for result in results.values())
     

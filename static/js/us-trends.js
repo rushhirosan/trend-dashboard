@@ -29,8 +29,6 @@ async function fetchWithRetry(url, options = {}, maxRetries = 2) {
 
 // Stock Trends data fetch for US
 async function fetchStockTrendsUS() {
-    console.log('=== Stock Trends fetch started (US) ===');
-    
     const loadingElement = document.getElementById('stockLoading');
     const resultsElement = document.getElementById('stockResults');
     const errorElement = document.getElementById('stockErrorMessage');
@@ -84,7 +82,6 @@ async function fetchStockTrendsUS() {
 
 // Display Stock Results (US)
 function displayStockResultsUS(data) {
-    console.log('📊 Stock Results display started', data);
     const tableBody = document.getElementById('stockTrendsTableBody');
     const resultsElement = document.getElementById('stockResults');
     const errorElement = document.getElementById('stockErrorMessage');
@@ -108,7 +105,6 @@ function displayStockResultsUS(data) {
         emptyRow.innerHTML = '<td colspan="4" class="text-center text-muted py-4">No trading today</td>';
         tableBody.appendChild(emptyRow);
         resultsElement.style.setProperty('display', 'block', 'important');
-        console.log('✅ Stock Results display completed (no data)');
         return;
     }
     
@@ -225,7 +221,6 @@ async function fetchCryptoTrendsUS() {
 
 // Display Crypto Results (US)
 function displayCryptoResultsUS(data) {
-    console.log('📊 Crypto Results display started', data);
     const tableBody = document.getElementById('cryptoTrendsTableBody');
     const resultsElement = document.getElementById('cryptoResults');
     
@@ -271,16 +266,12 @@ function displayCryptoResultsUS(data) {
         }
     });
     
-    console.log('📊 Crypto: Rows added to table:', tableBody.children.length);
-    
     // Display results
     resultsElement.style.setProperty('display', 'block', 'important');
-    console.log('✅ Crypto Results display completed');
 }
 
 // Movie Trends data fetch for US
 async function fetchMovieTrendsUS() {
-    console.log('=== Movie Trends fetch started (US) ===');
     
     const loadingElement = document.getElementById('movieLoading');
     const resultsElement = document.getElementById('movieResults');
@@ -333,7 +324,6 @@ async function fetchMovieTrendsUS() {
 
 // Display Movie Results (US)
 function displayMovieResultsUS(data) {
-    console.log('📊 Movie Results display started', data);
     const tableBody = document.getElementById('movieTrendsTableBody');
     const resultsElement = document.getElementById('movieResults');
     
@@ -385,12 +375,10 @@ function displayMovieResultsUS(data) {
     
     // Display results
     resultsElement.style.setProperty('display', 'block', 'important');
-    console.log('✅ Movie Results display completed');
 }
 
 // Book Trends data fetch for US
 async function fetchBookTrendsUS() {
-    console.log('=== Book Trends fetch started (US) ===');
     
     const loadingElement = document.getElementById('bookLoading');
     const resultsElement = document.getElementById('bookResults');
@@ -467,8 +455,6 @@ async function fetchBookTrendsUS() {
 
 // Display Book Results (US)
 function displayBookResultsUS(data) {
-    console.log('📊 Book Results display started', data);
-    console.log('📊 Book data structure:', JSON.stringify(data, null, 2));
     const tableBody = document.getElementById('bookTrendsTableBody');
     const resultsElement = document.getElementById('bookResults');
     
@@ -513,7 +499,6 @@ function displayBookResultsUS(data) {
             `;
             tableBody.appendChild(row);
         });
-        console.log('📊 Added', bookData.length, 'rows to table');
     } else {
         console.warn('📊 No book data to display', { bookData, isArray: Array.isArray(bookData), length: Array.isArray(bookData) ? bookData.length : 'N/A' });
         tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">データがありません</td></tr>';
@@ -521,12 +506,10 @@ function displayBookResultsUS(data) {
     
     // Display results
     resultsElement.style.setProperty('display', 'block', 'important');
-    console.log('✅ Book Results display completed');
 }
 
 // Load Movie Trends from Cache (US)
 function loadMovieTrendsFromCacheUS() {
-    console.log('📊 Movie Trends cache data loading (US)');
     const loadingElement = document.getElementById('movieLoading');
     if (loadingElement) {
         loadingElement.style.display = 'block';
@@ -1027,11 +1010,17 @@ function loadCachedDataUS() {
     // Load App Store Trends from cache
     loadAppStoreTrendsFromCacheUS();
     
-    // Load Hacker Noon from cache
-    loadHackerNoonTrendsFromCacheUS();
-    
     // Load Podcast from cache (Redditと独立して表示)
     loadPodcastFromCacheUS();
+    
+    // Load DEV.to from cache
+    loadDevToFromCacheUS();
+    
+    // Load Medium from cache
+    loadMediumFromCacheUS();
+    
+    // Load Amazon Best Sellers from cache
+    loadAmazonFromCacheUS();
     
     // Load Twitch from cache
     loadTwitchFromCacheUS();
@@ -2224,44 +2213,275 @@ function loadTheHackerNewsTrendsFromCacheUS() {
         });
 }
 
-// Hacker Noon cache data loading for US
-function loadHackerNoonTrendsFromCacheUS() {
-    console.log('📊 Hacker Noon cache data loading for US');
-    const loadingElement = document.getElementById('hackernoonLoading');
-    const resultsElement = document.getElementById('hackernoonResults');
+// DEV.to cache data loading for US
+function loadDevToFromCacheUS() {
+    const loadingElement = document.getElementById('devtoLoading');
+    const resultsElement = document.getElementById('devtoResults');
     
     if (loadingElement) loadingElement.style.display = 'block';
     if (resultsElement) resultsElement.style.display = 'none';
     
-    fetchWithRetry('/api/hackernoon-trends?limit=25&force_refresh=false')
+    fetchWithRetry('/api/devto-trends?limit=25&force_refresh=false')
         .then(response => {
-            console.log('Hacker Noon API response:', response.status, response.ok);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
             return response.json();
         })
         .then(data => {
-            console.log('Hacker Noon API data:', data);
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
             
             if (data.success && data.data && data.data.length > 0) {
-                console.log('Hacker Noon data display starting');
-                if (typeof displayHackerNoonResults === 'function') {
-                    displayHackerNoonResults(data);
+                displayDevToResults(data);
                 } else {
-                    console.error('displayHackerNoonResults function not found');
-                }
-            } else {
-                console.log('Hacker Noon data not found or error:', data);
+                showDevToError(data.error || 'No data available');
             }
         })
         .catch(error => {
-            console.error('Hacker Noon cache loading error:', error);
+            console.error('DEV.to cache loading error:', error);
+            if (loadingElement) loadingElement.style.display = 'none';
+            showDevToError('Failed to load DEV.to data');
+        });
+}
+
+// Medium cache data loading for US
+function loadMediumFromCacheUS() {
+    const loadingElement = document.getElementById('mediumLoading');
+    const resultsElement = document.getElementById('mediumResults');
+    
+    if (loadingElement) loadingElement.style.display = 'block';
+    if (resultsElement) resultsElement.style.display = 'none';
+    
+    fetchWithRetry('/api/medium-trends?limit=25&force_refresh=false')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
+            
+            if (data.success && data.data && data.data.length > 0) {
+                displayMediumResults(data);
+            } else {
+                showMediumError(data.error || 'No data available');
+            }
+        })
+        .catch(error => {
+            console.error('Medium cache loading error:', error);
+            if (loadingElement) loadingElement.style.display = 'none';
+            showMediumError('Failed to load Medium data');
         });
+}
+
+// Amazon Best Sellers cache data loading for US
+function loadAmazonFromCacheUS() {
+    const loadingElement = document.getElementById('amazonLoading');
+    const resultsElement = document.getElementById('amazonResults');
+    
+    if (loadingElement) loadingElement.style.display = 'block';
+    if (resultsElement) resultsElement.style.display = 'none';
+    
+    fetchWithRetry('/api/amazon-trends?limit=25&force_refresh=false')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (loadingElement) loadingElement.style.display = 'none';
+            if (resultsElement) resultsElement.style.display = 'block';
+            
+            if (data.success && data.data && data.data.length > 0) {
+                displayAmazonResults(data);
+            } else {
+                showAmazonError(data.error || 'No data available');
+            }
+        })
+        .catch(error => {
+            console.error('Amazon Best Sellers cache loading error:', error);
+            if (loadingElement) loadingElement.style.display = 'none';
+            showAmazonError('Failed to load Amazon Best Sellers data');
+        });
+}
+
+// Display DEV.to Results
+function displayDevToResults(data) {
+    const tableBody = document.getElementById('devtoTrendsTableBody');
+    const statusMessage = document.getElementById('devtoStatusMessage');
+    const errorElement = document.getElementById('devtoErrorMessage');
+    const resultsElement = document.getElementById('devtoResults');
+    const loadingElement = document.getElementById('devtoLoading');
+    
+    if (!tableBody || !resultsElement) {
+        console.error('DEV.to DOM elements not found');
+        return;
+    }
+    
+    if (loadingElement) loadingElement.style.display = 'none';
+    if (errorElement) errorElement.style.display = 'none';
+    if (statusMessage) statusMessage.style.display = 'none';
+    
+    tableBody.innerHTML = '';
+    
+    if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
+        showDevToError('No data available');
+        return;
+    }
+    
+    data.data.forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.className = 'trend-card';
+        const title = item.title || 'N/A';
+        const author = item.author || 'Unknown';
+        const reactions = item.positive_reactions_count || 0;
+        const url = item.url || item.canonical_url || '#';
+        const rank = item.rank || (index + 1);
+        
+        row.innerHTML = `
+            <td><span class="badge" style="background-color: #0a0e27; color: white;">${rank}</span></td>
+            <td><a href="${url}" target="_blank" class="text-decoration-none"><strong>${title}</strong></a></td>
+            <td>${author}</td>
+            <td>${formatNumber(reactions)}</td>
+        `;
+        tableBody.appendChild(row);
+    });
+    
+    resultsElement.style.setProperty('display', 'block', 'important');
+}
+
+// Display Medium Results
+function displayMediumResults(data) {
+    const tableBody = document.getElementById('mediumTrendsTableBody');
+    const statusMessage = document.getElementById('mediumStatusMessage');
+    const errorElement = document.getElementById('mediumErrorMessage');
+    const resultsElement = document.getElementById('mediumResults');
+    const loadingElement = document.getElementById('mediumLoading');
+    
+    if (!tableBody || !resultsElement) {
+        console.error('Medium DOM elements not found');
+        return;
+    }
+    
+    if (loadingElement) loadingElement.style.display = 'none';
+    if (errorElement) errorElement.style.display = 'none';
+    if (statusMessage) statusMessage.style.display = 'none';
+    
+    tableBody.innerHTML = '';
+    
+    if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
+        showMediumError('No data available');
+        return;
+    }
+    
+    data.data.forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.className = 'trend-card';
+        const title = item.title || 'N/A';
+        const author = item.author || 'Unknown';
+        const publishedDate = item.published_date || item.published_at || '';
+        const published = publishedDate ? new Date(publishedDate).toLocaleDateString('en-US') : 'N/A';
+        const url = item.url || '#';
+        const rank = item.rank || (index + 1);
+        
+        row.innerHTML = `
+            <td><span class="badge bg-dark">${rank}</span></td>
+            <td><a href="${url}" target="_blank" class="text-decoration-none"><strong>${title}</strong></a></td>
+            <td>${author}</td>
+            <td>${published}</td>
+        `;
+        tableBody.appendChild(row);
+    });
+    
+    resultsElement.style.setProperty('display', 'block', 'important');
+}
+
+// Display Amazon Best Sellers Results
+function displayAmazonResults(data) {
+    const tableBody = document.getElementById('amazonTrendsTableBody');
+    const statusMessage = document.getElementById('amazonStatusMessage');
+    const errorElement = document.getElementById('amazonErrorMessage');
+    const resultsElement = document.getElementById('amazonResults');
+    const loadingElement = document.getElementById('amazonLoading');
+    
+    if (!tableBody || !resultsElement) {
+        console.error('Amazon Best Sellers DOM elements not found');
+        return;
+    }
+    
+    if (loadingElement) loadingElement.style.display = 'none';
+    if (errorElement) errorElement.style.display = 'none';
+    if (statusMessage) statusMessage.style.display = 'none';
+    
+    tableBody.innerHTML = '';
+    
+    if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
+        showAmazonError('No data available');
+        return;
+    }
+    
+    data.data.forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.className = 'trend-card';
+        const title = item.title || 'N/A';
+        const publishedDate = item.published_date || '';
+        const published = publishedDate ? new Date(publishedDate).toLocaleDateString('en-US') : 'N/A';
+        const url = item.url || '#';
+        const rank = item.rank || (index + 1);
+        
+        row.innerHTML = `
+            <td><span class="badge" style="background-color: #ff9900; color: white;">${rank}</span></td>
+            <td><a href="${url}" target="_blank" class="text-decoration-none"><strong>${title}</strong></a></td>
+            <td>${published}</td>
+        `;
+        tableBody.appendChild(row);
+    });
+    
+    resultsElement.style.setProperty('display', 'block', 'important');
+}
+
+// Error display functions
+function showDevToError(message) {
+    const loadingElement = document.getElementById('devtoLoading');
+    const errorElement = document.getElementById('devtoErrorMessage');
+    const resultsElement = document.getElementById('devtoResults');
+    
+    if (loadingElement) loadingElement.style.display = 'none';
+    if (errorElement) {
+        errorElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
+        errorElement.style.display = 'block';
+    }
+    if (resultsElement) resultsElement.style.display = 'block';
+}
+
+function showMediumError(message) {
+    const loadingElement = document.getElementById('mediumLoading');
+    const errorElement = document.getElementById('mediumErrorMessage');
+    const resultsElement = document.getElementById('mediumResults');
+    
+    if (loadingElement) loadingElement.style.display = 'none';
+    if (errorElement) {
+        errorElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
+        errorElement.style.display = 'block';
+    }
+    if (resultsElement) resultsElement.style.display = 'block';
+}
+
+function showAmazonError(message) {
+    const loadingElement = document.getElementById('amazonLoading');
+    const errorElement = document.getElementById('amazonErrorMessage');
+    const resultsElement = document.getElementById('amazonResults');
+    
+    if (loadingElement) loadingElement.style.display = 'none';
+    if (errorElement) {
+        errorElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
+        errorElement.style.display = 'block';
+    }
+    if (resultsElement) resultsElement.style.display = 'block';
 }
 
 // Page initialization

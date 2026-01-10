@@ -295,42 +295,89 @@ Sitemap: https://trends-dashboard.fly.dev/sitemap.xml
         logger.error(f"❌ /sitemap.xml ルート定義エラー: {e}", exc_info=True)
     
     def check_database_health(cache_instance):
-        """データベース接続のヘルスチェック"""
+        """データベース接続のヘルスチェック（タイムアウト付き）"""
         import time
+        import signal
+        
         if not cache_instance:
             return {
                 'status': 'unhealthy',
                 'connected': False,
                 'error': 'Database cache instance not initialized'
             }
+        
+        # タイムアウトを10秒に設定（ヘルスチェック用）
+        timeout_seconds = 10
+        db_check_start = time.time()
+        
         try:
-            db_check_start = time.time()
-            db_conn = cache_instance.get_connection()
-            db_check_time = (time.time() - db_check_start) * 1000  # ミリ秒
-            
-            if db_conn and not db_conn.closed:
-                # 簡単なクエリで接続を確認
-                with db_conn.cursor() as cursor:
-                    cursor.execute("SELECT 1")
-                    cursor.fetchone()
+            # タイムアウト処理（シンプルな実装）
+            # 実際には、get_connection()内でタイムアウトが発生する可能性があるため、
+            # ここでは接続試行時間を計測し、タイムアウトした場合はエラーを返す
+            try:
+                db_conn = cache_instance.get_connection()
+                db_check_time = (time.time() - db_check_start) * 1000  # ミリ秒
                 
-                return {
-                    'status': 'healthy',
-                    'connected': True,
-                    'response_time_ms': round(db_check_time, 2)
-                }
-            else:
-                return {
-                    'status': 'unhealthy',
-                    'connected': False,
-                    'error': 'Database connection is closed or None'
-                }
+                # タイムアウトチェック
+                if db_check_time > (timeout_seconds * 1000):
+                    return {
+                        'status': 'unhealthy',
+                        'connected': False,
+                        'error': f'Database connection timeout (>{timeout_seconds}s)',
+                        'response_time_ms': round(db_check_time, 2)
+                    }
+                
+                if db_conn and not db_conn.closed:
+                    # 簡単なクエリで接続を確認（タイムアウトを考慮）
+                    query_start = time.time()
+                    with db_conn.cursor() as cursor:
+                        cursor.execute("SELECT 1")
+                        cursor.fetchone()
+                    query_time = (time.time() - query_start) * 1000
+                    
+                    total_time = (time.time() - db_check_start) * 1000
+                    
+                    return {
+                        'status': 'healthy',
+                        'connected': True,
+                        'response_time_ms': round(total_time, 2),
+                        'query_time_ms': round(query_time, 2)
+                    }
+                else:
+                    return {
+                        'status': 'unhealthy',
+                        'connected': False,
+                        'error': 'Database connection is closed or None',
+                        'response_time_ms': round(db_check_time, 2)
+                    }
+            except Exception as conn_error:
+                db_check_time = (time.time() - db_check_start) * 1000
+                # タイムアウトエラーかどうかを判定
+                error_str = str(conn_error)
+                if "timeout" in error_str.lower() or db_check_time > (timeout_seconds * 1000):
+                    logger.warning(f"Health check: Database connection timeout: {conn_error}")
+                    return {
+                        'status': 'unhealthy',
+                        'connected': False,
+                        'error': f'Database connection timeout: {error_str[:100]}',
+                        'response_time_ms': round(db_check_time, 2)
+                    }
+                else:
+                    logger.warning(f"Health check: Database connection failed: {conn_error}")
+                    return {
+                        'status': 'unhealthy',
+                        'connected': False,
+                        'error': str(conn_error)[:200],  # エラーメッセージを短縮
+                        'response_time_ms': round(db_check_time, 2)
+                    }
         except Exception as e:
-            logger.warning(f"Health check: Database connection failed: {e}")
+            db_check_time = (time.time() - db_check_start) * 1000
+            logger.warning(f"Health check: Unexpected error: {e}")
             return {
                 'status': 'unhealthy',
                 'connected': False,
-                'error': str(e)
+                'error': str(e)[:200],
+                'response_time_ms': round(db_check_time, 2)
             }
     
     def check_managers_health(managers):

@@ -2234,19 +2234,6 @@ function loadDevToFromCacheUS() {
             return response.json();
         })
         .then(data => {
-            // キャッシュが見つからない場合、force_refresh=trueで再取得
-            if (data.success && (data.status === 'cache_not_found' || !data.data || data.data.length === 0)) {
-                return fetchWithRetry('/api/devto-trends?limit=25&force_refresh=true')
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                        }
-                        return response.json();
-                    });
-            }
-            return data;
-        })
-        .then(data => {
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
             
@@ -2284,19 +2271,6 @@ function loadMediumFromCacheUS() {
             return response.json();
         })
         .then(data => {
-            // キャッシュが見つからない場合、force_refresh=trueで再取得
-            if (data.success && (data.status === 'cache_not_found' || !data.data || data.data.length === 0)) {
-                return fetchWithRetry('/api/medium-trends?limit=25&force_refresh=true')
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                        }
-                        return response.json();
-                    });
-            }
-            return data;
-        })
-        .then(data => {
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
             
@@ -2332,19 +2306,6 @@ function loadAmazonFromCacheUS(category = 'books') {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
             return response.json();
-        })
-        .then(data => {
-            // キャッシュが見つからない場合、force_refresh=trueで再取得
-            if (data.success && (data.status === 'cache_not_found' || !data.data || data.data.length === 0)) {
-                return fetchWithRetry(`/api/amazon-trends?category=${category}&limit=25&force_refresh=true`)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                        }
-                        return response.json();
-                    });
-            }
-            return data;
         })
         .then(data => {
             if (loadingElement) loadingElement.style.display = 'none';

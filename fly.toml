@@ -22,7 +22,7 @@ primary_region = "nrt"
   processes = ["app"]
 
   [[http_service.checks]]
-    grace_period = "30s"
+    grace_period = "90s"  # データベーススリープからの復帰時間を考慮して延長
     interval = "60s"
     method = "GET"
     timeout = "30s"

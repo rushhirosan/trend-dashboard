@@ -1,3 +1,4 @@
+import os
 import feedparser
 import requests
 from datetime import datetime
@@ -9,22 +10,28 @@ logger = get_logger(__name__)
 
 
 class AmazonTrendsManager:
-    """Amazon Best Sellersトレンド管理クラス（RSSフィード使用）"""
+    """Amazon Best Sellersトレンド管理クラス（非公式RSSフィード使用：AmaranRSS等）"""
 
     def __init__(self):
         """初期化"""
-        # Amazon Best Sellers RSSフィードURL（書籍カテゴリ）
-        self.rss_urls = [
-            "https://www.amazon.com/gp/rss/bestsellers/books",
-            "https://www.amazon.com/gp/rss/bestsellers/electronics",
-            "https://www.amazon.com/gp/rss/bestsellers/computers",
-        ]
+        # 環境変数からRSS URLを取得（AmaranRSSなどで生成したRSS URL）
+        # 複数のRSS URLをカンマ区切りで指定可能
+        rss_urls_env = os.getenv('AMAZON_RSS_URLS', '').strip()
+        
+        if rss_urls_env:
+            # カンマ区切りで分割し、空白を削除
+            self.rss_urls = [url.strip() for url in rss_urls_env.split(',') if url.strip()]
+        else:
+            # 環境変数が設定されていない場合は空のリスト
+            self.rss_urls = []
+            logger.warning("⚠️ AMAZON_RSS_URLS環境変数が設定されていません。AmaranRSS等で生成したRSS URLを設定してください。")
+        
         self.db = TrendsCache()
-        # レート制限: RSSフィードは特に制限なしだが、保守的に10リクエスト/分に設定
-        self.rate_limiter = get_rate_limiter('amazon', max_requests=10, window_seconds=60)
+        # レート制限: AmaranRSSの推奨に従い、1時間に1回（3600秒）に設定
+        self.rate_limiter = get_rate_limiter('amazon', max_requests=1, window_seconds=3600)
 
         logger.info("Amazon Best Sellers Trends Manager初期化:")
-        logger.info(f"  RSS URLs: {self.rss_urls}")
+        logger.info(f"  RSS URLs: {self.rss_urls if self.rss_urls else '(未設定 - AMAZON_RSS_URLS環境変数を設定してください)'}")
 
     def get_trends(self, limit=25, force_refresh=False):
         """Amazon Best Sellersトレンドを取得（キャッシュ優先）"""
@@ -61,8 +68,18 @@ class AmazonTrendsManager:
             return {'error': f'Amazon Best Sellersトレンドの取得に失敗しました: {str(e)}', 'success': False}
 
     def _fetch_amazon_trends(self, limit=25):
-        """Amazon Best Sellers RSSフィードからトレンドデータを取得"""
+        """Amazon Best Sellers RSSフィードからトレンドデータを取得（非公式RSS：AmaranRSS等）"""
         try:
+            if not self.rss_urls:
+                logger.warning("⚠️ Amazon Best Sellers: RSS URLが設定されていません。AMAZON_RSS_URLS環境変数を設定してください。")
+                return {
+                    'success': True,
+                    'data': [],
+                    'status': 'rss_url_not_configured',
+                    'source': 'amazon_rss',
+                    'error': 'RSS URLが設定されていません。AMAZON_RSS_URLS環境変数を設定してください。'
+                }
+            
             self.rate_limiter.wait_if_needed()
 
             all_entries = []

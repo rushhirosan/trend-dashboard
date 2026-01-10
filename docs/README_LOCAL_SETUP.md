@@ -51,6 +51,12 @@ DB_PORT=5432
 DB_NAME=trends_db
 DB_USER=postgres
 DB_PASSWORD=password
+
+# Amazon Best Sellers RSS URL（AmaranRSS等で生成したRSS URLを設定）
+# 複数のRSS URLをカンマ区切りで指定可能
+# 例: AMAZON_RSS_URLS=https://livdir.com/am-tb/xxxx.rss,https://livdir.com/am-tb/yyyy.rss
+# 注意: 1時間に1回以上の取得は避けてください（AmaranRSSの推奨）
+AMAZON_RSS_URLS=
 ```
 
 ### 4. アプリケーションの起動

@@ -172,33 +172,7 @@ class AmazonTrendsManager:
                     logger.warning(f"⚠️ Amazon RSS({category}): エントリーが空です。feed keys: {list(feed.keys())[:5]}")
                     if hasattr(feed, 'feed') and feed.feed:
                         logger.info(f"📋 feed.feed keys: {list(feed.feed.keys())[:5]}")
-                try:
-                    logger.info(f"Amazon Best Sellers RSS呼び出し開始: {rss_url}")
-                    
-                    # requestsでタイムアウトを設定して取得
-                    headers = {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                    }
-                    response = requests.get(rss_url, headers=headers, timeout=10)
-                    logger.info(f"📊 Amazon RSS({rss_url}): HTTP status={response.status_code}")
-                    
-                    if response.status_code != 200:
-                        logger.warning(f"⚠️ Amazon RSS({rss_url}): HTTP {response.status_code} - {response.text[:200]}")
-                        continue
-                    
-                    # feedparserで解析
-                    feed = feedparser.parse(response.content)
-                    logger.info(f"📊 Amazon RSS({rss_url}): feed status={feed.get('status', 'N/A')}, bozo={feed.get('bozo', False)}, bozo_exception={str(feed.get('bozo_exception', None))[:100] if feed.get('bozo_exception') else None}")
-                    
-                    if feed.entries:
-                        logger.info(f"✅ Amazon RSS({rss_url}): {len(feed.entries)}件のエントリーを取得")
-                        if len(feed.entries) > 0:
-                            logger.debug(f"📋 最初のエントリー: {feed.entries[0].get('title', 'N/A')}")
-                        all_entries.extend(feed.entries)
-                    else:
-                        logger.warning(f"⚠️ Amazon RSS({rss_url}): エントリーが空です。feed keys: {list(feed.keys())[:5]}")
-                        if hasattr(feed, 'feed') and feed.feed:
-                            logger.info(f"📋 feed.feed keys: {list(feed.feed.keys())[:5]}")
+                        
             except requests.exceptions.Timeout:
                 logger.warning(f"❌ Amazon RSS({category}) タイムアウト（10秒）")
                 return {

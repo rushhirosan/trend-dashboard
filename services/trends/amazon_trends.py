@@ -70,15 +70,24 @@ class AmazonTrendsManager:
                 try:
                     logger.info(f"Amazon Best Sellers RSS呼び出し開始: {rss_url}")
                     feed = feedparser.parse(rss_url)
+                    logger.info(f"📊 Amazon RSS({rss_url}): feed status={feed.get('status', 'N/A')}, bozo={feed.get('bozo', False)}, bozo_exception={feed.get('bozo_exception', None)}")
+                    
                     if feed.entries:
-                        all_entries.extend(feed.entries)
                         logger.info(f"✅ Amazon RSS({rss_url}): {len(feed.entries)}件のエントリーを取得")
+                        logger.debug(f"📋 最初のエントリー: {feed.entries[0].get('title', 'N/A') if feed.entries else 'N/A'}")
+                        all_entries.extend(feed.entries)
+                    else:
+                        logger.warning(f"⚠️ Amazon RSS({rss_url}): エントリーが空です。feed keys: {list(feed.keys())}")
+                        if hasattr(feed, 'feed'):
+                            logger.info(f"📋 feed.feed: {feed.feed}")
                 except requests.exceptions.Timeout:
                     logger.warning(f"❌ Amazon RSS({rss_url}) タイムアウト")
                 except Exception as e:
-                    logger.warning(f"❌ Amazon RSS({rss_url}) エラー: {e}")
+                    logger.warning(f"❌ Amazon RSS({rss_url}) エラー: {e}", exc_info=True)
 
+            logger.info(f"📊 Amazon RSS 合計エントリー数: {len(all_entries)}")
             if not all_entries:
+                logger.warning(f"⚠️ Amazon Best Sellers: すべてのRSSフィードからエントリーを取得できませんでした")
                 return {
                     'success': True,
                     'data': [],

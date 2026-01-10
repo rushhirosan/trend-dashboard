@@ -2218,6 +2218,11 @@ function loadDevToFromCacheUS() {
     const loadingElement = document.getElementById('devtoLoading');
     const resultsElement = document.getElementById('devtoResults');
     
+    if (!loadingElement || !resultsElement) {
+        console.error('DEV.to DOM elements not found');
+        return;
+    }
+    
     if (loadingElement) loadingElement.style.display = 'block';
     if (resultsElement) resultsElement.style.display = 'none';
     
@@ -2263,6 +2268,11 @@ function loadMediumFromCacheUS() {
     const loadingElement = document.getElementById('mediumLoading');
     const resultsElement = document.getElementById('mediumResults');
     
+    if (!loadingElement || !resultsElement) {
+        console.error('Medium DOM elements not found');
+        return;
+    }
+    
     if (loadingElement) loadingElement.style.display = 'block';
     if (resultsElement) resultsElement.style.display = 'none';
     
@@ -2307,6 +2317,11 @@ function loadMediumFromCacheUS() {
 function loadAmazonFromCacheUS() {
     const loadingElement = document.getElementById('amazonLoading');
     const resultsElement = document.getElementById('amazonResults');
+    
+    if (!loadingElement || !resultsElement) {
+        console.error('Amazon Best Sellers DOM elements not found');
+        return;
+    }
     
     if (loadingElement) loadingElement.style.display = 'block';
     if (resultsElement) resultsElement.style.display = 'none';

@@ -211,7 +211,6 @@ def refresh_all_trends(managers, force_refresh=True):
     call_manager('appstore', lambda m: m.get_trends(country='US', category='all', limit=25, force_refresh=force_refresh), 'US')
     call_manager('cisa_kev', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
     call_manager('thehackernews', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
-    call_manager('hackernoon', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
     call_manager('amazon', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
     call_manager('medium', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
     call_manager('devto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')

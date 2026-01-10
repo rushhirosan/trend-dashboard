@@ -2229,12 +2229,25 @@ function loadDevToFromCacheUS() {
             return response.json();
         })
         .then(data => {
+            // キャッシュが見つからない場合、force_refresh=trueで再取得
+            if (data.success && (data.status === 'cache_not_found' || !data.data || data.data.length === 0)) {
+                return fetchWithRetry('/api/devto-trends?limit=25&force_refresh=true')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        return response.json();
+                    });
+            }
+            return data;
+        })
+        .then(data => {
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
             
             if (data.success && data.data && data.data.length > 0) {
                 displayDevToResults(data);
-                } else {
+            } else {
                 showDevToError(data.error || 'No data available');
             }
         })
@@ -2259,6 +2272,19 @@ function loadMediumFromCacheUS() {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
             return response.json();
+        })
+        .then(data => {
+            // キャッシュが見つからない場合、force_refresh=trueで再取得
+            if (data.success && (data.status === 'cache_not_found' || !data.data || data.data.length === 0)) {
+                return fetchWithRetry('/api/medium-trends?limit=25&force_refresh=true')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        return response.json();
+                    });
+            }
+            return data;
         })
         .then(data => {
             if (loadingElement) loadingElement.style.display = 'none';
@@ -2291,6 +2317,19 @@ function loadAmazonFromCacheUS() {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
             return response.json();
+        })
+        .then(data => {
+            // キャッシュが見つからない場合、force_refresh=trueで再取得
+            if (data.success && (data.status === 'cache_not_found' || !data.data || data.data.length === 0)) {
+                return fetchWithRetry('/api/amazon-trends?limit=25&force_refresh=true')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        return response.json();
+                    });
+            }
+            return data;
         })
         .then(data => {
             if (loadingElement) loadingElement.style.display = 'none';

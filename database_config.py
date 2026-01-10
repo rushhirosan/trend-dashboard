@@ -4236,12 +4236,32 @@ class TrendsCache:
         """
         def query_func(conn):
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("""
-                    SELECT title, url, asin, published_date, description, rank, category, cached_at
-                    FROM amazon_trends_cache 
-                    WHERE category = %s
-                    ORDER BY rank
-                """, (category,))
+                # まず、categoryカラムが存在するか確認
+                try:
+                    cursor.execute("""
+                        SELECT column_name 
+                        FROM information_schema.columns 
+                        WHERE table_name='amazon_trends_cache' AND column_name='category'
+                    """)
+                    has_category_column = cursor.fetchone() is not None
+                except Exception:
+                    has_category_column = False
+                
+                # categoryカラムがない場合は、全データを取得して後でフィルタリング
+                if not has_category_column:
+                    cursor.execute("""
+                        SELECT title, url, asin, published_date, description, rank, cached_at
+                        FROM amazon_trends_cache 
+                        ORDER BY rank
+                    """)
+                else:
+                    cursor.execute("""
+                        SELECT title, url, asin, published_date, description, rank, category, cached_at
+                        FROM amazon_trends_cache 
+                        WHERE category = %s
+                        ORDER BY rank
+                    """, (category,))
+                
                 data = cursor.fetchall()
                 result = []
                 for row in data:
@@ -4249,6 +4269,9 @@ class TrendsCache:
                     if row_dict.get('published_date'):
                         if isinstance(row_dict['published_date'], datetime):
                             row_dict['published_date'] = row_dict['published_date'].isoformat()
+                    # categoryカラムがない場合は、デフォルト値を設定
+                    if 'category' not in row_dict:
+                        row_dict['category'] = category
                     result.append(row_dict)
                 return result
         return self._execute_with_retry(query_func)

@@ -4169,6 +4169,25 @@ class TrendsCache:
             logger.error(f"❌ amazon_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
             return False
         try:
+            # スキーマ更新（既存テーブルにcategoryカラムを追加）
+            try:
+                schema_conn = self.get_connection()
+                if schema_conn:
+                    try:
+                        with schema_conn.cursor() as cursor:
+                            # categoryカラムを追加（既存テーブル用）
+                            cursor.execute("ALTER TABLE amazon_trends_cache ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'books'")
+                        schema_conn.commit()
+                        logger.info("✅ amazon_trends_cacheテーブルにcategoryカラムを追加しました")
+                    except Exception as schema_error:
+                        logger.warning(f"⚠️ amazon_trends_cacheのスキーマ更新に失敗しました（処理は継続）: {schema_error}")
+                        schema_conn.rollback()
+                    finally:
+                        if schema_conn and not schema_conn.closed:
+                            schema_conn.close()
+            except Exception as e:
+                logger.warning(f"⚠️ amazon_trends_cacheスキーマ更新時の接続エラー（処理は継続）: {e}")
+            
             with conn.cursor() as cursor:
                 # カテゴリーでフィルタリングして削除（同じカテゴリーのデータのみ削除）
                 category = data[0].get('category', 'books') if data else 'books'

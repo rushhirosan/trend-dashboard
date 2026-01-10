@@ -153,6 +153,12 @@ function displayStockResultsUS(data) {
 function showStockErrorUS(message) {
     const errorElement = document.getElementById('stockErrorMessage');
     const resultsElement = document.getElementById('stockResults');
+    const tableBody = document.getElementById('stockTrendsTableBody');
+    
+    // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+    if (tableBody) {
+        tableBody.innerHTML = '';
+    }
     
     if (errorElement) {
         errorElement.textContent = message;
@@ -527,6 +533,12 @@ function loadMovieTrendsFromCacheUS() {
             return response.json();
         })
         .then(data => {
+            // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+            const tableBody = document.getElementById('movieTrendsTableBody');
+            if (tableBody) {
+                tableBody.innerHTML = '';
+            }
+            
             if (data.data && data.data.length > 0) {
                 displayMovieResultsUS(data);
             }
@@ -548,6 +560,13 @@ function loadMovieTrendsFromCacheUS() {
             if (loadingElement) {
                 loadingElement.style.display = 'none';
             }
+            
+            // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+            const tableBody = document.getElementById('movieTrendsTableBody');
+            if (tableBody) {
+                tableBody.innerHTML = '';
+            }
+            
             const resultsElement = document.getElementById('movieResults');
             if (resultsElement) {
                 resultsElement.style.display = 'block';
@@ -676,6 +695,12 @@ function loadBookTrendsFromCacheUS() {
 function showCryptoErrorUS(message) {
     const errorElement = document.getElementById('cryptoErrorMessage');
     const resultsElement = document.getElementById('cryptoResults');
+    const tableBody = document.getElementById('cryptoTrendsTableBody');
+    
+    // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+    if (tableBody) {
+        tableBody.innerHTML = '';
+    }
     
     if (errorElement) {
         errorElement.textContent = message;
@@ -940,6 +965,12 @@ function showGoogleError(message) {
     const errorElement = document.getElementById('googleErrorMessage');
     const resultsElement = document.getElementById('googleResults');
     const loadingElement = document.getElementById('googleLoading');
+    const tableBody = document.getElementById('googleTrendsTableBody');
+    
+    // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+    if (tableBody) {
+        tableBody.innerHTML = '';
+    }
     
     if (errorElement) {
         errorElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
@@ -952,6 +983,12 @@ function showGoogleError(message) {
 function showYouTubeError(message) {
     const errorElement = document.getElementById('youtubeErrorMessage');
     const resultsElement = document.getElementById('youtubeResults');
+    const tableBody = document.getElementById('youtubeTrendsTableBody');
+    
+    // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+    if (tableBody) {
+        tableBody.innerHTML = '';
+    }
     
     if (errorElement) {
         errorElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
@@ -1277,6 +1314,12 @@ function displaySpotifyResults(data) {
 function showWorldNewsError(message) {
     const errorElement = document.getElementById('worldnewsErrorMessage');
     const resultsElement = document.getElementById('worldnewsResults');
+    const tableBody = document.getElementById('worldnewsTrendsTableBody');
+    
+    // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+    if (tableBody) {
+        tableBody.innerHTML = '';
+    }
     
     if (errorElement) {
         errorElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
@@ -1288,6 +1331,12 @@ function showWorldNewsError(message) {
 function showSpotifyError(message) {
     const errorElement = document.getElementById('spotifyErrorMessage');
     const resultsElement = document.getElementById('spotifyResults');
+    const tableBody = document.getElementById('spotifyTrendsTableBody');
+    
+    // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+    if (tableBody) {
+        tableBody.innerHTML = '';
+    }
     
     if (errorElement) {
         errorElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
@@ -1428,10 +1477,16 @@ function showRedditError(message) {
     const loadingElement = document.getElementById('redditLoading');
     const errorElement = document.getElementById('redditErrorMessage');
     const resultsElement = document.getElementById('redditResults');
+    const tableBody = document.getElementById('redditTrendsTableBody');
     
     // Hide loading
     if (loadingElement) {
         loadingElement.style.display = 'none';
+    }
+    
+    // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+    if (tableBody) {
+        tableBody.innerHTML = '';
     }
     
     // Show error message in results area
@@ -1557,10 +1612,16 @@ function showPodcastError(message) {
     const loadingElement = document.getElementById('podcastLoading');
     const errorElement = document.getElementById('podcastErrorMessage');
     const resultsElement = document.getElementById('podcastResults');
+    const tableBody = document.getElementById('podcastTrendsTableBody');
     
     // Hide loading
     if (loadingElement) {
         loadingElement.style.display = 'none';
+    }
+    
+    // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+    if (tableBody) {
+        tableBody.innerHTML = '';
     }
     
     if (errorElement) {
@@ -1669,6 +1730,12 @@ function displayTwitchResults(data, type = 'games') {
 function showTwitchError(message) {
     const errorElement = document.getElementById('twitchErrorMessage');
     const resultsElement = document.getElementById('twitchResults');
+    const tableBody = document.getElementById('twitchTrendsTableBody');
+    
+    // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+    if (tableBody) {
+        tableBody.innerHTML = '';
+    }
     
     if (errorElement) {
         errorElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
@@ -1765,6 +1832,12 @@ function displayHackerNewsResults(data) {
 function showHackerNewsError(message) {
     const errorElement = document.getElementById('hackernewsErrorMessage');
     const resultsElement = document.getElementById('hackernewsResults');
+    const tableBody = document.getElementById('hackernewsTrendsTableBody');
+    
+    // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+    if (tableBody) {
+        tableBody.innerHTML = '';
+    }
     
     if (errorElement) {
         errorElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
@@ -1936,8 +2009,15 @@ function showCNNError(message) {
     const errorElement = document.getElementById('cnnErrorMessage');
     const resultsElement = document.getElementById('cnnResults');
     const loadingElement = document.getElementById('cnnLoading');
+    const tableBody = document.getElementById('cnnTrendsTableBody');
     
     if (loadingElement) loadingElement.style.display = 'none';
+    
+    // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+    if (tableBody) {
+        tableBody.innerHTML = '';
+    }
+    
     if (resultsElement) resultsElement.style.display = 'block';
     if (errorElement) {
         errorElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
@@ -2042,8 +2122,15 @@ function showProductHuntError(message) {
     const errorElement = document.getElementById('producthuntErrorMessage');
     const resultsElement = document.getElementById('producthuntResults');
     const loadingElement = document.getElementById('producthuntLoading');
+    const tableBody = document.getElementById('producthuntTrendsTableBody');
     
     if (loadingElement) loadingElement.style.display = 'none';
+    
+    // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+    if (tableBody) {
+        tableBody.innerHTML = '';
+    }
+    
     if (resultsElement) resultsElement.style.display = 'block';
     if (errorElement) {
         errorElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
@@ -2074,6 +2161,12 @@ function loadGitHubTrendsFromCacheUS() {
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
             
+            // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+            const tableBody = document.getElementById('githubTrendsTableBody');
+            if (tableBody) {
+                tableBody.innerHTML = '';
+            }
+            
             if (data.success && data.data && data.data.length > 0) {
                 console.log('GitHub Trends data display starting');
                 if (typeof displayGitHubResults === 'function') {
@@ -2089,6 +2182,12 @@ function loadGitHubTrendsFromCacheUS() {
             console.error('GitHub Trends cache loading error:', error);
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
+            
+            // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+            const tableBody = document.getElementById('githubTrendsTableBody');
+            if (tableBody) {
+                tableBody.innerHTML = '';
+            }
         });
 }
 
@@ -2115,6 +2214,12 @@ function loadAppStoreTrendsFromCacheUS() {
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
             
+            // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+            const tableBody = document.getElementById('appstoreTrendsTableBody');
+            if (tableBody) {
+                tableBody.innerHTML = '';
+            }
+            
             if (data.success && data.data && data.data.length > 0) {
                 console.log('App Store Trends data display starting');
                 if (typeof displayAppStoreResults === 'function') {
@@ -2130,6 +2235,12 @@ function loadAppStoreTrendsFromCacheUS() {
             console.error('App Store Trends cache loading error:', error);
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
+            
+            // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+            const tableBody = document.getElementById('appstoreTrendsTableBody');
+            if (tableBody) {
+                tableBody.innerHTML = '';
+            }
         });
 }
 
@@ -2155,6 +2266,12 @@ function loadCISAKEVTrendsFromCacheUS() {
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
             
+            // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+            const tableBody = document.getElementById('cisaKevTrendsTableBody');
+            if (tableBody) {
+                tableBody.innerHTML = '';
+            }
+            
             if (data.success && data.data && data.data.length > 0) {
                 console.log('CISA KEV data display starting');
                 if (typeof displayCISAKEVResults === 'function') {
@@ -2170,6 +2287,12 @@ function loadCISAKEVTrendsFromCacheUS() {
             console.error('CISA KEV cache loading error:', error);
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
+            
+            // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+            const tableBody = document.getElementById('cisaKevTrendsTableBody');
+            if (tableBody) {
+                tableBody.innerHTML = '';
+            }
         });
 }
 
@@ -2195,6 +2318,12 @@ function loadTheHackerNewsTrendsFromCacheUS() {
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
             
+            // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+            const tableBody = document.getElementById('thehackernewsTrendsTableBody');
+            if (tableBody) {
+                tableBody.innerHTML = '';
+            }
+            
             if (data.success && data.data && data.data.length > 0) {
                 console.log('The Hacker News data display starting');
                 if (typeof displayTheHackerNewsResults === 'function') {
@@ -2210,6 +2339,12 @@ function loadTheHackerNewsTrendsFromCacheUS() {
             console.error('The Hacker News cache loading error:', error);
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
+            
+            // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+            const tableBody = document.getElementById('thehackernewsTrendsTableBody');
+            if (tableBody) {
+                tableBody.innerHTML = '';
+            }
         });
 }
 
@@ -2472,8 +2607,15 @@ function showDevToError(message) {
     const loadingElement = document.getElementById('devtoLoading');
     const errorElement = document.getElementById('devtoErrorMessage');
     const resultsElement = document.getElementById('devtoResults');
+    const tableBody = document.getElementById('devtoTrendsTableBody');
     
     if (loadingElement) loadingElement.style.display = 'none';
+    
+    // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+    if (tableBody) {
+        tableBody.innerHTML = '';
+    }
+    
     if (errorElement) {
         errorElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
         errorElement.style.display = 'block';
@@ -2485,8 +2627,15 @@ function showMediumError(message) {
     const loadingElement = document.getElementById('mediumLoading');
     const errorElement = document.getElementById('mediumErrorMessage');
     const resultsElement = document.getElementById('mediumResults');
+    const tableBody = document.getElementById('mediumTrendsTableBody');
     
     if (loadingElement) loadingElement.style.display = 'none';
+    
+    // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+    if (tableBody) {
+        tableBody.innerHTML = '';
+    }
+    
     if (errorElement) {
         errorElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
         errorElement.style.display = 'block';

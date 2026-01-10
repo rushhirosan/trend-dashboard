@@ -69,13 +69,13 @@ class TrendsCache:
                 # Fly.ioのPostgreSQLは接続を閉じる可能性があるため、より積極的なキープアライブ設定を使用
                 self.connection = psycopg2.connect(
                     database_url,
-                    connect_timeout=15,  # 15秒に延長（データベース再起動時の接続確立時間を考慮）
+                    connect_timeout=30,  # 30秒に延長（データベース再起動時の接続確立時間を考慮）
                     keepalives=1,
-                    keepalives_idle=30,  # 30秒でキープアライブを開始（Fly.ioの接続タイムアウトを考慮）
-                    keepalives_interval=10,  # 10秒間隔でキープアライブを送信
-                    keepalives_count=3,  # 3回失敗まで許容
-                    # 接続プールの設定
-                    options='-c statement_timeout=30000'  # 30秒でタイムアウト
+                    keepalives_idle=30,  # 30秒でキープアライブを開始（Fly.ioのアイドルタイムアウトに対応）
+                    keepalives_interval=10,  # 10秒間隔でキープアライブを送信（より頻繁に）
+                    keepalives_count=5,  # 5回失敗まで許容（接続が切れる前に検出）
+                    # サーバー側のTCPキープアライブ設定も追加
+                    options='-c statement_timeout=60000 -c tcp_keepalives_idle=30 -c tcp_keepalives_interval=10 -c tcp_keepalives_count=5'
                 )
                 # 自動コミットを無効化（トランザクション制御のため）
                 self.connection.autocommit = False
@@ -88,11 +88,11 @@ class TrendsCache:
                     database=os.getenv('DB_NAME', 'trends_db'),
                     user=os.getenv('DB_USER', 'postgres'),
                     password=os.getenv('DB_PASSWORD', 'password'),
-                    connect_timeout=10,
+                    connect_timeout=30,  # 30秒に延長
                     keepalives=1,
-                    keepalives_idle=30,
-                    keepalives_interval=10,
-                    keepalives_count=3
+                    keepalives_idle=30,  # 30秒でキープアライブを開始
+                    keepalives_interval=10,  # 10秒間隔でキープアライブを送信
+                    keepalives_count=5  # 5回失敗まで許容
                 )
                 # 自動コミットを無効化（トランザクション制御のため）
                 self.connection.autocommit = False
@@ -668,71 +668,14 @@ class TrendsCache:
         if not data:
             return False
         
-        # Fly.ioでは接続を保持するよりも、毎回新規接続を作成する方が安全
-        # 接続を取得（毎回新規接続を作成、リトライロジック付き）
-        import time
-        conn = None
-        max_retries = 3
-        retry_delay = 1.0  # 1秒待機してから再試行
-        
-        for attempt in range(max_retries):
-            try:
-                # 接続をリセットしてから新規接続を作成
-                if self.connection:
-                    try:
-                        if not self.connection.closed:
-                            self.connection.close()
-                    except:
-                        pass
-                    self.connection = None
-                
-                # 新規接続を作成
-                database_url = os.getenv('DATABASE_URL')
-                if database_url:
-                    conn = psycopg2.connect(
-                        database_url,
-                        connect_timeout=5,  # 5秒に短縮（キャッシュ取得は高速であるべき）
-                        keepalives=1,
-                        keepalives_idle=10,
-                        keepalives_interval=5,
-                        keepalives_count=5
-                    )
-                    conn.autocommit = False
-                    logger.info(f"✅ データベース接続成功 (試行 {attempt + 1}/{max_retries})")
-                    break  # 接続成功したらループを抜ける
-                else:
-                    conn = psycopg2.connect(
-                        host=os.getenv('DB_HOST', 'localhost'),
-                        port=os.getenv('DB_PORT', '5432'),
-                        database=os.getenv('DB_NAME', 'trends_db'),
-                        user=os.getenv('DB_USER', 'postgres'),
-                        password=os.getenv('DB_PASSWORD', 'password'),
-                        connect_timeout=10,
-                        keepalives=1,
-                        keepalives_idle=30,
-                        keepalives_interval=10,
-                        keepalives_count=3
-                    )
-                    conn.autocommit = False
-                    logger.info(f"✅ データベース接続成功 (試行 {attempt + 1}/{max_retries})")
-                    break  # 接続成功したらループを抜ける
-            except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
-                if attempt < max_retries - 1:
-                    logger.warning(f"⚠️ データベース接続失敗 (試行 {attempt + 1}/{max_retries}): {e} - {retry_delay}秒後に再試行します", exc_info=True)
-                    time.sleep(retry_delay)
-                    retry_delay *= 1.5  # 指数バックオフ
-                    continue
-                else:
-                    logger.error(f"❌ キャッシュ保存エラー: データベース接続取得に失敗しました（最大試行回数に達しました）: {e}", exc_info=True)
-                    return False
-            except Exception as e:
-                logger.error(f"❌ キャッシュ保存エラー: 予期しないエラー: {e}", exc_info=True)
-                import traceback
-                traceback.print_exc()
+        # get_connection() を使用して接続を取得（再接続ロジックが含まれている）
+        try:
+            conn = self.get_connection()
+            if not conn:
+                logger.error("❌ キャッシュ保存エラー: データベース接続を取得できませんでした")
                 return False
-        
-        if not conn:
-            logger.error("❌ キャッシュ保存エラー: データベース接続を取得できませんでした")
+        except Exception as e:
+            logger.error(f"❌ キャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
             return False
         
         try:
@@ -883,26 +826,32 @@ class TrendsCache:
                 
                 conn.commit()
                 logger.info(f"✅ {cache_key}のキャッシュを更新しました ({len(data)}件)")
-                # 接続を閉じる（毎回新規接続を作成するため）
-                try:
-                    if conn and not conn.closed:
-                        conn.close()
-                except:
-                    pass
+                # 接続は閉じない（get_connection()が管理している接続を共有しているため）
+                # エラーが発生した場合のみ接続をリセットする
                 return True
                 
-        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+        except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
             # 接続エラーの場合
-            logger.warning(f"⚠️ キャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
-            import traceback
-            traceback.print_exc()
-            # ロールバックを試みる（接続が有効な場合のみ）
-            try:
-                if conn and not conn.closed:
-                    conn.rollback()
-                    conn.close()
-            except:
-                pass
+            error_str = str(e)
+            if "server closed the connection" in error_str or "connection" in error_str.lower() or "closed" in error_str.lower():
+                logger.warning(f"⚠️ キャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
+                # 接続エラーの場合は接続をリセット（次回のget_connection()で再接続される）
+                self.connection = None
+                # ロールバックを試みる（接続が有効な場合のみ）
+                try:
+                    if conn and not conn.closed:
+                        conn.rollback()
+                except:
+                    pass
+            else:
+                # 接続エラー以外のデータベースエラー
+                logger.error(f"❌ キャッシュ保存エラー: {e}", exc_info=True)
+                # ロールバックを試みる（接続が有効な場合のみ）
+                try:
+                    if conn and not conn.closed:
+                        conn.rollback()
+                except:
+                    pass
             return False
         except Exception as e:
             logger.error(f"❌ キャッシュ保存エラー: {e}", exc_info=True)
@@ -912,7 +861,6 @@ class TrendsCache:
             try:
                 if conn and not conn.closed:
                     conn.rollback()
-                    conn.close()
             except:
                 pass
             return False
@@ -1039,116 +987,221 @@ class TrendsCache:
 
         ロックを使用して、複数のマネージャーからの同時アクセスを防ぐ
         ロックの範囲を最小限にして、クエリ実行時のブロッキングを防ぐ
+        
+        接続取得後、実際にクエリを実行して接続が有効か検証する
         """
         import time
         global _connection_lock
 
-        max_retries = 3  # リトライ回数を3に増加（並列リクエスト時の接続確立を考慮）
-        retry_delay = 0.5  # 待機時間を0.5秒に設定（接続確立の余裕を持たせる）
+        max_retries = 5  # リトライ回数を5に増加（データベース再起動時間を考慮）
+        base_retry_delay = 1.0  # ベース待機時間を1秒に設定
 
-        # 接続が既に存在する場合でも、有効性を確認（接続が予期せず閉じられる問題に対応）
+        # 接続が既に存在する場合、実際にクエリを実行して検証
         if self.connection and not self.connection.closed:
             try:
-                # 接続が有効かどうかを簡単なクエリで確認（ブロッキングを最小限に）
-                with self.connection.cursor() as cursor:
-                    cursor.execute("SELECT 1")
-                    cursor.fetchone()
-                return self.connection
+                # closed属性のチェック
+                _ = self.connection.closed
+                # 実際にクエリを実行して接続が有効か確認
+                try:
+                    with self.connection.cursor() as cursor:
+                        cursor.execute("SELECT 1")
+                        cursor.fetchone()
+                    return self.connection
+                except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
+                    # 接続が無効な場合は再接続
+                    logger.warning(f"⚠️ データベース接続検証失敗（再接続します）: {e}")
+                    self.connection = None
             except (psycopg2.InterfaceError, psycopg2.OperationalError, AttributeError):
-                # 接続が無効な場合は再接続
-                logger.warning("⚠️ データベース接続が無効です。再接続します")
+                # 接続オブジェクト自体が無効な場合は再接続
+                logger.warning("⚠️ データベース接続オブジェクトが無効です。再接続します")
                 self.connection = None
 
         # ロックを取得して、同時アクセスを防ぐ（再接続時のみ）
         with _connection_lock:
             # ロック取得後、再度チェック（他のスレッドが既に接続を確立した可能性がある）
             if self.connection and not self.connection.closed:
-                # 接続が有効かどうかを簡単なクエリで確認
                 try:
-                    with self.connection.cursor() as cursor:
-                        cursor.execute("SELECT 1")
-                        cursor.fetchone()
-                    return self.connection
+                    _ = self.connection.closed
+                    # 実際にクエリを実行して接続が有効か確認
+                    try:
+                        with self.connection.cursor() as cursor:
+                            cursor.execute("SELECT 1")
+                            cursor.fetchone()
+                        return self.connection
+                    except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError):
+                        self.connection = None
                 except (psycopg2.InterfaceError, psycopg2.OperationalError, AttributeError):
-                    # 接続が無効な場合は再接続
-                    logger.warning("⚠️ データベース接続が無効です。再接続します")
+                    logger.warning("⚠️ データベース接続オブジェクトが無効です。再接続します")
                     self.connection = None
 
             for attempt in range(max_retries):
                 try:
                     # 接続が存在しない、または閉じられている場合は再接続
-                    if not self.connection:
+                    if not self.connection or (hasattr(self.connection, 'closed') and self.connection.closed):
+                        logger.info(f"🔄 データベース接続を確立中... (試行 {attempt + 1}/{max_retries})")
                         self.connect()
                     else:
+                        # 接続オブジェクトが存在するが、無効な可能性があるため再接続
+                        logger.warning("⚠️ 既存の接続が無効です。再接続します")
+                        self.connection = None
+                        self.connect()
+                    
+                    # 接続が確立されたか確認し、実際にクエリを実行して検証
+                    if self.connection and not self.connection.closed:
                         try:
-                            # 接続が閉じられているか確認
-                            if self.connection.closed:
-                                self.connect()
-                            # 接続が有効かどうかを簡単なクエリで確認
+                            # 実際にクエリを実行して接続が有効か確認
                             with self.connection.cursor() as cursor:
                                 cursor.execute("SELECT 1")
                                 cursor.fetchone()
-                        except (psycopg2.InterfaceError, psycopg2.OperationalError, AttributeError) as e:
-                            # 接続エラーの場合は再接続
-                            logger.warning(f"⚠️ データベース接続エラー検出、再接続します: {e}")
+                            logger.info(f"✅ データベース接続を確立しました (試行 {attempt + 1}/{max_retries})")
+                            return self.connection
+                        except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as verify_error:
+                            logger.warning(f"⚠️ 接続検証失敗: {verify_error} - 再接続を試みます")
                             self.connection = None
-                            self.connect()
+                            if attempt < max_retries - 1:
+                                # 指数バックオフ: 1秒、2秒、4秒、8秒、16秒
+                                wait_time = base_retry_delay * (2 ** attempt)
+                                logger.info(f"⏳ {wait_time}秒待機してから再試行します...")
+                                time.sleep(wait_time)
+                                continue
+                            else:
+                                raise verify_error
+                    else:
+                        # 接続が確立されなかった
+                        if attempt < max_retries - 1:
+                            wait_time = base_retry_delay * (2 ** attempt)
+                            logger.warning(f"⚠️ 接続が確立できませんでした。{wait_time}秒待機してから再試行します...")
+                            time.sleep(wait_time)
+                            continue
+                        else:
+                            raise psycopg2.OperationalError("接続が確立できませんでした")
+                            
+                except psycopg2.OperationalError as e:
+                    # 接続エラーの場合は再接続を試みる
+                    error_str = str(e)
+                    logger.error(f"❌ データベース接続エラー (試行 {attempt + 1}/{max_retries}): {error_str}")
                     
-                    # 接続が確立されたか確認
-                    if self.connection and not self.connection.closed:
-                        return self.connection
+                    if attempt < max_retries - 1:
+                        # "server terminated abnormally" の場合は、より長い待機時間を設定
+                        if "server terminated abnormally" in error_str.lower() or "server closed the connection" in error_str.lower():
+                            # データベース再起動を考慮して、より長い待機時間を設定
+                            wait_time = base_retry_delay * (2 ** attempt) * 2  # 通常の2倍
+                            logger.warning(f"⚠️ データベースサーバーが異常終了した可能性があります。{wait_time}秒待機してから再試行します...")
+                            time.sleep(wait_time)
+                        else:
+                            wait_time = base_retry_delay * (2 ** attempt)
+                            logger.info(f"⏳ {wait_time}秒待機してから再試行します...")
+                            time.sleep(wait_time)
+                        self.connection = None
+                        continue
+                    else:
+                        logger.error(f"❌ データベース接続取得エラー（最大試行回数に達しました）: {error_str}")
+                        
                 except Exception as e:
                     # 予期しないエラーの場合も再試行
+                    logger.error(f"❌ 予期しないデータベース接続エラー (試行 {attempt + 1}/{max_retries}): {e}", exc_info=True)
                     if attempt < max_retries - 1:
-                        logger.warning(f"⚠️ データベース接続取得エラー: {e} - {retry_delay}秒後に再試行します")
-                        time.sleep(retry_delay)
+                        wait_time = base_retry_delay * (2 ** attempt)
+                        logger.info(f"⏳ {wait_time}秒待機してから再試行します...")
+                        time.sleep(wait_time)
                         self.connection = None
                         continue
                     else:
                         logger.error(f"❌ データベース接続取得エラー（最大試行回数）: {e}")
             
             # 全ての再試行が失敗した場合
-            error_msg = "データベース接続を確立できませんでした（最大試行回数に達しました）"
+            error_msg = "データベース接続を確立できませんでした（最大試行回数に達しました）。データベースサーバーの状態を確認してください。"
             logger.error(f"❌ {error_msg}")
+            logger.error("   考えられる原因:")
+            logger.error("   - データベースサーバーがダウンしている")
+            logger.error("   - ネットワーク接続の問題")
+            logger.error("   - データベースのリソース不足")
+            logger.error("   - 認証情報の誤り")
             raise psycopg2.OperationalError(error_msg)
     
-    def _execute_with_retry(self, query_func, max_retries=2):
+    def _execute_with_retry(self, query_func, max_retries=3):
         """接続エラーが発生した場合に自動的に再接続を試みるヘルパーメソッド
         
         Args:
-            query_func: データベースクエリを実行する関数（引数なし、接続オブジェクトを返す）
-            max_retries: 最大再試行回数（デフォルト: 2）
+            query_func: データベースクエリを実行する関数（接続オブジェクトを引数として受け取る）
+            max_retries: 最大再試行回数（デフォルト: 3）
         
         Returns:
             クエリ関数の戻り値、またはNone（全ての再試行が失敗した場合）
         """
+        import time
+        
+        base_wait_time = 0.5  # ベース待機時間（秒）
+        
         for attempt in range(max_retries):
+            conn = None
             try:
                 conn = self.get_connection()
                 if not conn:
                     if attempt < max_retries - 1:
-                        logger.warning(f"⚠️ データベース接続が取得できませんでした。再接続を試みます (試行 {attempt + 1}/{max_retries})")
+                        wait_time = base_wait_time * (2 ** attempt)
+                        logger.warning(f"⚠️ データベース接続が取得できませんでした。{wait_time}秒待機してから再試行します (試行 {attempt + 1}/{max_retries})")
                         self.connection = None
+                        time.sleep(wait_time)
                         continue
                     else:
                         logger.error("❌ データベース接続を取得できませんでした（最大試行回数）")
                         return None
                 
-                return query_func(conn)
+                # クエリを実行
+                result = query_func(conn)
                 
-            except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-                logger.warning(f"⚠️ データベース接続エラーが発生しました: {e} (試行 {attempt + 1}/{max_retries})")
-                self.connection = None
-                if attempt < max_retries - 1:
-                    import time
-                    # 待機時間を段階的に増やす（1回目: 0.5秒、2回目: 1秒）
-                    wait_time = 0.5 * (attempt + 1)
-                    time.sleep(wait_time)
-                    continue
+                # SELECT文の場合は明示的なコミットは不要
+                # 接続をクリーンな状態に保つため、トランザクションが開いている場合のみ処理
+                # 注意: SELECT文は自動コミットされるため、通常はコミット不要
+                
+                return result
+                
+            except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
+                error_str = str(e)
+                
+                # ロールバックを試みる（トランザクションが開いている場合）
+                if conn and not conn.closed:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass  # ロールバックエラーは無視
+                
+                # 接続が閉じられたエラーを特定
+                if ("server closed the connection" in error_str.lower() or 
+                    "connection" in error_str.lower() or 
+                    "closed" in error_str.lower() or
+                    "server terminated abnormally" in error_str.lower()):
+                    logger.warning(f"⚠️ データベース接続エラーが発生しました: {e} (試行 {attempt + 1}/{max_retries})")
+                    self.connection = None
+                    
+                    if attempt < max_retries - 1:
+                        # 指数バックオフで待機時間を増やす
+                        # "server terminated abnormally"の場合は、より長い待機時間を設定
+                        if "server terminated abnormally" in error_str.lower():
+                            wait_time = base_wait_time * (2 ** attempt) * 3  # 通常の3倍
+                            logger.info(f"⏳ データベースサーバーが異常終了した可能性があります。{wait_time}秒待機してから再試行します...")
+                        else:
+                            wait_time = base_wait_time * (2 ** attempt)
+                            logger.info(f"⏳ {wait_time}秒待機してから再試行します...")
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        logger.error(f"❌ データベース接続エラー（最大試行回数）: {e}")
+                        return None
                 else:
-                    logger.error(f"❌ データベース接続エラー（最大試行回数）: {e}")
-                    return None
+                    # 接続エラー以外のデータベースエラーはそのまま再スロー
+                    logger.error(f"❌ データベースエラー（再接続不可）: {e}", exc_info=True)
+                    raise
+                    
             except Exception as e:
+                # ロールバックを試みる
+                if conn and not conn.closed:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                
                 # 接続エラー以外のエラーはそのまま再スロー
                 logger.error(f"❌ 予期しないエラーが発生しました: {e}", exc_info=True)
                 raise
@@ -1330,52 +1383,100 @@ class TrendsCache:
         try:
             conn = self.get_connection()
             if conn:
-                with conn.cursor() as cursor:
-                    # INSERT文で使用しているカラムを確認して追加
-                    cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS album TEXT")
-                    cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS play_count INTEGER DEFAULT 0")
-                    cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS spotify_url TEXT")
-                    cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS rank INTEGER DEFAULT 0")
-                    cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS region_code VARCHAR(10)")
-                    cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS track_id VARCHAR(255)")
-                conn.commit()
+                try:
+                    with conn.cursor() as cursor:
+                        # INSERT文で使用しているカラムを確認して追加
+                        cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS album TEXT")
+                        cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS play_count INTEGER DEFAULT 0")
+                        cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS spotify_url TEXT")
+                        cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS rank INTEGER DEFAULT 0")
+                        cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS region_code VARCHAR(10)")
+                        cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS track_id VARCHAR(255)")
+                    conn.commit()
+                except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
+                    error_str = str(e)
+                    if "server closed the connection" in error_str or "connection" in error_str.lower() or "closed" in error_str.lower():
+                        logger.warning(f"⚠️ music_trends_cacheスキーマ更新中に接続エラーが発生、再接続を試みます: {e}")
+                        self.connection = None
+                        conn = self.get_connection()
+                        if conn:
+                            try:
+                                with conn.cursor() as cursor:
+                                    cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS album TEXT")
+                                    cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS play_count INTEGER DEFAULT 0")
+                                    cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS spotify_url TEXT")
+                                    cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS rank INTEGER DEFAULT 0")
+                                    cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS region_code VARCHAR(10)")
+                                    cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS track_id VARCHAR(255)")
+                                conn.commit()
+                            except Exception as retry_e:
+                                logger.warning(f"⚠️ music_trends_cacheのスキーマ更新に失敗しました（再接続後も）: {retry_e}")
         except Exception as e:
             logger.warning(f"⚠️ music_trends_cacheのスキーマ更新に失敗しました: {e}", exc_info=True)
         
         # 接続を取得（有効性チェックと再接続を自動で行う）
-        try:
-            conn = self.get_connection()
-            if not conn:
-                return None
-        except Exception as e:
-            logger.error(f"❌ Music Trendsキャッシュ取得エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return None
+        max_retries = 2
+        for attempt in range(max_retries):
+            try:
+                conn = self.get_connection()
+                if not conn:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"⚠️ Music Trendsキャッシュ取得: データベース接続が取得できませんでした。再試行します (試行 {attempt + 1}/{max_retries})")
+                        self.connection = None
+                        import time
+                        time.sleep(0.5)
+                        continue
+                    else:
+                        logger.error(f"❌ Music Trendsキャッシュ取得エラー: データベース接続取得に失敗しました（最大試行回数）")
+                        return None
+                
+                # 実際のクエリを実行（接続エラーが発生した場合は再接続を試みる）
+                try:
+                    with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                        cursor.execute("""
+                            SELECT title, artist, album, play_count, popularity, spotify_url, rank, 
+                                   service, region_code, created_at, track_id
+                            FROM music_trends_cache 
+                            WHERE service = %s AND region_code = %s
+                            ORDER BY rank
+                        """, (service, region))
+                        data = cursor.fetchall()
+                        
+                        # RealDictCursorの結果を辞書のリストに変換
+                        result = []
+                        for row in data:
+                            result.append(dict(row))
+                        
+                        return result
+                except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
+                    error_str = str(e)
+                    if "server closed the connection" in error_str or "connection" in error_str.lower() or "closed" in error_str.lower():
+                        if attempt < max_retries - 1:
+                            logger.warning(f"⚠️ Music Trendsキャッシュ取得中に接続エラーが発生、再接続を試みます (試行 {attempt + 1}/{max_retries}): {e}")
+                            self.connection = None
+                            import time
+                            time.sleep(0.5)
+                            continue
+                        else:
+                            logger.error(f"❌ Music Trendsキャッシュ取得エラー: 接続エラーが継続しています（最大試行回数）: {e}")
+                            return None
+                    else:
+                        # 接続エラー以外のデータベースエラー
+                        logger.error(f"❌ Music Trendsキャッシュ取得エラー: {e}", exc_info=True)
+                        return None
+                        
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    logger.warning(f"⚠️ Music Trendsキャッシュ取得エラー: {e} - 再試行します (試行 {attempt + 1}/{max_retries})")
+                    self.connection = None
+                    import time
+                    time.sleep(0.5)
+                    continue
+                else:
+                    logger.error(f"❌ Music Trendsキャッシュ取得エラー（最大試行回数）: {e}", exc_info=True)
+                    return None
         
-        try:
-            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("""
-                    SELECT title, artist, album, play_count, popularity, spotify_url, rank, 
-                           service, region_code, created_at, track_id
-                    FROM music_trends_cache 
-                    WHERE service = %s AND region_code = %s
-                    ORDER BY rank
-                """, (service, region))
-                data = cursor.fetchall()
-                
-                # RealDictCursorの結果を辞書のリストに変換
-                result = []
-                for row in data:
-                    result.append(dict(row))
-                
-                return result
-                
-        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-            logger.warning(f"⚠️ Music Trendsキャッシュ取得中に接続エラーが発生: {e}", exc_info=True)
-            self.connection = None
-            return None
-        except Exception as e:
-            logger.error(f"❌ Music Trendsキャッシュ取得エラー: {e}", exc_info=True)
-            return None
+        return None
     
     def clear_music_trends_cache(self, service='spotify', region='JP'):
         """Music Trendsキャッシュをクリア"""

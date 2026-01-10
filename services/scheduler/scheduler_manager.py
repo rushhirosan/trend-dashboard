@@ -78,12 +78,80 @@ class TrendsScheduler:
                     max_instances=1  # 同時実行は1つのみ
                 )
                 
+                # Amazon Best Sellersの個別スケジュール
+                # 7時と14時にbooks取得
+                self.scheduler.add_job(
+                    func=lambda: self._fetch_amazon_trends_by_category('books'),
+                    trigger=CronTrigger(hour=7, minute=0, timezone=jst),
+                    id='amazon_books_fetch_7am',
+                    name='Amazon Best Sellers (books) 7時取得',
+                    replace_existing=True,
+                    misfire_grace_time=3600,
+                    coalesce=True,
+                    max_instances=1
+                )
+                self.scheduler.add_job(
+                    func=lambda: self._fetch_amazon_trends_by_category('books'),
+                    trigger=CronTrigger(hour=14, minute=0, timezone=jst),
+                    id='amazon_books_fetch_2pm',
+                    name='Amazon Best Sellers (books) 14時取得',
+                    replace_existing=True,
+                    misfire_grace_time=3600,
+                    coalesce=True,
+                    max_instances=1
+                )
+                
+                # 8時と15時にelectronics取得
+                self.scheduler.add_job(
+                    func=lambda: self._fetch_amazon_trends_by_category('electronics'),
+                    trigger=CronTrigger(hour=8, minute=0, timezone=jst),
+                    id='amazon_electronics_fetch_8am',
+                    name='Amazon Best Sellers (electronics) 8時取得',
+                    replace_existing=True,
+                    misfire_grace_time=3600,
+                    coalesce=True,
+                    max_instances=1
+                )
+                self.scheduler.add_job(
+                    func=lambda: self._fetch_amazon_trends_by_category('electronics'),
+                    trigger=CronTrigger(hour=15, minute=0, timezone=jst),
+                    id='amazon_electronics_fetch_3pm',
+                    name='Amazon Best Sellers (electronics) 15時取得',
+                    replace_existing=True,
+                    misfire_grace_time=3600,
+                    coalesce=True,
+                    max_instances=1
+                )
+                
+                # 9時と16時にcomputers取得
+                self.scheduler.add_job(
+                    func=lambda: self._fetch_amazon_trends_by_category('computers'),
+                    trigger=CronTrigger(hour=9, minute=0, timezone=jst),
+                    id='amazon_computers_fetch_9am',
+                    name='Amazon Best Sellers (computers) 9時取得',
+                    replace_existing=True,
+                    misfire_grace_time=3600,
+                    coalesce=True,
+                    max_instances=1
+                )
+                self.scheduler.add_job(
+                    func=lambda: self._fetch_amazon_trends_by_category('computers'),
+                    trigger=CronTrigger(hour=16, minute=0, timezone=jst),
+                    id='amazon_computers_fetch_4pm',
+                    name='Amazon Best Sellers (computers) 16時取得',
+                    replace_existing=True,
+                    misfire_grace_time=3600,
+                    coalesce=True,
+                    max_instances=1
+                )
+                
                 # スケジューラーを開始
                 self.scheduler.start()
                 self.is_running = True
                 
                 logger.info("✅ スケジューラー開始完了")
                 logger.info("📅 毎日朝7:00と昼14:00（日本時間）に全トレンドを自動取得します")
+                logger.info("📅 Amazon Best Sellers: 7時/14時(books), 8時/15時(electronics), 9時/16時(computers)に個別取得します")
                 
                 # 起動時の自動実行は無効化（デプロイ時の不要なAPI呼び出しとメール送信を防ぐ）
                 # 環境変数SKIP_STARTUP_EXECUTION=trueの場合はスキップ
@@ -95,9 +163,42 @@ class TrendsScheduler:
                 else:
                     logger.info("⏭️ 起動時の自動実行をスキップします（デプロイ時の不要なAPI呼び出しを防ぐため）")
                 
-            except Exception as e:
-                logger.error(f"❌ スケジューラー開始エラー: {e}", exc_info=True)
-                self.is_running = False
+        except Exception as e:
+            logger.error(f"❌ スケジューラー開始エラー: {e}", exc_info=True)
+            self.is_running = False
+    
+    def _fetch_amazon_trends_by_category(self, category):
+        """Amazon Best Sellersの特定カテゴリを取得
+        
+        Args:
+            category (str): カテゴリ ('books', 'electronics', 'computers')
+        """
+        try:
+            logger.info(f"🔄 Amazon Best Sellers ({category}) 取得開始")
+            
+            with self.app.app_context():
+                managers = self.app.config.get('TREND_MANAGERS')
+                if not managers:
+                    logger.error("❌ トレンドマネージャーが初期化されていません")
+                    return
+                
+                amazon_manager = managers.get('amazon')
+                if not amazon_manager:
+                    logger.error("❌ Amazon Best Sellersマネージャーが初期化されていません")
+                    return
+                
+                # 指定カテゴリのみ取得（force_refresh=True）
+                result = amazon_manager.get_trends(category=category, limit=25, force_refresh=True)
+                
+                if result.get('success'):
+                    data_count = len(result.get('data', []))
+                    logger.info(f"✅ Amazon Best Sellers ({category}) 取得完了: {data_count}件")
+                else:
+                    error_msg = result.get('error', 'Unknown error')
+                    logger.warning(f"⚠️ Amazon Best Sellers ({category}) 取得エラー: {error_msg}")
+                    
+        except Exception as e:
+            logger.error(f"❌ Amazon Best Sellers ({category}) 取得エラー: {e}", exc_info=True)
     
     def _check_and_execute_missed_job(self, jst):
         """
@@ -221,9 +322,10 @@ class TrendsScheduler:
                 # 既存のrefresh_all_trends()関数を使用
                 # スケジューラー実行時（7時・14時）は強制更新（force_refresh=True）で実行
                 # これにより、既存のキャッシュがあっても最新データを取得する
-                from managers.trend_managers import refresh_all_trends
-                logger.info("🔄 refresh_all_trends実行開始 (force_refresh=True)")
-                result = refresh_all_trends(managers, force_refresh=True)
+                # Amazon Best Sellersは別スケジュールで取得するため除外
+                from managers.trend_managers import refresh_all_trends_except_amazon
+                logger.info("🔄 refresh_all_trends実行開始 (force_refresh=True, Amazon除外)")
+                result = refresh_all_trends_except_amazon(managers, force_refresh=True)
                 logger.info(f"🔄 refresh_all_trends実行完了: success={result.get('success')}")
             
             # 結果をログ出力

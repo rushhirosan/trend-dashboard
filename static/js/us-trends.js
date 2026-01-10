@@ -2498,8 +2498,15 @@ function showAmazonError(message) {
     const loadingElement = document.getElementById('amazonLoading');
     const errorElement = document.getElementById('amazonErrorMessage');
     const resultsElement = document.getElementById('amazonResults');
+    const tableBody = document.getElementById('amazonTrendsTableBody');
     
     if (loadingElement) loadingElement.style.display = 'none';
+    
+    // スケルトンUIをクリア（処理が走っていないように見えないようにする）
+    if (tableBody) {
+        tableBody.innerHTML = '';
+    }
+    
     if (errorElement) {
         errorElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
         errorElement.style.display = 'block';

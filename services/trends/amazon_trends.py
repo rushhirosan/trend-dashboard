@@ -159,6 +159,19 @@ class AmazonTrendsManager:
                         'error': f'RSS取得に失敗しました: HTTP {response.status_code}'
                     }
                 
+                # エラーコード009のチェック（AmaranRSSのエラー）
+                response_text = response.text
+                if 'code:009' in response_text or 'ERROR:Failed to get Amazon bestsellers data' in response_text:
+                    logger.warning(f"⚠️ Amazon RSS({category}): AmaranRSSエラーコード009 - Amazon.comのベストセラー情報を取得できませんでした")
+                    return {
+                        'success': True,
+                        'data': [],
+                        'status': 'amaranrss_error',
+                        'source': 'amazon_rss',
+                        'category': category,
+                        'error': 'AmaranRSSがAmazon.comのベストセラー情報を取得できませんでした（エラーコード009）。しばらく待ってから再試行してください。'
+                    }
+                
                 # feedparserで解析
                 feed = feedparser.parse(response.content)
                 logger.info(f"📊 Amazon RSS({category}): feed status={feed.get('status', 'N/A')}, bozo={feed.get('bozo', False)}, bozo_exception={str(feed.get('bozo_exception', None))[:100] if feed.get('bozo_exception') else None}")

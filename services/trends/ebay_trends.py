@@ -58,7 +58,7 @@ class eBayTrendsManager:
             'electronics': {
                 'id': '9355',
                 'name': 'Electronics',
-                'keyword': 'electronics'
+                'keyword': 'headphones'
             },
             'cell_phones': {
                 'id': '9355',

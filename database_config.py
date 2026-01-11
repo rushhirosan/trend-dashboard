@@ -576,9 +576,21 @@ class TrendsCache:
                     seller VARCHAR(255),
                     shipping VARCHAR(50),
                     rank INTEGER DEFAULT 0,
+                    category VARCHAR(50) NOT NULL DEFAULT 'electronics',
                     published_date TIMESTAMP WITH TIME ZONE,
                     cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
+                
+                -- 既存のテーブルにcategoryカラムを追加（既存テーブルがある場合）
+                DO $$ 
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns 
+                        WHERE table_name = 'ebay_trends_cache' AND column_name = 'category'
+                    ) THEN
+                        ALTER TABLE ebay_trends_cache ADD COLUMN category VARCHAR(50) NOT NULL DEFAULT 'electronics';
+                    END IF;
+                END $$;
                 
                 CREATE TABLE IF NOT EXISTS medium_trends_cache (
                     id SERIAL PRIMARY KEY,
@@ -4421,8 +4433,8 @@ class TrendsCache:
             return False
 
     # eBay Trends キャッシュメソッド
-    def save_ebay_trends_to_cache(self, data):
-        """eBay Popular/Trending Trendsデータをキャッシュに保存"""
+    def save_ebay_trends_to_cache(self, data, category='electronics'):
+        """eBay Popular/Trending Trendsデータをキャッシュに保存（カテゴリ対応）"""
         if not data:
             return False
         try:
@@ -4434,12 +4446,13 @@ class TrendsCache:
             return False
         try:
             with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM ebay_trends_cache")
+                # カテゴリ別に削除
+                cursor.execute("DELETE FROM ebay_trends_cache WHERE category = %s", (category,))
                 for item in data:
                     cursor.execute("""
                         INSERT INTO ebay_trends_cache 
-                        (title, url, item_id, price, currency, image_url, condition, seller, shipping, rank, published_date)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        (title, url, item_id, price, currency, image_url, condition, seller, shipping, rank, category, published_date)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
                         item.get('title', ''),
                         item.get('url', ''),
@@ -4451,6 +4464,7 @@ class TrendsCache:
                         item.get('seller'),
                         item.get('shipping'),
                         item.get('rank', 0),
+                        item.get('category', category),
                         item.get('published_date')
                     ))
                 import pytz
@@ -4461,7 +4475,7 @@ class TrendsCache:
                     ('ebay_trends', now_jst, len(data), now_jst, len(data))
                 )
                 conn.commit()
-                logger.info(f"✅ ebay_trendsキャッシュを保存しました ({len(data)}件)")
+                logger.info(f"✅ ebay_trendsキャッシュを保存しました (category: {category}, {len(data)}件)")
                 return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ ebay_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
@@ -4475,15 +4489,16 @@ class TrendsCache:
                 pass
             return False
 
-    def get_ebay_trends_from_cache(self):
-        """eBay Popular/Trending Trendsデータをキャッシュから取得"""
+    def get_ebay_trends_from_cache(self, category='electronics'):
+        """eBay Popular/Trending Trendsデータをキャッシュから取得（カテゴリ対応）"""
         def query_func(conn):
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute("""
-                    SELECT title, url, item_id, price, currency, image_url, condition, seller, shipping, rank, published_date, cached_at
+                    SELECT title, url, item_id, price, currency, image_url, condition, seller, shipping, rank, category, published_date, cached_at
                     FROM ebay_trends_cache 
+                    WHERE category = %s
                     ORDER BY rank
-                """)
+                """, (category,))
                 data = cursor.fetchall()
                 result = []
                 for row in data:
@@ -4495,8 +4510,8 @@ class TrendsCache:
                 return result
         return self._execute_with_retry(query_func)
 
-    def clear_ebay_trends_cache(self):
-        """eBay Popular/Trending Trendsキャッシュをクリア"""
+    def clear_ebay_trends_cache(self, category=None):
+        """eBay Popular/Trending Trendsキャッシュをクリア（カテゴリ対応）"""
         try:
             conn = self.get_connection()
             if not conn:
@@ -4506,9 +4521,13 @@ class TrendsCache:
             return False
         try:
             with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM ebay_trends_cache")
+                if category:
+                    cursor.execute("DELETE FROM ebay_trends_cache WHERE category = %s", (category,))
+                    logger.info(f"✅ ebay_trendsのキャッシュをクリアしました (category: {category})")
+                else:
+                    cursor.execute("DELETE FROM ebay_trends_cache")
+                    logger.info(f"✅ ebay_trendsのキャッシュをクリアしました（全カテゴリ）")
                 conn.commit()
-                logger.info(f"✅ ebay_trendsのキャッシュをクリアしました")
                 return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ ebay_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)

@@ -1056,8 +1056,8 @@ function loadCachedDataUS() {
     // Load Medium from cache
     loadMediumFromCacheUS();
     
-    // Load Amazon Best Sellers from cache (default: books)
-    loadEbayFromCacheUS();
+    // Load eBay from cache (default: electronics)
+    loadEbayFromCacheUS('electronics');
     
     // Load Twitch from cache
     loadTwitchFromCacheUS();
@@ -2423,7 +2423,9 @@ function loadMediumFromCacheUS() {
 }
 
 // eBay Popular/Trending cache data loading for US
-function loadEbayFromCacheUS() {
+function loadEbayFromCacheUS(category = 'electronics') {
+    console.log(`📊 eBay cache data loading for US (category: ${category})`);
+    
     const loadingElement = document.getElementById('ebayLoading');
     const resultsElement = document.getElementById('ebayResults');
     
@@ -2435,7 +2437,7 @@ function loadEbayFromCacheUS() {
     if (loadingElement) loadingElement.style.display = 'block';
     if (resultsElement) resultsElement.style.display = 'none';
     
-    fetchWithRetry(`/api/ebay-trends?limit=25&force_refresh=false`)
+    fetchWithRetry(`/api/ebay-trends?category=${category}&limit=25&force_refresh=false`)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2474,7 +2476,7 @@ function loadEbayFromCacheUS() {
 }
 
 // eBay Popular/Trending data loading with refresh (force_refresh=true)
-function loadEbayFromCacheUSWithRefresh() {
+function loadEbayFromCacheUSWithRefresh(category = 'electronics') {
     const loadingElement = document.getElementById('ebayLoading');
     const resultsElement = document.getElementById('ebayResults');
     const errorElement = document.getElementById('ebayErrorMessage');
@@ -2488,7 +2490,7 @@ function loadEbayFromCacheUSWithRefresh() {
     if (loadingElement) loadingElement.style.display = 'block';
     if (resultsElement) resultsElement.style.display = 'none';
     
-    fetchWithRetry(`/api/ebay-trends?limit=25&force_refresh=true`)
+    fetchWithRetry(`/api/ebay-trends?category=${category}&limit=25&force_refresh=true`)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2733,7 +2735,9 @@ function showEbayError(message, status = null) {
         
         // cache_not_foundの場合は更新ボタンを表示
         if (status === 'cache_not_found') {
-            errorHtml += `<br><button class="btn btn-primary btn-sm mt-2" onclick="loadEbayFromCacheUSWithRefresh()">
+            const categorySelect = document.getElementById('ebayCategorySelectUS');
+            const selectedCategory = categorySelect ? categorySelect.value : 'electronics';
+            errorHtml += `<br><button class="btn btn-primary btn-sm mt-2" onclick="loadEbayFromCacheUSWithRefresh('${selectedCategory}')">
                 <i class="fas fa-sync-alt"></i> データを更新
             </button>`;
         }
@@ -2781,6 +2785,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const selectedType = this.value;
             console.log(`Twitch type changed to: ${selectedType}`);
             loadTwitchFromCacheUS(selectedType);
+        });
+    }
+    
+    // eBay category selector event listener
+    const ebayCategorySelect = document.getElementById('ebayCategorySelectUS');
+    if (ebayCategorySelect) {
+        ebayCategorySelect.addEventListener('change', function() {
+            const selectedCategory = this.value;
+            console.log(`eBay category changed to: ${selectedCategory}`);
+            loadEbayFromCacheUS(selectedCategory);
         });
     }
     

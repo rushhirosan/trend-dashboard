@@ -53,14 +53,74 @@ class eBayTrendsManager:
         # レート制限: eBay APIの推奨に従い、1時間に5000リクエスト（保守的に1分に10リクエストに設定）
         self.rate_limiter = get_rate_limiter('ebay', max_requests=10, window_seconds=60)
         
+        # カテゴリ定義（カテゴリID、表示名、キーワード）
+        self.categories = {
+            'electronics': {
+                'id': '9355',
+                'name': 'Electronics',
+                'keyword': 'electronics'
+            },
+            'cell_phones': {
+                'id': '9355',
+                'name': 'Cell Phones & Accessories',
+                'keyword': 'iphone'
+            },
+            'fashion': {
+                'id': '11450',
+                'name': 'Fashion',
+                'keyword': 'clothing'
+            },
+            'home_garden': {
+                'id': '11700',
+                'name': 'Home & Garden',
+                'keyword': 'home'
+            },
+            'computers': {
+                'id': '58058',
+                'name': 'Computers/Tablets',
+                'keyword': 'laptop'
+            },
+            'video_games': {
+                'id': '1249',
+                'name': 'Video Games & Consoles',
+                'keyword': 'playstation'
+            },
+            'beauty': {
+                'id': '26395',
+                'name': 'Beauty & Health',
+                'keyword': 'makeup'
+            },
+            'toys': {
+                'id': '220',
+                'name': 'Toys & Hobbies',
+                'keyword': 'lego'
+            },
+            'sports': {
+                'id': '888',
+                'name': 'Sports & Outdoors',
+                'keyword': 'fitness'
+            },
+            'automotive': {
+                'id': '6000',
+                'name': 'Automotive Parts & Accessories',
+                'keyword': 'car parts'
+            }
+        }
+        
         logger.info("eBay Popular/Trending Trends Manager初期化:")
         logger.info(f"  Client ID: {'設定済み' if self.client_id else '未設定'}")
         logger.info(f"  Client Secret: {'設定済み' if self.client_secret else '未設定'}")
+        logger.info(f"  カテゴリ数: {len(self.categories)}")
+    
+    def get_available_categories(self):
+        """利用可能なカテゴリ一覧を取得"""
+        return list(self.categories.keys())
         
-    def get_trends(self, limit=25, force_refresh=False):
+    def get_trends(self, category='electronics', limit=25, force_refresh=False):
         """eBay Popular/Trendingトレンドを取得（キャッシュ優先）
         
         Args:
+            category (str): カテゴリ名（デフォルト: 'electronics'）
             limit (int): 取得件数
             force_refresh (bool): キャッシュを無視して取得するかどうか
         """
@@ -80,42 +140,68 @@ class eBayTrendsManager:
                     'source': 'ebay_api'
                 }
             
+            # カテゴリの検証
+            if category not in self.categories:
+                logger.warning(f"⚠️ eBay: 無効なカテゴリ '{category}'、デフォルト 'electronics' を使用します")
+                category = 'electronics'
+            
             if force_refresh:
-                logger.info(f"🔄 eBay force_refresh: キャッシュをクリアします")
-                self.db.clear_ebay_trends_cache()
+                logger.info(f"🔄 eBay force_refresh: カテゴリ '{category}' のキャッシュをクリアします")
+                self.db.clear_ebay_trends_cache(category)
 
-            cached_data = self.db.get_ebay_trends_from_cache()
+            cached_data = self.get_from_cache_by_category(category)
             if cached_data:
                 # ランキングでソート（昇順）
                 cached_data.sort(key=lambda x: x.get('rank', 999), reverse=False)
-                logger.info(f"✅ eBay: キャッシュから{len(cached_data)}件のデータを取得しました")
+                logger.info(f"✅ eBay: カテゴリ '{category}' のキャッシュから{len(cached_data)}件のデータを取得しました")
                 return {
                     'success': True,
                     'data': cached_data[:limit],
                     'status': 'cached',
+                    'category': category,
                     'source': 'database_cache'
                 }
             else:
                 if not force_refresh:
-                    logger.warning(f"⚠️ eBay: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
+                    logger.warning(f"⚠️ eBay: カテゴリ '{category}' のキャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
                     return {
                         'success': True,
                         'data': [],
                         'status': 'cache_not_found',
+                        'category': category,
                         'source': 'database_cache',
                         'message': 'キャッシュにデータがありません。force_refresh=trueで更新してください。'
                     }
-                logger.warning(f"⚠️ eBay: キャッシュデータが見つかりません。外部APIを呼び出します")
-                return self._fetch_ebay_trends(limit)
+                logger.warning(f"⚠️ eBay: カテゴリ '{category}' のキャッシュデータが見つかりません。外部APIを呼び出します")
+                return self._fetch_ebay_trends(category, limit)
 
         except Exception as e:
             logger.error(f"❌ eBay トレンド取得エラー: {e}", exc_info=True)
             return {'error': f'eBayトレンドの取得に失敗しました: {str(e)}', 'success': False}
     
-    def _fetch_ebay_trends(self, limit=25):
+    def get_from_cache_by_category(self, category):
+        """カテゴリ別のキャッシュデータを取得"""
+        try:
+            logger.debug(f"🔍 eBay: カテゴリ別キャッシュ取得: category='{category}'")
+            cached_data = self.db.get_ebay_trends_from_cache(category)
+            
+            if cached_data:
+                # categoryでフィルタリング（念のため）
+                category_data = [item for item in cached_data if item.get('category') == category]
+                logger.info(f"✅ eBay: カテゴリ別キャッシュ取得完了: {len(category_data)}件")
+                return category_data
+            else:
+                logger.warning(f"⚠️ eBay: カテゴリ別キャッシュ取得: データが取得できませんでした")
+                return []
+        except Exception as e:
+            logger.error(f"❌ eBay: カテゴリ別キャッシュ取得エラー: {e}", exc_info=True)
+            return []
+    
+    def _fetch_ebay_trends(self, category='electronics', limit=25):
         """eBay Browse APIから人気商品を取得
         
         Args:
+            category (str): カテゴリ名
             limit (int): 取得件数
         """
         try:
@@ -142,11 +228,16 @@ class eBayTrendsManager:
                 'Content-Type': 'application/json'
             }
             
+            # カテゴリ情報を取得
+            if category not in self.categories:
+                category = 'electronics'
+            category_info = self.categories[category]
+            
             # パラメータ: 人気商品を取得
             # サンドボックス環境でも動作するように、具体的なキーワード + カテゴリID + フィルターで絞り込み
             params = {
-                'q': 'iphone',  # 具体的なキーワード
-                'category_ids': '9355',  # ElectronicsカテゴリID（エラー回避のため絞り込み）
+                'q': category_info['keyword'],  # カテゴリに応じたキーワード
+                'category_ids': category_info['id'],  # カテゴリID
                 'filter': 'conditions:{NEW};price:[50..1500]',  # 新品のみ、価格フィルター
                 'sort': 'bestMatch',  # ベストマッチ順
                 'limit': min(limit, 25),  # 25件に固定
@@ -213,6 +304,7 @@ class eBayTrendsManager:
                         'condition': item.get('condition', ''),
                         'seller': item.get('seller', {}).get('username', '') if item.get('seller') else '',
                         'shipping': item.get('shippingOptions', [{}])[0].get('shippingCost', {}).get('value', '') if item.get('shippingOptions') else '',
+                        'category': category,  # カテゴリ情報を追加
                         'source': 'eBay Popular/Trending',
                         'published_date': datetime.now().isoformat()
                     }
@@ -224,14 +316,15 @@ class eBayTrendsManager:
             final_data = formatted_data[:limit]
 
             if final_data:
-                self.db.save_ebay_trends_to_cache(final_data)
+                self.db.save_ebay_trends_to_cache(final_data, category)
                 self.db.update_cache_status('ebay_trends', len(final_data))
 
-            logger.info(f"✅ eBay: {len(final_data)}件の人気商品を取得しました")
+            logger.info(f"✅ eBay: カテゴリ '{category}' から{len(final_data)}件の人気商品を取得しました")
             return {
                 'success': True,
                 'data': final_data,
                 'status': 'api_fetched',
+                'category': category,
                 'source': 'ebay_api',
                 'total_count': len(final_data)
             }

@@ -680,13 +680,21 @@ def get_amazon_trends(manager):
 @trend_bp.route('/ebay-trends')
 @require_manager('ebay')
 def get_ebay_trends(manager):
-    """eBay Popular/Trending Trends APIエンドポイント"""
+    """eBay Popular/Trending Trends APIエンドポイント（カテゴリ対応）"""
     try:
+        category = request.args.get('category', 'electronics')
         limit = int(request.args.get('limit', 25))
         force_refresh = get_force_refresh()
         
-        result = manager.get_trends(limit=limit, force_refresh=force_refresh)
-        return handle_trend_response(result, 'eBay Popular/Trending', 'eBay API')
+        result = manager.get_trends(category=category, limit=limit, force_refresh=force_refresh)
+        
+        # category情報をレスポンスに含める
+        if isinstance(result, dict):
+            result['category'] = category
+            if 'available_categories' not in result:
+                result['available_categories'] = manager.get_available_categories()
+        
+        return handle_trend_response(result, 'eBay Popular/Trending', 'eBay API', category=category)
         
     except Exception as e:
         return handle_api_error('eBay Popular/Trending Trends', e)

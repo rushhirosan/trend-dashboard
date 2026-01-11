@@ -24,8 +24,15 @@ class eBayTrendsManager:
         if not self.client_secret:
             logger.warning("⚠️ eBay Client Secret環境変数が設定されていません。eBay開発者プログラムでCert IDを取得して設定してください。")
         
-        # サンドボックス環境かどうかを判定（Client IDがSBXで始まる場合はサンドボックス）
-        is_sandbox = self.client_id.startswith('SBX-') if self.client_id else False
+        # サンドボックス環境かどうかを判定（Client IDまたはClient SecretがSBXで始まる場合はサンドボックス）
+        is_sandbox = False
+        if self.client_id and self.client_id.startswith('SBX-'):
+            is_sandbox = True
+        elif self.client_secret and self.client_secret.startswith('SBX-'):
+            is_sandbox = True
+        # サンドボックス環境のApp IDは "AppName-SBX-xxxxx-xxxxx" の形式の場合もある
+        elif self.client_id and 'SBX-' in self.client_id:
+            is_sandbox = True
         
         if is_sandbox:
             # サンドボックス環境

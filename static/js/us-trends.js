@@ -2451,13 +2451,6 @@ function loadEbayFromCacheUS(category = 'electronics') {
             if (data.success && data.data && data.data.length > 0) {
                 displayEbayResults(data);
             } else {
-                // キャッシュがない場合は自動的にAPIから取得
-                if (data.status === 'cache_not_found') {
-                    console.log(`eBay: カテゴリ '${category}' のキャッシュが見つかりません。APIからデータを取得します。`);
-                    loadEbayFromCacheUSWithRefresh(category);
-                    return;
-                }
-                
                 let errorMessage = data.error || 'No data available';
                 
                 if (data.status === 'api_key_not_configured') {

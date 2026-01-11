@@ -161,19 +161,14 @@ class eBayTrendsManager:
                     'category': category,
                     'source': 'database_cache'
                 }
-            else:
-                if not force_refresh:
-                    logger.warning(f"⚠️ eBay: カテゴリ '{category}' のキャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
-                    return {
-                        'success': True,
-                        'data': [],
-                        'status': 'cache_not_found',
-                        'category': category,
-                        'source': 'database_cache',
-                        'message': 'キャッシュにデータがありません。force_refresh=trueで更新してください。'
-                    }
-                logger.warning(f"⚠️ eBay: カテゴリ '{category}' のキャッシュデータが見つかりません。外部APIを呼び出します")
-                return self._fetch_ebay_trends(category, limit)
+            
+            # force_refresh=Falseの場合でも、キャッシュがない場合は外部APIを呼び出す
+            # （ユーザーがカテゴリを選択したときにデータを表示できるようにするため）
+            if not force_refresh:
+                logger.warning(f"⚠️ eBay: カテゴリ '{category}' のキャッシュにデータがありません。外部APIを呼び出してデータを取得します")
+            
+            logger.warning(f"⚠️ eBay: カテゴリ '{category}' のキャッシュデータが見つかりません。外部APIを呼び出します")
+            return self._fetch_ebay_trends(category, limit)
 
         except Exception as e:
             logger.error(f"❌ eBay トレンド取得エラー: {e}", exc_info=True)

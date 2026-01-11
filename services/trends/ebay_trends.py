@@ -268,10 +268,13 @@ class eBayTrendsManager:
             }
             
             # OAuth 2.0 Client Credentials Grant
+            # サンドボックス環境では、スコープを指定しないか、またはアプリケーションに割り当てられたスコープを指定
             data = {
-                'grant_type': 'client_credentials',
-                'scope': 'https://api.ebay.com/oauth/api_scope/buy.marketplace.readonly'
+                'grant_type': 'client_credentials'
             }
+            # 本番環境の場合のみスコープを指定（サンドボックスでは不要な場合がある）
+            if not self.oauth_url.startswith('https://api.sandbox.ebay.com'):
+                data['scope'] = 'https://api.ebay.com/oauth/api_scope/buy.marketplace.readonly'
             
             logger.info(f"eBay OAuth トークン取得開始: {self.oauth_url}")
             

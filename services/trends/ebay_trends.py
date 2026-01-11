@@ -275,13 +275,8 @@ class eBayTrendsManager:
             data = {
                 'grant_type': 'client_credentials'
             }
-            # サンドボックス環境では最小スコープ、本番環境では詳細スコープを指定
-            if self.oauth_url.startswith('https://api.sandbox.ebay.com'):
-                # サンドボックス環境：最小スコープ
-                data['scope'] = 'https://api.ebay.com/oauth/api_scope'
-            else:
-                # 本番環境：詳細スコープ
-                data['scope'] = 'https://api.ebay.com/oauth/api_scope/buy.marketplace.readonly'
+            # サンドボックス・本番環境ともに最小スコープを使用
+            data['scope'] = 'https://api.ebay.com/oauth/api_scope'
             
             logger.info(f"eBay OAuth トークン取得開始: {self.oauth_url}")
             

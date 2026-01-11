@@ -2451,11 +2451,16 @@ function loadEbayFromCacheUS(category = 'electronics') {
             if (data.success && data.data && data.data.length > 0) {
                 displayEbayResults(data);
             } else {
+                // キャッシュがない場合は自動的にAPIから取得
+                if (data.status === 'cache_not_found') {
+                    console.log(`eBay: カテゴリ '${category}' のキャッシュが見つかりません。APIからデータを取得します。`);
+                    loadEbayFromCacheUSWithRefresh(category);
+                    return;
+                }
+                
                 let errorMessage = data.error || 'No data available';
                 
-                if (data.status === 'cache_not_found') {
-                    errorMessage = 'キャッシュにデータがありません。更新ボタンを押してデータを取得してください。';
-                } else if (data.status === 'api_key_not_configured') {
+                if (data.status === 'api_key_not_configured') {
                     errorMessage = 'eBay Client IDが設定されていません。eBay開発者プログラムでApp IDを取得して環境変数EBAY_CLIENT_IDに設定してください。';
                 } else if (data.status === 'authentication_error') {
                     errorMessage = 'eBay API認証エラー。Client IDを確認するか、OAuth認証の設定が必要です。';
@@ -2731,17 +2736,7 @@ function showEbayError(message, status = null) {
     }
     
     if (errorElement) {
-        let errorHtml = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
-        
-        // cache_not_foundの場合は更新ボタンを表示
-        if (status === 'cache_not_found') {
-            const categorySelect = document.getElementById('ebayCategorySelectUS');
-            const selectedCategory = categorySelect ? categorySelect.value : 'electronics';
-            errorHtml += `<br><button class="btn btn-primary btn-sm mt-2" onclick="loadEbayFromCacheUSWithRefresh('${selectedCategory}')">
-                <i class="fas fa-sync-alt"></i> データを更新
-            </button>`;
-        }
-        
+        const errorHtml = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
         errorElement.innerHTML = errorHtml;
         errorElement.style.display = 'block';
     }

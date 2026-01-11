@@ -1057,7 +1057,7 @@ function loadCachedDataUS() {
     loadMediumFromCacheUS();
     
     // Load Amazon Best Sellers from cache (default: books)
-    loadAmazonFromCacheUS('books');
+    loadEbayFromCacheUS();
     
     // Load Twitch from cache
     loadTwitchFromCacheUS();
@@ -2422,20 +2422,20 @@ function loadMediumFromCacheUS() {
         });
 }
 
-// Amazon Best Sellers cache data loading for US
-function loadAmazonFromCacheUS(category = 'books') {
-    const loadingElement = document.getElementById('amazonLoading');
-    const resultsElement = document.getElementById('amazonResults');
+// eBay Popular/Trending cache data loading for US
+function loadEbayFromCacheUS() {
+    const loadingElement = document.getElementById('ebayLoading');
+    const resultsElement = document.getElementById('ebayResults');
     
     if (!loadingElement || !resultsElement) {
-        console.error('Amazon Best Sellers DOM elements not found');
+        console.error('eBay Popular/Trending DOM elements not found');
         return;
     }
     
     if (loadingElement) loadingElement.style.display = 'block';
     if (resultsElement) resultsElement.style.display = 'none';
     
-    fetchWithRetry(`/api/amazon-trends?category=${category}&limit=25&force_refresh=false`)
+    fetchWithRetry(`/api/ebay-trends?limit=25&force_refresh=false`)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2447,15 +2447,80 @@ function loadAmazonFromCacheUS(category = 'books') {
             if (resultsElement) resultsElement.style.display = 'block';
             
             if (data.success && data.data && data.data.length > 0) {
-                displayAmazonResults(data, category);
+                displayEbayResults(data);
             } else {
-                showAmazonError(data.error || 'No data available');
+                let errorMessage = data.error || 'No data available';
+                
+                if (data.status === 'cache_not_found') {
+                    errorMessage = 'キャッシュにデータがありません。更新ボタンを押してデータを取得してください。';
+                } else if (data.status === 'api_key_not_configured') {
+                    errorMessage = 'eBay Client IDが設定されていません。eBay開発者プログラムでApp IDを取得して環境変数EBAY_CLIENT_IDに設定してください。';
+                } else if (data.status === 'authentication_error') {
+                    errorMessage = 'eBay API認証エラー。Client IDを確認するか、OAuth認証の設定が必要です。';
+                } else if (data.status === 'api_error') {
+                    errorMessage = `eBay APIエラー: ${data.error || '不明なエラー'}`;
+                } else if (data.status === 'no_items') {
+                    errorMessage = 'eBayから商品を取得できませんでした。';
+                }
+                
+                showEbayError(errorMessage, data.status);
             }
         })
         .catch(error => {
-            console.error('Amazon Best Sellers cache loading error:', error);
+            console.error('eBay Popular/Trending cache loading error:', error);
             if (loadingElement) loadingElement.style.display = 'none';
-            showAmazonError('Failed to load Amazon Best Sellers data');
+            showEbayError('Failed to load eBay Popular/Trending data');
+        });
+}
+
+// eBay Popular/Trending data loading with refresh (force_refresh=true)
+function loadEbayFromCacheUSWithRefresh() {
+    const loadingElement = document.getElementById('ebayLoading');
+    const resultsElement = document.getElementById('ebayResults');
+    const errorElement = document.getElementById('ebayErrorMessage');
+    
+    if (!loadingElement || !resultsElement) {
+        console.error('eBay Popular/Trending DOM elements not found');
+        return;
+    }
+    
+    if (errorElement) errorElement.style.display = 'none';
+    if (loadingElement) loadingElement.style.display = 'block';
+    if (resultsElement) resultsElement.style.display = 'none';
+    
+    fetchWithRetry(`/api/ebay-trends?limit=25&force_refresh=true`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (loadingElement) loadingElement.style.display = 'none';
+            if (resultsElement) resultsElement.style.display = 'block';
+            
+            if (data.success && data.data && data.data.length > 0) {
+                displayEbayResults(data);
+            } else {
+                let errorMessage = data.error || 'No data available';
+                
+                if (data.status === 'api_key_not_configured') {
+                    errorMessage = 'eBay Client IDが設定されていません。eBay開発者プログラムでApp IDを取得して環境変数EBAY_CLIENT_IDに設定してください。';
+                } else if (data.status === 'authentication_error') {
+                    errorMessage = 'eBay API認証エラー。Client IDを確認するか、OAuth認証の設定が必要です。';
+                } else if (data.status === 'api_error') {
+                    errorMessage = `eBay APIエラー: ${data.error || '不明なエラー'}`;
+                } else if (data.status === 'no_items') {
+                    errorMessage = 'eBayから商品を取得できませんでした。';
+                }
+                
+                showEbayError(errorMessage, data.status);
+            }
+        })
+        .catch(error => {
+            console.error('eBay Popular/Trending refresh error:', error);
+            if (loadingElement) loadingElement.style.display = 'none';
+            showEbayError('Failed to refresh eBay Popular/Trending data');
         });
 }
 
@@ -2551,15 +2616,15 @@ function displayMediumResults(data) {
 }
 
 // Display Amazon Best Sellers Results
-function displayAmazonResults(data, category = 'books') {
-    const tableBody = document.getElementById('amazonTrendsTableBody');
-    const statusMessage = document.getElementById('amazonStatusMessage');
-    const errorElement = document.getElementById('amazonErrorMessage');
-    const resultsElement = document.getElementById('amazonResults');
-    const loadingElement = document.getElementById('amazonLoading');
+function displayEbayResults(data) {
+    const tableBody = document.getElementById('ebayTrendsTableBody');
+    const statusMessage = document.getElementById('ebayStatusMessage');
+    const errorElement = document.getElementById('ebayErrorMessage');
+    const resultsElement = document.getElementById('ebayResults');
+    const loadingElement = document.getElementById('ebayLoading');
     
     if (!tableBody || !resultsElement) {
-        console.error('Amazon Best Sellers DOM elements not found');
+        console.error('eBay Popular/Trending DOM elements not found');
         return;
     }
     
@@ -2578,7 +2643,15 @@ function displayAmazonResults(data, category = 'books') {
     tableBody.innerHTML = '';
     
     if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
-        showAmazonError(data.error || 'No data available');
+        let errorMessage = data.error || 'No data available';
+        
+        if (data.status === 'cache_not_found') {
+            errorMessage = 'キャッシュにデータがありません。更新ボタンを押してデータを取得してください。';
+        } else if (data.status === 'api_key_not_configured') {
+            errorMessage = 'eBay Client IDが設定されていません。eBay開発者プログラムでApp IDを取得して環境変数EBAY_CLIENT_IDに設定してください。';
+        }
+        
+        showEbayError(errorMessage, data.status);
         return;
     }
     
@@ -2586,15 +2659,14 @@ function displayAmazonResults(data, category = 'books') {
         const row = document.createElement('tr');
         row.className = 'trend-card';
         const title = item.title || 'N/A';
-        const publishedDate = item.published_date || '';
-        const published = publishedDate ? new Date(publishedDate).toLocaleDateString('en-US') : 'N/A';
+        const price = item.price ? `${item.currency || 'USD'} $${item.price}` : 'N/A';
         const url = item.url || '#';
         const rank = item.rank || (index + 1);
         
         row.innerHTML = `
-            <td><span class="badge" style="background-color: #ff9900; color: white;">${rank}</span></td>
+            <td><span class="badge" style="background-color: #0064D2; color: white;">${rank}</span></td>
             <td><a href="${url}" target="_blank" class="text-decoration-none"><strong>${title}</strong></a></td>
-            <td>${published}</td>
+            <td>${price}</td>
         `;
         tableBody.appendChild(row);
     });
@@ -2643,11 +2715,11 @@ function showMediumError(message) {
     if (resultsElement) resultsElement.style.display = 'block';
 }
 
-function showAmazonError(message) {
-    const loadingElement = document.getElementById('amazonLoading');
-    const errorElement = document.getElementById('amazonErrorMessage');
-    const resultsElement = document.getElementById('amazonResults');
-    const tableBody = document.getElementById('amazonTrendsTableBody');
+function showEbayError(message, status = null) {
+    const loadingElement = document.getElementById('ebayLoading');
+    const errorElement = document.getElementById('ebayErrorMessage');
+    const resultsElement = document.getElementById('ebayResults');
+    const tableBody = document.getElementById('ebayTrendsTableBody');
     
     if (loadingElement) loadingElement.style.display = 'none';
     
@@ -2657,11 +2729,21 @@ function showAmazonError(message) {
     }
     
     if (errorElement) {
-        errorElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
+        let errorHtml = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
+        
+        // cache_not_foundの場合は更新ボタンを表示
+        if (status === 'cache_not_found') {
+            errorHtml += `<br><button class="btn btn-primary btn-sm mt-2" onclick="loadEbayFromCacheUSWithRefresh()">
+                <i class="fas fa-sync-alt"></i> データを更新
+            </button>`;
+        }
+        
+        errorElement.innerHTML = errorHtml;
         errorElement.style.display = 'block';
     }
     if (resultsElement) resultsElement.style.display = 'block';
 }
+
 
 // Page initialization
 document.addEventListener('DOMContentLoaded', function() {
@@ -2702,15 +2784,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Amazon category selector event listener
-    const amazonCategorySelect = document.getElementById('amazonCategorySelectUS');
-    if (amazonCategorySelect) {
-        amazonCategorySelect.addEventListener('change', function() {
-            const selectedCategory = this.value;
-            console.log(`Amazon category changed to: ${selectedCategory}`);
-            loadAmazonFromCacheUS(selectedCategory);
-        });
-    }
     
     console.log('=== US Trends initialization completed ===');
 });

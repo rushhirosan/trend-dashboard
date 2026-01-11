@@ -1564,60 +1564,50 @@
             </div>
         </div>
 
-        <!-- Row 10: Amazon Best Sellers + Twitch Trends -->
+        <!-- Row 10: eBay Popular/Trending + Twitch Trends -->
         <div class="row g-3 mb-3">
-            <!-- Left: Amazon Best Sellers -->
+            <!-- Left: eBay Popular/Trending -->
             <div class="col-12 col-md-6">
                 <div class="card h-100">
-                    <div class="card-header" style="background-color: #ff9900; color: white;">
-                        <h5><i class="fab fa-amazon"></i> Amazon Best Sellers</h5>
+                    <div class="card-header" style="background-color: #0064D2; color: white;">
+                        <h5><i class="fab fa-ebay"></i> eBay Popular/Trending</h5>
                     </div>
                     <div class="card-body">
                         
-                        <!-- Category Selection -->
-                        <div class="mb-3">
-                            <label for="amazonCategorySelectUS" class="form-label text-white" style="background-color: #ff9900; padding: 5px 10px; border-radius: 5px;">Select Category:</label>
-                            <select class="form-select" id="amazonCategorySelectUS">
-                                <option value="books">Books</option>
-                                <option value="electronics">Electronics</option>
-                                <option value="computers">Computers</option>
-                            </select>
-                        </div>
-                        
-                        <!-- Amazon Best Sellers Data Display -->
-                        <div class="loading text-center py-5" id="amazonLoading" style="display: none;">
-                            <div class="spinner-border" style="color: #ff9900;" role="status">
+                        <!-- eBay Popular/Trending Data Display -->
+                        <div class="loading text-center py-5" id="ebayLoading" style="display: none;">
+                            <div class="spinner-border" style="color: #0064D2;" role="status">
                                 <span class="visually-hidden">Loading...</span>
                             </div>
-                            <p class="mt-3">Loading Amazon Best Sellers data...</p>
+                            <p class="mt-3">Loading eBay Popular/Trending data...</p>
                         </div>
 
-                        <!-- Amazon Best Sellers Results Display Area -->
-                        <div id="amazonResults" style="display: none;">
+                        <!-- eBay Popular/Trending Results Display Area -->
+                        <div id="ebayResults" style="display: none;">
                             <!-- Status Display -->
-                            <div class="alert alert-success status-message" id="amazonStatusMessage" style="display: none;">
+                            <div class="alert alert-success status-message" id="ebayStatusMessage" style="display: none;">
                                 <!-- Status messages will be displayed here -->
                             </div>
                             
                             <!-- Error Messages -->
-                            <div class="alert alert-danger" id="amazonErrorMessage" style="display: none;">
-                                <!-- Amazon Best Sellers error messages will be displayed here -->
+                            <div class="alert alert-danger" id="ebayErrorMessage" style="display: none;">
+                                <!-- eBay Popular/Trending error messages will be displayed here -->
                             </div>
 
-                            <!-- Amazon Best Sellers Table -->
+                            <!-- eBay Popular/Trending Table -->
                             <div class="card trend-table category-card">
                                 <div class="card-body">
                                     <div class="trend-table-container">
                             <div class="table-responsive">
-                                <table class="table table-hover trend-table" id="amazonTrendsTable">
+                                <table class="table table-hover trend-table" id="ebayTrendsTable">
                                     <thead class="table-dark">
                                         <tr>
                                             <th>Rank</th>
                                             <th>Title</th>
-                                            <th>Published</th>
+                                            <th>Price</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="amazonTrendsTableBody">
+                                    <tbody id="ebayTrendsTableBody">
                                         <!-- Skeleton UI: Placeholder before data loads -->
                                         <tr class="skeleton-row">
                                             <td><div class="skeleton skeleton-badge"></div></td>
@@ -1776,7 +1766,7 @@
         #bookResults,
         #devtoResults,
         #mediumResults,
-        #amazonResults,
+        #ebayResults,
         #twitchResults {
             display: block !important;
             visibility: visible !important;

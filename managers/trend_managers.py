@@ -32,6 +32,7 @@ from services.trends.hackernoon_trends import HackerNoonTrendsManager
 from services.trends.zenn_trends import ZennTrendsManager
 from services.trends.note_trends import NoteTrendsManager
 from services.trends.amazon_trends import AmazonTrendsManager
+from services.trends.ebay_trends import eBayTrendsManager
 from services.trends.medium_trends import MediumTrendsManager
 from services.trends.devto_trends import DevToTrendsManager
 from utils.logger_config import get_logger
@@ -70,6 +71,7 @@ MANAGER_CONFIGS = [
     ('zenn', ZennTrendsManager, 'Zenn'),
     ('note', NoteTrendsManager, 'Note'),
     ('amazon', AmazonTrendsManager, 'Amazon Best Sellers'),
+    ('ebay', eBayTrendsManager, 'eBay Popular/Trending'),
     ('medium', MediumTrendsManager, 'Medium'),
     ('devto', DevToTrendsManager, 'DEV.to'),
 ]

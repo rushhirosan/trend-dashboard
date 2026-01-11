@@ -669,10 +669,27 @@ def get_amazon_trends(manager):
         # category情報をレスポンスに含める
         if isinstance(result, dict):
             result['category'] = category
+            # available_categoriesが設定されていない場合は取得
+            if 'available_categories' not in result:
+                result['available_categories'] = manager.get_available_categories()
         return handle_trend_response(result, 'Amazon Best Sellers', 'Amazon RSS', category=category)
         
     except Exception as e:
         return handle_api_error('Amazon Best Sellers Trends', e)
+
+@trend_bp.route('/ebay-trends')
+@require_manager('ebay')
+def get_ebay_trends(manager):
+    """eBay Popular/Trending Trends APIエンドポイント"""
+    try:
+        limit = int(request.args.get('limit', 25))
+        force_refresh = get_force_refresh()
+        
+        result = manager.get_trends(limit=limit, force_refresh=force_refresh)
+        return handle_trend_response(result, 'eBay Popular/Trending', 'eBay API')
+        
+    except Exception as e:
+        return handle_api_error('eBay Popular/Trending Trends', e)
 
 @trend_bp.route('/medium-trends')
 @require_manager('medium')

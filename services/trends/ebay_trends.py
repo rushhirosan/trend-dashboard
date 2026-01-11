@@ -154,6 +154,7 @@ class eBayTrendsManager:
             }
             
             logger.info(f"eBay Browse API呼び出し開始: {endpoint}")
+            logger.info(f"📋 eBay API パラメータ: {params}")
             
             response = requests.get(endpoint, headers=headers, params=params, timeout=15)
             

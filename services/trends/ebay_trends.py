@@ -143,13 +143,13 @@ class eBayTrendsManager:
             }
             
             # パラメータ: 人気商品を取得
-            # qパラメータに'*'は使えないため、一般的なキーワードを使用
-            # またはカテゴリIDを指定する必要がある
-            # サンドボックス環境では、適切なキーワードで検索
+            # サンドボックス環境でも動作するように、具体的なキーワード + カテゴリID + フィルターで絞り込み
             params = {
-                'q': 'electronics',  # 一般的なカテゴリキーワード
-                'sort': 'price',  # 価格順
-                'limit': min(limit, 200),  # 最大200件
+                'q': 'iphone',  # 具体的なキーワード
+                'category_ids': '9355',  # ElectronicsカテゴリID（エラー回避のため絞り込み）
+                'filter': 'conditions:{NEW};price:[50..1500]',  # 新品のみ、価格フィルター
+                'sort': 'bestMatch',  # ベストマッチ順
+                'limit': min(limit, 25),  # 25件に固定
                 'offset': 0
             }
             

@@ -97,12 +97,17 @@ class AmazonTrendsManager:
             else:
                 if not force_refresh:
                     logger.warning(f"⚠️ Amazon ({category}): キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
+                    # カテゴリーが利用可能かチェック
+                    category_available = category in self.rss_urls_by_category
                     return {
                         'success': True,
                         'data': [],
                         'status': 'cache_not_found',
                         'source': 'database_cache',
-                        'category': category
+                        'category': category,
+                        'category_available': category_available,
+                        'available_categories': self.available_categories,
+                        'message': 'キャッシュにデータがありません。force_refresh=trueで更新してください。'
                     }
                 logger.warning(f"⚠️ Amazon ({category}): キャッシュデータが見つかりません。外部APIを呼び出します")
                 return self._fetch_amazon_trends(category, limit)
@@ -159,17 +164,30 @@ class AmazonTrendsManager:
                         'error': f'RSS取得に失敗しました: HTTP {response.status_code}'
                     }
                 
-                # エラーコード009のチェック（AmaranRSSのエラー）
+                # AmaranRSSのエラーチェック（エラーコード009, 003など）
                 response_text = response.text
-                if 'code:009' in response_text or 'ERROR:Failed to get Amazon bestsellers data' in response_text:
-                    logger.warning(f"⚠️ Amazon RSS({category}): AmaranRSSエラーコード009 - Amazon.comのベストセラー情報を取得できませんでした")
+                if 'ERROR:Failed to get Amazon bestsellers data' in response_text:
+                    # エラーコードを抽出（code:003, code:009など）
+                    error_code = 'unknown'
+                    if 'code:003' in response_text:
+                        error_code = '003'
+                    elif 'code:009' in response_text:
+                        error_code = '009'
+                    elif 'code:' in response_text:
+                        # その他のエラーコードを抽出
+                        import re
+                        match = re.search(r'code:(\d+)', response_text)
+                        if match:
+                            error_code = match.group(1)
+                    
+                    logger.warning(f"⚠️ Amazon RSS({category}): AmaranRSSエラーコード{error_code} - Amazon.comのベストセラー情報を取得できませんでした")
                     return {
                         'success': True,
                         'data': [],
                         'status': 'amaranrss_error',
                         'source': 'amazon_rss',
                         'category': category,
-                        'error': 'AmaranRSSがAmazon.comのベストセラー情報を取得できませんでした（エラーコード009）。しばらく待ってから再試行してください。'
+                        'error': f'AmaranRSSがAmazon.comのベストセラー情報を取得できませんでした（エラーコード{error_code}）。しばらく待ってから再試行してください。'
                     }
                 
                 # feedparserで解析

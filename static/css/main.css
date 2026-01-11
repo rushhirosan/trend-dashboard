@@ -1510,22 +1510,28 @@ body.data-status-active #data-status .card-body {
     max-height: 36px;
 }
 
-/* Limit product title to 2 lines */
-#rakutenTrendsTable td:nth-child(2) strong {
+/* Limit product title to 2 lines - 商品名列のみ折り返し可能に */
+#rakutenTrendsTable td:nth-child(2) {
+    white-space: normal;
+    word-break: break-word;
+    max-width: 300px; /* 適切な最大幅を設定 */
+}
+
+#rakutenTrendsTable td:nth-child(2) strong,
+#rakutenTrendsTable td:nth-child(2) a {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
 }
 
 /* Tighten columns; allow wrapping only for title column */
-#rakutenTrendsTable th,
-#rakutenTrendsTable td {
+/* 商品名列以外の列は折り返し禁止 */
+#rakutenTrendsTable th:not(:nth-child(2)),
+#rakutenTrendsTable td:not(:nth-child(2)) {
     white-space: nowrap;
-}
-
-#rakutenTrendsTable td:nth-child(2) {
-    white-space: normal;
 }
 
 /* カードのマージン調整 */
@@ -3303,4 +3309,3 @@ body.data-status-active #data-status .card-body {
 .trend-table tbody:has(tr:not(.skeleton-row)) tr.skeleton-row {
     display: none;
 }
-

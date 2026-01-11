@@ -642,8 +642,6 @@ class SubscriptionManager:
             from services.trends.thehackernews_trends import TheHackerNewsTrendsManager
             from services.trends.devto_trends import DevToTrendsManager
             from services.trends.medium_trends import MediumTrendsManager
-            from services.trends.amazon_trends import AmazonTrendsManager
-            
             # 各マネージャーのインスタンスを作成
             managers = {
                 'google_trends': GoogleTrendsManager(),
@@ -671,7 +669,6 @@ class SubscriptionManager:
                 'thehackernews_trends': TheHackerNewsTrendsManager(),
                 'devto_trends': DevToTrendsManager(),
                 'medium_trends': MediumTrendsManager(),
-                'amazon_trends': AmazonTrendsManager(),
             }
             
             trends_data = {}

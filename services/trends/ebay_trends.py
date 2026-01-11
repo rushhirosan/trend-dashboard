@@ -142,9 +142,12 @@ class eBayTrendsManager:
                 'Content-Type': 'application/json'
             }
             
-            # パラメータ: 人気商品を取得（価格順でソート）
+            # パラメータ: 人気商品を取得
+            # qパラメータに'*'は使えないため、一般的なキーワードを使用
+            # またはカテゴリIDを指定する必要がある
+            # サンドボックス環境では、適切なキーワードで検索
             params = {
-                'q': '*',  # 全商品
+                'q': 'electronics',  # 一般的なカテゴリキーワード
                 'sort': 'price',  # 価格順
                 'limit': min(limit, 200),  # 最大200件
                 'offset': 0

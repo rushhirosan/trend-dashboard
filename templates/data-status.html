@@ -1087,26 +1087,26 @@
                                     </div>
 
                                     <div class="row g-3 mt-2">
-                                        <!-- US 10行目: Amazon Best Sellers + Twitch Trends -->
+                                        <!-- US 10行目: eBay Popular/Trending + Twitch Trends -->
                                         <div class="col-md-6">
                                             <div class="card h-100">
                                                 <div class="card-body">
                                                     <div class="d-flex align-items-center mb-3">
-                                                        <i class="fab fa-amazon text-warning fs-4 me-3"></i>
-                                                        <h6 class="card-title mb-0">Amazon Best Sellers</h6>
+                                                        <i class="fab fa-ebay text-primary fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">eBay Popular/Trending</h6>
                                                     </div>
                                                     <div class="row text-center">
                                                         <div class="col-4">
                                                             <small class="text-muted">最終更新/Last updated</small>
-                                                            <div class="fw-bold" id="amazonUSLastUpdate">-</div>
+                                                            <div class="fw-bold" id="ebayUSLastUpdate">-</div>
                                                         </div>
                                                         <div class="col-4">
                                                             <small class="text-muted">データ件数/Data count</small>
-                                                            <div class="fw-bold" id="amazonUSDataCount">-</div>
+                                                            <div class="fw-bold" id="ebayUSDataCount">-</div>
                                                         </div>
                                                         <div class="col-4">
                                                             <small class="text-muted">ステータス/Status</small>
-                                                            <div><span class="badge bg-secondary" id="amazonUSStatus">-</span></div>
+                                                            <div><span class="badge bg-secondary" id="ebayUSStatus">-</span></div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1258,7 +1258,7 @@
                 { id: 'bookUS', name: 'Book Trends', endpoint: '/api/book-trends?country=US' },
                 { id: 'spotifyUS', name: 'Spotify', endpoint: '/api/music-trends?service=spotify&region=US' },
                 { id: 'podcastUS', name: 'Podcast', endpoint: '/api/podcast-trends?region=us' },
-                { id: 'amazonUS', name: 'Amazon Best Sellers', endpoint: '/api/amazon-trends?limit=25' },
+                { id: 'ebayUS', name: 'eBay Popular/Trending', endpoint: '/api/ebay-trends?limit=25' },
                 { id: 'twitchUS', name: 'Twitch', endpoint: '/api/twitch-trends?type=games' }
             ];
             
@@ -1315,7 +1315,7 @@
                             'Podcast': 'Podcast',
                             'DEV.to': 'DEV.to',
                             'Medium': 'Medium',
-                            'Amazon Best Sellers': 'Amazon Best Sellers',
+                            'eBay Popular/Trending': 'eBay Popular/Trending',
                             'Twitch': 'Twitch'
                         };
                         

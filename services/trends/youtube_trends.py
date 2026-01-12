@@ -8,84 +8,138 @@ import pytz
 from googleapiclient.discovery import build
 from database_config import TrendsCache
 from utils.logger_config import get_logger
+from services.trends.base_trends_manager import BaseTrendsManager
 
 # ロガーの初期化
 logger = get_logger(__name__)
 
-class YouTubeTrendsManager:
+class YouTubeTrendsManager(BaseTrendsManager):
     """YouTube Trendsの管理クラス"""
     
     def __init__(self):
+        # ベースクラスを初期化（rate_limiterも自動的に初期化される）
+        super().__init__(service_name='youtube', max_requests=10, window_seconds=60)
         self.youtube_api_key = os.getenv('YOUTUBE_API_KEY')
-        self.db = TrendsCache()
+    
+    def _get_cache_key(self):
+        """キャッシュキーを返す"""
+        return 'youtube_trends'
+    
+    def _get_from_cache(self, *args, **kwargs):
+        """キャッシュからデータを取得"""
+        region_code = kwargs.get('region_code', 'JP')
+        trend_type = kwargs.get('trend_type', 'trending')
+        return self.db.get_youtube_trends_from_cache(region_code, trend_type)
+    
+    def _save_to_cache(self, data, *args, **kwargs):
+        """キャッシュにデータを保存"""
+        try:
+            region_code = kwargs.get('region_code', 'JP')
+            trend_type = kwargs.get('trend_type', 'trending')
+            return self.db.save_youtube_trends_to_cache(data, region_code, trend_type)
+        except Exception as e:
+            logger.error(f"❌ YouTube キャッシュ保存エラー: {e}", exc_info=True)
+            return False
+    
+    def _clear_cache(self, *args, **kwargs):
+        """キャッシュをクリア"""
+        try:
+            region_code = kwargs.get('region_code', 'JP')
+            # clear_youtube_trends_cacheはregionを受け取るが、trend_typeは受け取らない
+            # 実際にはclear_cache('youtube_trends', region)を呼び出す
+            # ここではregion_codeのみを使用
+            return self.db.clear_youtube_trends_cache(region_code)
+        except Exception as e:
+            logger.error(f"❌ YouTube キャッシュクリアエラー: {e}", exc_info=True)
+            return False
+    
+    def _update_cache_status(self, cache_key, data_count):
+        """cache_statusテーブルを更新"""
+        try:
+            return self.db.update_cache_status(cache_key, data_count)
+        except Exception as e:
+            logger.warning(f"⚠️ YouTube: cache_status更新エラー: {e}")
+            return False
     
     def get_trends(self, region_code: str = 'JP', max_results: int = 25, force_refresh=False):
-        """YouTubeのトレンド動画を取得（キャッシュデータが存在しない場合のみ外部APIを呼び出し）"""
+        """YouTubeのトレンド動画を取得（キャッシュデータが存在しない場合は外部APIを呼び出し）"""
+        # ベースクラスのget_trendsを使用し、視聴回数でソートするように設定
+        # auto_fetch_on_cache_miss=Trueで、キャッシュがない場合はAPIを呼び出す
+        return super().get_trends(
+            limit=max_results,
+            force_refresh=force_refresh,
+            auto_fetch_on_cache_miss=True,  # キャッシュがない場合はAPIを呼び出す
+            sort_key='view_count',  # 視聴回数でソート
+            sort_reverse=True,  # 降順
+            region_code=region_code,
+            trend_type='trending'
+        )
+    
+    def _fetch_trends(self, limit=25, *args, **kwargs):
+        """YouTubeの人気動画を外部APIから取得"""
+        region_code = kwargs.get('region_code', 'JP')
+        
+        if not self.youtube_api_key:
+            return {'error': 'YouTube APIキーが設定されていません', 'success': False}
+        
+        # レート制限をチェック
+        self.rate_limiter.wait_if_needed()
+        
         try:
-            cached_data = None
-            if force_refresh:
-                logger.info(f"🔄 YouTube: force_refresh指定のためキャッシュをスキップします (region: {region_code})")
-            else:
-                logger.debug(f"🔍 YouTube: キャッシュデータ取得開始 (region: {region_code})")
-                cached_data = self.db.get_youtube_trends_from_cache(region_code, 'trending')
-                logger.debug(f"🔍 YouTube: キャッシュデータ取得結果: {type(cached_data)}, 長さ: {len(cached_data) if cached_data else 0}")
+            youtube = build('youtube', 'v3', developerKey=self.youtube_api_key)
             
-            if cached_data:
-                # 視聴回数でソート（降順）
-                cached_data.sort(key=lambda x: x.get('view_count', 0), reverse=True)
-                
-                # ランキングを再設定
-                for i, item in enumerate(cached_data, 1):
-                    item['rank'] = i
-                
-                # キャッシュデータを使用する場合でも、cache_statusを更新（スケジューラー実行時の時刻を統一するため）
-                if force_refresh:
-                    try:
-                        self._update_cache_status('youtube_trends', len(cached_data))
-                    except Exception as e:
-                        logger.warning(f"⚠️ YouTube: cache_status更新エラー（処理は継続）: {e}")
-                
-                logger.info(f"✅ YouTube: キャッシュデータを使用し、視聴回数でソートしました ({len(cached_data)}件)")
-                return {
-                    'data': cached_data,
-                    'status': 'cached',
-                    'region_code': region_code
-                }
-            # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
-            if not force_refresh:
-                logger.warning(f"⚠️ YouTube: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません (region: {region_code})")
-                return {
-                    'data': [],
-                    'status': 'cache_not_found',
-                    'region_code': region_code,
-                    'success': True,  # エラーではなく、データがない状態として扱う
-                    'error': 'キャッシュにデータがありません'
-                }
-            # force_refresh=trueの場合のみ外部APIを呼び出す
-            logger.warning(f"⚠️ YouTube: キャッシュ未使用のため外部APIを呼び出します")
-            api_result = self._fetch_trending_from_api(region_code, max_results)
-            if api_result and isinstance(api_result, dict) and api_result.get('data'):
-                trends_data = api_result['data']
-                # キャッシュに保存
-                self.save_to_cache(region_code, 'trending', trends_data)
-                logger.info(f"✅ YouTube: 外部APIから{len(trends_data)}件のデータを取得し、キャッシュに保存しました")
-                return {
-                    'data': trends_data,
-                    'status': 'api_fetched',
-                    'region_code': region_code,
-                    'source': 'YouTube Data API'
-                }
-            else:
-                logger.error(f"❌ YouTube: 外部APIからデータを取得できませんでした")
-                return {
-                    'data': [],
-                    'status': 'api_error',
-                    'region_code': region_code
-                }
+            # 人気動画を取得
+            request = youtube.videos().list(
+                part='snippet,statistics',
+                chart='mostPopular',
+                regionCode=region_code,
+                maxResults=limit
+            )
+            
+            response = request.execute()
+            
+            if not response.get('items'):
+                return {'error': '動画データが取得できませんでした', 'success': False}
+            
+            # データを整形
+            trends = []
+            for item in response['items']:
+                try:
+                    trends.append({
+                        'title': item['snippet']['title'],
+                        'channel_title': item['snippet']['channelTitle'],
+                        'view_count': int(item['statistics'].get('viewCount', 0)),
+                        'like_count': int(item['statistics'].get('likeCount', 0)),
+                        'comment_count': int(item['statistics'].get('commentCount', 0)),
+                        'published_at': item['snippet']['publishedAt'],
+                        'video_id': item['id'],
+                        'thumbnail_url': item['snippet']['thumbnails']['medium']['url'],
+                        'description': item['snippet']['description'][:100] + '...' if len(item['snippet']['description']) > 100 else item['snippet']['description']
+                    })
+                except Exception as e:
+                    logger.warning(f"動画データの処理でエラー: {e}", exc_info=True)
+                    continue
+            
+            # 視聴回数でソート（降順）
+            trends.sort(key=lambda x: x.get('view_count', 0), reverse=True)
+            
+            # ランキングを設定
+            for i, trend in enumerate(trends, 1):
+                trend['rank'] = i
+            
+            logger.info(f"✅ YouTube人気動画: 外部APIから{len(trends)}件のデータを取得し、視聴回数でソートしました")
+            
+            return {
+                'success': True,
+                'data': trends,
+                'status': 'api_fetched',
+                'region_code': region_code,
+                'source': 'YouTube Data API'
+            }
             
         except Exception as e:
-            logger.error(f"YouTube キャッシュ取得エラー: {e}", exc_info=True)
-            return {'error': f'YouTube キャッシュ取得でエラーが発生しました: {str(e)}'}
+            logger.error(f"YouTube Data APIでエラー: {e}", exc_info=True)
+            return {'error': f'YouTube Data APIでエラーが発生しました: {str(e)}', 'success': False}
 
     def get_rising_trends(self, region_code: str = 'JP', max_results: int = 25, force_refresh: bool = False):
         """YouTubeの急上昇トレンド動画を取得（キャッシュ優先）"""
@@ -125,68 +179,6 @@ class YouTubeTrendsManager:
         except Exception as e:
             logger.error(f"YouTube急上昇 キャッシュ取得エラー: {e}", exc_info=True)
             return {'error': f'YouTube急上昇 キャッシュ取得でエラーが発生しました: {str(e)}'}
-
-    def _fetch_trending_from_api(self, region_code: str = 'JP', max_results: int = 25):
-        """YouTubeの人気動画を外部APIから取得"""
-        if not self.youtube_api_key:
-            return {'error': 'YouTube APIキーが設定されていません'}
-        
-        # レート制限をチェック
-        self.rate_limiter.wait_if_needed()
-        
-        try:
-            youtube = build('youtube', 'v3', developerKey=self.youtube_api_key)
-            
-            # 人気動画を取得
-            request = youtube.videos().list(
-                part='snippet,statistics',
-                chart='mostPopular',
-                regionCode=region_code,
-                maxResults=max_results
-            )
-            
-            response = request.execute()
-            
-            if not response.get('items'):
-                return {'error': '動画データが取得できませんでした'}
-            
-            # データを整形
-            trends = []
-            for item in response['items']:
-                try:
-                    trends.append({
-                        'title': item['snippet']['title'],
-                        'channel_title': item['snippet']['channelTitle'],
-                        'view_count': int(item['statistics'].get('viewCount', 0)),
-                        'like_count': int(item['statistics'].get('likeCount', 0)),
-                        'comment_count': int(item['statistics'].get('commentCount', 0)),
-                        'published_at': item['snippet']['publishedAt'],
-                        'video_id': item['id'],
-                        'thumbnail_url': item['snippet']['thumbnails']['medium']['url'],
-                        'description': item['snippet']['description'][:100] + '...' if len(item['snippet']['description']) > 100 else item['snippet']['description']
-                    })
-                except Exception as e:
-                    logger.warning(f"動画データの処理でエラー: {e}", exc_info=True)
-                    continue
-            
-            # 視聴回数でソート（降順）
-            trends.sort(key=lambda x: x.get('view_count', 0), reverse=True)
-            
-            # ランキングを設定
-            for i, trend in enumerate(trends, 1):
-                trend['rank'] = i
-            
-            logger.info(f"✅ YouTube人気動画: 外部APIから{len(trends)}件のデータを取得し、視聴回数でソートしました")
-            
-            return {
-                'data': trends,
-                'status': 'api_fetched',
-                'region_code': region_code
-            }
-            
-        except Exception as e:
-            logger.error(f"YouTube Data APIでエラー: {e}", exc_info=True)
-            return {'error': f'YouTube Data APIでエラーが発生しました: {str(e)}'}
 
     def _fetch_rising_trends_from_api(self, region_code: str = 'JP', max_results: int = 25):
         """YouTubeの急上昇トレンド動画を外部APIから取得"""
@@ -290,7 +282,7 @@ class YouTubeTrendsManager:
             return {'error': f'YouTube Data APIでエラーが発生しました: {str(e)}'}
 
     def save_to_cache(self, region_code: str, trend_type: str, trends_data: list):
-        """YouTube Trendsデータをキャッシュに保存"""
+        """YouTube Trendsデータをキャッシュに保存（get_rising_trends用）"""
         try:
             self.db.save_youtube_trends_to_cache(trends_data, region_code, trend_type)
             # cache_statusテーブルも更新
@@ -299,30 +291,8 @@ class YouTubeTrendsManager:
             logger.error(f"YouTubeキャッシュ保存エラー: {e}", exc_info=True)
             raise
     
-    def _update_cache_status(self, cache_key, data_count):
-        """cache_statusテーブルを更新"""
-        try:
-            from datetime import datetime
-            import pytz
-            # 日本時間で現在時刻を取得
-            jst = pytz.timezone('Asia/Tokyo')
-            now = datetime.now(jst)
-            
-            with self.db.get_connection() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("""
-                        INSERT INTO cache_status (cache_key, last_updated, data_count)
-                        VALUES (%s, %s, %s)
-                        ON CONFLICT (cache_key) DO UPDATE SET
-                            last_updated = EXCLUDED.last_updated,
-                            data_count = EXCLUDED.data_count
-                    """, (cache_key, now, data_count))
-                    conn.commit()
-        except Exception as e:
-            logger.error(f"cache_status更新エラー: {e}", exc_info=True)
-
     def get_from_cache(self, region_code: str, trend_type: str = 'trending'):
-        """キャッシュからYouTube Trendsデータを取得"""
+        """キャッシュからYouTube Trendsデータを取得（get_rising_trends用）"""
         cached_data = self.db.get_youtube_trends_from_cache(region_code, trend_type)
         
         # キャッシュデータにランキングを追加（rankフィールドがない場合）
@@ -402,4 +372,4 @@ class YouTubeTrendsManager:
                           now, now))
                     conn.commit()
         except Exception as e:
-            logger.error(f"キャッシュ更新日時記録エラー: {e}", exc_info=True) 
+            logger.error(f"キャッシュ更新日時記録エラー: {e}", exc_info=True)

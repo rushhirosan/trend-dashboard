@@ -682,7 +682,7 @@ def get_amazon_trends(manager):
 def get_ebay_trends(manager):
     """eBay Popular/Trending Trends APIエンドポイント（カテゴリ対応）"""
     try:
-        category = request.args.get('category', 'electronics')
+        category = request.args.get('category', 'fashion')
         limit = int(request.args.get('limit', 25))
         force_refresh = get_force_refresh()
         

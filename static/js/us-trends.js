@@ -1056,8 +1056,8 @@ function loadCachedDataUS() {
     // Load Medium from cache
     loadMediumFromCacheUS();
     
-    // Load eBay from cache (default: electronics)
-    loadEbayFromCacheUS('electronics');
+    // Load eBay from cache (default: fashion)
+    loadEbayFromCacheUS('fashion');
     
     // Load Twitch from cache
     loadTwitchFromCacheUS();
@@ -2423,7 +2423,7 @@ function loadMediumFromCacheUS() {
 }
 
 // eBay Popular/Trending cache data loading for US
-function loadEbayFromCacheUS(category = 'electronics') {
+function loadEbayFromCacheUS(category = 'fashion') {
     console.log(`📊 eBay cache data loading for US (category: ${category})`);
     
     const loadingElement = document.getElementById('ebayLoading');
@@ -2474,7 +2474,7 @@ function loadEbayFromCacheUS(category = 'electronics') {
 }
 
 // eBay Popular/Trending data loading with refresh (force_refresh=true)
-function loadEbayFromCacheUSWithRefresh(category = 'electronics') {
+function loadEbayFromCacheUSWithRefresh(category = 'fashion') {
     const loadingElement = document.getElementById('ebayLoading');
     const resultsElement = document.getElementById('ebayResults');
     const errorElement = document.getElementById('ebayErrorMessage');

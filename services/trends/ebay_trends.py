@@ -55,11 +55,6 @@ class eBayTrendsManager:
         
         # カテゴリ定義（カテゴリID、表示名、キーワード）
         self.categories = {
-            'electronics': {
-                'id': '9355',
-                'name': 'Electronics',
-                'keyword': 'headphones'
-            },
             'cell_phones': {
                 'id': '9355',
                 'name': 'Cell Phones & Accessories',
@@ -116,11 +111,11 @@ class eBayTrendsManager:
         """利用可能なカテゴリ一覧を取得"""
         return list(self.categories.keys())
         
-    def get_trends(self, category='electronics', limit=25, force_refresh=False):
+    def get_trends(self, category='fashion', limit=25, force_refresh=False):
         """eBay Popular/Trendingトレンドを取得（キャッシュ優先）
         
         Args:
-            category (str): カテゴリ名（デフォルト: 'electronics'）
+            category (str): カテゴリ名（デフォルト: 'fashion'）
             limit (int): 取得件数
             force_refresh (bool): キャッシュを無視して取得するかどうか
         """
@@ -142,8 +137,8 @@ class eBayTrendsManager:
             
             # カテゴリの検証
             if category not in self.categories:
-                logger.warning(f"⚠️ eBay: 無効なカテゴリ '{category}'、デフォルト 'electronics' を使用します")
-                category = 'electronics'
+                logger.warning(f"⚠️ eBay: 無効なカテゴリ '{category}'、デフォルト 'fashion' を使用します")
+                category = 'fashion'
             
             if force_refresh:
                 logger.info(f"🔄 eBay force_refresh: カテゴリ '{category}' のキャッシュをクリアします")
@@ -192,7 +187,7 @@ class eBayTrendsManager:
             logger.error(f"❌ eBay: カテゴリ別キャッシュ取得エラー: {e}", exc_info=True)
             return []
     
-    def _fetch_ebay_trends(self, category='electronics', limit=25):
+    def _fetch_ebay_trends(self, category='fashion', limit=25):
         """eBay Browse APIから人気商品を取得
         
         Args:

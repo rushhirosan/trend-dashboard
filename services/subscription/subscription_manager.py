@@ -743,8 +743,13 @@ class SubscriptionManager:
                         result = manager.get_trends(limit=25, force_refresh=False)
                     elif normalized_cat == 'medium_trends':
                         result = manager.get_trends(limit=25, force_refresh=False)
-                    elif normalized_cat == 'amazon_trends':
-                        result = manager.get_trends(limit=25, force_refresh=False)
+                    elif normalized_cat == 'ebay_trends':
+                        manager = managers.get('ebay')
+                        if manager:
+                            result = manager.get_trends(category='fashion', limit=25, force_refresh=False)
+                        else:
+                            logger.warning(f"   ⚠️ {original_cat}: eBay Managerが初期化されていません")
+                            result = None
                     else:
                         logger.warning(f"   ⚠️ {original_cat}: 未対応のカテゴリです")
                         result = None
@@ -974,8 +979,8 @@ class SubscriptionManager:
             'music_trends_us',
             # 18. ポッドキャストトレンド
             'podcast_trends_us',
-            # 19. Amazon Best Sellers
-            'amazon_trends_us',
+            # 19. eBay Popular/Trending
+            'ebay_trends_us',
             # 20. Twitchゲームトレンド
             'twitch_trends_us',
         ]
@@ -1066,7 +1071,7 @@ class SubscriptionManager:
                 'thehackernews_trends': 'The Hacker News',
                 'devto_trends': 'DEV.to',
                 'medium_trends': 'Medium',
-                'amazon_trends': 'Amazon Best Sellers'
+                'ebay_trends': 'eBay Popular/Trending'
             }
             
             # フロントエンドのカテゴリ形式をtrends_dataのキー形式に変換
@@ -1197,9 +1202,14 @@ class SubscriptionManager:
                                     html += f'<div class="trend-item">{i}. {title} by {author}</div>'
                                 else:
                                     html += f'<div class="trend-item">{i}. {title}</div>'
-                            elif normalized_category == 'amazon_trends':
+                            elif normalized_category == 'ebay_trends':
                                 title = item.get('title', 'N/A')
-                                html += f'<div class="trend-item">{i}. {title}</div>'
+                                price = item.get('price', '')
+                                currency = item.get('currency', 'USD')
+                                if price:
+                                    html += f'<div class="trend-item">{i}. {title} - {currency} {price}</div>'
+                                else:
+                                    html += f'<div class="trend-item">{i}. {title}</div>'
                             elif normalized_category == 'github_trends':
                                 name = item.get('name', 'N/A') or item.get('repo', 'N/A')
                                 stars = item.get('stars', 0) or item.get('stargazers_count', 0)
@@ -1309,7 +1319,7 @@ class SubscriptionManager:
                 'thehackernews_trends': 'The Hacker News',
                 'devto_trends': 'DEV.to',
                 'medium_trends': 'Medium',
-                'amazon_trends': 'Amazon Best Sellers'
+                'ebay_trends': 'eBay Popular/Trending'
             }
             
             # フロントエンドのカテゴリ形式をtrends_dataのキー形式に変換
@@ -1436,9 +1446,14 @@ class SubscriptionManager:
                                     text += f"{i}. {title} by {author}\n"
                                 else:
                                     text += f"{i}. {title}\n"
-                            elif normalized_category == 'amazon_trends':
+                            elif normalized_category == 'ebay_trends':
                                 title = item.get('title', 'N/A')
-                                text += f"{i}. {title}\n"
+                                price = item.get('price', '')
+                                currency = item.get('currency', 'USD')
+                                if price:
+                                    text += f"{i}. {title} - {currency} {price}\n"
+                                else:
+                                    text += f"{i}. {title}\n"
                             elif normalized_category == 'github_trends':
                                 name = item.get('name', 'N/A') or item.get('repo', 'N/A')
                                 stars = item.get('stars', 0) or item.get('stargazers_count', 0)
@@ -1525,7 +1540,7 @@ class SubscriptionManager:
             'crypto_trends_us': 'Cryptocurrency Trends (US)',
             'movie_trends_us': '映画トレンド (US)',
             'book_trends_us': '本トレンド (US)',
-            'amazon_trends_us': 'Amazon Best Sellers (US)',
+            'ebay_trends_us': 'eBay Popular/Trending (US)',
             # 日本のカテゴリ（追加）
             'nhk_trends_jp': 'NHK ニュース (日本)',
             'qiita_trends_jp': 'Qiita トレンド (日本)',
@@ -1648,7 +1663,7 @@ class SubscriptionManager:
             'crypto_trends_us': 'Cryptocurrency Trends (US)',
             'movie_trends_us': 'Movie Trends (US)',
             'book_trends_us': 'Book Trends (US)',
-            'amazon_trends_us': 'Amazon Best Sellers (US)',
+            'ebay_trends_us': 'eBay Popular/Trending (US)',
             # 日本のカテゴリ（追加）
             'nhk_trends_jp': 'NHK ニュース (日本)',
             'qiita_trends_jp': 'Qiita トレンド (日本)',

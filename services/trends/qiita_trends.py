@@ -53,11 +53,12 @@ class QiitaTrendsManager(BaseTrendsManager):
             logger.warning(f"⚠️ Qiita: cache_status更新エラー: {e}")
             return False
 
-    def get_trends(self, limit=25, force_refresh=False):
+    def get_trends(self, limit=25, sort='likes_count', force_refresh=False):
         """Qiitaトレンドを取得（キャッシュ優先、likes_countでソート）"""
         # ベースクラスのget_trendsを使用
         # auto_fetch_on_cache_miss=Falseで、既存動作を維持（キャッシュがない場合はAPIを呼び出さない）
         # sort_key='likes_count'でいいね数でソート
+        # sortパラメータは互換性のために受け取るが、実際のソートはlikes_countで固定
         return super().get_trends(
             limit=limit,
             force_refresh=force_refresh,

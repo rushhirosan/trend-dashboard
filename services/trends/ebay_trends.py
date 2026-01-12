@@ -220,7 +220,7 @@ class eBayTrendsManager:
             
             # カテゴリ情報を取得
             if category not in self.categories:
-                category = 'electronics'
+                category = 'fashion'
             category_info = self.categories[category]
             
             # パラメータ: 人気商品を取得

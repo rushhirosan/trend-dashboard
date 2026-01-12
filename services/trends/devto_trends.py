@@ -2,62 +2,70 @@ import requests
 from datetime import datetime
 from database_config import TrendsCache
 from utils.logger_config import get_logger
-from utils.rate_limiter import get_rate_limiter
+from services.trends.base_trends_manager import BaseTrendsManager
 
 logger = get_logger(__name__)
 
 
-class DevToTrendsManager:
+class DevToTrendsManager(BaseTrendsManager):
     """DEV.toトレンド管理クラス（API使用）"""
 
     def __init__(self):
         """初期化"""
+        # ベースクラスを初期化（rate_limiterも自動的に初期化される）
+        super().__init__(service_name='devto', max_requests=5, window_seconds=60)
+        
         # DEV.to APIエンドポイント（無料、認証不要）
         self.api_url = "https://dev.to/api/articles"
-        self.db = TrendsCache()
-        # レート制限: DEV.to APIは1分あたり10リクエスト（保守的に5リクエスト/分に設定）
-        self.rate_limiter = get_rate_limiter('devto', max_requests=5, window_seconds=60)
 
         logger.info("DEV.to Trends Manager初期化:")
         logger.info(f"  API URL: {self.api_url}")
 
-    def get_trends(self, limit=25, force_refresh=False):
-        """DEV.toトレンドを取得（キャッシュ優先）"""
+    def _get_cache_key(self):
+        """キャッシュキーを返す"""
+        return 'devto_trends'
+
+    def _get_from_cache(self, *args, **kwargs):
+        """キャッシュからデータを取得"""
+        return self.db.get_devto_trends_from_cache()
+
+    def _save_to_cache(self, data, *args, **kwargs):
+        """キャッシュにデータを保存"""
         try:
-            if force_refresh:
-                logger.info("🔄 DEV.to force_refresh: キャッシュをクリアします")
-                self.db.clear_devto_trends_cache()
-
-            cached_data = self.db.get_devto_trends_from_cache()
-            if cached_data:
-                # reactions_countでソート（降順）
-                cached_data.sort(key=lambda x: x.get('reactions_count', 0), reverse=True)
-                for i, item in enumerate(cached_data, 1):
-                    item['rank'] = i
-                logger.info(f"✅ DEV.to: キャッシュから{len(cached_data)}件のデータを取得しました")
-                return {
-                    'success': True,
-                    'data': cached_data[:limit],
-                    'status': 'cached',
-                    'source': 'database_cache'
-                }
-            else:
-                if not force_refresh:
-                    logger.warning("⚠️ DEV.to: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
-                    return {
-                        'success': True,
-                        'data': [],
-                        'status': 'cache_not_found',
-                        'source': 'database_cache'
-                    }
-                logger.warning("⚠️ DEV.to: キャッシュデータが見つかりません。外部APIを呼び出します")
-                return self._fetch_devto_trends(limit)
-
+            return self.db.save_devto_trends_to_cache(data)
         except Exception as e:
-            logger.error(f"❌ DEV.to トレンド取得エラー: {e}", exc_info=True)
-            return {'error': f'DEV.toトレンドの取得に失敗しました: {str(e)}', 'success': False}
+            logger.error(f"❌ DEV.to キャッシュ保存エラー: {e}", exc_info=True)
+            return False
 
-    def _fetch_devto_trends(self, limit=25):
+    def _clear_cache(self, *args, **kwargs):
+        """キャッシュをクリア"""
+        try:
+            return self.db.clear_devto_trends_cache()
+        except Exception as e:
+            logger.error(f"❌ DEV.to キャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
+    def _update_cache_status(self, cache_key, data_count):
+        """cache_statusテーブルを更新"""
+        try:
+            return self.db.update_cache_status(cache_key, data_count)
+        except Exception as e:
+            logger.warning(f"⚠️ DEV.to: cache_status更新エラー: {e}")
+            return False
+
+    def get_trends(self, limit=25, force_refresh=False):
+        """DEV.toトレンドを取得（キャッシュ優先、reactions_countでソート）"""
+        # ベースクラスのget_trendsを使用し、reactions_countでソートするように設定
+        # auto_fetch_on_cache_miss=Falseで、既存動作を維持（キャッシュがない場合はAPIを呼び出さない）
+        return super().get_trends(
+            limit=limit,
+            force_refresh=force_refresh,
+            auto_fetch_on_cache_miss=False,  # 既存動作を維持
+            sort_key='reactions_count',  # reactions_countでソート
+            sort_reverse=True  # 降順
+        )
+
+    def _fetch_trends(self, limit=25, *args, **kwargs):
         """DEV.to APIからトレンドデータを取得"""
         try:
             self.rate_limiter.wait_if_needed()
@@ -79,7 +87,7 @@ class DevToTrendsManager:
             if response.status_code != 200:
                 logger.warning(f"⚠️ DEV.to API: HTTP {response.status_code} - {response.text[:200]}")
                 return {
-                    'success': True,
+                    'success': False,
                     'data': [],
                     'status': 'api_fetch_failed',
                     'source': 'devto_api',
@@ -90,7 +98,7 @@ class DevToTrendsManager:
             if not isinstance(articles, list):
                 logger.warning(f"⚠️ DEV.to API: 予期しないレスポンス形式 - {type(articles)}")
                 return {
-                    'success': True,
+                    'success': False,
                     'data': [],
                     'status': 'invalid_response',
                     'source': 'devto_api',
@@ -106,10 +114,9 @@ class DevToTrendsManager:
                     'source': 'devto_api'
                 }
 
-            logger.info(f"✅ DEV.to API: {len(articles)}件の記事を取得")
-
+            # データを整形
             formatted_data = []
-            for i, article in enumerate(articles[:limit * 2], 1):
+            for article in articles[:limit * 2]:
                 try:
                     # 公開日を取得
                     published_date = None
@@ -130,17 +137,20 @@ class DevToTrendsManager:
                         tags = article['tags']
 
                     formatted_data.append({
-                        'rank': i,
+                        'id': article.get('id'),
                         'title': article.get('title', 'No Title'),
                         'url': article.get('url', ''),
                         'canonical_url': article.get('canonical_url', article.get('url', '')),
                         'article_id': article.get('id'),
                         'published_date': published_date.isoformat() if published_date else None,
+                        'published_at': article.get('published_at'),
                         'description': article.get('description', '')[:300] if article.get('description') else '',
                         'author': article.get('user', {}).get('username', '') if article.get('user') else '',
                         'tags': tags,
                         'reactions_count': article.get('positive_reactions_count', article.get('reactions_count', 0)),
+                        'positive_reactions_count': article.get('positive_reactions_count', article.get('reactions_count', 0)),
                         'comments_count': article.get('comments_count', 0),
+                        'reading_time_minutes': article.get('reading_time_minutes', 0),
                         'source': 'DEV.to'
                     })
                 except Exception as e:
@@ -149,13 +159,12 @@ class DevToTrendsManager:
 
             # reactions_countでソート（降順）
             formatted_data.sort(key=lambda x: x.get('reactions_count', 0), reverse=True)
+            
+            # ランキングを設定
             for i, item in enumerate(formatted_data[:limit], 1):
                 item['rank'] = i
+            
             final_data = formatted_data[:limit]
-
-            if final_data:
-                self.db.save_devto_trends_to_cache(final_data)
-                self.db.update_cache_status('devto_trends', len(final_data))
 
             logger.info(f"✅ DEV.to: {len(final_data)}件の記事を取得しました")
             return {
@@ -168,10 +177,6 @@ class DevToTrendsManager:
         except requests.exceptions.Timeout:
             logger.error("❌ DEV.to API タイムアウトエラー", exc_info=True)
             return {'error': 'DEV.to API タイムアウト', 'success': False}
-        except requests.exceptions.RequestException as e:
-            logger.error(f"❌ DEV.to API リクエストエラー: {e}", exc_info=True)
-            return {'error': f'DEV.to APIリクエストエラー: {str(e)}', 'success': False}
         except Exception as e:
             logger.error(f"❌ DEV.to API エラー: {e}", exc_info=True)
             return {'error': f'DEV.to API取得エラー: {str(e)}', 'success': False}
-

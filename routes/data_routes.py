@@ -98,6 +98,7 @@ def get_data_freshness():
             'note_trends_business': 'Note (ビジネス)',
             'note_trends_lifestyle': 'Note (ライフスタイル)',
             'note_trends_entertainment': 'Note (エンタメ)',
+            'ebay_trends': 'eBay Popular/Trending',
         }
         
         freshness_info = {}

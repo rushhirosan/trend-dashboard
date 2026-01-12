@@ -642,6 +642,7 @@ class SubscriptionManager:
             from services.trends.thehackernews_trends import TheHackerNewsTrendsManager
             from services.trends.devto_trends import DevToTrendsManager
             from services.trends.medium_trends import MediumTrendsManager
+            from services.trends.ebay_trends import eBayTrendsManager
             # 各マネージャーのインスタンスを作成
             managers = {
                 'google_trends': GoogleTrendsManager(),
@@ -669,6 +670,7 @@ class SubscriptionManager:
                 'thehackernews_trends': TheHackerNewsTrendsManager(),
                 'devto_trends': DevToTrendsManager(),
                 'medium_trends': MediumTrendsManager(),
+                'ebay_trends': eBayTrendsManager(),
             }
             
             trends_data = {}
@@ -744,12 +746,7 @@ class SubscriptionManager:
                     elif normalized_cat == 'medium_trends':
                         result = manager.get_trends(limit=25, force_refresh=False)
                     elif normalized_cat == 'ebay_trends':
-                        manager = managers.get('ebay')
-                        if manager:
-                            result = manager.get_trends(category='fashion', limit=25, force_refresh=False)
-                        else:
-                            logger.warning(f"   ⚠️ {original_cat}: eBay Managerが初期化されていません")
-                            result = None
+                        result = manager.get_trends(category='fashion', limit=25, force_refresh=False)
                     else:
                         logger.warning(f"   ⚠️ {original_cat}: 未対応のカテゴリです")
                         result = None

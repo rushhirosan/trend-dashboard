@@ -3,16 +3,19 @@ import requests
 from datetime import datetime
 from database_config import TrendsCache
 from utils.logger_config import get_logger
-from utils.rate_limiter import get_rate_limiter
+from services.trends.base_trends_manager import BaseTrendsManager
 
 logger = get_logger(__name__)
 
 
-class NoteTrendsManager:
+class NoteTrendsManager(BaseTrendsManager):
     """note.com トレンド管理クラス（RSSフィード使用、カテゴリ対応）"""
 
     def __init__(self):
         """初期化"""
+        # ベースクラスを初期化（rate_limiterも自動的に初期化される）
+        super().__init__(service_name='note', max_requests=10, window_seconds=60)
+        
         # カテゴリ別RSSフィードURL
         self.category_urls = {
             'all': 'https://note.com/rss',
@@ -21,8 +24,6 @@ class NoteTrendsManager:
             'lifestyle': 'https://note.com/categories/lifestyle/rss',
             'entertainment': 'https://note.com/categories/entertainment/rss',
         }
-        self.db = TrendsCache()
-        self.rate_limiter = get_rate_limiter('note', max_requests=10, window_seconds=60)
 
         logger.info("Note Trends Manager初期化:")
         logger.info(f"  カテゴリ: {list(self.category_urls.keys())}")
@@ -37,68 +38,91 @@ class NoteTrendsManager:
             'entertainment', # エンタメ
         ]
 
+    def _get_cache_key(self):
+        """キャッシュキーを返す"""
+        return 'note_trends'
+
+    def _get_from_cache(self, *args, **kwargs):
+        """キャッシュからデータを取得"""
+        category = kwargs.get('category', 'all')
+        cached_data = self.db.get_note_trends_from_cache(category)
+        if cached_data:
+            # カテゴリでフィルタリング
+            category_data = [item for item in cached_data if item.get('category') == category]
+            return category_data
+        return None
+
+    def _save_to_cache(self, data, *args, **kwargs):
+        """キャッシュにデータを保存"""
+        try:
+            category = kwargs.get('category', 'all')
+            return self.db.save_note_trends_to_cache(data, category)
+        except Exception as e:
+            logger.error(f"❌ Note キャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def _clear_cache(self, *args, **kwargs):
+        """キャッシュをクリア"""
+        try:
+            category = kwargs.get('category', 'all')
+            return self.db.clear_note_trends_cache(category)
+        except Exception as e:
+            logger.error(f"❌ Note キャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
+    def _update_cache_status(self, cache_key, data_count, *args, **kwargs):
+        """cache_statusテーブルを更新"""
+        try:
+            category = kwargs.get('category', 'all')
+            cache_key_with_category = f'{cache_key}_{category}'
+            return self.db.update_cache_status(cache_key_with_category, data_count)
+        except Exception as e:
+            logger.warning(f"⚠️ Note: cache_status更新エラー: {e}")
+            return False
+
     def get_trends(self, category='all', limit=25, force_refresh=False, fetch_all_categories=False):
         """Noteトレンドを取得（キャッシュ優先）"""
-        try:
-            # 全カテゴリを取得する場合
-            if fetch_all_categories:
-                logger.info("🔄 Note: 全カテゴリのデータを取得します")
-                all_data = self._fetch_and_cache_all_categories()
-                if all_data:
-                    self._save_all_categories_to_cache(all_data)
-                    # 'all'カテゴリのデータを返す（互換性のため）
-                    all_category_data = [item for item in all_data if item.get('category') == 'all']
-                    return {
-                        'data': all_category_data[:limit] if all_category_data else [],
-                        'status': 'api_fetched',
-                        'category': 'all',
-                        'source': 'Note RSS',
-                        'success': True
-                    }
-                else:
-                    return {
-                        'data': [],
-                        'status': 'api_error',
-                        'category': 'all',
-                        'error': '全カテゴリのデータ取得に失敗しました',
-                        'success': False
-                    }
+        # 全カテゴリを取得する場合
+        if fetch_all_categories:
+            logger.info("🔄 Note: 全カテゴリのデータを取得します")
+            all_data = self._fetch_and_cache_all_categories()
+            if all_data:
+                self._save_all_categories_to_cache(all_data)
+                # 'all'カテゴリのデータを返す（互換性のため）
+                all_category_data = [item for item in all_data if item.get('category') == 'all']
+                return {
+                    'data': all_category_data[:limit] if all_category_data else [],
+                    'status': 'api_fetched',
+                    'category': 'all',
+                    'source': 'Note RSS',
+                    'success': True
+                }
+            else:
+                return {
+                    'data': [],
+                    'status': 'api_error',
+                    'category': 'all',
+                    'error': '全カテゴリのデータ取得に失敗しました',
+                    'success': False
+                }
 
-            if force_refresh:
-                logger.info(f"🔄 Note force_refresh: カテゴリ '{category}' のキャッシュをクリアします")
-                self.db.clear_note_trends_cache(category)
+        # ベースクラスのget_trendsを使用
+        # auto_fetch_on_cache_miss=Trueで、キャッシュがない場合はAPIを呼び出す（はてぶと同じ挙動）
+        # sort_key='published_date'で公開日でソート
+        result = super().get_trends(
+            limit=limit,
+            force_refresh=force_refresh,
+            auto_fetch_on_cache_miss=True,  # キャッシュがない場合はAPIを呼び出す
+            sort_key='published_date',  # 公開日でソート
+            sort_reverse=True,  # 降順（新しい順）
+            category=category
+        )
+        # categoryパラメータを結果に追加
+        if result and isinstance(result, dict):
+            result['category'] = category
+        return result
 
-            # カテゴリ別キャッシュから取得
-            cached_data = self.db.get_note_trends_from_cache(category)
-            
-            if cached_data and len(cached_data) > 0:
-                # カテゴリでフィルタリング
-                category_data = [item for item in cached_data if item.get('category') == category]
-                if category_data:
-                    category_data.sort(key=lambda x: x.get('published_date') or '', reverse=True)
-                    for i, item in enumerate(category_data, 1):
-                        item['rank'] = i
-                    logger.info(f"✅ Note: キャッシュから{len(category_data)}件のデータを取得しました (category: {category})")
-                    return {
-                        'success': True,
-                        'data': category_data[:limit],
-                        'status': 'cached',
-                        'category': category,
-                        'source': 'database_cache'
-                    }
-            
-            # キャッシュがない場合
-            if not force_refresh:
-                # force_refresh=Falseでもキャッシュがない場合は外部APIを呼び出す（はてぶと同じ挙動）
-                logger.warning(f"⚠️ Note: キャッシュにデータがありません。外部APIを呼び出してデータを取得します (category: {category})")
-            
-            return self._fetch_note_trends(category, limit)
-
-        except Exception as e:
-            logger.error(f"❌ Note トレンド取得エラー: {e}", exc_info=True)
-            return {'error': f'Noteトレンドの取得に失敗しました: {str(e)}', 'success': False}
-
-    def _fetch_note_trends(self, category='all', limit=25):
+    def _fetch_trends(self, category='all', limit=25, *args, **kwargs):
         """Note RSSフィードからトレンドデータを取得"""
         try:
             self.rate_limiter.wait_if_needed()
@@ -121,7 +145,7 @@ class NoteTrendsManager:
             logger.info(f"✅ Note RSS: {len(feed.entries)}件のエントリーを取得 (category: {category})")
 
             formatted_data = []
-            for i, entry in enumerate(feed.entries[:limit], 1):
+            for entry in feed.entries[:limit]:
                 try:
                     published_date = None
                     if hasattr(entry, 'published_parsed') and entry.published_parsed:
@@ -145,7 +169,6 @@ class NoteTrendsManager:
                         description = entry.summary
 
                     formatted_data.append({
-                        'rank': i,
                         'title': entry.get('title', 'No Title'),
                         'url': entry.get('link', ''),
                         'published_date': published_date.isoformat() if published_date else None,
@@ -162,11 +185,6 @@ class NoteTrendsManager:
             for i, item in enumerate(formatted_data, 1):
                 item['rank'] = i
             final_data = formatted_data[:limit]
-
-            if final_data:
-                # カテゴリ別にキャッシュに保存
-                self.db.save_note_trends_to_cache(final_data, category)
-                self.db.update_cache_status(f'note_trends_{category}', len(final_data))
 
             logger.info(f"✅ Note: {len(final_data)}件の記事を取得しました (category: {category})")
             return {
@@ -194,7 +212,7 @@ class NoteTrendsManager:
             
             for category in categories:
                 logger.info(f"📊 Note カテゴリ '{category}' のデータを取得中...")
-                result = self._fetch_note_trends(category, 25)
+                result = self._fetch_trends(category, 25)
                 if result.get('success') and result.get('data'):
                     trends_data = result.get('data', [])
                     for item in trends_data:

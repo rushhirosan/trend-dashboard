@@ -5,15 +5,18 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from database_config import TrendsCache
 from utils.logger_config import get_logger
-from utils.rate_limiter import get_rate_limiter
+from services.trends.base_trends_manager import BaseTrendsManager
 
 logger = get_logger(__name__)
 
-class NHKTrendsManager:
+class NHKTrendsManager(BaseTrendsManager):
     """NHK RSSフィードを使用してニューストレンドを取得・管理するクラス"""
     
     def __init__(self):
         """初期化"""
+        # ベースクラスを初期化（rate_limiterも自動的に初期化される）
+        super().__init__(service_name='nhk', max_requests=10, window_seconds=60)
+        
         # NHK RSSフィードURL
         self.rss_urls = {
             'main': 'https://www3.nhk.or.jp/rss/news/cat0.xml',  # 主要ニュース
@@ -23,64 +26,64 @@ class NHKTrendsManager:
             'sports': 'https://www3.nhk.or.jp/rss/news/cat4.xml',  # スポーツ
             'science': 'https://www3.nhk.or.jp/rss/news/cat5.xml',  # 科学・文化
         }
-        self.db = TrendsCache()
-        # レート制限: NHK APIは特に制限なしだが、保守的に10リクエスト/分に設定
-        self.rate_limiter = get_rate_limiter('nhk', max_requests=10, window_seconds=60)
         
         logger.info("NHK Trends Manager初期化:")
         logger.info(f"  RSS URL: {self.rss_urls['main']}")
     
-    def get_trends(self, limit=25, force_refresh=False):
-        """NHKニューストレンドを取得（キャッシュデータが存在しない場合のみ外部APIを呼び出し）"""
+    def _get_cache_key(self):
+        """キャッシュキーを返す"""
+        return 'nhk_trends'
+
+    def _get_from_cache(self, *args, **kwargs):
+        """キャッシュからデータを取得"""
         try:
-            if force_refresh:
-                logger.info(f"🔄 NHK force_refresh: キャッシュをクリアします")
-                self.db.clear_nhk_trends_cache()
-            
-            try:
-                cached_data = self.db.get_nhk_trends_from_cache()
-            except Exception as e:
-                logger.error(f"❌ NHK: キャッシュ取得エラー: {e}", exc_info=True)
-                # エラー時は空のリストとして扱う（500エラーを防ぐ）
-                cached_data = []
-            
+            cached_data = self.db.get_nhk_trends_from_cache()
+            # 重複排除を適用
             if cached_data:
-                # キャッシュから取得したデータにも重複排除を適用
                 cached_data = self._remove_duplicates(cached_data)
-                
-                # キャッシュデータを使用する場合でも、cache_statusを更新（スケジューラー実行時の時刻を統一するため）
-                if force_refresh:
-                    try:
-                        self.db.update_cache_status('nhk_trends', len(cached_data))
-                    except Exception as e:
-                        logger.warning(f"⚠️ NHK: cache_status更新エラー（処理は継続）: {e}")
-                
-                logger.info(f"✅ NHK: キャッシュから{len(cached_data)}件のデータを取得しました（重複排除後）")
-                return {
-                    'success': True,
-                    'data': cached_data[:limit],  # 制限数まで取得
-                    'status': 'cached',
-                    'source': 'database_cache'
-                }
-            else:
-                # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
-                if not force_refresh:
-                    logger.warning("⚠️ NHK: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
-                    return {
-                        'success': False,
-                        'data': [],
-                        'status': 'cache_not_found',
-                        'source': 'database_cache',
-                        'error': 'キャッシュにデータがありません'
-                    }
-                # force_refresh=trueの場合のみ外部APIを呼び出す
-                logger.warning("⚠️ NHK: キャッシュデータが見つかりません。外部RSSを呼び出します")
-                return self._fetch_nhk_trends(limit)
-        
+            return cached_data
         except Exception as e:
-            logger.error(f"❌ NHK トレンド取得エラー: {e}", exc_info=True)
-            return {'error': f'NHKニュースの取得に失敗しました: {str(e)}', 'success': False}
-    
+            logger.error(f"❌ NHK: キャッシュ取得エラー: {e}", exc_info=True)
+            # エラー時は空のリストとして扱う（500エラーを防ぐ）
+            return []
+
+    def _save_to_cache(self, data, *args, **kwargs):
+        """キャッシュにデータを保存"""
+        try:
+            return self.db.save_nhk_trends_to_cache(data)
+        except Exception as e:
+            logger.error(f"❌ NHK キャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def _clear_cache(self, *args, **kwargs):
+        """キャッシュをクリア"""
+        try:
+            return self.db.clear_nhk_trends_cache()
+        except Exception as e:
+            logger.error(f"❌ NHK キャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
+    def _update_cache_status(self, cache_key, data_count):
+        """cache_statusテーブルを更新"""
+        try:
+            return self.db.update_cache_status(cache_key, data_count)
+        except Exception as e:
+            logger.warning(f"⚠️ NHK: cache_status更新エラー: {e}")
+            return False
+
+    def get_trends(self, limit=25, force_refresh=False):
+        """NHKニューストレンドを取得（キャッシュ優先、published_dateでソート）"""
+        # ベースクラスのget_trendsを使用
+        # auto_fetch_on_cache_miss=Falseで、既存動作を維持（キャッシュがない場合はAPIを呼び出さない）
+        # sort_key='published_date'で公開日でソート
+        return super().get_trends(
+            limit=limit,
+            force_refresh=force_refresh,
+            auto_fetch_on_cache_miss=False,  # 既存動作を維持
+            sort_key='published_date',  # 公開日でソート
+            sort_reverse=True  # 降順（新しい順）
+        )
+
     def _remove_duplicates(self, items):
         """重複を排除するヘルパーメソッド"""
         def normalize_title(title):
@@ -154,7 +157,7 @@ class NHKTrendsManager:
         
         return items
     
-    def _fetch_nhk_trends(self, limit=25):
+    def _fetch_trends(self, limit=25, *args, **kwargs):
         """NHK RSSフィードからトレンドデータを取得"""
         try:
             logger.info(f"NHK RSS呼び出し開始")
@@ -226,15 +229,14 @@ class NHKTrendsManager:
             for i, item in enumerate(formatted_data, 1):
                 item['rank'] = i
             
-            # キャッシュに保存
-            self.db.save_nhk_trends_to_cache(formatted_data)
             logger.info(f"✅ NHK: {len(formatted_data)}件のニュース記事を取得しました")
             
             return {
                 'success': True,
                 'data': formatted_data,
                 'status': 'api_fetched',
-                'source': 'nhk_rss'
+                'source': 'nhk_rss',
+                'total_count': len(formatted_data)
             }
         
         except requests.exceptions.Timeout:
@@ -249,4 +251,3 @@ class NHKTrendsManager:
         except Exception as e:
             logger.error(f"❌ NHKニュース取得エラー: {e}", exc_info=True)
             return {'error': f'NHKニュースの取得に失敗しました: {str(e)}', 'success': False}
-

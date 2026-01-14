@@ -243,10 +243,11 @@ function createDropdownTrendsManager(config) {
                 if (data.success) {
                     if (typeof displayFunction === 'function') {
                         displayFunction(data);
+                        // displayFunction内でshowResults/showErrorが呼ばれるので、ここでは呼ばない
                     } else {
                         console.error(`display${serviceName.charAt(0).toUpperCase() + serviceName.slice(1)}Results関数が見つかりません`);
+                        showError(`表示関数が見つかりません`);
                     }
-                    showResults();
                 } else {
                     showError(data.error || `${serviceName}トレンドの取得に失敗しました`);
                 }

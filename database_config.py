@@ -1176,6 +1176,26 @@ class TrendsCache:
                         logger.error("❌ データベース接続を取得できませんでした（最大試行回数）")
                         return None
                 
+                # 接続が有効か再確認（get_connection()で検証済みだが、念のため）
+                # 接続が取得されてからクエリ実行までの間に閉じられる可能性があるため
+                try:
+                    if conn.closed:
+                        raise psycopg2.InterfaceError("接続が閉じられています")
+                    # 軽量な検証クエリを実行して接続が有効か確認
+                    with conn.cursor() as test_cursor:
+                        test_cursor.execute("SELECT 1")
+                        test_cursor.fetchone()
+                except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as verify_error:
+                    # 接続が無効な場合は再接続を試みる
+                    logger.warning(f"⚠️ 接続検証失敗（再接続します）: {verify_error}")
+                    self.connection = None
+                    if attempt < max_retries - 1:
+                        wait_time = base_wait_time * (2 ** attempt)
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        raise verify_error
+                
                 # クエリを実行
                 result = query_func(conn)
                 
@@ -1895,17 +1915,13 @@ class TrendsCache:
     
     def update_cache_status(self, cache_key, data_count, timestamp=None):
         """特定のトレンドのcache_statusを更新"""
-        try:
-            import pytz
-            if timestamp is None:
-                jst = pytz.timezone('Asia/Tokyo')
-                timestamp = datetime.now(jst)
-            
-            conn = self.get_connection()
-            if not conn:
-                logger.warning(f"⚠️ データベース接続が取得できませんでした。cache_status更新をスキップします (cache_key: {cache_key})")
-                return False
-            
+        import pytz
+        if timestamp is None:
+            jst = pytz.timezone('Asia/Tokyo')
+            timestamp = datetime.now(jst)
+        
+        def query_func(conn):
+            """cache_statusを更新するクエリ関数"""
             with conn.cursor() as cursor:
                 cursor.execute("""
                     INSERT INTO cache_status (cache_key, last_updated, data_count)
@@ -1916,17 +1932,15 @@ class TrendsCache:
                 """, (cache_key, timestamp, data_count))
                 conn.commit()
                 return True
-                
-        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-            logger.warning(f"⚠️ cache_status更新中に接続エラーが発生: {e}", exc_info=True)
-            self.connection = None
-            return False
+        
+        try:
+            result = self._execute_with_retry(query_func, max_retries=5)
+            if result is None:
+                logger.warning(f"⚠️ データベース接続が取得できませんでした。cache_status更新をスキップします (cache_key: {cache_key})")
+                return False
+            return result
         except Exception as e:
             logger.error(f"❌ cache_status更新エラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     def clear_all_cache(self):
@@ -2481,6 +2495,11 @@ class TrendsCache:
                 
                 # 新しいデータを挿入
                 for item in data:
+                    # stars_countを取得（starsキーからも取得を試みる）
+                    stars_count = item.get('stars_count', 0) or 0
+                    if stars_count == 0:
+                        stars_count = item.get('stars', 0) or 0
+                    
                     cursor.execute("""
                         INSERT INTO github_trends_cache 
                         (repo_id, name, full_name, description, url, language, stars_count, forks_count,
@@ -2494,10 +2513,10 @@ class TrendsCache:
                         item.get('description', ''),
                         item.get('url', ''),
                         item.get('language', ''),
-                        item.get('stars_count', 0),
-                        item.get('forks_count', 0),
-                        item.get('watchers_count', 0),
-                        item.get('open_issues_count', 0),
+                        stars_count,
+                        item.get('forks_count', 0) or 0,
+                        item.get('watchers_count', 0) or 0,
+                        item.get('open_issues_count', 0) or 0,
                         item.get('created_at', ''),
                         item.get('updated_at', ''),
                         item.get('pushed_at', ''),

@@ -30,13 +30,43 @@ class GitHubTrendsManager(BaseTrendsManager):
         return 'github_trends'
 
     def _get_from_cache(self, *args, **kwargs):
-        """キャッシュからデータを取得（stars_countをstarsにもマッピング）"""
+        """キャッシュからデータを取得（stars_countとstarsの両方向マッピング）"""
         cached_data = self.db.get_github_trends_from_cache()
         if cached_data:
-            # stars_countをstarsにもマッピング（フロントエンド互換性のため）
+            # stars_countとstarsの両方向マッピング（互換性のため）
             for item in cached_data:
-                if 'stars_count' in item and 'stars' not in item:
-                    item['stars'] = item.get('stars_count', 0) or 0
+                # データベースから取得したstars_countを確認（Noneの場合は0に変換）
+                stars_count = item.get('stars_count')
+                if stars_count is None:
+                    stars_count = 0
+                else:
+                    try:
+                        stars_count = int(stars_count) if stars_count else 0
+                    except (ValueError, TypeError):
+                        stars_count = 0
+                
+                stars = item.get('stars')
+                if stars is None:
+                    stars = 0
+                else:
+                    try:
+                        stars = int(stars) if stars else 0
+                    except (ValueError, TypeError):
+                        stars = 0
+                
+                # どちらか一方が0で、もう一方が0より大きい場合は、0の方を更新
+                if stars_count == 0 and stars > 0:
+                    item['stars_count'] = stars
+                elif stars == 0 and stars_count > 0:
+                    item['stars'] = stars_count
+                elif stars_count == 0 and stars == 0:
+                    # 両方とも0の場合は、両方のキーを確実に設定
+                    item['stars_count'] = 0
+                    item['stars'] = 0
+                else:
+                    # 両方とも値がある場合は、両方のキーを確実に設定
+                    item['stars_count'] = stars_count
+                    item['stars'] = stars_count
         return cached_data
 
     def _save_to_cache(self, data, *args, **kwargs):

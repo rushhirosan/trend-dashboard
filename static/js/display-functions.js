@@ -257,7 +257,9 @@ function displayGitHubResults(data) {
             const row = document.createElement('tr');
             row.className = 'trend-card';
             
-            const stars = item.stars_count ? item.stars_count.toLocaleString() : '0';
+            // stars_countまたはstarsのどちらかを使用（互換性のため）
+            const starsValue = item.stars_count !== undefined ? item.stars_count : (item.stars !== undefined ? item.stars : 0);
+            const stars = starsValue ? starsValue.toLocaleString() : '0';
             const language = item.language || 'N/A';
             const repoUrl = item.url || '#';
             

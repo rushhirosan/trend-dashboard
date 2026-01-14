@@ -3,66 +3,74 @@ import requests
 from datetime import datetime
 from database_config import TrendsCache
 from utils.logger_config import get_logger
-from utils.rate_limiter import get_rate_limiter
+from services.trends.base_trends_manager import BaseTrendsManager
 
 logger = get_logger(__name__)
 
 
-class MediumTrendsManager:
+class MediumTrendsManager(BaseTrendsManager):
     """Mediumトレンド管理クラス（RSSフィード使用）"""
 
     def __init__(self):
         """初期化"""
+        # ベースクラスを初期化（rate_limiterも自動的に初期化される）
+        super().__init__(service_name='medium', max_requests=10, window_seconds=60)
+        
         # Medium RSSフィードURL（トップ記事と人気のタグ）
         self.rss_urls = [
             "https://medium.com/feed/tag/programming",
             "https://medium.com/feed/tag/technology",
             "https://medium.com/feed/tag/startup",
         ]
-        self.db = TrendsCache()
-        # レート制限: RSSフィードは特に制限なしだが、保守的に10リクエスト/分に設定
-        self.rate_limiter = get_rate_limiter('medium', max_requests=10, window_seconds=60)
 
         logger.info("Medium Trends Manager初期化:")
         logger.info(f"  RSS URLs: {self.rss_urls}")
 
-    def get_trends(self, limit=25, force_refresh=False):
-        """Mediumトレンドを取得（キャッシュ優先）"""
+    def _get_from_cache(self, *args, **kwargs):
+        """キャッシュからデータを取得"""
+        return self.db.get_medium_trends_from_cache()
+
+    def _save_to_cache(self, data, *args, **kwargs):
+        """キャッシュにデータを保存"""
         try:
-            if force_refresh:
-                logger.info("🔄 Medium force_refresh: キャッシュをクリアします")
-                self.db.clear_medium_trends_cache()
-
-            cached_data = self.db.get_medium_trends_from_cache()
-            if cached_data:
-                # 公開日でソート（降順）
-                cached_data.sort(key=lambda x: x.get('published_date') or '', reverse=True)
-                for i, item in enumerate(cached_data, 1):
-                    item['rank'] = i
-                logger.info(f"✅ Medium: キャッシュから{len(cached_data)}件のデータを取得しました")
-                return {
-                    'success': True,
-                    'data': cached_data[:limit],
-                    'status': 'cached',
-                    'source': 'database_cache'
-                }
-            else:
-                if not force_refresh:
-                    logger.warning("⚠️ Medium: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
-                    return {
-                        'success': True,
-                        'data': [],
-                        'status': 'cache_not_found',
-                        'source': 'database_cache'
-                    }
-                logger.warning("⚠️ Medium: キャッシュデータが見つかりません。外部APIを呼び出します")
-                return self._fetch_medium_trends(limit)
-
+            return self.db.save_medium_trends_to_cache(data)
         except Exception as e:
-            logger.error(f"❌ Medium トレンド取得エラー: {e}", exc_info=True)
-            return {'error': f'Mediumトレンドの取得に失敗しました: {str(e)}', 'success': False}
+            logger.error(f"❌ Medium キャッシュ保存エラー: {e}", exc_info=True)
+            return False
 
-    def _fetch_medium_trends(self, limit=25):
+    def _clear_cache(self, *args, **kwargs):
+        """キャッシュをクリア"""
+        try:
+            return self.db.clear_medium_trends_cache()
+        except Exception as e:
+            logger.error(f"❌ Medium キャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
+    def _get_cache_key(self):
+        """キャッシュキーを返す"""
+        return 'medium_trends'
+
+    def _update_cache_status(self, cache_key, data_count):
+        """cache_statusテーブルを更新"""
+        try:
+            self.db.update_cache_status(cache_key, data_count)
+            return True
+        except Exception as e:
+            logger.warning(f"⚠️ Medium: cache_status更新エラー: {e}")
+            return False
+
+    def get_trends(self, limit=25, force_refresh=False):
+        """Mediumトレンドを取得（キャッシュ優先、公開日でソート）"""
+        # ベースクラスのget_trendsを使用し、公開日でソートするように設定
+        return super().get_trends(
+            limit=limit,
+            force_refresh=force_refresh,
+            auto_fetch_on_cache_miss=True,  # キャッシュがない場合は自動的にAPIを呼び出す
+            sort_key='published_date',  # 公開日でソート
+            sort_reverse=True  # 降順
+        )
+
+    def _fetch_trends(self, limit=25, *args, **kwargs):
         """Medium RSSフィードからトレンドデータを取得"""
         try:
             self.rate_limiter.wait_if_needed()
@@ -156,10 +164,6 @@ class MediumTrendsManager:
                 item['rank'] = i
             final_data = formatted_data[:limit]
 
-            if final_data:
-                self.db.save_medium_trends_to_cache(final_data)
-                self.db.update_cache_status('medium_trends', len(final_data))
-
             logger.info(f"✅ Medium: {len(final_data)}件の記事を取得しました")
             return {
                 'success': True,
@@ -174,4 +178,3 @@ class MediumTrendsManager:
         except Exception as e:
             logger.error(f"❌ Medium RSS エラー: {e}", exc_info=True)
             return {'error': f'Medium RSS取得エラー: {str(e)}', 'success': False}
-

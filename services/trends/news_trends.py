@@ -3,30 +3,26 @@ import requests
 from datetime import datetime, timedelta
 from database_config import TrendsCache
 from utils.logger_config import get_logger
-from utils.rate_limiter import get_rate_limiter
+from services.trends.base_trends_manager import BaseTrendsManager
 
 # ロガーの初期化
 logger = get_logger(__name__)
 
-class NewsTrendsManager:
+class NewsTrendsManager(BaseTrendsManager):
     """NewsAPIを使用してニューストレンドを取得・管理するクラス"""
     
     def __init__(self):
         """初期化"""
+        # ベースクラスを初期化（rate_limiterも自動的に初期化される）
+        super().__init__(service_name='news', max_requests=10, window_seconds=60)
+        
         self.api_key = os.getenv('NEWS_API_KEY')
-        self.db = TrendsCache()
-        # レート制限: News APIは100 requests/日（保守的に10リクエスト/分に設定）
-        self.rate_limiter = get_rate_limiter('news', max_requests=10, window_seconds=60)
         
         if not self.api_key:
             logger.warning("Warning: NEWS_API_KEYが設定されていません")
         
         logger.debug(f"News API認証情報確認:")
         logger.debug(f"  API Key: {self.api_key[:10]}..." if self.api_key else "  API Key: 未設定")
-        
-        # NewsAPI接続テスト（キャッシュモードでは無効化）
-        # if self.api_key:
-        #     self._test_connection()
     
     def _test_connection(self):
         """NewsAPI接続テスト"""
@@ -46,69 +42,77 @@ class NewsTrendsManager:
         except Exception as e:
             logger.error(f"News API接続テストエラー: {e}", exc_info=True)
     
-    def get_trends(self, country='jp', category='general', page_size=25, force_refresh=False):
-        """ニューストレンドを取得（キャッシュデータが存在しない場合のみ外部APIを呼び出し）"""
+    def _get_cache_key(self):
+        """キャッシュキーを返す"""
+        return 'news_trends'
+
+    def _get_from_cache(self, *args, **kwargs):
+        """キャッシュからデータを取得"""
         try:
-            logger.debug(f"🔍 News: キャッシュデータ取得開始 (country: {country}, category: {category})")
-            
-            cached_data = None
-            if force_refresh:
-                logger.info(f"🔄 News: force_refresh指定のためキャッシュをスキップします (country: {country}, category: {category})")
-            else:
-                cached_data = self.get_from_cache(country, category)
-                logger.debug(f"🔍 News: キャッシュデータ取得結果: {type(cached_data)}, 長さ: {len(cached_data) if cached_data else 0}")
-            
-            if cached_data:
-                logger.info(f"✅ News: キャッシュデータを使用 ({len(cached_data)}件)")
-                return {
-                    'data': cached_data,
-                    'status': 'cached',
-                    'country': country.upper(),
-                    'category': category
-                }
-            # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
-            if not force_refresh:
-                logger.warning(f"⚠️ News: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません (country: {country}, category: {category})")
-                return {
-                    'data': [],
-                    'status': 'cache_not_found',
-                    'country': country.upper(),
-                    'category': category,
-                    'success': False,
-                    'error': 'キャッシュにデータがありません'
-                }
-            # force_refresh=trueの場合のみ外部APIを呼び出す
-            logger.warning(f"⚠️ News: キャッシュ未使用のため外部APIを呼び出します")
-            trends_data = self._get_news_trends(country, category, page_size)
-            if trends_data:
-                # キャッシュに保存
-                self.save_to_cache(trends_data, country, category)
-                logger.info(f"✅ News: 外部APIから{len(trends_data)}件のデータを取得し、キャッシュに保存しました")
-                return {
-                    'data': trends_data,
-                    'status': 'api_fetched',
-                    'country': country.upper(),
-                    'category': category,
-                    'source': 'News API'
-                }
-            else:
-                logger.error(f"❌ News: 外部APIからデータを取得できませんでした")
-                return {
-                    'data': [],
-                    'status': 'api_error',
-                    'country': country.upper(),
-                    'category': category
-                }
-                
+            country = kwargs.get('country', 'jp')
+            category = kwargs.get('category', 'general')
+            return self.db.get_news_trends_from_cache(country, category)
         except Exception as e:
-            logger.error(f"ニューストレンド取得エラー: {e}", exc_info=True)
-            return {'error': f'ニューストレンドの取得に失敗しました: {str(e)}'}
+            logger.error(f"❌ News: キャッシュ取得エラー: {e}", exc_info=True)
+            return None
+
+    def _save_to_cache(self, data, *args, **kwargs):
+        """キャッシュにデータを保存"""
+        try:
+            country = kwargs.get('country', 'jp')
+            category = kwargs.get('category', 'general')
+            return self.db.save_news_trends_to_cache(data, country, category)
+        except Exception as e:
+            logger.error(f"❌ News キャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def _clear_cache(self, *args, **kwargs):
+        """キャッシュをクリア"""
+        try:
+            country = kwargs.get('country', 'jp')
+            category = kwargs.get('category', 'general')
+            return self.db.clear_news_trends_cache(country, category)
+        except Exception as e:
+            logger.error(f"❌ News キャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
+    def _update_cache_status(self, cache_key, data_count):
+        """cache_statusテーブルを更新"""
+        try:
+            return self.db.update_cache_status(cache_key, data_count)
+        except Exception as e:
+            logger.warning(f"⚠️ News: cache_status更新エラー: {e}")
+            return False
+
+    def get_trends(self, country='jp', category='general', page_size=25, force_refresh=False):
+        """ニューストレンドを取得（キャッシュ優先、published_atでソート）"""
+        # ベースクラスのget_trendsを使用
+        # auto_fetch_on_cache_miss=Falseで、既存動作を維持（キャッシュがない場合はAPIを呼び出さない）
+        # sort_key='published_at'で公開日でソート
+        result = super().get_trends(
+            limit=page_size,
+            force_refresh=force_refresh,
+            auto_fetch_on_cache_miss=False,  # 既存動作を維持
+            sort_key='published_at',  # 公開日でソート
+            sort_reverse=True,  # 降順（新しい順）
+            country=country,
+            category=category
+        )
+        # countryとcategoryパラメータを結果に追加
+        if result and isinstance(result, dict):
+            result['country'] = country.upper()
+            result['category'] = category
+        return result
     
-    def _get_news_trends(self, country='jp', category='general', page_size=25):
+    def _fetch_trends(self, country='jp', category='general', page_size=25, *args, **kwargs):
         """NewsAPIからトレンドデータを取得"""
         if not self.api_key:
             logger.warning("News APIキーが設定されていません")
-            return None
+            return {
+                'success': False,
+                'error': 'News APIキーが設定されていません',
+                'data': []
+            }
         
         try:
             logger.info(f"News API呼び出し開始 (国: {country}, カテゴリ: {category})")
@@ -154,13 +158,29 @@ class NewsTrendsManager:
                 logger.warning("5. サンプルデータを生成...")
                 trends = self._get_sample_news_data()
             
-            return trends
+            if not trends:
+                return {
+                    'success': False,
+                    'error': '記事データが取得できませんでした',
+                    'data': []
+                }
+            
+            return {
+                'success': True,
+                'data': trends,
+                'status': 'api_fetched',
+                'source': 'News API'
+            }
             
         except Exception as e:
             logger.error(f"News API エラー: {e}", exc_info=True)
             import traceback
             traceback.print_exc()
-            return None
+            return {
+                'success': False,
+                'error': f'News API エラー: {str(e)}',
+                'data': []
+            }
     
     def _get_news_trends_with_category(self, country='jp', category='general', page_size=25):
         """カテゴリ付きでNewsAPIからトレンドデータを取得"""
@@ -411,26 +431,3 @@ class NewsTrendsManager:
         
         logger.info(f"サンプルニュースデータ生成完了: {len(sample_news)}件")
         return sample_news
-    
-    def get_from_cache(self, country, category):
-        """キャッシュからデータを取得"""
-        try:
-            return self.db.get_news_trends_from_cache(country, category)
-        except Exception as e:
-            logger.error(f"キャッシュ取得エラー: {e}", exc_info=True)
-            return None
-    
-    def save_to_cache(self, data, country, category):
-        """データをキャッシュに保存"""
-        try:
-            self.db.save_news_trends_to_cache(data, country, category)
-        except Exception as e:
-            logger.error(f"キャッシュ保存エラー: {e}", exc_info=True)
-    
-    def is_cache_valid(self, country, category):
-        """キャッシュが有効かチェック"""
-        try:
-            return self.db.is_news_cache_valid(country, category)
-        except Exception as e:
-            logger.error(f"キャッシュ有効性チェックエラー: {e}", exc_info=True)
-            return False 

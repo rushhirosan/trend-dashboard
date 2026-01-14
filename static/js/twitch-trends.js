@@ -1,40 +1,31 @@
-// Twitchトレンド関連の関数
-function fetchTwitchTrends() {
-    showTwitchLoading();
-    hideTwitchResults();
-    
-    // 選択されたトレンドタイプを取得
-    const typeSelect = document.getElementById('twitchTypeSelect');
-    const selectedType = typeSelect ? typeSelect.value : 'games';
-    
-    console.log(`🔍 Twitch: カテゴリ選択時のカテゴリ '${selectedType}' のデータを取得中...`);
-    
-    fetch(`/api/twitch-trends?type=${selectedType}&limit=25`)
-        .then(response => response.json())
-        .then(data => {
-            hideTwitchLoading();
-            if (data.success) {
-                displayTwitchResults(data);
-            } else {
-                showTwitchError(data.error || 'Twitch トレンドの取得に失敗しました');
-            }
-        })
-        .catch(error => {
-            hideTwitchLoading();
-            showTwitchError('ネットワークエラー: ' + error.message);
-        });
+// Twitchトレンド関連の関数（共通化）
+let twitchManager = null;
+
+// ドロップダウンパターンの共通マネージャーを作成
+if (typeof createDropdownTrendsManager === 'function') {
+    twitchManager = createDropdownTrendsManager({
+        serviceName: 'twitch',
+        selectId: 'twitchTypeSelect',
+        apiEndpoint: '/api/twitch-trends',
+        defaultValue: 'games',
+        paramName: 'type',
+        uiIds: {
+            loading: 'twitchTrendsLoading',
+            results: 'twitchResults',
+            tableBody: 'twitchTrendsTableBody',
+            statusMessage: 'twitchStatusMessage',
+            errorMessage: 'twitchErrorMessage'
+        },
+        displayFunction: displayTwitchResults
+    });
 }
 
-// カテゴリ選択時のイベントリスナー
-document.addEventListener('DOMContentLoaded', function() {
-    const typeSelect = document.getElementById('twitchTypeSelect');
-    if (typeSelect) {
-        typeSelect.addEventListener('change', function() {
-            console.log('🔍 Twitch: カテゴリ変更検出:', this.value);
-            fetchTwitchTrends();
-        });
+// 後方互換性のため、既存の関数名も保持
+function fetchTwitchTrends() {
+    if (twitchManager) {
+        twitchManager.fetchTrends();
     }
-});
+}
 
 function displayTwitchResults(data) {
     const tableBody = document.getElementById('twitchTrendsTableBody');
@@ -63,31 +54,58 @@ function displayTwitchResults(data) {
     }
 }
 
+// 後方互換性のため、既存の関数名も保持（共通マネージャーを使用）
 function showTwitchLoading() {
-    document.getElementById('twitchTrendsLoading').style.display = 'block';
+    if (twitchManager) {
+        twitchManager.showLoading();
+    } else {
+        const element = document.getElementById('twitchTrendsLoading');
+        if (element) element.style.display = 'block';
+    }
 }
 
 function hideTwitchLoading() {
-    document.getElementById('twitchTrendsLoading').style.display = 'none';
+    if (twitchManager) {
+        twitchManager.hideLoading();
+    } else {
+        const element = document.getElementById('twitchTrendsLoading');
+        if (element) element.style.display = 'none';
+    }
 }
 
 function showTwitchResults() {
-    document.getElementById('twitchResults').style.display = 'block';
+    if (twitchManager) {
+        twitchManager.showResults();
+    } else {
+        const element = document.getElementById('twitchResults');
+        if (element) element.style.display = 'block';
+    }
 }
 
 function hideTwitchResults() {
-    document.getElementById('twitchResults').style.display = 'none';
+    if (twitchManager) {
+        twitchManager.hideResults();
+    } else {
+        const element = document.getElementById('twitchResults');
+        if (element) element.style.display = 'none';
+    }
 }
 
 function showTwitchStatusMessage(message, type = 'info') {
     const statusElement = document.getElementById('twitchStatusMessage');
-    statusElement.textContent = message;
-    statusElement.className = `alert alert-${type}`;
-    statusElement.style.display = 'block';
+    if (statusElement) {
+        statusElement.textContent = message;
+        statusElement.className = `alert alert-${type}`;
+        statusElement.style.display = 'block';
+    }
 }
 
 function showTwitchError(message) {
-    showTwitchStatusMessage(message, 'danger');
-    showTwitchResults();
+    if (twitchManager) {
+        twitchManager.showError(message);
+    } else {
+        showTwitchStatusMessage(message, 'danger');
+        showTwitchResults();
+    }
 }
 

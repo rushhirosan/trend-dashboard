@@ -656,27 +656,6 @@ def get_note_trends(manager):
     except Exception as e:
         return handle_api_error('Note Trends', e)
 
-@trend_bp.route('/amazon-trends')
-@require_manager('amazon')
-def get_amazon_trends(manager):
-    """Amazon Best Sellers Trends APIエンドポイント"""
-    try:
-        category = request.args.get('category', 'books')  # categoryパラメータでカテゴリーを指定
-        limit = int(request.args.get('limit', 25))
-        force_refresh = get_force_refresh()
-        
-        result = manager.get_trends(category=category, limit=limit, force_refresh=force_refresh)
-        # category情報をレスポンスに含める
-        if isinstance(result, dict):
-            result['category'] = category
-            # available_categoriesが設定されていない場合は取得
-            if 'available_categories' not in result:
-                result['available_categories'] = manager.get_available_categories()
-        return handle_trend_response(result, 'Amazon Best Sellers', 'Amazon RSS', category=category)
-        
-    except Exception as e:
-        return handle_api_error('Amazon Best Sellers Trends', e)
-
 @trend_bp.route('/ebay-trends')
 @require_manager('ebay')
 def get_ebay_trends(manager):

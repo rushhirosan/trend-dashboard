@@ -12,19 +12,18 @@ import pandas as pd
 from datetime import datetime, timedelta
 from database_config import TrendsCache
 from utils.logger_config import get_logger
-from utils.rate_limiter import get_rate_limiter
+from services.trends.base_trends_manager import BaseTrendsManager
 
 # ロガーの初期化
 logger = get_logger(__name__)
 
-class StockTrendsManager:
+class StockTrendsManager(BaseTrendsManager):
     """株価トレンドの管理クラス"""
     
     def __init__(self):
         """初期化"""
-        self.db = TrendsCache()
-        # レート制限: yfinanceは制限が緩いが、保守的に10リクエスト/分に設定（APIの安定性を考慮）
-        self.rate_limiter = get_rate_limiter('stock', max_requests=10, window_seconds=60)
+        # ベースクラスを初期化（rate_limiterも自動的に初期化される）
+        super().__init__(service_name='stock', max_requests=10, window_seconds=60)
         
         # yfinanceのセッション設定（Fly.io環境での接続問題を回避するため）
         # ユーザーエージェントを設定して、より安定した接続を試みる
@@ -293,6 +292,46 @@ class StockTrendsManager:
         
         logger.info("Stock Trends Manager初期化完了")
     
+    def _get_cache_key(self, *args, **kwargs):
+        """キャッシュキーを返す"""
+        market = kwargs.get('market', 'US')
+        return f'stock_trends_{market}'
+
+    def _get_from_cache(self, *args, **kwargs):
+        """キャッシュからデータを取得"""
+        try:
+            market = kwargs.get('market', 'US')
+            return self.db.get_stock_trends_from_cache(market)
+        except Exception as e:
+            logger.error(f"❌ Stock: キャッシュ取得エラー: {e}", exc_info=True)
+            return None
+
+    def _save_to_cache(self, data, *args, **kwargs):
+        """キャッシュにデータを保存"""
+        try:
+            market = kwargs.get('market', 'US')
+            return self.db.save_stock_trends_to_cache(data, market)
+        except Exception as e:
+            logger.error(f"❌ Stock キャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def _clear_cache(self, *args, **kwargs):
+        """キャッシュをクリア"""
+        try:
+            market = kwargs.get('market', 'US')
+            return self.db.clear_stock_trends_cache(market)
+        except Exception as e:
+            logger.error(f"❌ Stock キャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
+    def _update_cache_status(self, cache_key, data_count):
+        """cache_statusテーブルを更新"""
+        try:
+            return self.db.update_cache_status(cache_key, data_count)
+        except Exception as e:
+            logger.warning(f"⚠️ Stock: cache_status更新エラー: {e}")
+            return False
+
     def get_trends(self, market='US', limit=25, force_refresh=False):
         """
         株価トレンドを取得（急騰・急落銘柄）
@@ -335,7 +374,7 @@ class StockTrendsManager:
             if force_refresh:
                 logger.info(f"🔄 Stock force_refresh: 外部APIから最新データを取得します (market: {market})")
                 # 外部APIからデータを取得（成功時のみキャッシュを更新、失敗時は既存キャッシュを保持）
-                api_result = self._fetch_trending_stocks(market, limit)
+                api_result = self._fetch_trends(market, limit)
                 
                 # APIからデータが正常に取得できた場合、その結果を返す
                 # データが取得できなかった場合（週末・市場休場など）、既存のキャッシュがあればそれを返す
@@ -376,7 +415,7 @@ class StockTrendsManager:
             logger.error(f"❌ Stock トレンド取得エラー: {e}", exc_info=True)
             return {'error': f'株価トレンドの取得に失敗しました: {str(e)}', 'success': False}
     
-    def _fetch_trending_stocks(self, market='US', limit=25):
+    def _fetch_trends(self, market='US', limit=25, *args, **kwargs):
         """yahooqueryまたはyfinanceを使用して急騰・急落銘柄を取得"""
         # yahooqueryを使用する場合
         if self.use_yahooquery:

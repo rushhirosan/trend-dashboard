@@ -3,31 +3,27 @@ import requests
 from datetime import datetime, timedelta
 from database_config import TrendsCache
 from utils.logger_config import get_logger
-from utils.rate_limiter import get_rate_limiter
+from services.trends.base_trends_manager import BaseTrendsManager
 
 # ロガーの初期化
 logger = get_logger(__name__)
 
-class PodcastTrendsManager:
+class PodcastTrendsManager(BaseTrendsManager):
     """Listen Notes APIを使用してポッドキャストトレンドを取得・管理するクラス"""
     
     def __init__(self):
         """初期化"""
+        # ベースクラスを初期化（rate_limiterも自動的に初期化される）
+        super().__init__(service_name='podcast', max_requests=10, window_seconds=60)
+        
         self.api_key = os.getenv('LISTEN_API_KEY')
         self.base_url = "https://listen-api.listennotes.com/api/v2"
-        self.db = TrendsCache()
-        # レート制限: Listen Notes APIは300 requests/月（保守的に10リクエスト/分に設定）
-        self.rate_limiter = get_rate_limiter('podcast', max_requests=10, window_seconds=60)
         
         if not self.api_key:
             logger.warning("Warning: LISTEN_API_KEYが設定されていません")
         
         logger.debug(f"Listen Notes API認証情報確認:")
         logger.debug(f"  API Key: {self.api_key[:10]}..." if self.api_key else "  API Key: 未設定")
-        
-        # Listen Notes API接続テスト（キャッシュモードでは無効化）
-        # if self.api_key:
-        #     self._test_connection()
     
     def _test_connection(self):
         """Listen Notes API接続テスト"""
@@ -46,42 +42,77 @@ class PodcastTrendsManager:
         except Exception as e:
             logger.error(f"Listen Notes API接続テストエラー: {e}", exc_info=True)
     
-    def get_trends(self, trend_type='best_podcasts', genre_id=None, region='jp', page_size=25, force_refresh=False):
-        """ポッドキャストトレンドを取得（キャッシュデータが存在しない場合のみ外部APIを呼び出し）"""
+    def _get_cache_key(self):
+        """キャッシュキーを返す"""
+        return 'podcast_trends'
+
+    def _get_from_cache(self, *args, **kwargs):
+        """キャッシュからデータを取得"""
         try:
-            logger.debug(f"🔍 Podcast: キャッシュデータ取得開始 (trend_type: {trend_type}, region: {region})")
-            
-            # キャッシュチェック
-            cache_key = f"{trend_type}_{genre_id or 'all'}_{region}"
-            cached_data = None
-            if force_refresh:
-                logger.info(f"🔄 Podcast: force_refresh指定のためキャッシュをスキップします (cache_key: {cache_key})")
-            else:
-                cached_data = self.get_from_cache(cache_key, region)
-                if cached_data:
-                    logger.info(f"✅ Podcast: キャッシュデータを取得しました ({len(cached_data)}件, cache_key: {cache_key})")
-                else:
-                    logger.debug(f"🔍 Podcast: キャッシュデータが見つかりませんでした (cache_key: {cache_key})")
-            
-            if cached_data:
-                # エピソード数でソート（降順）、同じ場合はスコアでソート
-                cached_data.sort(key=lambda x: (x.get('total_episodes', 0), x.get('score', 0)), reverse=True)
-                
-                # ランキングを再設定
-                for i, item in enumerate(cached_data, 1):
-                    item['rank'] = i
-                    # スコアも再計算
-                    score = 100 * (1 - (i - 1) / (len(cached_data) - 1)) if len(cached_data) > 1 else 100
-                    item['score'] = round(score, 1)
-                
-                logger.info(f"✅ Podcast: キャッシュデータを使用し、エピソード数でソートしました ({len(cached_data)}件)")
-                return {
-                    'data': cached_data,
-                    'status': 'cached',
-                    'trend_type': trend_type,
-                    'genre_id': genre_id,
-                    'region': region.upper()
-                }
+            region = kwargs.get('region', 'JP')
+            return self.db.get_podcast_trends_from_cache('podcast_trends', region)
+        except Exception as e:
+            logger.error(f"❌ Podcast: キャッシュ取得エラー: {e}", exc_info=True)
+            return None
+
+    def _save_to_cache(self, data, *args, **kwargs):
+        """キャッシュにデータを保存"""
+        try:
+            region = kwargs.get('region', 'JP')
+            return self.db.save_podcast_trends_to_cache(data, 'podcast_trends', region)
+        except Exception as e:
+            logger.error(f"❌ Podcast キャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def _clear_cache(self, *args, **kwargs):
+        """キャッシュをクリア"""
+        try:
+            return self.db.clear_podcast_trends_cache('podcast_trends')
+        except Exception as e:
+            logger.error(f"❌ Podcast キャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
+    def _update_cache_status(self, cache_key, data_count):
+        """cache_statusテーブルを更新"""
+        try:
+            return self.db.update_cache_status(cache_key, data_count)
+        except Exception as e:
+            logger.warning(f"⚠️ Podcast: cache_status更新エラー: {e}")
+            return False
+
+    def get_trends(self, trend_type='best_podcasts', genre_id=None, region='jp', page_size=25, force_refresh=False):
+        """ポッドキャストトレンドを取得（キャッシュ優先、total_episodesでソート）"""
+        # ベースクラスのget_trendsを使用
+        # auto_fetch_on_cache_miss=Falseで、既存動作を維持（キャッシュがない場合はAPIを呼び出さない）
+        # sort_key='total_episodes'でエピソード数でソート
+        result = super().get_trends(
+            limit=page_size,
+            force_refresh=force_refresh,
+            auto_fetch_on_cache_miss=False,  # 既存動作を維持
+            sort_key='total_episodes',  # エピソード数でソート
+            sort_reverse=True,  # 降順
+            trend_type=trend_type,
+            genre_id=genre_id,
+            region=region
+        )
+        # trend_type、genre_id、regionパラメータを結果に追加
+        if result and isinstance(result, dict):
+            result['trend_type'] = trend_type
+            result['genre_id'] = genre_id
+            result['region'] = region.upper()
+        return result
+    
+    def _fetch_trends(self, trend_type='best_podcasts', genre_id=None, region='jp', page_size=25, *args, **kwargs):
+        """Listen Notes APIからポッドキャストトレンドデータを取得"""
+        if not self.api_key:
+            logger.warning("Listen Notes APIキーが設定されていません")
+            return {
+                'success': False,
+                'error': 'Listen Notes APIキーが設定されていません',
+                'data': []
+            }
+        
+        try:
             logger.warning(f"⚠️ Podcast: キャッシュ未使用のため外部APIを呼び出します")
             if trend_type == 'best_podcasts':
                 trends_data = self._get_best_podcasts(genre_id, page_size, region)
@@ -90,38 +121,35 @@ class PodcastTrendsManager:
             else:
                 logger.error(f"❌ 未対応のトレンドタイプ: {trend_type}")
                 return {
-                    'data': [],
-                    'status': 'unsupported_type',
-                    'trend_type': trend_type,
-                    'genre_id': genre_id,
-                    'region': region.upper()
+                    'success': False,
+                    'error': f'未対応のトレンドタイプ: {trend_type}',
+                    'data': []
                 }
             
-            if trends_data:
-                # キャッシュに保存
-                self.save_to_cache(trends_data, cache_key, region)
-                logger.info(f"✅ Podcast: 外部APIから{len(trends_data)}件のデータを取得し、キャッシュに保存しました")
+            if not trends_data:
                 return {
-                    'data': trends_data,
-                    'status': 'api_fetched',
-                    'trend_type': trend_type,
-                    'genre_id': genre_id,
-                    'region': region.upper(),
-                    'source': 'Listen Notes API'
+                    'success': False,
+                    'error': 'データが取得できませんでした',
+                    'data': []
                 }
-            else:
-                logger.error(f"❌ Podcast: 外部APIからデータを取得できませんでした")
-                return {
-                    'data': [],
-                    'status': 'api_error',
-                    'trend_type': trend_type,
-                    'genre_id': genre_id,
-                    'region': region.upper()
-                }
-                
+            
+            return {
+                'success': True,
+                'data': trends_data,
+                'status': 'api_fetched',
+                'source': 'Listen Notes API',
+                'trend_type': trend_type,
+                'genre_id': genre_id,
+                'region': region.upper()
+            }
+            
         except Exception as e:
             logger.error(f"ポッドキャストトレンド取得エラー: {e}", exc_info=True)
-            return {'error': f'ポッドキャストトレンドの取得に失敗しました: {str(e)}'}
+            return {
+                'success': False,
+                'error': f'ポッドキャストトレンドの取得に失敗しました: {str(e)}',
+                'data': []
+            }
     
     def _get_best_podcasts(self, genre_id=None, page_size=25, region='jp'):
         """ベストポッドキャストを取得"""
@@ -297,45 +325,6 @@ class PodcastTrendsManager:
             logger.error(f"国・地域取得エラー: {e}", exc_info=True)
             return []
     
-    def get_from_cache(self, cache_key, region):
-        """キャッシュからデータを取得"""
-        try:
-            return self.db.get_podcast_trends_from_cache('podcast_trends', region)
-        except Exception as e:
-            logger.error(f"キャッシュ取得エラー: {e}", exc_info=True)
-            return None
-    
-    def save_to_cache(self, data, cache_key, region):
-        """データをキャッシュに保存"""
-        try:
-            self.db.save_podcast_trends_to_cache(data, 'podcast_trends', region)
-            # cache_statusテーブルも更新
-            self._update_cache_status('podcast_trends', len(data))
-        except Exception as e:
-            logger.error(f"キャッシュ保存エラー: {e}", exc_info=True)
-    
-    def _update_cache_status(self, cache_key, data_count):
-        """cache_statusテーブルを更新"""
-        try:
-            from datetime import datetime
-            import pytz
-            # 日本時間で現在時刻を取得
-            jst = pytz.timezone('Asia/Tokyo')
-            now = datetime.now(jst)
-            
-            with self.db.get_connection() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("""
-                        INSERT INTO cache_status (cache_key, last_updated, data_count)
-                        VALUES (%s, %s, %s)
-                        ON CONFLICT (cache_key) DO UPDATE SET
-                            last_updated = EXCLUDED.last_updated,
-                            data_count = EXCLUDED.data_count
-                    """, (cache_key, now, data_count))
-                    conn.commit()
-        except Exception as e:
-            logger.error(f"cache_status更新エラー: {e}", exc_info=True)
-    
     def is_cache_valid(self, cache_key, region):
         """キャッシュが有効かチェック"""
         try:
@@ -376,4 +365,4 @@ class PodcastTrendsManager:
                     return True  # 初回は更新する
         except Exception as e:
             logger.error(f"キャッシュ更新日時チェックエラー: {e}", exc_info=True)
-            return True 
+            return True

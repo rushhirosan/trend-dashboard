@@ -8,78 +8,70 @@ import requests
 from datetime import datetime
 from database_config import TrendsCache
 from utils.logger_config import get_logger
-from utils.rate_limiter import get_rate_limiter
+from services.trends.base_trends_manager import BaseTrendsManager
 
 # ロガーの初期化
 logger = get_logger(__name__)
 
-class CryptoTrendsManager:
+class CryptoTrendsManager(BaseTrendsManager):
     """仮想通貨トレンドの管理クラス"""
     
     def __init__(self):
         """初期化"""
+        # ベースクラスを初期化（rate_limiterも自動的に初期化される）
+        super().__init__(service_name='crypto', max_requests=10, window_seconds=60)
+        
         self.base_url = "https://api.coingecko.com/api/v3"
-        self.db = TrendsCache()
-        # レート制限: CoinGecko APIは10-50リクエスト/分（保守的に10リクエスト/分に設定）
-        self.rate_limiter = get_rate_limiter('crypto', max_requests=10, window_seconds=60)
         
         logger.info("Crypto Trends Manager初期化完了")
         logger.info(f"  Base URL: {self.base_url}")
     
-    def get_trends(self, limit=25, force_refresh=False):
-        """
-        仮想通貨トレンドを取得（CoinGeckoのトレンド検索）
-        
-        Args:
-            limit: 取得件数
-            force_refresh: キャッシュを無視して強制更新
-        
-        Returns:
-            dict: トレンドデータ
-        """
+    def _get_cache_key(self):
+        """キャッシュキーを返す"""
+        return 'crypto_trends'
+
+    def _get_from_cache(self, *args, **kwargs):
+        """キャッシュからデータを取得"""
+        return self.db.get_crypto_trends_from_cache()
+
+    def _save_to_cache(self, data, *args, **kwargs):
+        """キャッシュにデータを保存"""
         try:
-            if force_refresh:
-                logger.info(f"🔄 Crypto force_refresh: キャッシュをクリアします")
-                self.db.clear_crypto_trends_cache()
-            
-            # キャッシュからデータを取得
-            cached_data = self.db.get_crypto_trends_from_cache()
-            
-            if cached_data:
-                # 時価総額順でソート（market_cap_rankの昇順）
-                cached_data.sort(key=lambda x: x.get('market_cap_rank', 999999))
-                
-                # ランキングを再設定
-                for i, item in enumerate(cached_data, 1):
-                    item['rank'] = i
-                
-                logger.info(f"✅ Crypto: キャッシュから{len(cached_data)}件のデータを取得しました")
-                return {
-                    'success': True,
-                    'data': cached_data[:limit],
-                    'status': 'cached',
-                    'source': 'database_cache'
-                }
-            else:
-                # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
-                if not force_refresh:
-                    logger.warning("⚠️ Crypto: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
-                    return {
-                        'data': [],
-                        'status': 'cache_not_found',
-                        'source': 'database_cache',
-                        'success': True,  # エラーではなく、データがない状態として扱う
-                        'error': 'キャッシュにデータがありません'
-                    }
-                # force_refresh=trueの場合のみ外部APIを呼び出す
-                logger.warning("⚠️ Crypto: キャッシュデータが見つかりません。外部APIを呼び出します")
-                return self._fetch_trending_cryptos(limit)
-                
+            return self.db.save_crypto_trends_to_cache(data)
         except Exception as e:
-            logger.error(f"❌ Crypto トレンド取得エラー: {e}", exc_info=True)
-            return {'error': f'仮想通貨トレンドの取得に失敗しました: {str(e)}', 'success': False}
+            logger.error(f"❌ Crypto キャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def _clear_cache(self, *args, **kwargs):
+        """キャッシュをクリア"""
+        try:
+            return self.db.clear_crypto_trends_cache()
+        except Exception as e:
+            logger.error(f"❌ Crypto キャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
+    def _update_cache_status(self, cache_key, data_count):
+        """cache_statusテーブルを更新"""
+        try:
+            return self.db.update_cache_status(cache_key, data_count)
+        except Exception as e:
+            logger.warning(f"⚠️ Crypto: cache_status更新エラー: {e}")
+            return False
+
+    def get_trends(self, limit=25, force_refresh=False):
+        """仮想通貨トレンドを取得（キャッシュ優先、market_cap_rankでソート）"""
+        # ベースクラスのget_trendsを使用
+        # auto_fetch_on_cache_miss=Falseで、既存動作を維持（キャッシュがない場合はAPIを呼び出さない）
+        # sort_key='market_cap_rank'で時価総額順でソート
+        return super().get_trends(
+            limit=limit,
+            force_refresh=force_refresh,
+            auto_fetch_on_cache_miss=False,  # 既存動作を維持
+            sort_key='market_cap_rank',  # 時価総額順でソート
+            sort_reverse=False  # 昇順（market_cap_rankが小さいほど上位）
+        )
     
-    def _fetch_trending_cryptos(self, limit=25):
+    def _fetch_trends(self, limit=25, *args, **kwargs):
         """CoinGecko APIを使用して時価総額順の仮想通貨を取得"""
         try:
             logger.info(f"🪙 Crypto API呼び出し開始（時価総額順）")
@@ -178,9 +170,7 @@ class CryptoTrendsManager:
             for i, item in enumerate(trends_data, 1):
                 item['rank'] = i
             
-            # キャッシュに保存
-            self.db.save_crypto_trends_to_cache(trends_data)
-            logger.info(f"✅ Crypto: {len(trends_data)}件のデータを取得し、キャッシュに保存しました（時価総額順）")
+            logger.info(f"✅ Crypto: {len(trends_data)}件のデータを取得しました（時価総額順）")
             
             return {
                 'success': True,

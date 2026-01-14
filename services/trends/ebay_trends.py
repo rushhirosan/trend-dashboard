@@ -4,16 +4,19 @@ import base64
 from datetime import datetime, timedelta
 from database_config import TrendsCache
 from utils.logger_config import get_logger
-from utils.rate_limiter import get_rate_limiter
+from services.trends.base_trends_manager import BaseTrendsManager
 
 logger = get_logger(__name__)
 
 
-class eBayTrendsManager:
+class eBayTrendsManager(BaseTrendsManager):
     """eBay Popular/Trendingトレンド管理クラス（eBay Browse API使用）"""
 
     def __init__(self):
         """初期化"""
+        # ベースクラスを初期化（rate_limiterも自動的に初期化される）
+        super().__init__(service_name='ebay', max_requests=10, window_seconds=60)
+        
         # eBay Client ID (App ID) を環境変数から取得
         self.client_id = os.getenv('EBAY_CLIENT_ID', '').strip()
         # eBay Client Secret (Cert ID) を環境変数から取得
@@ -48,10 +51,6 @@ class eBayTrendsManager:
         # OAuthトークンのキャッシュ
         self.access_token = None
         self.token_expires_at = None
-        
-        self.db = TrendsCache()
-        # レート制限: eBay APIの推奨に従い、1時間に5000リクエスト（保守的に1分に10リクエストに設定）
-        self.rate_limiter = get_rate_limiter('ebay', max_requests=10, window_seconds=60)
         
         # カテゴリ定義（カテゴリID、表示名、キーワード）
         self.categories = {
@@ -144,7 +143,7 @@ class eBayTrendsManager:
                 logger.info(f"🔄 eBay force_refresh: カテゴリ '{category}' のキャッシュをクリアします")
                 self.db.clear_ebay_trends_cache(category)
 
-            cached_data = self.get_from_cache_by_category(category)
+            cached_data = self._get_from_cache(category=category)
             if cached_data:
                 # ランキングでソート（昇順）
                 cached_data.sort(key=lambda x: x.get('rank', 999), reverse=False)
@@ -163,31 +162,17 @@ class eBayTrendsManager:
                 logger.warning(f"⚠️ eBay: カテゴリ '{category}' のキャッシュにデータがありません。外部APIを呼び出してデータを取得します")
             
             logger.warning(f"⚠️ eBay: カテゴリ '{category}' のキャッシュデータが見つかりません。外部APIを呼び出します")
-            return self._fetch_ebay_trends(category, limit)
+            result = self._fetch_trends(category, limit)
+            # categoryパラメータを結果に追加
+            if result and isinstance(result, dict):
+                result['category'] = category
+            return result
 
         except Exception as e:
             logger.error(f"❌ eBay トレンド取得エラー: {e}", exc_info=True)
             return {'error': f'eBayトレンドの取得に失敗しました: {str(e)}', 'success': False}
     
-    def get_from_cache_by_category(self, category):
-        """カテゴリ別のキャッシュデータを取得"""
-        try:
-            logger.debug(f"🔍 eBay: カテゴリ別キャッシュ取得: category='{category}'")
-            cached_data = self.db.get_ebay_trends_from_cache(category)
-            
-            if cached_data:
-                # categoryでフィルタリング（念のため）
-                category_data = [item for item in cached_data if item.get('category') == category]
-                logger.info(f"✅ eBay: カテゴリ別キャッシュ取得完了: {len(category_data)}件")
-                return category_data
-            else:
-                logger.warning(f"⚠️ eBay: カテゴリ別キャッシュ取得: データが取得できませんでした")
-                return []
-        except Exception as e:
-            logger.error(f"❌ eBay: カテゴリ別キャッシュ取得エラー: {e}", exc_info=True)
-            return []
-    
-    def _fetch_ebay_trends(self, category='fashion', limit=25):
+    def _fetch_trends(self, category='fashion', limit=25, *args, **kwargs):
         """eBay Browse APIから人気商品を取得
         
         Args:

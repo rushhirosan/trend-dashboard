@@ -3,77 +3,72 @@ import json
 from datetime import datetime, timedelta
 from database_config import TrendsCache
 from utils.logger_config import get_logger
-from utils.rate_limiter import get_rate_limiter
+from services.trends.base_trends_manager import BaseTrendsManager
 
 logger = get_logger(__name__)
 
-class CISAKEVTrendsManager:
+class CISAKEVTrendsManager(BaseTrendsManager):
     """CISA KEV（Known Exploited Vulnerabilities）トレンド管理クラス"""
     
     def __init__(self):
         """初期化"""
+        # ベースクラスを初期化（rate_limiterも自動的に初期化される）
+        super().__init__(service_name='cisa_kev', max_requests=10, window_seconds=60)
+        
         # CISA KEV JSON API URL（GitHubから直接取得）
         self.kev_json_url = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
         # GitHubのraw URL（フォールバック用）
         self.github_kev_url = "https://raw.githubusercontent.com/cisagov/kev-data/main/data/vulnerabilities.json"
-        self.db = TrendsCache()
-        # レート制限: CISA APIは特に制限なしだが、保守的に10リクエスト/分に設定
-        self.rate_limiter = get_rate_limiter('cisa_kev', max_requests=10, window_seconds=60)
         
         logger.info("CISA KEV Trends Manager初期化:")
         logger.info(f"  KEV JSON URL: {self.kev_json_url}")
     
-    def get_trends(self, limit=25, force_refresh=False):
-        """CISA KEVトレンドを取得（キャッシュ優先）"""
+    def _get_cache_key(self):
+        """キャッシュキーを返す"""
+        return 'cisa_kev_trends'
+
+    def _get_from_cache(self, *args, **kwargs):
+        """キャッシュからデータを取得"""
+        return self.db.get_cisa_kev_trends_from_cache()
+
+    def _save_to_cache(self, data, *args, **kwargs):
+        """キャッシュにデータを保存"""
         try:
-            if force_refresh:
-                logger.info(f"🔄 CISA KEV force_refresh: キャッシュをクリアします")
-                self.db.clear_cisa_kev_trends_cache()
-            
-            # キャッシュからデータを取得
-            cached_data = self.db.get_cisa_kev_trends_from_cache()
-            
-            if cached_data:
-                # 公開日でソート（新しい順）
-                cached_data.sort(key=lambda x: x.get('date_added') or '', reverse=True)
-                
-                # ランキングを再設定
-                for i, item in enumerate(cached_data, 1):
-                    item['rank'] = i
-                
-                # キャッシュデータを使用する場合でも、cache_statusを更新
-                if force_refresh:
-                    try:
-                        self.db.update_cache_status('cisa_kev_trends', len(cached_data))
-                    except Exception as e:
-                        logger.warning(f"⚠️ CISA KEV: cache_status更新エラー（処理は継続）: {e}")
-                
-                logger.info(f"✅ CISA KEV: キャッシュから{len(cached_data)}件のデータを取得しました")
-                return {
-                    'success': True,
-                    'data': cached_data[:limit],
-                    'status': 'cached',
-                    'source': 'database_cache'
-                }
-            else:
-                # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
-                if not force_refresh:
-                    logger.warning("⚠️ CISA KEV: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
-                    return {
-                        'success': True,
-                        'data': [],
-                        'status': 'cache_not_found',
-                        'source': 'database_cache'
-                    }
-                # force_refresh=trueの場合のみ外部APIを呼び出す
-                logger.warning("⚠️ CISA KEV: キャッシュデータが見つかりません。外部APIを呼び出します")
-                return self._fetch_kev_trends(limit)
-                
+            return self.db.save_cisa_kev_trends_to_cache(data)
         except Exception as e:
-            logger.error(f"❌ CISA KEV トレンド取得エラー: {e}", exc_info=True)
-            return {'error': f'CISA KEVトレンドの取得に失敗しました: {str(e)}', 'success': False}
+            logger.error(f"❌ CISA KEV キャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def _clear_cache(self, *args, **kwargs):
+        """キャッシュをクリア"""
+        try:
+            return self.db.clear_cisa_kev_trends_cache()
+        except Exception as e:
+            logger.error(f"❌ CISA KEV キャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
+    def _update_cache_status(self, cache_key, data_count):
+        """cache_statusテーブルを更新"""
+        try:
+            return self.db.update_cache_status(cache_key, data_count)
+        except Exception as e:
+            logger.warning(f"⚠️ CISA KEV: cache_status更新エラー: {e}")
+            return False
+
+    def get_trends(self, limit=25, force_refresh=False):
+        """CISA KEVトレンドを取得（キャッシュ優先、date_addedでソート）"""
+        # ベースクラスのget_trendsを使用
+        # auto_fetch_on_cache_miss=Falseで、既存動作を維持（キャッシュがない場合はAPIを呼び出さない）
+        # sort_key='date_added'で公開日でソート
+        return super().get_trends(
+            limit=limit,
+            force_refresh=force_refresh,
+            auto_fetch_on_cache_miss=False,  # 既存動作を維持
+            sort_key='date_added',  # 公開日でソート
+            sort_reverse=True  # 降順（新しい順）
+        )
     
-    def _fetch_kev_trends(self, limit=25):
+    def _fetch_trends(self, limit=25, *args, **kwargs):
         """CISA KEVデータを取得（最近更新されたものから25件）"""
         try:
             logger.info(f"CISA KEV API呼び出し開始")
@@ -157,11 +152,6 @@ class CISAKEVTrendsManager:
                 # ソート用フィールドを削除
                 item.pop('sort_date', None)
             
-            # キャッシュに保存
-            if formatted_data:
-                self.db.save_cisa_kev_trends_to_cache(formatted_data)
-                self.db.update_cache_status('cisa_kev_trends', len(formatted_data))
-            
             logger.info(f"✅ CISA KEV: {len(formatted_data)}件の最新脆弱性情報を取得しました")
             
             return {
@@ -184,4 +174,3 @@ class CISAKEVTrendsManager:
                 'error': f'CISA KEVデータ取得エラー: {str(e)}',
                 'success': False
             }
-

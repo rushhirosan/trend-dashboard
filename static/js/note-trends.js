@@ -1,42 +1,31 @@
-// Noteトレンド関連の関数
-function fetchNoteTrends() {
-    showNoteLoading();
-    hideNoteResults();
-    
-    // 選択されたカテゴリーを取得
-    const categorySelect = document.getElementById('noteCategorySelect');
-    const selectedCategory = categorySelect ? categorySelect.value : 'all';
-    
-    console.log(`🔍 Note: カテゴリ '${selectedCategory}' のデータを取得中...`);
-    
-    fetch(`/api/note-trends?category=${selectedCategory}&limit=25`)
-        .then(response => response.json())
-        .then(data => {
-            hideNoteLoading();
-            console.log(`📊 Note: カテゴリ '${selectedCategory}' のデータ取得完了`, data);
-            if (data.success) {
-                displayNoteResults(data);
-            } else {
-                showNoteError(data.error || 'Noteトレンドの取得に失敗しました');
-            }
-        })
-        .catch(error => {
-            hideNoteLoading();
-            console.error('❌ Note: エラー', error);
-            showNoteError('ネットワークエラー: ' + error.message);
-        });
+// Noteトレンド関連の関数（共通化）
+let noteManager = null;
+
+// ドロップダウンパターンの共通マネージャーを作成
+if (typeof createDropdownTrendsManager === 'function') {
+    noteManager = createDropdownTrendsManager({
+        serviceName: 'note',
+        selectId: 'noteCategorySelect',
+        apiEndpoint: '/api/note-trends',
+        defaultValue: 'all',
+        paramName: 'category',
+        uiIds: {
+            loading: 'noteLoading',
+            results: 'noteResults',
+            tableBody: 'noteTrendsTableBody',
+            statusMessage: 'noteStatusMessage',
+            errorMessage: 'noteErrorMessage'
+        },
+        displayFunction: displayNoteResults
+    });
 }
 
-// カテゴリ選択時のイベントリスナー
-document.addEventListener('DOMContentLoaded', function() {
-    const categorySelect = document.getElementById('noteCategorySelect');
-    if (categorySelect) {
-        categorySelect.addEventListener('change', function() {
-            console.log(`🔄 Note: カテゴリが '${this.value}' に変更されました`);
-            fetchNoteTrends();
-        });
+// 後方互換性のため、既存の関数名も保持
+function fetchNoteTrends() {
+    if (noteManager) {
+        noteManager.fetchTrends();
     }
-});
+}
 
 function displayNoteResults(data) {
     const tableBody = document.getElementById('noteTrendsTableBody');
@@ -91,24 +80,41 @@ function displayNoteResults(data) {
     }
 }
 
+// 後方互換性のため、既存の関数名も保持（共通マネージャーを使用）
 function showNoteLoading() {
-    const loadingElement = document.getElementById('noteLoading');
-    if (loadingElement) loadingElement.style.display = 'block';
+    if (noteManager) {
+        noteManager.showLoading();
+    } else {
+        const element = document.getElementById('noteLoading');
+        if (element) element.style.display = 'block';
+    }
 }
 
 function hideNoteLoading() {
-    const loadingElement = document.getElementById('noteLoading');
-    if (loadingElement) loadingElement.style.display = 'none';
+    if (noteManager) {
+        noteManager.hideLoading();
+    } else {
+        const element = document.getElementById('noteLoading');
+        if (element) element.style.display = 'none';
+    }
 }
 
 function showNoteResults() {
-    const resultsElement = document.getElementById('noteResults');
-    if (resultsElement) resultsElement.style.display = 'block';
+    if (noteManager) {
+        noteManager.showResults();
+    } else {
+        const element = document.getElementById('noteResults');
+        if (element) element.style.display = 'block';
+    }
 }
 
 function hideNoteResults() {
-    const resultsElement = document.getElementById('noteResults');
-    if (resultsElement) resultsElement.style.display = 'none';
+    if (noteManager) {
+        noteManager.hideResults();
+    } else {
+        const element = document.getElementById('noteResults');
+        if (element) element.style.display = 'none';
+    }
 }
 
 function showNoteStatusMessage(message, type = 'info') {
@@ -121,7 +127,11 @@ function showNoteStatusMessage(message, type = 'info') {
 }
 
 function showNoteError(message) {
-    showNoteStatusMessage(message, 'danger');
-    showNoteResults();
+    if (noteManager) {
+        noteManager.showError(message);
+    } else {
+        showNoteStatusMessage(message, 'danger');
+        showNoteResults();
+    }
 }
 

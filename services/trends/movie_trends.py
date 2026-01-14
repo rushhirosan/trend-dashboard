@@ -8,21 +8,21 @@ import requests
 from datetime import datetime
 from database_config import TrendsCache
 from utils.logger_config import get_logger
-from utils.rate_limiter import get_rate_limiter
+from services.trends.base_trends_manager import BaseTrendsManager
 
 # ロガーの初期化
 logger = get_logger(__name__)
 
-class MovieTrendsManager:
+class MovieTrendsManager(BaseTrendsManager):
     """映画トレンドの管理クラス"""
     
     def __init__(self):
         """初期化"""
+        # ベースクラスを初期化（rate_limiterも自動的に初期化される）
+        super().__init__(service_name='movie', max_requests=10, window_seconds=60)
+        
         self.base_url = "https://api.themoviedb.org/3"
         self.api_key = os.getenv('TMDB_API_KEY')
-        self.db = TrendsCache()
-        # レート制限: TMDB APIは40リクエスト/10秒（保守的に10リクエスト/分に設定）
-        self.rate_limiter = get_rate_limiter('movie', max_requests=10, window_seconds=60)
         
         if not self.api_key:
             logger.warning("⚠️ TMDB_API_KEYが設定されていません。TMDB APIは使用できません。")
@@ -30,6 +30,59 @@ class MovieTrendsManager:
             logger.info("Movie Trends Manager初期化完了")
             logger.info(f"  Base URL: {self.base_url}")
     
+    def _get_cache_key(self, *args, **kwargs):
+        """キャッシュキーを返す"""
+        country = kwargs.get('country', 'JP')
+        return f'movie_trends_{country}'
+
+    def _get_from_cache(self, *args, **kwargs):
+        """キャッシュからデータを取得"""
+        try:
+            country = kwargs.get('country', 'JP')
+            cached_data = self.db.get_movie_trends_from_cache(country=country)
+            if cached_data:
+                # item_urlを生成（キャッシュデータに含まれていない場合）
+                for item in cached_data:
+                    if 'item_url' not in item or not item.get('item_url'):
+                        movie_id = item.get('id') or item.get('movie_id')
+                        if movie_id:
+                            item['item_url'] = f"https://www.themoviedb.org/movie/{movie_id}"
+                        else:
+                            item['item_url'] = None
+            return cached_data
+        except Exception as e:
+            logger.error(f"❌ Movie: キャッシュ取得エラー: {e}", exc_info=True)
+            return None
+
+    def _save_to_cache(self, data, *args, **kwargs):
+        """キャッシュにデータを保存"""
+        try:
+            country = kwargs.get('country', 'JP')
+            # 各データに国コードを追加
+            for item in data:
+                item['country'] = country
+            return self.db.save_movie_trends_to_cache(data, country=country)
+        except Exception as e:
+            logger.error(f"❌ Movie キャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def _clear_cache(self, *args, **kwargs):
+        """キャッシュをクリア"""
+        try:
+            country = kwargs.get('country', 'JP')
+            return self.db.clear_movie_trends_cache(country=country)
+        except Exception as e:
+            logger.error(f"❌ Movie キャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
+    def _update_cache_status(self, cache_key, data_count):
+        """cache_statusテーブルを更新"""
+        try:
+            return self.db.update_cache_status(cache_key, data_count)
+        except Exception as e:
+            logger.warning(f"⚠️ Movie: cache_status更新エラー: {e}")
+            return False
+
     def get_trends(self, country='JP', time_window='day', limit=25, force_refresh=False):
         """
         映画トレンドを取得（TMDBのトレンド検索）
@@ -43,73 +96,29 @@ class MovieTrendsManager:
         Returns:
             dict: トレンドデータ
         """
-        try:
-            if not self.api_key:
-                return {
-                    'success': False,
-                    'error': 'TMDB_API_KEYが設定されていません',
-                    'data': []
-                }
-            
-            # 言語設定（国コードに基づく）
-            language = 'en-US' if country == 'US' else 'ja-JP'
-            
-            if force_refresh:
-                logger.info(f"🔄 Movie force_refresh: キャッシュをクリアします (country: {country})")
-                self.db.clear_movie_trends_cache(country=country)
-            
-            # キャッシュからデータを取得（国コードでフィルタ）
-            cached_data = self.db.get_movie_trends_from_cache(country=country)
-            
-            if cached_data:
-                # 人気度順でソート（popularityの降順）
-                cached_data.sort(key=lambda x: x.get('popularity', 0), reverse=True)
-                
-                # ランキングを再設定し、item_urlを生成（キャッシュデータに含まれていない場合）
-                for i, item in enumerate(cached_data, 1):
-                    item['rank'] = i
-                    # item_urlが存在しない場合は生成
-                    if 'item_url' not in item or not item.get('item_url'):
-                        movie_id = item.get('id')
-                        if movie_id:
-                            item['item_url'] = f"https://www.themoviedb.org/movie/{movie_id}"
-                        else:
-                            item['item_url'] = None
-                
-                # キャッシュデータを使用する場合でも、cache_statusを更新（スケジューラー実行時の時刻を統一するため）
-                if force_refresh:
-                    try:
-                        self.db.update_cache_status(f'movie_trends_{country}', len(cached_data))
-                    except Exception as e:
-                        logger.warning(f"⚠️ Movie: cache_status更新エラー（処理は継続）: {e}")
-                
-                logger.info(f"✅ Movie: キャッシュから{len(cached_data)}件のデータを取得しました")
-                return {
-                    'success': True,
-                    'data': cached_data[:limit],
-                    'status': 'cached',
-                    'source': 'database_cache'
-                }
-            else:
-                # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
-                if not force_refresh:
-                    logger.warning(f"⚠️ Movie: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません (country: {country})")
-                    return {
-                        'data': [],
-                        'status': 'cache_not_found',
-                        'source': 'database_cache',
-                        'success': True,  # エラーではなく、データがない状態として扱う
-                        'error': 'キャッシュにデータがありません'
-                    }
-                # force_refresh=trueの場合のみ外部APIを呼び出す
-                logger.warning(f"⚠️ Movie: キャッシュデータが見つかりません。外部APIを呼び出します (country: {country})")
-                return self._fetch_trending_movies(country, time_window, limit)
-                
-        except Exception as e:
-            logger.error(f"❌ Movie トレンド取得エラー: {e}", exc_info=True)
-            return {'error': f'映画トレンドの取得に失敗しました: {str(e)}', 'success': False}
+        # APIキーのチェック
+        if not self.api_key:
+            return {
+                'success': False,
+                'error': 'TMDB_API_KEYが設定されていません',
+                'data': []
+            }
+        
+        # ベースクラスのget_trendsを使用
+        # auto_fetch_on_cache_miss=Falseで、既存動作を維持（キャッシュがない場合はAPIを呼び出さない）
+        # sort_key='popularity'で人気度でソート
+        result = super().get_trends(
+            limit=limit,
+            force_refresh=force_refresh,
+            auto_fetch_on_cache_miss=False,  # 既存動作を維持
+            sort_key='popularity',  # 人気度でソート
+            sort_reverse=True,  # 降順
+            country=country,
+            time_window=time_window
+        )
+        return result
     
-    def _fetch_trending_movies(self, country='JP', time_window='day', limit=25):
+    def _fetch_trends(self, country='JP', time_window='day', limit=25, *args, **kwargs):
         """TMDB APIを使用してトレンド映画を取得（ページネーション対応）"""
         try:
             # 言語設定（国コードに基づく）
@@ -225,13 +234,7 @@ class MovieTrendsManager:
                     error_count += 1
                     continue
             
-            # データベースにキャッシュを保存（国コードを含める）
-            if trends_data:
-                # 各データに国コードを追加
-                for item in trends_data:
-                    item['country'] = country
-                self.db.save_movie_trends_to_cache(trends_data, country=country)
-                logger.info(f"✅ Movie: {len(trends_data)}件のデータを取得し、キャッシュに保存しました (country: {country}, 成功: {success_count}, エラー: {error_count})")
+            logger.info(f"✅ Movie: {len(trends_data)}件のデータを取得しました (country: {country}, 成功: {success_count}, エラー: {error_count})")
             
             return {
                 'success': True,
@@ -254,4 +257,3 @@ class MovieTrendsManager:
                 'error': f'映画トレンドの取得に失敗しました: {str(e)}',
                 'data': []
             }
-

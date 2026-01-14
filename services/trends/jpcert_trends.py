@@ -3,77 +3,72 @@ import feedparser
 from datetime import datetime
 from database_config import TrendsCache
 from utils.logger_config import get_logger
-from utils.rate_limiter import get_rate_limiter
+from services.trends.base_trends_manager import BaseTrendsManager
 
 logger = get_logger(__name__)
 
-class JPCERTTrendsManager:
+class JPCERTTrendsManager(BaseTrendsManager):
     """JPCERT/CCトレンド管理クラス（RSSフィード使用）"""
     
     def __init__(self):
         """初期化"""
+        # ベースクラスを初期化（rate_limiterも自動的に初期化される）
+        super().__init__(service_name='jpcert', max_requests=10, window_seconds=60)
+        
         # JPCERT/CC RSSフィードURL
         self.rss_url = "https://www.jpcert.or.jp/rss/jpcert.rdf"
         # フォールバック用のXML URL
         self.rss_xml_url = "https://www.jpcert.or.jp/rss/jpcert.xml"
-        self.db = TrendsCache()
-        # レート制限: RSSフィードは特に制限なしだが、保守的に10リクエスト/分に設定
-        self.rate_limiter = get_rate_limiter('jpcert', max_requests=10, window_seconds=60)
         
         logger.info("JPCERT/CC Trends Manager初期化:")
         logger.info(f"  RSS URL: {self.rss_url}")
     
-    def get_trends(self, limit=25, force_refresh=False):
-        """JPCERT/CCトレンドを取得（キャッシュ優先）"""
+    def _get_cache_key(self):
+        """キャッシュキーを返す"""
+        return 'jpcert_trends'
+
+    def _get_from_cache(self, *args, **kwargs):
+        """キャッシュからデータを取得"""
+        return self.db.get_jpcert_trends_from_cache()
+
+    def _save_to_cache(self, data, *args, **kwargs):
+        """キャッシュにデータを保存"""
         try:
-            if force_refresh:
-                logger.info(f"🔄 JPCERT/CC force_refresh: キャッシュをクリアします")
-                self.db.clear_jpcert_trends_cache()
-            
-            # キャッシュからデータを取得
-            cached_data = self.db.get_jpcert_trends_from_cache()
-            
-            if cached_data:
-                # 公開日でソート（新しい順）
-                cached_data.sort(key=lambda x: x.get('published_date') or '', reverse=True)
-                
-                # ランキングを再設定
-                for i, item in enumerate(cached_data, 1):
-                    item['rank'] = i
-                
-                # キャッシュデータを使用する場合でも、cache_statusを更新
-                if force_refresh:
-                    try:
-                        self.db.update_cache_status('jpcert_trends', len(cached_data))
-                    except Exception as e:
-                        logger.warning(f"⚠️ JPCERT/CC: cache_status更新エラー（処理は継続）: {e}")
-                
-                logger.info(f"✅ JPCERT/CC: キャッシュから{len(cached_data)}件のデータを取得しました")
-                return {
-                    'success': True,
-                    'data': cached_data[:limit],
-                    'status': 'cached',
-                    'source': 'database_cache'
-                }
-            else:
-                # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
-                if not force_refresh:
-                    logger.warning("⚠️ JPCERT/CC: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
-                    return {
-                        'success': True,
-                        'data': [],
-                        'status': 'cache_not_found',
-                        'source': 'database_cache'
-                    }
-                # force_refresh=trueの場合のみ外部APIを呼び出す
-                logger.warning("⚠️ JPCERT/CC: キャッシュデータが見つかりません。外部APIを呼び出します")
-                return self._fetch_jpcert_trends(limit)
-                
+            return self.db.save_jpcert_trends_to_cache(data)
         except Exception as e:
-            logger.error(f"❌ JPCERT/CC トレンド取得エラー: {e}", exc_info=True)
-            return {'error': f'JPCERT/CCトレンドの取得に失敗しました: {str(e)}', 'success': False}
+            logger.error(f"❌ JPCERT/CC キャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def _clear_cache(self, *args, **kwargs):
+        """キャッシュをクリア"""
+        try:
+            return self.db.clear_jpcert_trends_cache()
+        except Exception as e:
+            logger.error(f"❌ JPCERT/CC キャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
+    def _update_cache_status(self, cache_key, data_count):
+        """cache_statusテーブルを更新"""
+        try:
+            return self.db.update_cache_status(cache_key, data_count)
+        except Exception as e:
+            logger.warning(f"⚠️ JPCERT/CC: cache_status更新エラー: {e}")
+            return False
+
+    def get_trends(self, limit=25, force_refresh=False):
+        """JPCERT/CCトレンドを取得（キャッシュ優先、published_dateでソート）"""
+        # ベースクラスのget_trendsを使用
+        # auto_fetch_on_cache_miss=Falseで、既存動作を維持（キャッシュがない場合はAPIを呼び出さない）
+        # sort_key='published_date'で公開日でソート
+        return super().get_trends(
+            limit=limit,
+            force_refresh=force_refresh,
+            auto_fetch_on_cache_miss=False,  # 既存動作を維持
+            sort_key='published_date',  # 公開日でソート
+            sort_reverse=True  # 降順（新しい順）
+        )
     
-    def _fetch_jpcert_trends(self, limit=25):
+    def _fetch_trends(self, limit=25, *args, **kwargs):
         """JPCERT/CC RSSフィードからトレンドデータを取得"""
         try:
             logger.info(f"JPCERT/CC RSS呼び出し開始")
@@ -104,7 +99,7 @@ class JPCERTTrendsManager:
             
             # データを整形
             formatted_data = []
-            for i, entry in enumerate(feed.entries[:limit], 1):
+            for entry in feed.entries[:limit]:
                 try:
                     # 公開日をパース
                     published_date = None
@@ -132,7 +127,6 @@ class JPCERTTrendsManager:
                         description = entry.summary
                     
                     formatted_item = {
-                        'rank': i,
                         'title': entry.get('title', 'No Title'),
                         'url': entry.get('link', ''),
                         'published_date': published_date.isoformat() if published_date else None,
@@ -148,17 +142,8 @@ class JPCERTTrendsManager:
             # 公開日でソート（新しい順）
             formatted_data.sort(key=lambda x: x.get('published_date') or '', reverse=True)
             
-            # ランキングを再設定
-            for i, item in enumerate(formatted_data, 1):
-                item['rank'] = i
-            
             # 制限数まで取得
             formatted_data = formatted_data[:limit]
-            
-            # キャッシュに保存
-            if formatted_data:
-                self.db.save_jpcert_trends_to_cache(formatted_data)
-                self.db.update_cache_status('jpcert_trends', len(formatted_data))
             
             logger.info(f"✅ JPCERT/CC: {len(formatted_data)}件の注意喚起情報を取得しました")
             
@@ -182,4 +167,3 @@ class JPCERTTrendsManager:
                 'error': f'JPCERT/CC RSS取得エラー: {str(e)}',
                 'success': False
             }
-

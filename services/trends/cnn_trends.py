@@ -4,103 +4,150 @@ import requests
 from datetime import datetime, timedelta
 from database_config import TrendsCache
 from utils.logger_config import get_logger
-from utils.rate_limiter import get_rate_limiter
+from services.trends.base_trends_manager import BaseTrendsManager
 
 logger = get_logger(__name__)
 
-class CNNTrendsManager:
+class CNNTrendsManager(BaseTrendsManager):
     """CNNニューストレンドを取得・管理するクラス（NewsAPIを使用）"""
     
     def __init__(self):
         """初期化"""
+        # ベースクラスを初期化（rate_limiterも自動的に初期化される）
+        super().__init__(service_name='cnn', max_requests=10, window_seconds=60)
+        
         # NewsAPIキーを取得（CNN RSSフィードが2024年8月で止まっているため、NewsAPIを使用）
         self.news_api_key = os.getenv('NEWS_API_KEY')
         self.news_api_base_url = "https://newsapi.org/v2"
-        self.db = TrendsCache()
-        # レート制限: News API（CNN用）は100 requests/日（保守的に10リクエスト/分に設定）
-        self.rate_limiter = get_rate_limiter('cnn', max_requests=10, window_seconds=60)
         
         if not self.news_api_key:
             logger.warning("⚠️ NEWS_API_KEYが設定されていません。CNN記事は取得できません")
         else:
             logger.info("✅ CNN Trends Manager初期化: NewsAPIを使用して最新のCNN記事を取得します")
     
-    def get_trends(self, limit=25, force_refresh=False):
-        """CNNニューストレンドを取得（キャッシュデータが存在しない場合のみNewsAPIを呼び出し）"""
-        try:
-            if force_refresh:
-                logger.info(f"🔄 CNN force_refresh: キャッシュをクリアします")
-                self.db.clear_cnn_trends_cache()
-            
-            cached_data = self.db.get_cnn_trends_from_cache()
-            
-            if cached_data:
-                # キャッシュから取得したデータにも重複排除を適用
-                cached_data = self._remove_duplicates(cached_data)
-                
-                # 古いデータをフィルタリング（過去7日間のデータのみ）
-                # 最新の記事のみを表示するため、過去7日間のデータのみをフィルタリング
-                today = datetime.now()
-                cutoff_date = today - timedelta(days=7)
-                filtered_cached_data = []
-                for item in cached_data:
-                    published_date_str = item.get('published_date')
-                    if published_date_str:
-                        try:
-                            # ISO形式の文字列をdatetimeに変換
-                            if isinstance(published_date_str, str):
-                                published_date = datetime.fromisoformat(published_date_str.replace('Z', '+00:00'))
-                                # タイムゾーン情報を削除して比較
-                                published_date = published_date.replace(tzinfo=None)
-                                # 過去7日間のデータのみを表示
-                                if published_date >= cutoff_date:
-                                    filtered_cached_data.append(item)
-                        except Exception as e:
-                            logger.debug(f"⚠️ キャッシュデータの日付パースエラー: {published_date_str} - {e}")
-                            # 日付がパースできない場合はスキップ
-                            continue
-                
-                if len(filtered_cached_data) == 0:
-                    logger.warning(f"⚠️ CNN: キャッシュに過去7日間の記事がありません。NewsAPIを呼び出します")
-                    return self._fetch_cnn_trends(limit)
-                
-                # 公開日でソート（新しい順）
-                filtered_cached_data.sort(key=lambda x: x.get('published_date') or '', reverse=True)
-                
-                # キャッシュデータを使用する場合でも、cache_statusを更新（スケジューラー実行時の時刻を統一するため）
-                if force_refresh:
+    def _get_cache_key(self):
+        """キャッシュキーを返す"""
+        return 'cnn_trends'
+
+    def _get_from_cache(self, *args, **kwargs):
+        """キャッシュからデータを取得"""
+        cached_data = self.db.get_cnn_trends_from_cache()
+        if cached_data:
+            # 重複排除を適用
+            cached_data = self._remove_duplicates(cached_data)
+            # 古いデータをフィルタリング（過去7日間のデータのみ）
+            today = datetime.now()
+            cutoff_date = today - timedelta(days=7)
+            filtered_cached_data = []
+            for item in cached_data:
+                published_date_str = item.get('published_date')
+                if published_date_str:
                     try:
-                        self.db.update_cache_status('cnn_trends', len(filtered_cached_data))
+                        # ISO形式の文字列をdatetimeに変換
+                        if isinstance(published_date_str, str):
+                            published_date = datetime.fromisoformat(published_date_str.replace('Z', '+00:00'))
+                            # タイムゾーン情報を削除して比較
+                            published_date = published_date.replace(tzinfo=None)
+                            # 過去7日間のデータのみを表示
+                            if published_date >= cutoff_date:
+                                filtered_cached_data.append(item)
                     except Exception as e:
-                        logger.warning(f"⚠️ CNN: cache_status更新エラー（処理は継続）: {e}")
-                
-                logger.info(f"✅ CNN: キャッシュから{len(filtered_cached_data)}件のデータを取得しました（重複排除・日付フィルタリング後）")
-                return {
-                    'success': True,
-                    'data': filtered_cached_data[:limit],  # 制限数まで取得
-                    'status': 'cached',
-                    'source': 'database_cache'
-                }
-            else:
-                # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
-                if not force_refresh:
-                    logger.warning("⚠️ CNN: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
-                    return {
-                        'success': True,  # エラーではなく、データがない状態として扱う
-                        'data': [],
-                        'status': 'cache_not_found',
-                        'source': 'database_cache',
-                        'error': 'キャッシュにデータがありません'
-                    }
-                # force_refresh=trueの場合のみ外部APIを呼び出す
-                logger.warning("⚠️ CNN: キャッシュデータが見つかりません。NewsAPIを呼び出します")
-                return self._fetch_cnn_trends(limit)
-        
+                        logger.debug(f"⚠️ キャッシュデータの日付パースエラー: {published_date_str} - {e}")
+                        continue
+            return filtered_cached_data
+        return None
+
+    def _save_to_cache(self, data, *args, **kwargs):
+        """キャッシュにデータを保存"""
+        try:
+            return self.db.save_cnn_trends_to_cache(data)
         except Exception as e:
-            logger.error(f"❌ CNN トレンド取得エラー: {e}", exc_info=True)
-            return {'error': f'CNNニュースの取得に失敗しました: {str(e)}', 'success': False}
+            logger.error(f"❌ CNN キャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def _clear_cache(self, *args, **kwargs):
+        """キャッシュをクリア"""
+        try:
+            return self.db.clear_cnn_trends_cache()
+        except Exception as e:
+            logger.error(f"❌ CNN キャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
+    def _update_cache_status(self, cache_key, data_count):
+        """cache_statusテーブルを更新"""
+        try:
+            return self.db.update_cache_status(cache_key, data_count)
+        except Exception as e:
+            logger.warning(f"⚠️ CNN: cache_status更新エラー: {e}")
+            return False
+
+    def get_trends(self, limit=25, force_refresh=False):
+        """CNNニューストレンドを取得（キャッシュ優先、published_dateでソート）"""
+        # キャッシュがない場合、過去7日間のデータがない場合はAPIを呼び出す
+        cached_data = self._get_from_cache()
+        if not cached_data or len(cached_data) == 0:
+            if not force_refresh:
+                logger.warning(f"⚠️ CNN: キャッシュに過去7日間の記事がありません。NewsAPIを呼び出します")
+                # auto_fetch_on_cache_miss=TrueでAPIを呼び出す
+                return super().get_trends(
+                    limit=limit,
+                    force_refresh=force_refresh,
+                    auto_fetch_on_cache_miss=True,  # キャッシュがない場合はAPIを呼び出す
+                    sort_key='published_date',  # 公開日でソート
+                    sort_reverse=True  # 降順（新しい順）
+                )
+        
+        # ベースクラスのget_trendsを使用
+        # auto_fetch_on_cache_miss=Falseで、既存動作を維持
+        # sort_key='published_date'で公開日でソート
+        return super().get_trends(
+            limit=limit,
+            force_refresh=force_refresh,
+            auto_fetch_on_cache_miss=False,  # 既存動作を維持
+            sort_key='published_date',  # 公開日でソート
+            sort_reverse=True  # 降順（新しい順）
+        )
+
+    def _remove_duplicates(self, items):
+        """重複を排除するヘルパーメソッド"""
+        def normalize_title(title):
+            """タイトルを正規化（重複チェック用）"""
+            if not title:
+                return ''
+            normalized = str(title).strip()
+            normalized = re.sub(r'\s+', ' ', normalized)
+            return normalized
+        
+        seen_urls = set()
+        seen_titles = set()
+        unique_items = []
+        duplicate_count = 0
+        
+        for item in items:
+            url = str(item.get('url', '')).strip()
+            title = str(item.get('title', '')).strip()
+            normalized_title = normalize_title(title)
+            
+            # URLまたは正規化されたタイトルが既に存在する場合はスキップ
+            if url in seen_urls or normalized_title in seen_titles:
+                duplicate_count += 1
+                continue
+            
+            # 空のタイトルやURLはスキップ
+            if not normalized_title or not url:
+                duplicate_count += 1
+                continue
+            
+            seen_urls.add(url)
+            seen_titles.add(normalized_title)
+            unique_items.append(item)
+        
+        if duplicate_count > 0:
+            logger.info(f"🔄 CNN: キャッシュデータから{duplicate_count}件の重複を排除しました（残り: {len(unique_items)}件）")
+        
+        return unique_items
     
-    def _fetch_cnn_trends(self, limit=25):
+    def _fetch_trends(self, limit=25, *args, **kwargs):
         """CNNニューストレンドデータを取得（NewsAPIのみ）"""
         if not self.news_api_key:
             logger.error("❌ NEWS_API_KEYが設定されていません。CNN記事を取得できません")
@@ -191,15 +238,14 @@ class CNNTrendsManager:
             # 制限数まで取得
             formatted_data = formatted_data[:limit]
             
-            # キャッシュに保存
-            self.db.save_cnn_trends_to_cache(formatted_data)
             logger.info(f"✅ CNN: NewsAPIから{len(formatted_data)}件の最新ニュース記事を取得しました")
             
             return {
                 'success': True,
                 'data': formatted_data,
                 'status': 'api_fetched',
-                'source': 'newsapi'
+                'source': 'newsapi',
+                'total_count': len(formatted_data)
             }
             
         except requests.exceptions.Timeout:
@@ -216,43 +262,3 @@ class CNNTrendsManager:
                 'error': f'NewsAPI エラー: {str(e)}',
                 'data': []
             }
-
-    def _remove_duplicates(self, items):
-        """重複を排除するヘルパーメソッド"""
-        def normalize_title(title):
-            """タイトルを正規化（重複チェック用）"""
-            if not title:
-                return ''
-            normalized = str(title).strip()
-            normalized = re.sub(r'\s+', ' ', normalized)
-            return normalized
-        
-        seen_urls = set()
-        seen_titles = set()
-        unique_items = []
-        duplicate_count = 0
-        
-        for item in items:
-            url = str(item.get('url', '')).strip()
-            title = str(item.get('title', '')).strip()
-            normalized_title = normalize_title(title)
-            
-            # URLまたは正規化されたタイトルが既に存在する場合はスキップ
-            if url in seen_urls or normalized_title in seen_titles:
-                duplicate_count += 1
-                continue
-            
-            # 空のタイトルやURLはスキップ
-            if not normalized_title or not url:
-                duplicate_count += 1
-                continue
-            
-            seen_urls.add(url)
-            seen_titles.add(normalized_title)
-            unique_items.append(item)
-        
-        if duplicate_count > 0:
-            logger.info(f"🔄 CNN: キャッシュデータから{duplicate_count}件の重複を排除しました（残り: {len(unique_items)}件）")
-        
-        return unique_items
-

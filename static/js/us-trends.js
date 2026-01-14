@@ -1100,11 +1100,17 @@ function loadGoogleTrendsFromCacheUS() {
         });
 }
 
-// YouTube Trends cache data loading for US
+// YouTube Trends cache data loading for US (統一パターン: ラジオボタンの値に応じてエンドポイントを選択)
 function loadYouTubeTrendsFromCacheUS() {
     console.log('📊 YouTube Trends cache data loading for US');
     
-    fetchWithRetry('/api/youtube-trends?region=US&force_refresh=false')
+    const region = 'US';
+    const trendType = document.querySelector('input[name="youtubeTrendTypeUS"]:checked')?.value || 'top25';
+    const endpoint = trendType === 'rising' ? '/api/youtube-rising-trends' : '/api/youtube-trends';
+    
+    console.log(`YouTube API call: ${endpoint}?region=${region}`);
+    
+    fetchWithRetry(`${endpoint}?region=${region}&force_refresh=false`)
         .then(response => {
             console.log('YouTube Trends API response:', response.status, response.ok);
             if (!response.ok) {
@@ -1125,34 +1131,6 @@ function loadYouTubeTrendsFromCacheUS() {
         .catch(error => {
             console.error('YouTube Trends cache loading error:', error);
             showYouTubeError(`Failed to load YouTube Trends: ${error.message}`);
-        });
-}
-
-// YouTube Rising Trends cache data loading for US
-function loadYouTubeRisingTrendsFromCacheUS() {
-    console.log('📊 YouTube Rising Trends cache data loading for US');
-    
-    fetchWithRetry('/api/youtube-rising-trends?region=US')
-        .then(response => {
-            console.log('YouTube Rising Trends API response:', response.status, response.ok);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log('YouTube Rising Trends API data:', data);
-            if (data.success && data.data && data.data.length > 0) {
-                console.log('YouTube Rising Trends data display starting');
-                displayYouTubeResults(data);
-            } else {
-                console.log('YouTube Rising Trends data not found or error:', data);
-                showYouTubeError(data.error || 'No data available');
-            }
-        })
-        .catch(error => {
-            console.error('YouTube Rising Trends cache loading error:', error);
-            showYouTubeError(`Failed to load YouTube Rising Trends: ${error.message}`);
         });
 }
 
@@ -2744,27 +2722,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load cached data first (like Japan version)
     loadCachedDataUS();
     
-    // YouTube trend type buttons event listener
-    const trendingTab = document.getElementById('trendingTab');
-    const risingTab = document.getElementById('risingTab');
-    
-    if (trendingTab) {
-        trendingTab.addEventListener('click', function() {
-            console.log('YouTube Trending tab clicked');
-            this.classList.add('active');
-            if (risingTab) risingTab.classList.remove('active');
+    // YouTube trend type radio buttons event listener (統一パターン)
+    const youtubeTrendTypeRadios = document.querySelectorAll('input[name="youtubeTrendTypeUS"]');
+    youtubeTrendTypeRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            console.log('YouTube trend type changed:', this.value);
             loadYouTubeTrendsFromCacheUS();
         });
-    }
-    
-    if (risingTab) {
-        risingTab.addEventListener('click', function() {
-            console.log('YouTube Rising tab clicked');
-            this.classList.add('active');
-            if (trendingTab) trendingTab.classList.remove('active');
-            loadYouTubeRisingTrendsFromCacheUS();
-        });
-    }
+    });
     
     // Twitch type selector event listener
     const twitchTypeSelect = document.getElementById('twitchTypeSelectUS');

@@ -8,6 +8,7 @@ import json
 import threading
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from psycopg2 import extensions
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from utils.logger_config import get_logger
@@ -1010,6 +1011,50 @@ class TrendsCache:
             logger.error(f"❌ キャッシュクリアエラー: {e}", exc_info=True)
             return False
     
+    def _safe_set_autocommit(self, conn, value):
+        """トランザクション状態を確認してからautocommitを安全に設定する
+        
+        Args:
+            conn: データベース接続オブジェクト
+            value: 設定するautocommitの値（True/False）
+        
+        Returns:
+            tuple: (成功したかどうか, 元のautocommit値)
+        """
+        try:
+            original_autocommit = conn.autocommit
+            # トランザクション状態を確認
+            transaction_status = conn.get_transaction_status()
+            # トランザクションが開始されている場合は、先にコミットまたはロールバック
+            if transaction_status == extensions.TRANSACTION_STATUS_INTRANS:
+                # トランザクション内の場合は、ロールバックしてからautocommitを設定
+                try:
+                    conn.rollback()
+                except Exception as rollback_error:
+                    logger.warning(f"⚠️ トランザクションロールバック中にエラーが発生しました: {rollback_error}")
+                    return (False, original_autocommit)
+            elif transaction_status == extensions.TRANSACTION_STATUS_INERROR:
+                # エラー状態のトランザクションの場合は、ロールバックが必要
+                try:
+                    conn.rollback()
+                except Exception as rollback_error:
+                    logger.warning(f"⚠️ エラー状態のトランザクションロールバック中にエラーが発生しました: {rollback_error}")
+                    return (False, original_autocommit)
+            
+            # トランザクションが終了した後、autocommitを設定
+            try:
+                conn.autocommit = value
+                return (True, original_autocommit)
+            except psycopg2.ProgrammingError as e:
+                if "set_session cannot be used inside a transaction" in str(e):
+                    logger.warning(f"⚠️ トランザクション内でautocommitを設定できません: {e}")
+                    return (False, original_autocommit)
+                else:
+                    raise
+        except Exception as e:
+            logger.warning(f"⚠️ autocommit設定中にエラーが発生しました: {e}")
+            return (False, original_autocommit if 'original_autocommit' in locals() else None)
+    
     def get_connection(self):
         """データベース接続を取得（接続されていない場合は再接続を試みる）
 
@@ -1031,15 +1076,24 @@ class TrendsCache:
                 _ = self.connection.closed
                 # 実際にクエリを実行して接続が有効か確認（autocommitを有効化してトランザクションを開かない）
                 try:
-                    original_autocommit = self.connection.autocommit
-                    self.connection.autocommit = True
-                    try:
-                        with self.connection.cursor() as cursor:
-                            cursor.execute("SELECT 1")
-                            cursor.fetchone()
-                        return self.connection
-                    finally:
-                        self.connection.autocommit = original_autocommit
+                    success, original_autocommit = self._safe_set_autocommit(self.connection, True)
+                    if not success:
+                        # autocommit設定に失敗した場合は再接続
+                        logger.warning("⚠️ データベース接続検証失敗（再接続します）: autocommit設定に失敗しました")
+                        self.connection = None
+                        # 再接続処理に進む（ロックを取得して再接続）
+                    else:
+                        try:
+                            with self.connection.cursor() as cursor:
+                                cursor.execute("SELECT 1")
+                                cursor.fetchone()
+                            return self.connection
+                        finally:
+                            if original_autocommit is not None:
+                                try:
+                                    self.connection.autocommit = original_autocommit
+                                except Exception:
+                                    pass
                 except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
                     # 接続が無効な場合は再接続
                     logger.warning(f"⚠️ データベース接続検証失敗（再接続します）: {e}")
@@ -1057,15 +1111,22 @@ class TrendsCache:
                     _ = self.connection.closed
                     # 実際にクエリを実行して接続が有効か確認（autocommitを有効化してトランザクションを開かない）
                     try:
-                        original_autocommit = self.connection.autocommit
-                        self.connection.autocommit = True
+                        success, original_autocommit = self._safe_set_autocommit(self.connection, True)
+                        if not success:
+                            # autocommit設定に失敗した場合は再接続
+                            self.connection = None
+                            continue
                         try:
                             with self.connection.cursor() as cursor:
                                 cursor.execute("SELECT 1")
                                 cursor.fetchone()
                             return self.connection
                         finally:
-                            self.connection.autocommit = original_autocommit
+                            if original_autocommit is not None:
+                                try:
+                                    self.connection.autocommit = original_autocommit
+                                except Exception:
+                                    pass
                     except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError):
                         self.connection = None
                 except (psycopg2.InterfaceError, psycopg2.OperationalError, AttributeError):
@@ -1088,8 +1149,18 @@ class TrendsCache:
                     if self.connection and not self.connection.closed:
                         try:
                             # 実際にクエリを実行して接続が有効か確認（autocommitを有効化してトランザクションを開かない）
-                            original_autocommit = self.connection.autocommit
-                            self.connection.autocommit = True
+                            success, original_autocommit = self._safe_set_autocommit(self.connection, True)
+                            if not success:
+                                # autocommit設定に失敗した場合は再接続を試みる
+                                logger.warning(f"⚠️ 接続検証失敗: autocommit設定に失敗しました - 再接続を試みます")
+                                self.connection = None
+                                if attempt < max_retries - 1:
+                                    wait_time = base_retry_delay * (2 ** attempt)
+                                    logger.info(f"⏳ {wait_time}秒待機してから再試行します...")
+                                    time.sleep(wait_time)
+                                    continue
+                                else:
+                                    raise psycopg2.OperationalError("autocommit設定に失敗しました")
                             try:
                                 with self.connection.cursor() as cursor:
                                     cursor.execute("SELECT 1")
@@ -1097,7 +1168,11 @@ class TrendsCache:
                                 logger.info(f"✅ データベース接続を確立しました (試行 {attempt + 1}/{max_retries})")
                                 return self.connection
                             finally:
-                                self.connection.autocommit = original_autocommit
+                                if original_autocommit is not None:
+                                    try:
+                                        self.connection.autocommit = original_autocommit
+                                    except Exception:
+                                        pass
                         except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as verify_error:
                             logger.warning(f"⚠️ 接続検証失敗: {verify_error} - 再接続を試みます")
                             self.connection = None
@@ -1216,14 +1291,30 @@ class TrendsCache:
                 # SELECT文（読み取り専用）の場合はautocommitを有効化してトランザクションを開かない
                 # INSERT/UPDATE/DELETE（書き込み）の場合はトランザクション管理が必要
                 if is_read_only:
-                    original_autocommit = conn.autocommit
-                    conn.autocommit = True
+                    success, original_autocommit = self._safe_set_autocommit(conn, True)
+                    if not success:
+                        # autocommit設定に失敗した場合は、接続をリセットして再接続を試みる
+                        logger.warning("⚠️ autocommit設定に失敗しました。接続をリセットして再接続を試みます")
+                        self.connection = None
+                        if attempt < max_retries - 1:
+                            wait_time = base_wait_time * (2 ** attempt)
+                            time.sleep(wait_time)
+                            continue
+                        else:
+                            raise psycopg2.ProgrammingError("autocommit設定に失敗しました")
                 
                 # クエリを実行
                 result = query_func(conn)
                 
                 # SELECT文の場合は明示的なコミットは不要（autocommit=Trueのため）
                 # 書き込み操作の場合は呼び出し側でコミットを実行
+                
+                # autocommitを元に戻す（読み取り専用の場合のみ）
+                if is_read_only and original_autocommit is not None:
+                    try:
+                        conn.autocommit = original_autocommit
+                    except Exception:
+                        pass  # 元に戻すのに失敗しても無視
                 
                 return result
                 

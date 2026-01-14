@@ -1,42 +1,32 @@
-// はてなブックマークトレンド関連の関数
-function fetchHatenaTrends() {
-    showHatenaLoading();
-    hideHatenaResults();
-    
-    // 選択されたカテゴリーを取得
-    const categorySelect = document.getElementById('hatenaCategorySelect');
-    const selectedCategory = categorySelect ? categorySelect.value : 'all';
-    
-    console.log(`🔍 はてなブックマーク: カテゴリ '${selectedCategory}' のデータを取得中...`);
-    
-    fetch(`/api/hatena-trends?category=${selectedCategory}&limit=25&type=hot`)
-        .then(response => response.json())
-        .then(data => {
-            hideHatenaLoading();
-            console.log(`📊 はてなブックマーク: カテゴリ '${selectedCategory}' のデータ取得完了`, data);
-            if (data.success) {
-                displayHatenaResults(data);
-            } else {
-                showHatenaError(data.error || 'はてなブックマークトレンドの取得に失敗しました');
-            }
-        })
-        .catch(error => {
-            hideHatenaLoading();
-            console.error('❌ はてなブックマーク: エラー', error);
-            showHatenaError('ネットワークエラー: ' + error.message);
-        });
+// はてなブックマークトレンド関連の関数（共通化）
+let hatenaManager = null;
+
+// ドロップダウンパターンの共通マネージャーを作成
+if (typeof createDropdownTrendsManager === 'function') {
+    hatenaManager = createDropdownTrendsManager({
+        serviceName: 'hatena',
+        selectId: 'hatenaCategorySelect',
+        apiEndpoint: '/api/hatena-trends',
+        defaultValue: 'all',
+        paramName: 'category',
+        uiIds: {
+            loading: 'hatenaTrendsLoading',
+            results: 'hatenaResults',
+            tableBody: 'hatenaTrendsTableBody',
+            statusMessage: 'hatenaStatusMessage',
+            errorMessage: 'hatenaErrorMessage'
+        },
+        displayFunction: displayHatenaResults,
+        getParams: (category) => ({ type: 'hot' })
+    });
 }
 
-// カテゴリ選択時のイベントリスナー
-document.addEventListener('DOMContentLoaded', function() {
-    const categorySelect = document.getElementById('hatenaCategorySelect');
-    if (categorySelect) {
-        categorySelect.addEventListener('change', function() {
-            console.log(`🔄 はてなブックマーク: カテゴリが '${this.value}' に変更されました`);
-            fetchHatenaTrends();
-        });
+// 後方互換性のため、既存の関数名も保持
+function fetchHatenaTrends() {
+    if (hatenaManager) {
+        hatenaManager.fetchTrends();
     }
-});
+}
 
 function displayHatenaResults(data) {
     const tableBody = document.getElementById('hatenaTrendsTableBody');
@@ -80,30 +70,57 @@ function displayHatenaResults(data) {
     }
 }
 
+// 後方互換性のため、既存の関数名も保持（共通マネージャーを使用）
 function showHatenaLoading() {
-    document.getElementById('hatenaTrendsLoading').style.display = 'block';
+    if (hatenaManager) {
+        hatenaManager.showLoading();
+    } else {
+        const element = document.getElementById('hatenaTrendsLoading');
+        if (element) element.style.display = 'block';
+    }
 }
 
 function hideHatenaLoading() {
-    document.getElementById('hatenaTrendsLoading').style.display = 'none';
+    if (hatenaManager) {
+        hatenaManager.hideLoading();
+    } else {
+        const element = document.getElementById('hatenaTrendsLoading');
+        if (element) element.style.display = 'none';
+    }
 }
 
 function showHatenaResults() {
-    document.getElementById('hatenaResults').style.display = 'block';
+    if (hatenaManager) {
+        hatenaManager.showResults();
+    } else {
+        const element = document.getElementById('hatenaResults');
+        if (element) element.style.display = 'block';
+    }
 }
 
 function hideHatenaResults() {
-    document.getElementById('hatenaResults').style.display = 'none';
+    if (hatenaManager) {
+        hatenaManager.hideResults();
+    } else {
+        const element = document.getElementById('hatenaResults');
+        if (element) element.style.display = 'none';
+    }
 }
 
 function showHatenaStatusMessage(message, type = 'info') {
     const statusElement = document.getElementById('hatenaStatusMessage');
-    statusElement.textContent = message;
-    statusElement.className = `alert alert-${type}`;
-    statusElement.style.display = 'block';
+    if (statusElement) {
+        statusElement.textContent = message;
+        statusElement.className = `alert alert-${type}`;
+        statusElement.style.display = 'block';
+    }
 }
 
 function showHatenaError(message) {
-    showHatenaStatusMessage(message, 'danger');
-    showHatenaResults();
+    if (hatenaManager) {
+        hatenaManager.showError(message);
+    } else {
+        showHatenaStatusMessage(message, 'danger');
+        showHatenaResults();
+    }
 }

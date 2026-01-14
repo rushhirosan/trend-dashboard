@@ -88,11 +88,13 @@ def _initialize_single_manager(key, manager_class, display_name):
         初期化されたマネージャーインスタンス、またはNone
     """
     try:
+        logger.debug(f"🔄 {display_name} Manager初期化開始 (key: {key})")
         manager = manager_class()
         logger.info(f"✅ {display_name} Manager初期化完了")
         return manager
     except Exception as e:
-        logger.error(f"❌ {display_name} Manager初期化エラー: {e}", exc_info=True)
+        logger.error(f"❌ {display_name} Manager初期化エラー: {type(e).__name__}: {e}", exc_info=True)
+        logger.warning(f"⚠️ {display_name} Manager ({key}) の初期化に失敗しました")
         return None
 
 
@@ -211,7 +213,6 @@ def refresh_all_trends(managers, force_refresh=True):
     call_manager('appstore', lambda m: m.get_trends(country='US', category='all', limit=25, force_refresh=force_refresh), 'US')
     call_manager('cisa_kev', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
     call_manager('thehackernews', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
-    call_manager('amazon', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
     call_manager('medium', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
     call_manager('devto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
     

@@ -71,8 +71,8 @@ def create_app():
     cache = None
     try:
         cache = TrendsCache()
-        if not cache.connection:
-            # 接続を再試行
+        if not cache.pool:
+            # 接続プールを再試行
             try:
                 cache.connect()
             except Exception as connect_error:
@@ -81,7 +81,7 @@ def create_app():
                 cache = None
         
         # データベース接続が成功した場合のみテーブルを作成
-        if cache and cache.connection:
+        if cache and cache.pool:
             try:
                 if not cache.init_database():
                     logger.warning("⚠️ データベーステーブル作成に失敗しましたが、アプリは起動を続行します")
@@ -315,41 +315,42 @@ Sitemap: https://trends-dashboard.fly.dev/sitemap.xml
             # 実際には、get_connection()内でタイムアウトが発生する可能性があるため、
             # ここでは接続試行時間を計測し、タイムアウトした場合はエラーを返す
             try:
-                db_conn = cache_instance.get_connection()
-                db_check_time = (time.time() - db_check_start) * 1000  # ミリ秒
-                
-                # タイムアウトチェック
-                if db_check_time > (timeout_seconds * 1000):
-                    return {
-                        'status': 'unhealthy',
-                        'connected': False,
-                        'error': f'Database connection timeout (>{timeout_seconds}s)',
-                        'response_time_ms': round(db_check_time, 2)
-                    }
-                
-                if db_conn and not db_conn.closed:
-                    # 簡単なクエリで接続を確認（タイムアウトを考慮）
-                    query_start = time.time()
-                    with db_conn.cursor() as cursor:
-                        cursor.execute("SELECT 1")
-                        cursor.fetchone()
-                    query_time = (time.time() - query_start) * 1000
+                # 接続プールから接続を取得（コンテキストマネージャーとして）
+                with cache_instance.get_connection() as db_conn:
+                    db_check_time = (time.time() - db_check_start) * 1000  # ミリ秒
                     
-                    total_time = (time.time() - db_check_start) * 1000
+                    # タイムアウトチェック
+                    if db_check_time > (timeout_seconds * 1000):
+                        return {
+                            'status': 'unhealthy',
+                            'connected': False,
+                            'error': f'Database connection timeout (>{timeout_seconds}s)',
+                            'response_time_ms': round(db_check_time, 2)
+                        }
                     
-                    return {
-                        'status': 'healthy',
-                        'connected': True,
-                        'response_time_ms': round(total_time, 2),
-                        'query_time_ms': round(query_time, 2)
-                    }
-                else:
-                    return {
-                        'status': 'unhealthy',
-                        'connected': False,
-                        'error': 'Database connection is closed or None',
-                        'response_time_ms': round(db_check_time, 2)
-                    }
+                    if db_conn and not db_conn.closed:
+                        # 簡単なクエリで接続を確認（タイムアウトを考慮）
+                        query_start = time.time()
+                        with db_conn.cursor() as cursor:
+                            cursor.execute("SELECT 1")
+                            cursor.fetchone()
+                        query_time = (time.time() - query_start) * 1000
+                        
+                        total_time = (time.time() - db_check_start) * 1000
+                        
+                        return {
+                            'status': 'healthy',
+                            'connected': True,
+                            'response_time_ms': round(total_time, 2),
+                            'query_time_ms': round(query_time, 2)
+                        }
+                    else:
+                        return {
+                            'status': 'unhealthy',
+                            'connected': False,
+                            'error': 'Database connection is closed or None',
+                            'response_time_ms': round(db_check_time, 2)
+                        }
             except Exception as conn_error:
                 db_check_time = (time.time() - db_check_start) * 1000
                 # タイムアウトエラーかどうかを判定

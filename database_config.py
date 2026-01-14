@@ -7,9 +7,11 @@ import os
 import json
 import threading
 import psycopg2
+from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
 from psycopg2 import extensions
 from datetime import datetime, timedelta
+from contextlib import contextmanager
 from dotenv import load_dotenv
 from utils.logger_config import get_logger
 
@@ -22,8 +24,68 @@ logger = get_logger(__name__)
 # シングルトンインスタンス（全マネージャーで共有）
 _shared_cache_instance = None
 
-# データベース接続取得用のロック（複数マネージャーからの同時アクセスを防ぐ）
-_connection_lock = threading.Lock()
+# 接続プール（グローバルで共有）
+_connection_pool = None
+_pool_lock = threading.Lock()
+
+def _get_connection_pool():
+    """接続プールを取得または作成（シングルトン）"""
+    global _connection_pool
+    
+    if _connection_pool is not None:
+        return _connection_pool
+    
+    with _pool_lock:
+        # ダブルチェック（他のスレッドが既に作成した可能性がある）
+        if _connection_pool is not None:
+            return _connection_pool
+        
+        try:
+            database_url = os.getenv('DATABASE_URL')
+            if database_url:
+                # 接続パラメータを構築
+                min_conn = 2  # 最小接続数
+                max_conn = 10  # 最大接続数（同時リクエストに対応）
+                
+                # 接続パラメータを抽出
+                _connection_pool = pool.ThreadedConnectionPool(
+                    minconn=min_conn,
+                    maxconn=max_conn,
+                    dsn=database_url,
+                    connect_timeout=15,
+                    keepalives=1,
+                    keepalives_idle=10,
+                    keepalives_interval=5,
+                    keepalives_count=3,
+                    options='-c statement_timeout=60000 -c tcp_keepalives_idle=10 -c tcp_keepalives_interval=5 -c tcp_keepalives_count=3'
+                )
+                logger.info(f"✅ 接続プールを作成しました (min={min_conn}, max={max_conn})")
+            else:
+                # 個別の環境変数を使用
+                min_conn = 2
+                max_conn = 10
+                
+                _connection_pool = pool.ThreadedConnectionPool(
+                    minconn=min_conn,
+                    maxconn=max_conn,
+                    host=os.getenv('DB_HOST', 'localhost'),
+                    port=os.getenv('DB_PORT', '5432'),
+                    database=os.getenv('DB_NAME', 'trends_db'),
+                    user=os.getenv('DB_USER', 'postgres'),
+                    password=os.getenv('DB_PASSWORD', 'password'),
+                    connect_timeout=15,
+                    keepalives=1,
+                    keepalives_idle=10,
+                    keepalives_interval=5,
+                    keepalives_count=3
+                )
+                logger.info(f"✅ 接続プールを作成しました (min={min_conn}, max={max_conn})")
+            
+            return _connection_pool
+        except Exception as e:
+            logger.error(f"❌ 接続プール作成エラー: {e}", exc_info=True)
+            _connection_pool = None
+            raise
 
 class TrendsCache:
     """トレンドデータのキャッシュシステム"""
@@ -34,73 +96,31 @@ class TrendsCache:
         
         # シングルトンパターン：既存のインスタンスがあれば再利用
         if _shared_cache_instance is not None:
-            # 既存インスタンスの属性をコピー（接続を共有）
-            self.connection = _shared_cache_instance.connection
+            # 既存インスタンスの属性をコピー（接続プールを共有）
+            self.pool = _shared_cache_instance.pool
             return
         
         # 初回インスタンス作成
-        self.connection = None
-        # 接続を遅延初期化（エラーが発生してもアプリを起動できるように）
+        self.pool = None
+        # 接続プールを初期化（エラーが発生してもアプリは起動を続行）
         try:
-            self.connect()
+            self.pool = _get_connection_pool()
         except Exception as e:
-            logger.warning(f"⚠️ データベース接続の初期化に失敗しました（後で再試行可能）: {e}", exc_info=True)
-            self.connection = None
+            logger.warning(f"⚠️ 接続プールの初期化に失敗しました（後で再試行可能）: {e}", exc_info=True)
+            self.pool = None
         
         # グローバルインスタンスに保存
         _shared_cache_instance = self
     
     def connect(self):
-        """データベースに接続"""
-        # 既存の接続を閉じる（存在する場合）
-        if self.connection:
-            try:
-                if not self.connection.closed:
-                    self.connection.close()
-            except Exception:
-                pass  # 既に閉じられている場合は無視
-            self.connection = None
-        
+        """接続プールを初期化（後方互換性のため）"""
         try:
-            # DATABASE_URLが設定されている場合は優先的に使用（fly.ioなど）
-            database_url = os.getenv('DATABASE_URL')
-            if database_url:
-                # DATABASE_URLの形式: postgresql://user:password@host:port/database
-                # 接続タイムアウトとキープアライブ設定を追加
-                # Fly.ioのPostgreSQLは接続を閉じる可能性があるため、より積極的なキープアライブ設定を使用
-                self.connection = psycopg2.connect(
-                    database_url,
-                    connect_timeout=30,  # 30秒に延長（データベース再起動時の接続確立時間を考慮）
-                    keepalives=1,
-                    keepalives_idle=30,  # 30秒でキープアライブを開始（Fly.ioのアイドルタイムアウトに対応）
-                    keepalives_interval=10,  # 10秒間隔でキープアライブを送信（より頻繁に）
-                    keepalives_count=5,  # 5回失敗まで許容（接続が切れる前に検出）
-                    # サーバー側のTCPキープアライブ設定も追加
-                    options='-c statement_timeout=60000 -c tcp_keepalives_idle=30 -c tcp_keepalives_interval=10 -c tcp_keepalives_count=5'
-                )
-                # 自動コミットを無効化（トランザクション制御のため）
-                self.connection.autocommit = False
-                logger.info("✅ データベース接続成功 (DATABASE_URL使用)")
-            else:
-                # 個別の環境変数を使用（ローカル開発環境など）
-                self.connection = psycopg2.connect(
-                    host=os.getenv('DB_HOST', 'localhost'),
-                    port=os.getenv('DB_PORT', '5432'),
-                    database=os.getenv('DB_NAME', 'trends_db'),
-                    user=os.getenv('DB_USER', 'postgres'),
-                    password=os.getenv('DB_PASSWORD', 'password'),
-                    connect_timeout=30,  # 30秒に延長
-                    keepalives=1,
-                    keepalives_idle=30,  # 30秒でキープアライブを開始
-                    keepalives_interval=10,  # 10秒間隔でキープアライブを送信
-                    keepalives_count=5  # 5回失敗まで許容
-                )
-                # 自動コミットを無効化（トランザクション制御のため）
-                self.connection.autocommit = False
-                logger.info("✅ データベース接続成功 (個別環境変数使用)")
+            if not self.pool:
+                self.pool = _get_connection_pool()
+                logger.info("✅ 接続プールを初期化しました")
         except Exception as e:
-            logger.error(f"❌ データベース接続エラー: {e}", exc_info=True)
-            self.connection = None
+            logger.error(f"❌ 接続プール初期化エラー: {e}", exc_info=True)
+            self.pool = None
     
     def init_database(self):
         """データベースを初期化"""
@@ -1067,22 +1087,254 @@ class TrendsCache:
             logger.warning(f"⚠️ autocommit設定中にエラーが発生しました: {e}")
             return (False, original_autocommit if 'original_autocommit' in locals() else None)
     
+    @contextmanager
     def get_connection(self):
-        """データベース接続を取得（接続されていない場合は再接続を試みる）
-
-        ロックを使用して、複数のマネージャーからの同時アクセスを防ぐ
-        ロックの範囲を最小限にして、クエリ実行時のブロッキングを防ぐ
+        """データベース接続を取得（コンテキストマネージャー）
         
-        接続取得後、実際にクエリを実行して接続が有効か検証する
+        接続プールから接続を取得し、使用後に自動的に返却します。
+        各リクエストで独立した接続を取得するため、同時リクエストに対応できます。
+        
+        Usage:
+            with db.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT 1")
         """
         import time
-        global _connection_lock
-
-        max_retries = 5  # リトライ回数を5に増加（データベース再起動時間を考慮）
-        base_retry_delay = 1.0  # ベース待機時間を1秒に設定
-
-        # 接続が既に存在する場合、実際にクエリを実行して検証
-        if self.connection and not self.connection.closed:
+        
+        if not self.pool:
+            # 接続プールが初期化されていない場合は初期化を試みる
+            try:
+                self.pool = _get_connection_pool()
+            except Exception as e:
+                logger.error(f"❌ 接続プールの取得に失敗しました: {e}", exc_info=True)
+                raise psycopg2.OperationalError(f"接続プールが利用できません: {e}")
+        
+        conn = None
+        max_retries = 3
+        base_retry_delay = 0.5
+        
+        for attempt in range(max_retries):
+            try:
+                # 接続プールから接続を取得
+                conn = self.pool.getconn()
+                if not conn:
+                    raise psycopg2.OperationalError("接続プールから接続を取得できませんでした")
+                
+                # 接続が有効か検証
+                try:
+                    with conn.cursor() as cursor:
+                        cursor.execute("SET statement_timeout = 5000")
+                        cursor.execute("SELECT 1")
+                        cursor.fetchone()
+                        cursor.execute("RESET statement_timeout")
+                except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as verify_error:
+                    # 接続が無効な場合は返却して再試行
+                    if conn:
+                        try:
+                            self.pool.putconn(conn, close=True)
+                        except Exception:
+                            pass
+                        conn = None
+                    
+                    if attempt < max_retries - 1:
+                        wait_time = base_retry_delay * (2 ** attempt)
+                        logger.warning(f"⚠️ 接続検証失敗（再接続します）: {verify_error}")
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        raise verify_error
+                
+                # 接続を返す（コンテキストマネージャーとして）
+                try:
+                    yield conn
+                finally:
+                    # 使用後に接続を返却
+                    if conn:
+                        try:
+                            # トランザクション状態を確認してクリーンアップ
+                            transaction_status = conn.get_transaction_status()
+                            if transaction_status == extensions.TRANSACTION_STATUS_INTRANS:
+                                # トランザクションが開いている場合はロールバック
+                                try:
+                                    conn.rollback()
+                                except Exception:
+                                    pass
+                            elif transaction_status == extensions.TRANSACTION_STATUS_INERROR:
+                                # エラー状態の場合はロールバック
+                                try:
+                                    conn.rollback()
+                                except Exception:
+                                    pass
+                            
+                            # 接続を返却
+                            self.pool.putconn(conn)
+                        except Exception as put_error:
+                            logger.warning(f"⚠️ 接続の返却中にエラーが発生しました: {put_error}")
+                            # エラーが発生した場合は接続を閉じて返却
+                            try:
+                                self.pool.putconn(conn, close=True)
+                            except Exception:
+                                pass
+                return
+                
+            except pool.PoolError as pool_error:
+                # 接続プールのエラー
+                if attempt < max_retries - 1:
+                    wait_time = base_retry_delay * (2 ** attempt)
+                    logger.warning(f"⚠️ 接続プールエラー（再試行します）: {pool_error}")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    logger.error(f"❌ 接続プールエラー（最大試行回数）: {pool_error}")
+                    raise psycopg2.OperationalError(f"接続プールから接続を取得できませんでした: {pool_error}")
+            
+            except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
+                # 接続エラー
+                if conn:
+                    try:
+                        self.pool.putconn(conn, close=True)
+                    except Exception:
+                        pass
+                    conn = None
+                
+                if attempt < max_retries - 1:
+                    wait_time = base_retry_delay * (2 ** attempt)
+                    error_str = str(e).lower()
+                    if "server closed" in error_str or "connection" in error_str:
+                        logger.warning(f"⚠️ データベース接続エラー（再試行します）: {e}")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    logger.error(f"❌ データベース接続エラー（最大試行回数）: {e}")
+                    raise
+        
+        # 全ての再試行が失敗した場合
+        raise psycopg2.OperationalError("データベース接続を取得できませんでした（最大試行回数に達しました）")
+    
+    def _execute_with_retry(self, query_func, max_retries=3, is_read_only=True):
+        """接続エラーが発生した場合に自動的に再接続を試みるヘルパーメソッド
+        
+        Args:
+            query_func: データベースクエリを実行する関数（接続オブジェクトを引数として受け取る）
+            max_retries: 最大再試行回数（デフォルト: 3）
+            is_read_only: Trueの場合はSELECT文（読み取り専用）、Falseの場合はINSERT/UPDATE/DELETE（書き込み）
+        
+        Returns:
+            クエリ関数の戻り値、またはNone（全ての再試行が失敗した場合）
+        """
+        import time
+        
+        base_wait_time = 0.5  # ベース待機時間（秒）
+        
+        for attempt in range(max_retries):
+            try:
+                # 接続プールから接続を取得（コンテキストマネージャーとして）
+                with self.get_connection() as conn:
+                    # 接続が有効か再確認（get_connection()で検証済みだが、念のため）
+                    try:
+                        if conn.closed:
+                            raise psycopg2.InterfaceError("接続が閉じられています")
+                        # 軽量な検証クエリを実行して接続が有効か確認（タイムアウト5秒）
+                        with conn.cursor() as test_cursor:
+                            test_cursor.execute("SET statement_timeout = 5000")
+                            test_cursor.execute("SELECT 1")
+                            test_cursor.fetchone()
+                            test_cursor.execute("RESET statement_timeout")
+                    except psycopg2.OperationalError as timeout_error:
+                        # タイムアウトエラーの場合は接続が無効と判断
+                        error_str = str(timeout_error).lower()
+                        if "timeout" in error_str:
+                            logger.warning(f"⚠️ 接続検証タイムアウト（再接続します）: {timeout_error}")
+                        else:
+                            logger.warning(f"⚠️ 接続検証失敗（再接続します）: {timeout_error}")
+                        if attempt < max_retries - 1:
+                            wait_time = base_wait_time * (2 ** attempt)
+                            time.sleep(wait_time)
+                            continue
+                        else:
+                            raise timeout_error
+                    except (psycopg2.InterfaceError, psycopg2.DatabaseError) as verify_error:
+                        # 接続が無効な場合は再接続を試みる
+                        logger.warning(f"⚠️ 接続検証失敗（再接続します）: {verify_error}")
+                        if attempt < max_retries - 1:
+                            wait_time = base_wait_time * (2 ** attempt)
+                            time.sleep(wait_time)
+                            continue
+                        else:
+                            raise verify_error
+                    
+                    # SELECT文（読み取り専用）の場合はautocommitを有効化してトランザクションを開かない
+                    # INSERT/UPDATE/DELETE（書き込み）の場合はトランザクション管理が必要
+                    original_autocommit = None
+                    if is_read_only:
+                        success, original_autocommit = self._safe_set_autocommit(conn, True)
+                        if not success:
+                            # autocommit設定に失敗した場合は、接続をリセットして再接続を試みる
+                            logger.warning("⚠️ autocommit設定に失敗しました。再接続を試みます")
+                            if attempt < max_retries - 1:
+                                wait_time = base_wait_time * (2 ** attempt)
+                                time.sleep(wait_time)
+                                continue
+                            else:
+                                raise psycopg2.ProgrammingError("autocommit設定に失敗しました")
+                    
+                    # クエリを実行
+                    result = query_func(conn)
+                    
+                    # SELECT文の場合は明示的なコミットは不要（autocommit=Trueのため）
+                    # 書き込み操作の場合は呼び出し側でコミットを実行
+                    
+                    # autocommitを元に戻す（読み取り専用の場合のみ）
+                    if is_read_only and original_autocommit is not None:
+                        try:
+                            conn.autocommit = original_autocommit
+                        except Exception:
+                            pass  # 元に戻すのに失敗しても無視
+                    
+                    return result
+                    
+            except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
+                error_str = str(e)
+                
+                # 接続が閉じられたエラーを特定
+                if ("server closed the connection" in error_str.lower() or 
+                    "connection" in error_str.lower() or 
+                    "closed" in error_str.lower() or
+                    "server terminated abnormally" in error_str.lower()):
+                    logger.warning(f"⚠️ データベース接続エラーが発生しました: {e} (試行 {attempt + 1}/{max_retries})")
+                    
+                    if attempt < max_retries - 1:
+                        # 指数バックオフで待機時間を増やす
+                        # "server terminated abnormally"の場合は、より長い待機時間を設定
+                        if "server terminated abnormally" in error_str.lower():
+                            wait_time = base_wait_time * (2 ** attempt) * 3  # 通常の3倍
+                            logger.info(f"⏳ データベースサーバーが異常終了した可能性があります。{wait_time}秒待機してから再試行します...")
+                        else:
+                            wait_time = base_wait_time * (2 ** attempt)
+                            logger.info(f"⏳ {wait_time}秒待機してから再試行します...")
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        logger.error(f"❌ データベース接続エラー（最大試行回数）: {e}")
+                        return None
+                else:
+                    # 接続エラー以外のデータベースエラーはそのまま再スロー
+                    logger.error(f"❌ データベースエラー（再接続不可）: {e}", exc_info=True)
+                    raise
+                    
+            except Exception as e:
+                # 接続エラー以外のエラーはそのまま再スロー
+                logger.error(f"❌ 予期しないエラーが発生しました: {e}", exc_info=True)
+                raise
+        
+        # 全ての再試行が失敗した場合
+        logger.error("❌ データベース接続エラー（最大試行回数に達しました）")
+        return None
+    
+    def _execute_with_retry_old(self):
+        """古い実装（削除予定）"""
+        # このメソッドは削除されました
+        pass
             try:
                 # closed属性のチェック
                 _ = self.connection.closed
@@ -1096,10 +1348,22 @@ class TrendsCache:
                         # 再接続処理に進む（ロックを取得して再接続）
                     else:
                         try:
+                            # 接続検証クエリにタイムアウトを設定（5秒）
                             with self.connection.cursor() as cursor:
+                                # 接続検証用のタイムアウトを設定（このクエリのみ）
+                                cursor.execute("SET statement_timeout = 5000")
                                 cursor.execute("SELECT 1")
                                 cursor.fetchone()
+                                # タイムアウトを元に戻す
+                                cursor.execute("RESET statement_timeout")
                             return self.connection
+                        except psycopg2.OperationalError as timeout_error:
+                            # タイムアウトエラーの場合は接続が無効と判断
+                            if "timeout" in str(timeout_error).lower():
+                                logger.warning(f"⚠️ データベース接続検証タイムアウト（再接続します）: {timeout_error}")
+                            else:
+                                logger.warning(f"⚠️ データベース接続検証失敗（再接続します）: {timeout_error}")
+                            self.connection = None
                         finally:
                             if original_autocommit is not None:
                                 try:
@@ -1108,7 +1372,9 @@ class TrendsCache:
                                     pass
                 except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
                     # 接続が無効な場合は再接続
-                    logger.warning(f"⚠️ データベース接続検証失敗（再接続します）: {e}")
+                    error_str = str(e).lower()
+                    if "timeout" in error_str or "server closed" in error_str or "connection" in error_str:
+                        logger.warning(f"⚠️ データベース接続検証失敗（再接続します）: {e}")
                     self.connection = None
             except (psycopg2.InterfaceError, psycopg2.OperationalError, AttributeError):
                 # 接続オブジェクト自体が無効な場合は再接続
@@ -1130,17 +1396,32 @@ class TrendsCache:
                             # 再接続処理に進む（下のforループで再接続される）
                         else:
                             try:
+                                # 接続検証クエリにタイムアウトを設定（5秒）
                                 with self.connection.cursor() as cursor:
+                                    # 接続検証用のタイムアウトを設定（このクエリのみ）
+                                    cursor.execute("SET statement_timeout = 5000")
                                     cursor.execute("SELECT 1")
                                     cursor.fetchone()
+                                    # タイムアウトを元に戻す
+                                    cursor.execute("RESET statement_timeout")
                                 return self.connection
+                            except psycopg2.OperationalError as timeout_error:
+                                # タイムアウトエラーの場合は接続が無効と判断
+                                if "timeout" in str(timeout_error).lower():
+                                    logger.warning(f"⚠️ データベース接続検証タイムアウト（再接続します）: {timeout_error}")
+                                else:
+                                    logger.warning(f"⚠️ データベース接続検証失敗（再接続します）: {timeout_error}")
+                                self.connection = None
                             finally:
                                 if original_autocommit is not None:
                                     try:
                                         self.connection.autocommit = original_autocommit
                                     except Exception:
                                         pass
-                    except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError):
+                    except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
+                        error_str = str(e).lower()
+                        if "timeout" in error_str or "server closed" in error_str or "connection" in error_str:
+                            logger.warning(f"⚠️ データベース接続検証失敗（再接続します）: {e}")
                         self.connection = None
                 except (psycopg2.InterfaceError, psycopg2.OperationalError, AttributeError):
                     logger.warning("⚠️ データベース接続オブジェクトが無効です。再接続します")
@@ -1175,11 +1456,30 @@ class TrendsCache:
                                 else:
                                     raise psycopg2.OperationalError("autocommit設定に失敗しました")
                             try:
+                                # 接続検証クエリにタイムアウトを設定（5秒）
                                 with self.connection.cursor() as cursor:
+                                    # 接続検証用のタイムアウトを設定（このクエリのみ）
+                                    cursor.execute("SET statement_timeout = 5000")
                                     cursor.execute("SELECT 1")
                                     cursor.fetchone()
+                                    # タイムアウトを元に戻す
+                                    cursor.execute("RESET statement_timeout")
                                 logger.info(f"✅ データベース接続を確立しました (試行 {attempt + 1}/{max_retries})")
                                 return self.connection
+                            except psycopg2.OperationalError as timeout_error:
+                                # タイムアウトエラーの場合は接続が無効と判断
+                                if "timeout" in str(timeout_error).lower():
+                                    logger.warning(f"⚠️ 接続検証タイムアウト: {timeout_error} - 再接続を試みます")
+                                else:
+                                    logger.warning(f"⚠️ 接続検証失敗: {timeout_error} - 再接続を試みます")
+                                self.connection = None
+                                if attempt < max_retries - 1:
+                                    wait_time = base_retry_delay * (2 ** attempt)
+                                    logger.info(f"⏳ {wait_time}秒待機してから再試行します...")
+                                    time.sleep(wait_time)
+                                    continue
+                                else:
+                                    raise timeout_error
                             finally:
                                 if original_autocommit is not None:
                                     try:
@@ -1286,11 +1586,27 @@ class TrendsCache:
                 try:
                     if conn.closed:
                         raise psycopg2.InterfaceError("接続が閉じられています")
-                    # 軽量な検証クエリを実行して接続が有効か確認
+                    # 軽量な検証クエリを実行して接続が有効か確認（タイムアウト5秒）
                     with conn.cursor() as test_cursor:
+                        test_cursor.execute("SET statement_timeout = 5000")
                         test_cursor.execute("SELECT 1")
                         test_cursor.fetchone()
-                except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as verify_error:
+                        test_cursor.execute("RESET statement_timeout")
+                except psycopg2.OperationalError as timeout_error:
+                    # タイムアウトエラーの場合は接続が無効と判断
+                    error_str = str(timeout_error).lower()
+                    if "timeout" in error_str:
+                        logger.warning(f"⚠️ 接続検証タイムアウト（再接続します）: {timeout_error}")
+                    else:
+                        logger.warning(f"⚠️ 接続検証失敗（再接続します）: {timeout_error}")
+                    self.connection = None
+                    if attempt < max_retries - 1:
+                        wait_time = base_wait_time * (2 ** attempt)
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        raise timeout_error
+                except (psycopg2.InterfaceError, psycopg2.DatabaseError) as verify_error:
                     # 接続が無効な場合は再接続を試みる
                     logger.warning(f"⚠️ 接続検証失敗（再接続します）: {verify_error}")
                     self.connection = None

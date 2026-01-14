@@ -148,31 +148,168 @@ function truncateText(text, maxLength = 100) {
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
 }
 
+// ============================================
+// ドロップダウンパターン用の共通関数
+// ============================================
 
-// リトライ付きfetch関数（loadTrendsFromCacheで使用）
-async function fetchWithRetry(url, options = {}, maxRetries = 2) {
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-        try {
-            const response = await fetch(url, options);
-            // 500エラーやネットワークエラーもリトライ対象
-            if (!response.ok && response.status >= 500 && attempt < maxRetries - 1) {
-                console.warn(`⚠️ API呼び出しエラー (${response.status})。リトライします (試行 ${attempt + 1}/${maxRetries})`);
-                await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1))); // 指数バックオフ
-                continue;
-            }
-            return response;
-        } catch (error) {
-            if (attempt < maxRetries - 1) {
-                console.warn(`⚠️ ネットワークエラーが発生しました: ${error.message}。リトライします (試行 ${attempt + 1}/${maxRetries})`);
-                await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1))); // 指数バックオフ
-                continue;
-            }
-            throw error;
+/**
+ * ドロップダウンパターンのトレンドマネージャーを作成
+ * @param {Object} config - 設定オブジェクト
+ * @param {string} config.serviceName - サービス名（例: 'hatena', 'note', 'twitch'）
+ * @param {string} config.selectId - ドロップダウンのID（例: 'hatenaCategorySelect'）
+ * @param {string} config.apiEndpoint - APIエンドポイント（例: '/api/hatena-trends'）
+ * @param {string} config.defaultValue - デフォルト値（例: 'all', 'games'）
+ * @param {string} config.paramName - パラメータ名（例: 'category', 'type'）
+ * @param {Object} config.uiIds - UI要素のID
+ * @param {string} config.uiIds.loading - ローディング要素のID
+ * @param {string} config.uiIds.results - 結果要素のID
+ * @param {string} config.uiIds.tableBody - テーブルボディのID
+ * @param {string} config.uiIds.statusMessage - ステータスメッセージ要素のID
+ * @param {string} config.uiIds.errorMessage - エラーメッセージ要素のID
+ * @param {Function} config.displayFunction - データ表示関数
+ * @param {Function} config.getParams - 追加パラメータを取得する関数（オプション）
+ */
+function createDropdownTrendsManager(config) {
+    const {
+        serviceName,
+        selectId,
+        apiEndpoint,
+        defaultValue,
+        paramName = 'category',
+        uiIds,
+        displayFunction,
+        getParams = () => ({})
+    } = config;
+
+    // ヘルパー関数
+    const showLoading = () => {
+        const element = document.getElementById(uiIds.loading);
+        if (element) element.style.display = 'block';
+    };
+
+    const hideLoading = () => {
+        const element = document.getElementById(uiIds.loading);
+        if (element) element.style.display = 'none';
+    };
+
+    const showResults = () => {
+        const element = document.getElementById(uiIds.results);
+        if (element) element.style.display = 'block';
+    };
+
+    const hideResults = () => {
+        const element = document.getElementById(uiIds.results);
+        if (element) element.style.display = 'none';
+    };
+
+    const showStatusMessage = (message, type = 'info') => {
+        const element = document.getElementById(uiIds.statusMessage);
+        if (element) {
+            element.textContent = message;
+            element.className = `alert alert-${type}`;
+            element.style.display = 'block';
         }
+    };
+
+    const showError = (message) => {
+        showStatusMessage(message, 'danger');
+        showResults();
+    };
+
+    // データ取得関数
+    const fetchTrends = () => {
+        showLoading();
+        hideResults();
+        
+        const selectElement = document.getElementById(selectId);
+        const selectedValue = selectElement ? selectElement.value : defaultValue;
+        
+        console.log(`🔍 ${serviceName}: ${paramName} '${selectedValue}' のデータを取得中...`);
+        
+        const params = {
+            [paramName]: selectedValue,
+            limit: 25,
+            ...getParams(selectedValue)
+        };
+        
+        const queryString = new URLSearchParams(params).toString();
+        const url = `${apiEndpoint}?${queryString}`;
+        
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                console.log(`📊 ${serviceName}: ${paramName} '${selectedValue}' のデータ取得完了`, data);
+                if (data.success) {
+                    if (typeof displayFunction === 'function') {
+                        displayFunction(data);
+                    } else {
+                        console.error(`display${serviceName.charAt(0).toUpperCase() + serviceName.slice(1)}Results関数が見つかりません`);
+                    }
+                    showResults();
+                } else {
+                    showError(data.error || `${serviceName}トレンドの取得に失敗しました`);
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                console.error(`❌ ${serviceName}: エラー`, error);
+                showError('ネットワークエラー: ' + error.message);
+            });
+    };
+
+    // イベントリスナーの設定
+    const setupEventListener = () => {
+        console.log(`🔧 ${serviceName}: setupEventListener呼び出し (selectId: ${selectId})`);
+        const selectElement = document.getElementById(selectId);
+        if (selectElement) {
+            console.log(`✅ ${serviceName}: selectElement見つかりました、イベントリスナーを設定します`);
+            selectElement.addEventListener('change', function() {
+                console.log(`🔄 ${serviceName}: ${paramName}が '${this.value}' に変更されました`);
+                fetchTrends();
+            });
+        } else {
+            console.error(`❌ ${serviceName}: selectElement (id: ${selectId}) が見つかりません`);
+        }
+    };
+
+    // 初期化
+    console.log(`🔧 ${serviceName}: createDropdownTrendsManager初期化 (document.readyState: ${document.readyState})`);
+    if (document.readyState === 'loading') {
+        console.log(`🔧 ${serviceName}: DOMContentLoadedイベントを待機します`);
+        document.addEventListener('DOMContentLoaded', setupEventListener);
+    } else {
+        console.log(`🔧 ${serviceName}: DOM既に読み込み済み、即座にsetupEventListenerを呼び出します`);
+        setupEventListener();
     }
+
+    // 公開API
+    return {
+        fetchTrends,
+        showLoading,
+        hideLoading,
+        showResults,
+        hideResults,
+        showError
+    };
 }
 
-// シンプルパターン用の共通キャッシュ読み込み関数
+// ============================================
+// シンプルパターン用の共通関数
+// ============================================
+
+/**
+ * シンプルパターンのキャッシュデータ読み込み関数
+ * @param {Object} config - 設定オブジェクト
+ * @param {string} config.serviceName - サービス名
+ * @param {string} config.apiEndpoint - APIエンドポイント
+ * @param {Object} config.params - APIパラメータ
+ * @param {Object} config.uiIds - UI要素のID
+ * @param {string} config.uiIds.loading - ローディング要素のID（オプション）
+ * @param {string} config.uiIds.results - 結果要素のID（オプション）
+ * @param {Function} config.displayFunction - データ表示関数
+ * @param {number} config.timeout - タイムアウト時間（ミリ秒、デフォルト: 30000）
+ */
 function loadTrendsFromCache(config) {
     const {
         serviceName,
@@ -226,8 +363,6 @@ function loadTrendsFromCache(config) {
                 }
             }
             
-            // データが存在し、成功している場合に表示関数を呼び出す
-            // Google Trendsなど一部のAPIはdata.successがない場合もあるため、data.dataの存在をチェック
             if (data.data && data.data.length > 0) {
                 console.log(`${serviceName} Trends データ表示開始`);
                 if (typeof displayFunction === 'function') {

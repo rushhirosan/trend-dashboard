@@ -3,69 +3,87 @@ import requests
 from datetime import datetime
 from database_config import TrendsCache
 from utils.logger_config import get_logger
-from utils.rate_limiter import get_rate_limiter
+from services.trends.base_trends_manager import BaseTrendsManager
 
 # ロガーの初期化
 logger = get_logger(__name__)
 
-class AppStoreTrendsManager:
+class AppStoreTrendsManager(BaseTrendsManager):
     """App Storeトレンド管理クラス"""
     
     def __init__(self):
         """初期化"""
+        # ベースクラスを初期化（rate_limiterも自動的に初期化される）
+        super().__init__(service_name='appstore', max_requests=10, window_seconds=60)
+        
         self.base_url = "https://itunes.apple.com"
-        self.db = TrendsCache()
-        # レート制限: iTunes APIは特に制限なしだが、保守的に10リクエスト/分に設定
-        self.rate_limiter = get_rate_limiter('appstore', max_requests=10, window_seconds=60)
         
         logger.info(f"App Store Trends Manager初期化:")
         logger.info(f"  API URL: {self.base_url}")
     
-    def get_trends(self, country='JP', category='all', limit=25, force_refresh=False):
-        """App Storeトレンドを取得（キャッシュ優先）"""
+    def _get_cache_key(self):
+        """キャッシュキーを返す"""
+        return 'appstore_trends'
+
+    def _get_from_cache(self, *args, **kwargs):
+        """キャッシュからデータを取得"""
+        country = kwargs.get('country', 'JP')
+        return self.db.get_appstore_trends_from_cache(country)
+
+    def _save_to_cache(self, data, *args, **kwargs):
+        """キャッシュにデータを保存"""
         try:
-            cache_key = f'appstore_trends_{country}'
-            
-            if force_refresh:
-                logger.info(f"🔄 App Store force_refresh: キャッシュをクリアします")
-                self.db.clear_appstore_trends_cache(country)
-            
-            # キャッシュからデータを取得
-            cached_data = self.db.get_appstore_trends_from_cache(country)
-            
-            if cached_data:
-                logger.info(f"✅ App Store: キャッシュから{len(cached_data)}件のデータを取得しました")
-                # cache_statusを更新
-                self.db.update_cache_status(cache_key, len(cached_data))
-                return {
-                    'success': True,
-                    'data': cached_data,
-                    'status': 'cached',
-                    'source': 'database_cache',
-                    'country': country,
-                    'category': category
-                }
-            else:
-                # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
-                if not force_refresh:
-                    logger.warning("⚠️ App Store: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
-                    return {
-                        'success': True,  # エラーではなく、データがない状態として扱う
-                        'data': [],
-                        'status': 'cache_not_found',
-                        'source': 'database_cache',
-                        'country': country,
-                        'category': category
-                    }
-                # force_refresh=trueの場合のみ外部APIを呼び出す
-                logger.warning("⚠️ App Store: キャッシュデータが見つかりません。外部APIを呼び出します")
-                return self.get_top_apps(country, category, limit)
-                
+            country = kwargs.get('country', 'JP')
+            return self.db.save_appstore_trends_to_cache(data, country)
         except Exception as e:
-            logger.error(f"❌ App Store トレンド取得エラー: {e}", exc_info=True)
-            return {'error': f'App Storeトレンドの取得に失敗しました: {str(e)}', 'success': False}
+            logger.error(f"❌ App Store キャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def _clear_cache(self, *args, **kwargs):
+        """キャッシュをクリア"""
+        try:
+            country = kwargs.get('country', 'JP')
+            return self.db.clear_appstore_trends_cache(country)
+        except Exception as e:
+            logger.error(f"❌ App Store キャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
+    def _update_cache_status(self, cache_key, data_count, *args, **kwargs):
+        """cache_statusテーブルを更新"""
+        try:
+            country = kwargs.get('country', 'JP')
+            cache_key_with_country = f'{cache_key}_{country}'
+            return self.db.update_cache_status(cache_key_with_country, data_count)
+        except Exception as e:
+            logger.warning(f"⚠️ App Store: cache_status更新エラー: {e}")
+            return False
+
+    def get_trends(self, country='JP', category='all', limit=25, force_refresh=False):
+        """App Storeトレンドを取得（キャッシュ優先、average_user_ratingでソート）"""
+        # ベースクラスのget_trendsを使用
+        # auto_fetch_on_cache_miss=Falseで、既存動作を維持（キャッシュがない場合はAPIを呼び出さない）
+        # sort_key='average_user_rating'で評価でソート（降順、評価0のものは下に来る）
+        result = super().get_trends(
+            limit=limit,
+            force_refresh=force_refresh,
+            auto_fetch_on_cache_miss=False,  # 既存動作を維持
+            sort_key='average_user_rating',  # 評価でソート
+            sort_reverse=True,  # 降順
+            country=country,
+            category=category
+        )
+        # countryとcategoryパラメータを結果に追加
+        if result and isinstance(result, dict):
+            result['country'] = country
+            result['category'] = category
+        return result
     
     def get_top_apps(self, country='JP', category='all', limit=25):
+        """App Storeの人気アプリを取得（既存APIとの互換性のため）"""
+        # force_refresh=Trueで強制更新
+        return self.get_trends(country=country, category=category, limit=limit, force_refresh=True)
+    
+    def _fetch_trends(self, country='JP', category='all', limit=25, *args, **kwargs):
         """App Storeの人気アプリを取得（iTunes RSS Feed APIを使用）"""
         try:
             # レート制限をチェック
@@ -257,13 +275,6 @@ class AppStoreTrendsManager:
                         logger.warning(f"⚠️ App Store: 評価情報取得エラー: {e}")
                         # 評価情報が取得できなくても続行
                 
-                # データベースにキャッシュ
-                if formatted_data:
-                    self.db.save_appstore_trends_to_cache(formatted_data, country)
-                    # cache_statusを更新
-                    cache_key = f'appstore_trends_{country}'
-                    self.db.update_cache_status(cache_key, len(formatted_data))
-                
                 logger.info(f"✅ App Store: {len(formatted_data)}件のトレンドアプリを取得しました (RSS Feed API使用)")
                 return {
                     'success': True,
@@ -271,7 +282,8 @@ class AppStoreTrendsManager:
                     'status': 'api_fetched',
                     'source': 'appstore_rss_feed',
                     'country': country,
-                    'category': category
+                    'category': category,
+                    'total_count': len(formatted_data)
                 }
             else:
                 return {
@@ -297,4 +309,3 @@ class AppStoreTrendsManager:
                 'error': f'App Storeトレンドの取得に失敗しました: {str(e)}',
                 'success': False
             }
-

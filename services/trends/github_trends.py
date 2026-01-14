@@ -30,8 +30,14 @@ class GitHubTrendsManager(BaseTrendsManager):
         return 'github_trends'
 
     def _get_from_cache(self, *args, **kwargs):
-        """キャッシュからデータを取得"""
-        return self.db.get_github_trends_from_cache()
+        """キャッシュからデータを取得（stars_countをstarsにもマッピング）"""
+        cached_data = self.db.get_github_trends_from_cache()
+        if cached_data:
+            # stars_countをstarsにもマッピング（フロントエンド互換性のため）
+            for item in cached_data:
+                if 'stars_count' in item and 'stars' not in item:
+                    item['stars'] = item.get('stars_count', 0) or 0
+        return cached_data
 
     def _save_to_cache(self, data, *args, **kwargs):
         """キャッシュにデータを保存"""
@@ -58,13 +64,16 @@ class GitHubTrendsManager(BaseTrendsManager):
             return False
 
     def get_trends(self, language='all', limit=25, force_refresh=False):
-        """GitHubトレンドを取得（キャッシュ優先）"""
+        """GitHubトレンドを取得（キャッシュ優先、stars_countでソート）"""
         # ベースクラスのget_trendsを使用
         # auto_fetch_on_cache_miss=Falseで、既存動作を維持（キャッシュがない場合はAPIを呼び出さない）
+        # sort_key='stars_count'でスター数でソート（降順）
         result = super().get_trends(
             limit=limit,
             force_refresh=force_refresh,
             auto_fetch_on_cache_miss=False,  # 既存動作を維持
+            sort_key='stars_count',  # スター数でソート
+            sort_reverse=True,  # 降順
             language=language
         )
         # languageパラメータを結果に追加
@@ -180,27 +189,35 @@ class GitHubTrendsManager(BaseTrendsManager):
                         except Exception:
                             created_date = datetime.now()
                     
+                    stars_count = repo.get('stargazers_count', 0) or 0
                     formatted_data.append({
                         'id': repo.get('id'),
+                        'repo_id': str(repo.get('id', '')),
                         'name': repo.get('name', ''),
                         'full_name': repo.get('full_name', ''),
                         'description': repo.get('description', '')[:300] if repo.get('description') else '',
                         'url': repo.get('html_url', ''),
                         'language': repo.get('language', ''),
-                        'stars': repo.get('stargazers_count', 0),
+                        'stars': stars_count,  # フロントエンド用（互換性のため残す）
+                        'stars_count': stars_count,  # データベース用
                         'forks': repo.get('forks_count', 0),
+                        'forks_count': repo.get('forks_count', 0) or 0,
                         'open_issues': repo.get('open_issues_count', 0),
+                        'open_issues_count': repo.get('open_issues_count', 0) or 0,
                         'created_at': created_date.isoformat() if created_date else None,
                         'updated_at': updated_date.isoformat() if updated_date else None,
+                        'pushed_at': updated_date.isoformat() if updated_date else None,  # pushed_atがない場合はupdated_atを使用
                         'owner': repo.get('owner', {}).get('login', '') if repo.get('owner') else '',
+                        'owner_login': repo.get('owner', {}).get('login', '') if repo.get('owner') else '',
+                        'owner_avatar_url': repo.get('owner', {}).get('avatar_url', '') if repo.get('owner') else '',
                         'source': 'GitHub'
                     })
                 except Exception as e:
                     logger.warning(f"⚠️ GitHub リポジトリデータの処理でエラー: {e}", exc_info=True)
                     continue
             
-            # starsでソート（降順）- 既にAPIでソート済みだが念のため
-            formatted_data.sort(key=lambda x: x.get('stars', 0), reverse=True)
+            # stars_countでソート（降順）- 既にAPIでソート済みだが念のため
+            formatted_data.sort(key=lambda x: x.get('stars_count', 0) or 0, reverse=True)
             
             # ランキングを設定
             for i, item in enumerate(formatted_data[:limit], 1):

@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from database_config import TrendsCache
 from utils.logger_config import get_logger
-from utils.rate_limiter import get_rate_limiter
+from services.trends.base_trends_manager import BaseTrendsManager
 
 # 環境変数を明示的に読み込み
 load_dotenv()
@@ -12,21 +12,83 @@ load_dotenv()
 # ロガーの初期化
 logger = get_logger(__name__)
 
-class RakutenTrendsManager:
+class RakutenTrendsManager(BaseTrendsManager):
     """楽天のトレンドを取得・管理するクラス"""
     
     def __init__(self):
         """初期化"""
-        self.db = TrendsCache()
+        # ベースクラスを初期化（rate_limiterも自動的に初期化される）
+        super().__init__(service_name='rakuten', max_requests=10, window_seconds=60)
+        
         self.rakuten_app_id = os.getenv('RAKUTEN_APP_ID')
         self.rakuten_affiliate_id = os.getenv('RAKUTEN_AFFILIATE_ID')
-        # レート制限: 楽天APIは1リクエスト/秒
-        self.rate_limiter = get_rate_limiter('rakuten', max_requests=10, window_seconds=60)
         
         logger.info(f"Rakuten Trends Manager初期化:")
         logger.info(f"  App ID: {'設定済み' if self.rakuten_app_id else '未設定'}")
         logger.info(f"  Affiliate ID: {'設定済み' if self.rakuten_affiliate_id else '未設定'}")
     
+    def _get_cache_key(self, *args, **kwargs):
+        """キャッシュキーを返す"""
+        genre_id = kwargs.get('genre_id', None)
+        cache_scope = genre_id or 'all'
+        return f'rakuten_trends_{cache_scope}'
+
+    def _get_from_cache(self, *args, **kwargs):
+        """キャッシュからデータを取得"""
+        try:
+            genre_id = kwargs.get('genre_id', None)
+            cache_scope = genre_id or 'all'
+            return self.db.get_rakuten_trends_from_cache(cache_scope)
+        except Exception as e:
+            logger.error(f"❌ Rakuten: キャッシュ取得エラー: {e}", exc_info=True)
+            return None
+
+    def _save_to_cache(self, data, *args, **kwargs):
+        """キャッシュにデータを保存"""
+        try:
+            genre_id = kwargs.get('genre_id', None)
+            cache_scope = genre_id or 'all'
+            return self.db.save_rakuten_trends_to_cache(data, cache_scope)
+        except Exception as e:
+            logger.error(f"❌ Rakuten キャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def _clear_cache(self, *args, **kwargs):
+        """キャッシュをクリア"""
+        try:
+            genre_id = kwargs.get('genre_id', None)
+            cache_scope = genre_id or 'all'
+            return self.db.clear_rakuten_trends_cache(cache_scope)
+        except Exception as e:
+            logger.error(f"❌ Rakuten キャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
+    def _update_cache_status(self, cache_key, data_count):
+        """cache_statusテーブルを更新"""
+        try:
+            return self.db.update_cache_status(cache_key, data_count)
+        except Exception as e:
+            logger.warning(f"⚠️ Rakuten: cache_status更新エラー: {e}")
+            return False
+    
+    def _fetch_trends(self, genre_id=None, limit=25, *args, **kwargs):
+        """外部APIから楽天データを取得"""
+        result = self._get_rakuten_ranking(genre_id, limit)
+        if result and result.get('data'):
+            return {
+                'success': True,
+                'data': result['data'],
+                'status': 'api_fetched',
+                'genre_id': genre_id,
+                'source': '楽天商品ランキングAPI'
+            }
+        else:
+            return {
+                'success': False,
+                'error': 'データが取得できませんでした',
+                'data': []
+            }
+
     def get_trends(self, genre_id=None, limit=25, force_refresh=False):
         """楽天トレンドを取得（get_popular_itemsのエイリアス）"""
         return self.get_popular_items(genre_id, limit, force_refresh)

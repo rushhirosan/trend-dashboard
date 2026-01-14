@@ -6,28 +6,89 @@ import urllib.parse
 from datetime import datetime, timedelta
 from database_config import TrendsCache
 from utils.logger_config import get_logger
-from utils.rate_limiter import get_rate_limiter
+from services.trends.base_trends_manager import BaseTrendsManager
 
 # ロガーの初期化
 logger = get_logger(__name__)
 
-class HatenaTrendsManager:
+class HatenaTrendsManager(BaseTrendsManager):
     """はてなブックマークトレンド管理クラス（公式RSS + API使用）"""
     
     def __init__(self):
         """初期化"""
+        # ベースクラスを初期化（rate_limiterも自動的に初期化される）
+        super().__init__(service_name='hatena', max_requests=10, window_seconds=60)
+        
         self.base_url = "https://b.hatena.ne.jp"
         self.count_api_url = "https://bookmark.hatenaapis.com/count/entry"
         self.entry_api_url = "https://b.hatena.ne.jp/entry/json"
-        self.db = TrendsCache()
-        # レート制限: はてなAPIは特に制限なしだが、保守的に10リクエスト/分に設定
-        self.rate_limiter = get_rate_limiter('hatena', max_requests=10, window_seconds=60)
         
         logger.info(f"はてなブックマーク Trends Manager初期化:")
         logger.info(f"  ホットエントリーRSS: {self.base_url}/hotentry.rss")
         logger.info(f"  Count API: {self.count_api_url}")
         logger.info(f"  Entry API: {self.entry_api_url}")
     
+    def _get_cache_key(self):
+        """キャッシュキーを返す"""
+        return 'hatena_trends'
+
+    def _get_from_cache(self, *args, **kwargs):
+        """キャッシュからデータを取得"""
+        try:
+            category = kwargs.get('category', 'all')
+            return self.db.get_hatena_trends_from_cache(category)
+        except Exception as e:
+            logger.error(f"❌ Hatena: キャッシュ取得エラー: {e}", exc_info=True)
+            return None
+
+    def _save_to_cache(self, data, *args, **kwargs):
+        """キャッシュにデータを保存"""
+        try:
+            category = kwargs.get('category', 'all')
+            return self.db.save_hatena_trends_to_cache(data, category)
+        except Exception as e:
+            logger.error(f"❌ Hatena キャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def _clear_cache(self, *args, **kwargs):
+        """キャッシュをクリア"""
+        try:
+            category = kwargs.get('category', 'all')
+            return self.db.clear_hatena_trends_cache(category)
+        except Exception as e:
+            logger.error(f"❌ Hatena キャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
+    def _update_cache_status(self, cache_key, data_count):
+        """cache_statusテーブルを更新"""
+        try:
+            return self.db.update_cache_status(cache_key, data_count)
+        except Exception as e:
+            logger.warning(f"⚠️ Hatena: cache_status更新エラー: {e}")
+            return False
+    
+    def _fetch_trends(self, category='all', limit=25, *args, **kwargs):
+        """外部APIからはてなブックマークデータを取得"""
+        result = self.get_new_entries(category, limit)
+        if result and not result.get('error'):
+            trends_data = result.get('data', [])
+            # カテゴリ情報を追加
+            for item in trends_data:
+                item['category'] = category
+            return {
+                'success': True,
+                'data': trends_data,
+                'status': 'api_fetched',
+                'category': category,
+                'source': 'Hatena API'
+            }
+        else:
+            return {
+                'success': False,
+                'error': result.get('error', 'Unknown error') if result else 'API call failed',
+                'data': []
+            }
+
     def get_trends(self, category='all', limit=25, force_refresh=False, fetch_all_categories=False):
         """はてなブックマークトレンドを取得（get_hot_entriesのエイリアス）"""
         logger.debug(f"🔍 はてなブックマーク: get_trends呼び出し (category: {category}, fetch_all_categories: {fetch_all_categories})")
@@ -570,26 +631,10 @@ class HatenaTrendsManager:
     def _update_cache_status(self, cache_key, data_count):
         """cache_statusテーブルを更新"""
         try:
-            from datetime import datetime
-            now = datetime.now()
-            
-            conn = self.db.get_connection()
-            if not conn:
-                logger.warning("⚠️ データベース接続が取得できませんでした。cache_status更新をスキップします")
-                return
-            
-            with conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("""
-                        INSERT INTO cache_status (cache_key, last_updated, data_count)
-                        VALUES (%s, %s, %s)
-                        ON CONFLICT (cache_key) DO UPDATE SET
-                            last_updated = EXCLUDED.last_updated,
-                            data_count = EXCLUDED.data_count
-                    """, (cache_key, now, data_count))
-                    conn.commit()
+            return self.db.update_cache_status(cache_key, data_count)
         except Exception as e:
             logger.error(f"cache_status更新エラー: {e}", exc_info=True)
+            return False
 
     def _get_cache_info(self, cache_key):
         """キャッシュ情報を取得"""

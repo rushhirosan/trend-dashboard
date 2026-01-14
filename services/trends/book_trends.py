@@ -8,16 +8,19 @@ import requests
 from datetime import datetime
 from database_config import TrendsCache
 from utils.logger_config import get_logger
-from utils.rate_limiter import get_rate_limiter
+from services.trends.base_trends_manager import BaseTrendsManager
 
 # ロガーの初期化
 logger = get_logger(__name__)
 
-class BookTrendsManager:
+class BookTrendsManager(BaseTrendsManager):
     """書籍トレンドの管理クラス"""
     
     def __init__(self):
         """初期化"""
+        # ベースクラスを初期化（rate_limiterも自動的に初期化される）
+        super().__init__(service_name='book', max_requests=10, window_seconds=60)
+        
         # 楽天ブックスAPI設定（日本向け）
         # 書籍ジャンル一覧: https://webservice.rakuten.co.jp/api/booksgenreidsearch/
         # 001001: 本・雑誌（総合）
@@ -30,13 +33,62 @@ class BookTrendsManager:
         self.google_books_base_url = "https://www.googleapis.com/books/v1"
         self.google_books_api_key = os.getenv('GOOGLE_BOOKS_API_KEY')
         
-        self.db = TrendsCache()
-        # レート制限: 楽天APIは1リクエスト/秒、Google Books APIは1000リクエスト/日（保守的に10リクエスト/分に設定）
-        self.rate_limiter = get_rate_limiter('book', max_requests=10, window_seconds=60)
-        
         logger.info("Book Trends Manager初期化完了")
         logger.info(f"  楽天ブックス App ID: {'設定済み' if self.rakuten_app_id else '未設定'}")
         logger.info(f"  Google Books API Key: {'設定済み' if self.google_books_api_key else '未設定'}")
+    
+    def _get_cache_key(self, *args, **kwargs):
+        """キャッシュキーを返す"""
+        country = kwargs.get('country', 'JP')
+        return f'book_trends_{country}'
+
+    def _get_from_cache(self, *args, **kwargs):
+        """キャッシュからデータを取得"""
+        try:
+            country = kwargs.get('country', 'JP')
+            return self.db.get_book_trends_from_cache(country)
+        except Exception as e:
+            logger.error(f"❌ Book: キャッシュ取得エラー: {e}", exc_info=True)
+            return None
+
+    def _save_to_cache(self, data, *args, **kwargs):
+        """キャッシュにデータを保存"""
+        try:
+            country = kwargs.get('country', 'JP')
+            return self.db.save_book_trends_to_cache(data, country)
+        except Exception as e:
+            logger.error(f"❌ Book キャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def _clear_cache(self, *args, **kwargs):
+        """キャッシュをクリア"""
+        try:
+            country = kwargs.get('country', 'JP')
+            return self.db.clear_book_trends_cache(country)
+        except Exception as e:
+            logger.error(f"❌ Book キャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
+    def _update_cache_status(self, cache_key, data_count):
+        """cache_statusテーブルを更新"""
+        try:
+            return self.db.update_cache_status(cache_key, data_count)
+        except Exception as e:
+            logger.warning(f"⚠️ Book: cache_status更新エラー: {e}")
+            return False
+    
+    def _fetch_trends(self, country='JP', limit=25, *args, **kwargs):
+        """外部APIから書籍データを取得"""
+        if country == 'JP':
+            return self._fetch_rakuten_books_trends(limit)
+        elif country == 'US':
+            return self._fetch_google_books_trends(limit)
+        else:
+            return {
+                'success': False,
+                'error': f'サポートされていない国コード: {country}',
+                'data': []
+            }
     
     def get_trends(self, country='JP', limit=25, force_refresh=False):
         """

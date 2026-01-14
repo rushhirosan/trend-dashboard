@@ -3,21 +3,21 @@ import requests
 from datetime import datetime, timedelta
 from database_config import TrendsCache
 from utils.logger_config import get_logger
-from utils.rate_limiter import get_rate_limiter
+from services.trends.base_trends_manager import BaseTrendsManager
 
 # ロガーの初期化
 logger = get_logger(__name__)
 
-class WorldNewsTrendsManager:
+class WorldNewsTrendsManager(BaseTrendsManager):
     """World News APIを使用して日本のニューストレンドを取得・管理するクラス"""
     
     def __init__(self):
         """初期化"""
+        # ベースクラスを初期化（rate_limiterも自動的に初期化される）
+        super().__init__(service_name='worldnews', max_requests=10, window_seconds=60)
+        
         self.api_key = os.getenv('WORLDNEWS_API_KEY')
         self.base_url = "https://api.worldnewsapi.com"
-        self.db = TrendsCache()
-        # レート制限: World News APIは50 points/日（保守的に10リクエスト/分に設定）
-        self.rate_limiter = get_rate_limiter('worldnews', max_requests=10, window_seconds=60)
         
         if not self.api_key:
             logger.warning("Warning: WORLDNEWS_API_KEYが設定されていません")
@@ -29,6 +29,67 @@ class WorldNewsTrendsManager:
         # if self.api_key:
         #     self._test_connection()
     
+    def _get_cache_key(self, *args, **kwargs):
+        """キャッシュキーを返す"""
+        country = kwargs.get('country', 'jp')
+        return f'worldnews_trends_{country}'
+
+    def _get_from_cache(self, *args, **kwargs):
+        """キャッシュからデータを取得"""
+        try:
+            country = kwargs.get('country', 'jp')
+            # データベースに保存されている形式に合わせる（小文字）
+            return self.db.get_worldnews_trends_from_cache('general', country.lower())
+        except Exception as e:
+            logger.error(f"❌ WorldNews: キャッシュ取得エラー: {e}", exc_info=True)
+            return None
+
+    def _save_to_cache(self, data, *args, **kwargs):
+        """キャッシュにデータを保存"""
+        try:
+            country = kwargs.get('country', 'jp')
+            cache_key = kwargs.get('cache_key', 'worldnews_trends')
+            return self.db.save_worldnews_trends_to_cache(data, cache_key, country)
+        except Exception as e:
+            logger.error(f"❌ WorldNews キャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def _clear_cache(self, *args, **kwargs):
+        """キャッシュをクリア"""
+        try:
+            country = kwargs.get('country', 'jp')
+            return self.db.clear_worldnews_trends_cache('general', country)
+        except Exception as e:
+            logger.error(f"❌ WorldNews キャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
+    def _update_cache_status(self, cache_key, data_count):
+        """cache_statusテーブルを更新"""
+        try:
+            return self.db.update_cache_status(cache_key, data_count)
+        except Exception as e:
+            logger.warning(f"⚠️ WorldNews: cache_status更新エラー: {e}")
+            return False
+    
+    def _fetch_trends(self, country='jp', category=None, page_size=25, *args, **kwargs):
+        """外部APIからWorld Newsデータを取得"""
+        result = self._get_worldnews_trends(country, category, page_size)
+        if result:
+            return {
+                'success': True,
+                'data': result,
+                'status': 'api_fetched',
+                'country': country.upper(),
+                'category': category,
+                'source': 'World News API'
+            }
+        else:
+            return {
+                'success': False,
+                'error': 'データが取得できませんでした',
+                'data': []
+            }
+
     def _test_connection(self):
         """World News API接続テスト"""
         try:
@@ -237,24 +298,10 @@ class WorldNewsTrendsManager:
     def _update_cache_status(self, cache_key, data_count):
         """cache_statusテーブルを更新"""
         try:
-            from datetime import datetime
-            import pytz
-            # 日本時間で現在時刻を取得
-            jst = pytz.timezone('Asia/Tokyo')
-            now = datetime.now(jst)
-            
-            with self.db.get_connection() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("""
-                        INSERT INTO cache_status (cache_key, last_updated, data_count)
-                        VALUES (%s, %s, %s)
-                        ON CONFLICT (cache_key) DO UPDATE SET
-                            last_updated = EXCLUDED.last_updated,
-                            data_count = EXCLUDED.data_count
-                    """, (cache_key, now, data_count))
-                    conn.commit()
+            return self.db.update_cache_status(cache_key, data_count)
         except Exception as e:
             logger.error(f"cache_status更新エラー: {e}", exc_info=True)
+            return False
     
     def is_cache_valid(self, cache_key, country):
         """キャッシュが有効かチェック（6時間以内）"""

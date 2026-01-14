@@ -5,23 +5,23 @@ from datetime import datetime, timedelta
 import pytz
 from database_config import TrendsCache
 from utils.logger_config import get_logger
-from utils.rate_limiter import get_rate_limiter
+from services.trends.base_trends_manager import BaseTrendsManager
 
 # ロガーの初期化
 logger = get_logger(__name__)
 
-class TwitchTrendsManager:
+class TwitchTrendsManager(BaseTrendsManager):
     """Twitchトレンド管理クラス"""
     
     def __init__(self):
         """初期化"""
+        # ベースクラスを初期化（rate_limiterも自動的に初期化される）
+        super().__init__(service_name='twitch', max_requests=800, window_seconds=60)
+        
         self.client_id = os.getenv('TWITCH_CLIENT_ID')
         self.client_secret = os.getenv('TWITCH_CLIENT_SECRET')
         self.base_url = "https://api.twitch.tv/helix"
         self.auth_url = "https://id.twitch.tv/oauth2/token"
-        self.db = TrendsCache()
-        # レート制限: Twitch APIは800 points/分（保守的に800リクエスト/分に設定）
-        self.rate_limiter = get_rate_limiter('twitch', max_requests=800, window_seconds=60)
         self.access_token = None
         self.token_expires_at = None
         
@@ -30,6 +30,79 @@ class TwitchTrendsManager:
         logger.info(f"  Client Secret: {'設定済み' if self.client_secret else '未設定'}")
         logger.info(f"  Base URL: {self.base_url}")
     
+    def _get_cache_key(self):
+        """キャッシュキーを返す"""
+        return 'twitch_trends'
+
+    def _get_from_cache(self, *args, **kwargs):
+        """キャッシュからデータを取得"""
+        try:
+            category = kwargs.get('category', 'games')
+            return self.db.get_twitch_trends_from_cache(category)
+        except Exception as e:
+            logger.error(f"❌ Twitch: キャッシュ取得エラー: {e}", exc_info=True)
+            return None
+
+    def _save_to_cache(self, data, *args, **kwargs):
+        """キャッシュにデータを保存"""
+        try:
+            category = kwargs.get('category', 'games')
+            return self.db.save_twitch_trends_to_cache(data, category)
+        except Exception as e:
+            logger.error(f"❌ Twitch キャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def _clear_cache(self, *args, **kwargs):
+        """キャッシュをクリア"""
+        try:
+            category = kwargs.get('category', 'games')
+            return self.db.clear_twitch_trends_cache(category)
+        except Exception as e:
+            logger.error(f"❌ Twitch キャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
+    def _update_cache_status(self, cache_key, data_count):
+        """cache_statusテーブルを更新"""
+        try:
+            return self.db.update_cache_status(cache_key, data_count)
+        except Exception as e:
+            logger.warning(f"⚠️ Twitch: cache_status更新エラー: {e}")
+            return False
+    
+    def _fetch_trends(self, category='games', limit=25, *args, **kwargs):
+        """外部APIからTwitchデータを取得"""
+        if category == 'games':
+            api_result = self._get_top_games_from_api(limit)
+        elif category == 'streams':
+            api_result = self._get_top_streams_from_api(limit)
+        elif category == 'clips':
+            api_result = self._get_top_clips_from_api(limit)
+        else:
+            return {
+                'success': False,
+                'error': f'Unknown category: {category}',
+                'data': []
+            }
+        
+        if api_result and isinstance(api_result, dict) and api_result.get('data'):
+            trends_data = api_result['data']
+            # カテゴリ情報を追加
+            for item in trends_data:
+                item['category'] = category
+            return {
+                'success': True,
+                'data': trends_data,
+                'status': 'api_fetched',
+                'trend_type': category,
+                'source': 'Twitch API'
+            }
+        else:
+            return {
+                'success': False,
+                'error': api_result.get('error', 'Unknown error') if api_result else 'API call failed',
+                'data': []
+            }
+
     def get_available_categories(self):
         """利用可能なカテゴリ一覧を取得"""
         return ['games', 'streams', 'clips']
@@ -637,28 +710,10 @@ class TwitchTrendsManager:
     def _update_cache_status(self, cache_key, data_count):
         """cache_statusテーブルを更新"""
         try:
-            from datetime import datetime
-            import pytz
-            # 日本時間で現在時刻を取得
-            jst = pytz.timezone('Asia/Tokyo')
-            now = datetime.now(jst)
-            
-            conn = self.db.get_connection()
-            if not conn:
-                logger.warning(f"⚠️ Twitch: データベース接続が取得できませんでした (_update_cache_status)")
-                return
-            
-            with conn.cursor() as cursor:
-                cursor.execute("""
-                    INSERT INTO cache_status (cache_key, last_updated, data_count)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (cache_key) DO UPDATE SET
-                        last_updated = EXCLUDED.last_updated,
-                        data_count = EXCLUDED.data_count
-                """, (cache_key, now, data_count))
-                conn.commit()
+            return self.db.update_cache_status(cache_key, data_count)
         except Exception as e:
             logger.error(f"❌ Twitch: cache_status更新エラー: {e}", exc_info=True)
+            return False
     
     def _get_cache_info(self, cache_key):
         """キャッシュ情報を取得"""

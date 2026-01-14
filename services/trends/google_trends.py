@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from database_config import TrendsCache
 from dotenv import load_dotenv
 from utils.logger_config import get_logger
+from services.trends.base_trends_manager import BaseTrendsManager
 
 # 環境変数を明示的に読み込み
 load_dotenv()
@@ -13,7 +14,7 @@ load_dotenv()
 # ロガーの初期化
 logger = get_logger(__name__)
 
-class GoogleTrendsManager:
+class GoogleTrendsManager(BaseTrendsManager):
     """Google Trendsのトレンドを取得・管理するクラス"""
     
     def __init__(self):
@@ -21,8 +22,10 @@ class GoogleTrendsManager:
         import json
         import base64
         
+        # ベースクラスを初期化（rate_limiterは使用しないため、max_requestsを1に設定）
+        super().__init__(service_name='google', max_requests=1, window_seconds=60)
+        
         self.project_id = os.getenv('GOOGLE_CLOUD_PROJECT_ID')
-        self.db = TrendsCache()
         self.credentials = None
         
         # 方法1: Base64エンコードされた認証情報から読み込み（本番環境用）
@@ -60,6 +63,10 @@ class GoogleTrendsManager:
         logger.info(f"Google Trends Manager初期化:")
         logger.info(f"  Project ID: {'設定済み' if self.project_id else '未設定'}")
         logger.info(f"  Credentials: {'設定済み' if self.credentials else '未設定'}")
+    
+    def _fetch_trends(self, region='JP', limit=25, *args, **kwargs):
+        """外部APIからGoogle Trendsデータを取得"""
+        return self.get_bigquery_trends(region, limit)
     
     def get_trends(self, region='JP', limit=25, force_refresh=False):
         """Google Trendsを取得（キャッシュ優先、フォールバックでBigQuery）"""
@@ -186,8 +193,8 @@ class GoogleTrendsManager:
             
             logger.info(f"✅ Google Trends: {len(trends_data)}件のデータを取得しました (国コード: {region})")
             
-            # キャッシュに保存
-            self.db.save_google_trends_to_cache(trends_data, region)
+            # キャッシュに保存（_save_to_cacheはBaseTrendsManagerが呼び出す）
+            self._save_to_cache(trends_data, region=region)
             
             return {
                 'success': True,

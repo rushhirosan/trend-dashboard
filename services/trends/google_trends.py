@@ -230,6 +230,12 @@ class GoogleTrendsManager(BaseTrendsManager):
             # データベースからキャッシュを取得
             cached_data = self.db.get_google_trends_from_cache(region)
             
+            # cached_dataがNoneの場合はデータベースエラー
+            if cached_data is None:
+                logger.error(f"❌ Google Trends: データベースからキャッシュを取得する際にエラーが発生しました")
+                raise Exception("データベースからキャッシュを取得する際にエラーが発生しました")
+            
+            # キャッシュデータが存在する場合
             if cached_data:
                 # キャッシュデータに検索URLを追加
                 for item in cached_data:
@@ -246,6 +252,7 @@ class GoogleTrendsManager(BaseTrendsManager):
                     'total_count': len(cached_data)
                 }
             else:
+                # キャッシュデータが空の場合（データが存在しない）
                 # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
                 if not force_refresh:
                     logger.warning("⚠️ Google Trends: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")

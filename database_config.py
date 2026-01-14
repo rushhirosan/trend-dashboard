@@ -895,7 +895,13 @@ class TrendsCache:
             return False
     
     def get_from_cache(self, cache_key, region='JP'):
-        """キャッシュからデータを取得"""
+        """キャッシュからデータを取得
+        
+        Returns:
+            list: キャッシュデータのリスト（データが存在する場合）
+            []: 空のリスト（データが存在しない場合）
+            None: エラーが発生した場合（データベースエラーなど）
+        """
         def query_func(conn):
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 table_name = f"{cache_key}_cache"
@@ -938,7 +944,13 @@ class TrendsCache:
                 return result
         
         try:
-            return self._execute_with_retry(query_func)
+            result = self._execute_with_retry(query_func)
+            # _execute_with_retryがNoneを返した場合はエラー
+            if result is None:
+                logger.error(f"❌ キャッシュ取得エラー: _execute_with_retryがNoneを返しました (cache_key={cache_key}, region={region})")
+                return None
+            # 空のリストの場合はデータが存在しない（正常）
+            return result
         except Exception as e:
             logger.error(f"❌ キャッシュ取得エラー: {e}", exc_info=True)
             return None

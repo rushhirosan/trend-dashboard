@@ -260,26 +260,18 @@ function createDropdownTrendsManager(config) {
 
     // イベントリスナーの設定
     const setupEventListener = () => {
-        console.log(`🔧 ${serviceName}: setupEventListener呼び出し (selectId: ${selectId})`);
         const selectElement = document.getElementById(selectId);
         if (selectElement) {
-            console.log(`✅ ${serviceName}: selectElement見つかりました、イベントリスナーを設定します`);
             selectElement.addEventListener('change', function() {
-                console.log(`🔄 ${serviceName}: ${paramName}が '${this.value}' に変更されました`);
                 fetchTrends();
             });
-        } else {
-            console.error(`❌ ${serviceName}: selectElement (id: ${selectId}) が見つかりません`);
         }
     };
 
     // 初期化
-    console.log(`🔧 ${serviceName}: createDropdownTrendsManager初期化 (document.readyState: ${document.readyState})`);
     if (document.readyState === 'loading') {
-        console.log(`🔧 ${serviceName}: DOMContentLoadedイベントを待機します`);
         document.addEventListener('DOMContentLoaded', setupEventListener);
     } else {
-        console.log(`🔧 ${serviceName}: DOM既に読み込み済み、即座にsetupEventListenerを呼び出します`);
         setupEventListener();
     }
 

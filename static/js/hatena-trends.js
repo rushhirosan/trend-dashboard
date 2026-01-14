@@ -2,10 +2,7 @@
 let hatenaManager = null;
 
 // ドロップダウンパターンの共通マネージャーを作成
-console.log('🔧 hatena-trends.js: スクリプト読み込み開始');
-console.log('🔧 hatena-trends.js: createDropdownTrendsManager関数の存在確認:', typeof createDropdownTrendsManager);
 if (typeof createDropdownTrendsManager === 'function') {
-    console.log('✅ hatena-trends.js: createDropdownTrendsManager関数が見つかりました、マネージャーを作成します');
     hatenaManager = createDropdownTrendsManager({
         serviceName: 'hatena',
         selectId: 'hatenaCategorySelect',
@@ -22,9 +19,6 @@ if (typeof createDropdownTrendsManager === 'function') {
         displayFunction: displayHatenaResults,
         getParams: (category) => ({ type: 'hot' })
     });
-    console.log('✅ hatena-trends.js: hatenaManager作成完了', hatenaManager);
-} else {
-    console.error('❌ hatena-trends.js: createDropdownTrendsManager関数が見つかりません');
 }
 
 // 後方互換性のため、既存の関数名も保持

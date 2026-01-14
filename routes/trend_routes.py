@@ -70,20 +70,6 @@ def handle_trend_response(result, error_message, default_source=None, **extra_fi
         default_source: デフォルトのソース名
         **extra_fields: レスポンスに追加するフィールド
     """
-    # エラーが含まれている場合（success: Falseの場合のみエラーとして扱う）
-    if isinstance(result, dict) and 'error' in result and not result.get('success', False):
-        error_response = {
-            'success': False,
-            'error': result['error']
-        }
-        # 追加情報がある場合は含める
-        for key in ['status_code', 'suggestion', 'response_text']:
-            if key in result:
-                error_response[key] = result[key]
-        
-        status_code = result.get('status_code', 500)
-        return jsonify(error_response), status_code
-    
     # リストが直接返された場合（後方互換性のため）
     if isinstance(result, list):
         return jsonify({
@@ -97,12 +83,25 @@ def handle_trend_response(result, error_message, default_source=None, **extra_fi
     if isinstance(result, dict):
         # successフィールドがFalseの場合
         if not result.get('success', True):
+            # キャッシュが見つからない場合は、エラーではなく正常なレスポンスとして扱う（200 OK）
+            status = result.get('status', '')
+            if status == 'cache_not_found':
+                return jsonify({
+                    'success': True,
+                    'data': result.get('data', []),
+                    'status': status,
+                    'source': result.get('source', default_source),
+                    'message': result.get('error', 'キャッシュにデータがありません'),
+                    **extra_fields
+                }), 200
+            
+            # その他のエラーは500エラーとして返す
             error_response = {
                 'success': False,
                 'error': result.get('error', 'Unknown error')
             }
             # 追加情報がある場合は含める
-            for key in ['status_code', 'suggestion', 'response_text']:
+            for key in ['status_code', 'suggestion', 'response_text', 'status', 'source']:
                 if key in result:
                     error_response[key] = result[key]
             

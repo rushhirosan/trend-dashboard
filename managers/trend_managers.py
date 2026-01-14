@@ -88,13 +88,13 @@ def _initialize_single_manager(key, manager_class, display_name):
         初期化されたマネージャーインスタンス、またはNone
     """
     try:
-        logger.debug(f"🔄 {display_name} Manager初期化開始 (key: {key})")
+        logger.info(f"🔄 {display_name} Manager初期化開始 (key: {key})")
         manager = manager_class()
         logger.info(f"✅ {display_name} Manager初期化完了")
         return manager
     except Exception as e:
         logger.error(f"❌ {display_name} Manager初期化エラー: {type(e).__name__}: {e}", exc_info=True)
-        logger.warning(f"⚠️ {display_name} Manager ({key}) の初期化に失敗しました")
+        logger.warning(f"⚠️ {display_name} Manager ({key}) の初期化に失敗しました: {str(e)}")
         return None
 
 

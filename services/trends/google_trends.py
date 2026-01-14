@@ -68,6 +68,15 @@ class GoogleTrendsManager(BaseTrendsManager):
         """外部APIからGoogle Trendsデータを取得"""
         return self.get_bigquery_trends(region, limit)
     
+    def _save_to_cache(self, data, *args, **kwargs):
+        """キャッシュにデータを保存"""
+        try:
+            region = kwargs.get('region', 'JP')
+            return self.db.save_google_trends_to_cache(data, region)
+        except Exception as e:
+            logger.error(f"❌ Google Trends キャッシュ保存エラー: {e}", exc_info=True)
+            return False
+    
     def get_trends(self, region='JP', limit=25, force_refresh=False):
         """Google Trendsを取得（キャッシュ優先、フォールバックでBigQuery）"""
         if force_refresh:

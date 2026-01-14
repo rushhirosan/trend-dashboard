@@ -117,11 +117,11 @@ class TwitchTrendsManager(BaseTrendsManager):
     def get_trends(self, category='games', limit=25, force_refresh=False):
         """Twitchトレンドを取得（BaseTrendsManagerの共通処理を使用）"""
         # BaseTrendsManagerの共通処理を使用
-        # auto_fetch_on_cache_miss=Falseで、キャッシュがない場合はAPIを呼び出さない（既存動作を維持）
+        # auto_fetch_on_cache_miss=Trueで、キャッシュがない場合はAPIを呼び出してキャッシュを作成
         result = super().get_trends(
             limit=limit,
             force_refresh=force_refresh,
-            auto_fetch_on_cache_miss=False,  # キャッシュがない場合はAPIを呼び出さない
+            auto_fetch_on_cache_miss=True,  # キャッシュがない場合はAPIを呼び出してキャッシュを作成
             category=category
         )
         

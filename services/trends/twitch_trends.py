@@ -40,12 +40,12 @@ class TwitchTrendsManager(BaseTrendsManager):
             category = kwargs.get('category', 'games')
             cached_data = self.db.get_twitch_trends_from_cache(category)
             
-            if cached_data:
-                logger.debug(f"🔍 Twitch: キャッシュから{len(cached_data)}件のデータを取得 (category: {category})")
+            if cached_data and len(cached_data) > 0:
+                logger.info(f"✅ Twitch: キャッシュから{len(cached_data)}件のデータを取得 (category: {category})")
                 return cached_data
             else:
-                logger.debug(f"🔍 Twitch: キャッシュにデータがありません (category: {category})")
-                return []
+                logger.warning(f"⚠️ Twitch: キャッシュにデータがありません (category: {category}, cached_data: {cached_data})")
+                return None  # Noneを返すことで、base_trends_managerでキャッシュがないと判断される
         except Exception as e:
             logger.error(f"❌ Twitch: キャッシュ取得エラー: {e}", exc_info=True)
             return None
@@ -54,7 +54,13 @@ class TwitchTrendsManager(BaseTrendsManager):
         """キャッシュにデータを保存"""
         try:
             category = kwargs.get('category', 'games')
-            return self.db.save_twitch_trends_to_cache(data, category)
+            logger.info(f"💾 Twitch: キャッシュに保存開始 (category: {category}, data: {len(data)}件)")
+            success = self.db.save_twitch_trends_to_cache(data, category)
+            if success:
+                logger.info(f"✅ Twitch: キャッシュに保存完了 (category: {category}, data: {len(data)}件)")
+            else:
+                logger.warning(f"⚠️ Twitch: キャッシュ保存失敗 (category: {category})")
+            return success
         except Exception as e:
             logger.error(f"❌ Twitch キャッシュ保存エラー: {e}", exc_info=True)
             return False

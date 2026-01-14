@@ -179,7 +179,8 @@ def refresh_all_trends(managers, force_refresh=True):
     call_manager('podcast', lambda m: m.get_trends('best_podcasts', region='jp', force_refresh=force_refresh), 'JP')
     call_manager('rakuten', lambda m: m.get_trends(force_refresh=force_refresh), 'JP')
     call_manager('hatena', lambda m: m.get_trends(category='all', limit=25, force_refresh=force_refresh, fetch_all_categories=True), 'JP')
-    call_manager('twitch', lambda m: m.get_trends(category='games', limit=25, force_refresh=force_refresh), 'JP')
+    # Twitch: 全カテゴリーを取得してキャッシュに保存
+    call_manager('twitch', lambda m: m._fetch_and_cache_all_categories(), 'JP')
     call_manager('qiita', lambda m: m.get_trends(limit=25, sort='likes_count', force_refresh=force_refresh), 'JP')
     call_manager('nhk', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP')
     call_manager('stock', lambda m: m.get_trends(market='JP', limit=25, force_refresh=force_refresh), 'JP')
@@ -200,7 +201,16 @@ def refresh_all_trends(managers, force_refresh=True):
     call_manager('music', lambda m: m.get_trends('spotify', 'US', force_refresh=force_refresh), 'US')
     call_manager('worldnews', lambda m: m.get_trends(country='us', category=None, force_refresh=force_refresh), 'US')
     call_manager('podcast', lambda m: m.get_trends('best_podcasts', region='us', force_refresh=force_refresh), 'US')
-    call_manager('twitch', lambda m: m.get_trends(category='games', limit=25, force_refresh=force_refresh), 'US')
+    # Twitch: 全カテゴリーを取得してキャッシュに保存
+    call_manager('twitch', lambda m: m._fetch_and_cache_all_categories(), 'US')
+    # eBay: 全カテゴリーを取得してキャッシュに保存
+    ebay_manager = managers.get('ebay')
+    if ebay_manager:
+        categories = ebay_manager.get_available_categories()
+        for category in categories:
+            def ebay_handler(m, cat=category):
+                return m.get_trends(category=cat, limit=25, force_refresh=force_refresh)
+            call_manager('ebay', ebay_handler, 'US')
     call_manager('reddit', lambda m: m.get_trends('all', limit=25, time_filter='day', force_refresh=force_refresh), 'US')
     call_manager('hackernews', lambda m: m.get_trends('top', limit=25, force_refresh=force_refresh), 'US')
     call_manager('producthunt', lambda m: m.get_trends(limit=25, sort='votes', force_refresh=force_refresh), 'US')
@@ -281,7 +291,8 @@ def refresh_all_trends_except_amazon(managers, force_refresh=True):
     call_manager('podcast', lambda m: m.get_trends('best_podcasts', region='jp', force_refresh=force_refresh), 'JP')
     call_manager('rakuten', lambda m: m.get_trends(force_refresh=force_refresh), 'JP')
     call_manager('hatena', lambda m: m.get_trends(category='all', limit=25, force_refresh=force_refresh, fetch_all_categories=True), 'JP')
-    call_manager('twitch', lambda m: m.get_trends(category='games', limit=25, force_refresh=force_refresh), 'JP')
+    # Twitch: 全カテゴリーを取得してキャッシュに保存
+    call_manager('twitch', lambda m: m._fetch_and_cache_all_categories(), 'JP')
     call_manager('qiita', lambda m: m.get_trends(limit=25, sort='likes_count', force_refresh=force_refresh), 'JP')
     call_manager('nhk', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP')
     call_manager('stock', lambda m: m.get_trends(market='JP', limit=25, force_refresh=force_refresh), 'JP')
@@ -302,7 +313,16 @@ def refresh_all_trends_except_amazon(managers, force_refresh=True):
     call_manager('music', lambda m: m.get_trends('spotify', 'US', force_refresh=force_refresh), 'US')
     call_manager('worldnews', lambda m: m.get_trends(country='us', category=None, force_refresh=force_refresh), 'US')
     call_manager('podcast', lambda m: m.get_trends('best_podcasts', region='us', force_refresh=force_refresh), 'US')
-    call_manager('twitch', lambda m: m.get_trends(category='games', limit=25, force_refresh=force_refresh), 'US')
+    # Twitch: 全カテゴリーを取得してキャッシュに保存
+    call_manager('twitch', lambda m: m._fetch_and_cache_all_categories(), 'US')
+    # eBay: 全カテゴリーを取得してキャッシュに保存
+    ebay_manager = managers.get('ebay')
+    if ebay_manager:
+        categories = ebay_manager.get_available_categories()
+        for category in categories:
+            def ebay_handler(m, cat=category):
+                return m.get_trends(category=cat, limit=25, force_refresh=force_refresh)
+            call_manager('ebay', ebay_handler, 'US')
     call_manager('reddit', lambda m: m.get_trends('all', limit=25, time_filter='day', force_refresh=force_refresh), 'US')
     call_manager('hackernews', lambda m: m.get_trends('top', limit=25, force_refresh=force_refresh), 'US')
     call_manager('producthunt', lambda m: m.get_trends(limit=25, sort='votes', force_refresh=force_refresh), 'US')

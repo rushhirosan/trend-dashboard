@@ -48,7 +48,6 @@ function displayTwitchResults(data) {
         });
         
         showTwitchResults();
-        showTwitchStatusMessage(`✅ ${data.source} - ${data.total_count}件のトレンドを取得しました`, 'success');
     } else {
         showTwitchError('データが見つかりませんでした');
     }

@@ -70,7 +70,6 @@ function displayHatenaResults(data) {
         });
         
         showHatenaResults();
-        showHatenaStatusMessage(`✅ ${data.source} - ${data.total_count || data.data.length}件のエントリーを取得しました`, 'success');
     } else {
         showHatenaError('データが見つかりませんでした');
     }

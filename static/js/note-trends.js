@@ -74,7 +74,6 @@ function displayNoteResults(data) {
         });
         
         showNoteResults();
-        showNoteStatusMessage(`✅ ${data.source || 'Note RSS'} - ${data.total_count || data.data.length}件のエントリーを取得しました`, 'success');
     } else {
         showNoteError('データが見つかりませんでした');
     }

@@ -36,7 +36,16 @@ class HatenaTrendsManager(BaseTrendsManager):
         """キャッシュからデータを取得"""
         try:
             category = kwargs.get('category', 'all')
-            return self.db.get_hatena_trends_from_cache(category)
+            cached_data = self.db.get_hatena_trends_from_cache(category)
+            
+            if cached_data:
+                # categoryでフィルタリング（念のため）
+                category_data = [item for item in cached_data if item.get('category') == category]
+                logger.debug(f"🔍 はてなブックマーク: キャッシュから{len(category_data)}件のデータを取得 (category: {category})")
+                return category_data
+            else:
+                logger.debug(f"🔍 はてなブックマーク: キャッシュにデータがありません (category: {category})")
+                return []
         except Exception as e:
             logger.error(f"❌ Hatena: キャッシュ取得エラー: {e}", exc_info=True)
             return None
@@ -86,14 +95,16 @@ class HatenaTrendsManager(BaseTrendsManager):
             return {
                 'success': False,
                 'error': result.get('error', 'Unknown error') if result else 'API call failed',
-                'data': []
+                'data': [],
+                'status': 'api_error',
+                'category': category
             }
 
     def get_trends(self, category='all', limit=25, force_refresh=False, fetch_all_categories=False):
-        """はてなブックマークトレンドを取得（get_hot_entriesのエイリアス）"""
+        """はてなブックマークトレンドを取得（BaseTrendsManagerの共通処理を使用）"""
         logger.debug(f"🔍 はてなブックマーク: get_trends呼び出し (category: {category}, fetch_all_categories: {fetch_all_categories})")
         
-        # 全カテゴリを取得する場合
+        # 全カテゴリを取得する場合（スケジューラー用の特殊ケース）
         if fetch_all_categories:
             logger.info("🔄 はてなブックマーク: 全カテゴリのデータを取得します")
             all_data = self._fetch_and_cache_all_categories()
@@ -117,110 +128,25 @@ class HatenaTrendsManager(BaseTrendsManager):
                     'success': False
                 }
         
-        result = self.get_hot_entries(category, limit, force_refresh)
+        # BaseTrendsManagerの共通処理を使用
+        # auto_fetch_on_cache_miss=Trueで、キャッシュがない場合はAPIを呼び出す（既存動作を維持）
+        result = super().get_trends(
+            limit=limit,
+            force_refresh=force_refresh,
+            auto_fetch_on_cache_miss=True,  # キャッシュがない場合はAPIを呼び出す
+            category=category
+        )
+        
+        # categoryパラメータを結果に追加
+        if result and isinstance(result, dict):
+            result['category'] = category
         logger.debug(f"🔍 はてなブックマーク: get_trends完了 (category: {category})")
         return result
     
     def get_hot_entries(self, category='all', limit=25, force_refresh=False):
-        """はてなブックマークのホットエントリーを取得（カテゴリ別キャッシュ）"""
-        try:
-            force_fetch = force_refresh
-            logger.debug(f"🔍 はてなブックマーク: キャッシュデータ取得開始 (category: {category})")
-            
-            cached_data = None
-            if force_fetch:
-                logger.info(f"🔄 はてなブックマーク: force_refresh指定のためキャッシュをスキップします (category: {category})")
-            else:
-                # カテゴリ別キャッシュから取得を試行
-                logger.debug(f"🔍 はてなブックマーク: get_from_cache_by_category呼び出し開始")
-                try:
-                    cached_data = self.get_from_cache_by_category(category)
-                    logger.debug(f"🔍 はてなブックマーク: get_from_cache_by_category呼び出し完了")
-                    logger.debug(f"🔍 はてなブックマーク: キャッシュデータ取得結果: {type(cached_data)}, 長さ: {len(cached_data) if cached_data else 0}")
-                except Exception as e:
-                    logger.error(f"❌ はてなブックマーク: キャッシュ取得中にエラーが発生しました: {e}", exc_info=True)
-                    cached_data = []  # エラー時は空のリストとして扱う
-            
-            if cached_data and len(cached_data) > 0:
-                # ブックマーク数でソート（降順）
-                cached_data.sort(key=lambda x: x.get('bookmark_count', 0), reverse=True)
-                
-                # ランキングを再設定
-                for i, item in enumerate(cached_data, 1):
-                    item['rank'] = i
-                
-                logger.info(f"✅ はてなブックマーク: キャッシュデータを使用し、ブックマーク数でソートしました ({len(cached_data)}件)")
-                cache_info = self._get_cache_info('hatena_trends')
-                return {
-                    'data': cached_data,
-                    'status': 'cached',
-                    'category': category,
-                    'cache_info': cache_info,
-                    'source': 'database_cache',
-                    'success': True
-                }
-            
-            # force_refresh=Falseの場合でも、キャッシュがない場合は外部APIを呼び出す
-            # （ユーザーがカテゴリを選択したときにデータを表示できるようにするため）
-            if not force_fetch:
-                logger.warning(f"⚠️ はてなブックマーク: キャッシュにデータがありません。外部APIを呼び出してデータを取得します (category: {category})")
-            
-            logger.warning(f"⚠️ はてなブックマーク: キャッシュ未使用のため外部APIを呼び出します")
-            # 指定カテゴリのデータのみを取得
-            api_result = self.get_new_entries(category, limit)
-            
-            if api_result and not api_result.get('error'):
-                trends_data = api_result.get('data', [])
-                # カテゴリ情報を追加
-                for item in trends_data:
-                    item['category'] = category
-                
-                # キャッシュに保存（他のカテゴリと同じ方法）
-                success = self.db.save_hatena_trends_to_cache(trends_data, category)
-                if success:
-                    logger.info(f"✅ はてなブックマーク: 外部APIから{len(trends_data)}件のデータを取得し、キャッシュに保存しました")
-                else:
-                    logger.warning(f"⚠️ はてなブックマーク: データ取得成功しましたが、キャッシュ保存に失敗しました")
-                
-                return {
-                    'data': trends_data,
-                    'status': 'api_fetched',
-                    'category': category,
-                    'source': 'Hatena API',
-                    'success': True
-                }
-            else:
-                logger.error(f"❌ はてなブックマーク: 外部APIからデータを取得できませんでした")
-                return {
-                    'data': [],
-                    'status': 'api_error',
-                    'category': category,
-                    'error': api_result.get('error', 'Unknown error') if api_result else 'API call failed',
-                    'success': False
-                }
-            
-            # 全て失敗した場合
-            error_msg = f"はてなブックマーク: データを取得できませんでした (category: {category})"
-            logger.error(f"❌ {error_msg}")
-            return {
-                'data': [],
-                'status': 'api_error',
-                'category': category,
-                'error': error_msg,
-                'success': False
-            }
-                
-        except Exception as e:
-            import traceback
-            error_msg = f'はてなブックマークトレンド取得エラー: {str(e)}'
-            logger.error(f"❌ はてなブックマーク: エラー: {e}", exc_info=True)
-            traceback.print_exc()
-            return {
-                'error': error_msg,
-                'status': 'api_error',
-                'category': category,
-                'success': False
-            }
+        """はてなブックマークのホットエントリーを取得（後方互換性のため、get_trendsを呼び出す）"""
+        # 後方互換性のため、get_trendsを呼び出す
+        return self.get_trends(category=category, limit=limit, force_refresh=force_refresh)
     
     def get_new_entries(self, category='all', limit=25):
         """はてなブックマークの新着エントリーを取得（公式RSS使用）"""
@@ -416,29 +342,9 @@ class HatenaTrendsManager(BaseTrendsManager):
             return None
     
     def get_from_cache_by_category(self, category):
-        """カテゴリ別にキャッシュからデータを取得"""
-        try:
-            logger.debug(f"🔍 カテゴリ別キャッシュ取得: category='{category}'")
-            # 他のカテゴリと同じように、TrendsCacheのメソッドを使用
-            # regionパラメータにcategoryを渡すことで、カテゴリごとに取得
-            cached_data = self.db.get_hatena_trends_from_cache(category)
-            
-            if cached_data:
-                # categoryでフィルタリング（念のため）
-                category_data = [item for item in cached_data if item.get('category') == category]
-                logger.info(f"✅ カテゴリ別キャッシュ取得完了: {len(category_data)}件")
-                if len(category_data) > 0:
-                    logger.debug(f"🔍 最初のアイテムのカテゴリ: {category_data[0].get('category', 'N/A')}")
-                return category_data
-            else:
-                logger.warning(f"⚠️ カテゴリ別キャッシュ取得: データが取得できませんでした")
-                return []
-                    
-        except Exception as e:
-            logger.error(f"❌ カテゴリ別キャッシュ取得エラー: {e}", exc_info=True)
-            import traceback
-            traceback.print_exc()
-            return []
+        """カテゴリ別にキャッシュからデータを取得（後方互換性のため、_get_from_cacheを呼び出す）"""
+        # 後方互換性のため、_get_from_cacheを呼び出す
+        return self._get_from_cache(category=category)
     
     def _fetch_and_cache_all_categories(self):
         """全カテゴリのデータを一度に取得してキャッシュに保存"""

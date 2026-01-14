@@ -38,7 +38,14 @@ class TwitchTrendsManager(BaseTrendsManager):
         """キャッシュからデータを取得"""
         try:
             category = kwargs.get('category', 'games')
-            return self.db.get_twitch_trends_from_cache(category)
+            cached_data = self.db.get_twitch_trends_from_cache(category)
+            
+            if cached_data:
+                logger.debug(f"🔍 Twitch: キャッシュから{len(cached_data)}件のデータを取得 (category: {category})")
+                return cached_data
+            else:
+                logger.debug(f"🔍 Twitch: キャッシュにデータがありません (category: {category})")
+                return []
         except Exception as e:
             logger.error(f"❌ Twitch: キャッシュ取得エラー: {e}", exc_info=True)
             return None
@@ -108,110 +115,26 @@ class TwitchTrendsManager(BaseTrendsManager):
         return ['games', 'streams', 'clips']
     
     def get_trends(self, category='games', limit=25, force_refresh=False):
-        """Twitchトレンドを取得（キャッシュデータが存在しない場合のみ外部APIを呼び出し）"""
-        try:
-            logger.debug(f"🔍 Twitch: キャッシュデータ取得開始 (category: {category})")
-            
-            cached_data = None
-            if force_refresh:
-                logger.info(f"🔄 Twitch: force_refresh指定のためキャッシュをスキップします (category: {category})")
-            else:
-                # キャッシュからデータを取得
-                cached_data = self.get_from_cache_by_category(category)
-                logger.debug(f"🔍 Twitch: キャッシュデータ取得結果: {type(cached_data)}, 長さ: {len(cached_data) if cached_data else 0}")
-            
-            if cached_data:
-                logger.info(f"✅ Twitch: キャッシュデータを使用 ({len(cached_data)}件)")
-                return {
-                    'data': cached_data,
-                    'status': 'cached',
-                    'trend_type': category,
-                    'source': 'database_cache',
-                    'success': True
-                }
-            
-            # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
-            if not force_refresh:
-                logger.warning(f"⚠️ Twitch: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません (category: {category})")
-                return {
-                    'data': [],
-                    'status': 'cache_not_found',
-                    'trend_type': category,
-                    'source': 'database_cache',
-                    'success': False,
-                    'error': 'キャッシュにデータがありません'
-                }
-            
-            logger.warning(f"⚠️ Twitch: キャッシュ未使用のため外部APIを呼び出します")
-            if category == 'games':
-                api_result = self._get_top_games_from_api(limit)
-            elif category == 'streams':
-                api_result = self._get_top_streams_from_api(limit)
-            elif category == 'clips':
-                api_result = self._get_top_clips_from_api(limit)
-            else:
-                api_result = {'error': f'Unknown category: {category}'}
-            
-            if api_result and isinstance(api_result, dict) and api_result.get('data'):
-                trends_data = api_result['data']
-                # カテゴリ情報を追加
-                for item in trends_data:
-                    item['category'] = category
-                
-                # キャッシュに保存（database_config.pyのメソッドを使用）
-                success = self.db.save_twitch_trends_to_cache(trends_data, category)
-                if success:
-                    logger.info(f"✅ Twitch: 外部APIから{len(trends_data)}件のデータを取得し、キャッシュに保存しました")
-                else:
-                    logger.warning(f"⚠️ Twitch: データ取得成功しましたが、キャッシュ保存に失敗しました")
-                return {
-                    'data': trends_data,
-                    'status': 'api_fetched',
-                    'trend_type': category,
-                    'source': 'Twitch API',
-                    'success': True
-                }
-            else:
-                logger.error(f"❌ Twitch: 外部APIからデータを取得できませんでした")
-                return {
-                    'data': [],
-                    'status': 'api_error',
-                    'trend_type': category,
-                    'source': 'Twitch API',
-                    'success': False,
-                    'error': api_result.get('error', 'Unknown error') if api_result else 'API call failed'
-                }
-            
-        except Exception as e:
-            logger.error(f"❌ Twitch: get_trendsエラー: {e}", exc_info=True)
-            return {
-                'data': [],
-                'status': 'error',
-                'trend_type': category,
-                'source': 'Twitch API',
-                'success': False,
-                'error': f'Twitch トレンド取得エラー: {str(e)}'
-            }
+        """Twitchトレンドを取得（BaseTrendsManagerの共通処理を使用）"""
+        # BaseTrendsManagerの共通処理を使用
+        # auto_fetch_on_cache_miss=Falseで、キャッシュがない場合はAPIを呼び出さない（既存動作を維持）
+        result = super().get_trends(
+            limit=limit,
+            force_refresh=force_refresh,
+            auto_fetch_on_cache_miss=False,  # キャッシュがない場合はAPIを呼び出さない
+            category=category
+        )
+        
+        # categoryパラメータを結果に追加（trend_typeとしても保持）
+        if result and isinstance(result, dict):
+            result['trend_type'] = category
+            result['category'] = category
+        return result
     
     def get_from_cache_by_category(self, category):
-        """カテゴリ別のキャッシュデータを取得"""
-        try:
-            logger.debug(f"🔍 カテゴリ別キャッシュ取得: category='{category}'")
-            # database_config.pyのメソッドを使用
-            cached_data = self.db.get_twitch_trends_from_cache(category)
-            
-            if cached_data:
-                logger.info(f"✅ カテゴリ別キャッシュ取得完了: {len(cached_data)}件")
-                if len(cached_data) > 0:
-                    logger.debug(f"🔍 最初のアイテムのカテゴリ: {cached_data[0].get('category', 'unknown')}")
-                return cached_data
-            else:
-                logger.warning(f"⚠️ カテゴリ '{category}' のキャッシュデータが見つかりません")
-                return None
-                        
-        except Exception as e:
-            logger.error(f"❌ カテゴリ別キャッシュ取得エラー: {e}", exc_info=True)
-            return None
+        """カテゴリ別のキャッシュデータを取得（後方互換性のため、_get_from_cacheを呼び出す）"""
+        # 後方互換性のため、_get_from_cacheを呼び出す
+        return self._get_from_cache(category=category)
     
     def _save_to_cache_by_category(self, category, data):
         """カテゴリ別のデータをキャッシュに保存"""

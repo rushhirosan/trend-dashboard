@@ -64,9 +64,32 @@ class GoogleTrendsManager(BaseTrendsManager):
         logger.info(f"  Project ID: {'設定済み' if self.project_id else '未設定'}")
         logger.info(f"  Credentials: {'設定済み' if self.credentials else '未設定'}")
     
-    def _fetch_trends(self, region='JP', limit=25, *args, **kwargs):
-        """外部APIからGoogle Trendsデータを取得"""
-        return self.get_bigquery_trends(region, limit)
+    def _get_cache_key(self):
+        """キャッシュキーを返す"""
+        return 'google_trends'
+    
+    def _get_from_cache(self, *args, **kwargs):
+        """キャッシュからデータを取得"""
+        try:
+            region = kwargs.get('region', 'JP')
+            cached_data = self.db.get_google_trends_from_cache(region)
+            
+            # cached_dataがNoneの場合はデータベースエラー
+            if cached_data is None:
+                logger.error(f"❌ Google Trends: データベースからキャッシュを取得する際にエラーが発生しました")
+                return None
+            
+            # キャッシュデータに検索URLを追加（存在しない場合のみ）
+            if cached_data:
+                for item in cached_data:
+                    if 'google_search_url' not in item and 'keyword' in item:
+                        keyword = item['keyword']
+                        item['google_search_url'] = f"https://www.google.com/search?q={keyword.replace(' ', '+')}"
+            
+            return cached_data
+        except Exception as e:
+            logger.error(f"❌ Google Trends: キャッシュ取得エラー: {e}", exc_info=True)
+            return None
     
     def _save_to_cache(self, data, *args, **kwargs):
         """キャッシュにデータを保存"""
@@ -77,14 +100,42 @@ class GoogleTrendsManager(BaseTrendsManager):
             logger.error(f"❌ Google Trends キャッシュ保存エラー: {e}", exc_info=True)
             return False
     
+    def _clear_cache(self, *args, **kwargs):
+        """キャッシュをクリア"""
+        try:
+            region = kwargs.get('region', 'JP')
+            return self.db.clear_google_trends_cache(region)
+        except Exception as e:
+            logger.error(f"❌ Google Trends キャッシュクリアエラー: {e}", exc_info=True)
+            return False
+    
+    def _update_cache_status(self, cache_key, data_count):
+        """cache_statusテーブルを更新"""
+        try:
+            return self.db.update_cache_status(cache_key, data_count)
+        except Exception as e:
+            logger.warning(f"⚠️ Google Trends: cache_status更新エラー: {e}")
+            return False
+    
+    def _fetch_trends(self, region='JP', limit=25, *args, **kwargs):
+        """外部APIからGoogle Trendsデータを取得"""
+        return self.get_bigquery_trends(region, limit)
+    
     def get_trends(self, region='JP', limit=25, force_refresh=False):
         """Google Trendsを取得（キャッシュ優先、フォールバックでBigQuery）"""
-        if force_refresh:
-            logger.info(f"🔄 Google Trends force_refresh: キャッシュをクリアします")
-            self.db.clear_google_trends_cache(region)
+        # BaseTrendsManagerの共通処理を使用
+        # auto_fetch_on_cache_miss=Falseで、キャッシュがない場合はAPIを呼び出さない（既存動作を維持）
+        result = super().get_trends(
+            limit=limit,
+            force_refresh=force_refresh,
+            auto_fetch_on_cache_miss=False,  # 既存動作を維持
+            region=region
+        )
         
-        # 日本と同じロジックを使用（キャッシュ優先、フォールバックでBigQuery）
-        return self.get_cached_trends(region, limit, force_refresh)
+        # regionパラメータを結果に追加
+        if result and isinstance(result, dict):
+            result['country'] = region
+        return result
     
     def get_bigquery_trends(self, region='JP', limit=25):
         """BigQueryからGoogle Trendsデータを取得"""
@@ -202,8 +253,7 @@ class GoogleTrendsManager(BaseTrendsManager):
             
             logger.info(f"✅ Google Trends: {len(trends_data)}件のデータを取得しました (国コード: {region})")
             
-            # キャッシュに保存（_save_to_cacheはBaseTrendsManagerが呼び出す）
-            self._save_to_cache(trends_data, region=region)
+            # キャッシュに保存はBaseTrendsManager.get_trends()が自動的に行うため、ここでは不要
             
             return {
                 'success': True,
@@ -228,79 +278,6 @@ class GoogleTrendsManager(BaseTrendsManager):
                     'error_type': type(e).__name__,
                     'error_message': str(e)
                 }
-            }
-    
-    def get_cached_trends(self, region='JP', limit=25, force_refresh=False):
-        """Google Trendsデータを取得（キャッシュデータが存在しない場合のみ外部APIを呼び出し）"""
-        try:
-            logger.info(f"=== Google Trends キャッシュ取得開始 ===")
-            logger.info(f"リクエストパラメータ: region={region}, limit={limit}, force_refresh={force_refresh}")
-            
-            # データベースからキャッシュを取得
-            cached_data = self.db.get_google_trends_from_cache(region)
-            
-            # cached_dataがNoneの場合はデータベースエラー
-            if cached_data is None:
-                logger.error(f"❌ Google Trends: データベースからキャッシュを取得する際にエラーが発生しました")
-                raise Exception("データベースからキャッシュを取得する際にエラーが発生しました")
-            
-            # キャッシュデータが存在する場合
-            if cached_data:
-                # キャッシュデータに検索URLを追加
-                for item in cached_data:
-                    if 'google_search_url' not in item and 'keyword' in item:
-                        keyword = item['keyword']
-                        item['google_search_url'] = f"https://www.google.com/search?q={keyword.replace(' ', '+')}"
-                
-                logger.info(f"✅ Google Trends: キャッシュから{len(cached_data)}件のデータを取得しました")
-                return {
-                    'success': True,
-                    'data': cached_data,
-                    'status': 'cached',
-                    'source': 'database_cache',
-                    'total_count': len(cached_data)
-                }
-            else:
-                # キャッシュデータが空の場合（データが存在しない）
-                # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
-                if not force_refresh:
-                    logger.warning("⚠️ Google Trends: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
-                    return {
-                        'success': False,
-                        'data': [],
-                        'status': 'cache_not_found',
-                        'source': 'database_cache',
-                        'error': 'キャッシュにデータがありません'
-                    }
-                # force_refresh=trueの場合のみ外部APIを呼び出す
-                logger.warning("⚠️ Google Trends: キャッシュデータが見つかりません。外部APIを呼び出します")
-                # キャッシュデータが存在しない場合のみ外部APIを呼び出し
-                result = self.get_bigquery_trends(region, limit)
-                if result.get('success') and result.get('data'):
-                    logger.info(f"✅ Google Trends: 外部APIから{len(result['data'])}件のデータを取得し、キャッシュに保存しました")
-                    return {
-                        'success': True,
-                        'data': result['data'],
-                        'status': 'api_fetched',
-                        'source': 'BigQuery',
-                        'total_count': len(result['data'])
-                    }
-                else:
-                    logger.error(f"❌ Google Trends: 外部APIからデータを取得できませんでした")
-                    return {
-                        'success': False,
-                        'data': [],
-                        'status': 'api_error',
-                        'source': 'BigQuery',
-                        'total_count': 0
-                    }
-                
-        except Exception as e:
-            logger.error(f"❌ Google Trends キャッシュ取得エラー: {e}", exc_info=True)
-            return {
-                'success': False,
-                'error': f'Google Trends取得に失敗しました: {str(e)}',
-                'data': []
             }
     
 

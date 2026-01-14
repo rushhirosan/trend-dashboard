@@ -1029,12 +1029,17 @@ class TrendsCache:
             try:
                 # closed属性のチェック
                 _ = self.connection.closed
-                # 実際にクエリを実行して接続が有効か確認
+                # 実際にクエリを実行して接続が有効か確認（autocommitを有効化してトランザクションを開かない）
                 try:
-                    with self.connection.cursor() as cursor:
-                        cursor.execute("SELECT 1")
-                        cursor.fetchone()
-                    return self.connection
+                    original_autocommit = self.connection.autocommit
+                    self.connection.autocommit = True
+                    try:
+                        with self.connection.cursor() as cursor:
+                            cursor.execute("SELECT 1")
+                            cursor.fetchone()
+                        return self.connection
+                    finally:
+                        self.connection.autocommit = original_autocommit
                 except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
                     # 接続が無効な場合は再接続
                     logger.warning(f"⚠️ データベース接続検証失敗（再接続します）: {e}")
@@ -1050,12 +1055,17 @@ class TrendsCache:
             if self.connection and not self.connection.closed:
                 try:
                     _ = self.connection.closed
-                    # 実際にクエリを実行して接続が有効か確認
+                    # 実際にクエリを実行して接続が有効か確認（autocommitを有効化してトランザクションを開かない）
                     try:
-                        with self.connection.cursor() as cursor:
-                            cursor.execute("SELECT 1")
-                            cursor.fetchone()
-                        return self.connection
+                        original_autocommit = self.connection.autocommit
+                        self.connection.autocommit = True
+                        try:
+                            with self.connection.cursor() as cursor:
+                                cursor.execute("SELECT 1")
+                                cursor.fetchone()
+                            return self.connection
+                        finally:
+                            self.connection.autocommit = original_autocommit
                     except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError):
                         self.connection = None
                 except (psycopg2.InterfaceError, psycopg2.OperationalError, AttributeError):
@@ -1077,12 +1087,17 @@ class TrendsCache:
                     # 接続が確立されたか確認し、実際にクエリを実行して検証
                     if self.connection and not self.connection.closed:
                         try:
-                            # 実際にクエリを実行して接続が有効か確認
-                            with self.connection.cursor() as cursor:
-                                cursor.execute("SELECT 1")
-                                cursor.fetchone()
-                            logger.info(f"✅ データベース接続を確立しました (試行 {attempt + 1}/{max_retries})")
-                            return self.connection
+                            # 実際にクエリを実行して接続が有効か確認（autocommitを有効化してトランザクションを開かない）
+                            original_autocommit = self.connection.autocommit
+                            self.connection.autocommit = True
+                            try:
+                                with self.connection.cursor() as cursor:
+                                    cursor.execute("SELECT 1")
+                                    cursor.fetchone()
+                                logger.info(f"✅ データベース接続を確立しました (試行 {attempt + 1}/{max_retries})")
+                                return self.connection
+                            finally:
+                                self.connection.autocommit = original_autocommit
                         except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as verify_error:
                             logger.warning(f"⚠️ 接続検証失敗: {verify_error} - 再接続を試みます")
                             self.connection = None
@@ -1147,12 +1162,13 @@ class TrendsCache:
             logger.error("   - 認証情報の誤り")
             raise psycopg2.OperationalError(error_msg)
     
-    def _execute_with_retry(self, query_func, max_retries=3):
+    def _execute_with_retry(self, query_func, max_retries=3, is_read_only=True):
         """接続エラーが発生した場合に自動的に再接続を試みるヘルパーメソッド
         
         Args:
             query_func: データベースクエリを実行する関数（接続オブジェクトを引数として受け取る）
             max_retries: 最大再試行回数（デフォルト: 3）
+            is_read_only: Trueの場合はSELECT文（読み取り専用）、Falseの場合はINSERT/UPDATE/DELETE（書き込み）
         
         Returns:
             クエリ関数の戻り値、またはNone（全ての再試行が失敗した場合）
@@ -1163,6 +1179,7 @@ class TrendsCache:
         
         for attempt in range(max_retries):
             conn = None
+            original_autocommit = None
             try:
                 conn = self.get_connection()
                 if not conn:
@@ -1196,20 +1213,32 @@ class TrendsCache:
                     else:
                         raise verify_error
                 
+                # SELECT文（読み取り専用）の場合はautocommitを有効化してトランザクションを開かない
+                # INSERT/UPDATE/DELETE（書き込み）の場合はトランザクション管理が必要
+                if is_read_only:
+                    original_autocommit = conn.autocommit
+                    conn.autocommit = True
+                
                 # クエリを実行
                 result = query_func(conn)
                 
-                # SELECT文の場合は明示的なコミットは不要
-                # 接続をクリーンな状態に保つため、トランザクションが開いている場合のみ処理
-                # 注意: SELECT文は自動コミットされるため、通常はコミット不要
+                # SELECT文の場合は明示的なコミットは不要（autocommit=Trueのため）
+                # 書き込み操作の場合は呼び出し側でコミットを実行
                 
                 return result
                 
             except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
                 error_str = str(e)
                 
-                # ロールバックを試みる（トランザクションが開いている場合）
-                if conn and not conn.closed:
+                # autocommitを元に戻す
+                if conn and not conn.closed and original_autocommit is not None:
+                    try:
+                        conn.autocommit = original_autocommit
+                    except Exception:
+                        pass
+                
+                # ロールバックを試みる（トランザクションが開いている場合、書き込み操作のみ）
+                if conn and not conn.closed and not is_read_only:
                     try:
                         conn.rollback()
                     except Exception:
@@ -1243,8 +1272,15 @@ class TrendsCache:
                     raise
                     
             except Exception as e:
-                # ロールバックを試みる
-                if conn and not conn.closed:
+                # autocommitを元に戻す
+                if conn and not conn.closed and original_autocommit is not None:
+                    try:
+                        conn.autocommit = original_autocommit
+                    except Exception:
+                        pass
+                
+                # ロールバックを試みる（書き込み操作のみ）
+                if conn and not conn.closed and not is_read_only:
                     try:
                         conn.rollback()
                     except Exception:
@@ -1253,6 +1289,13 @@ class TrendsCache:
                 # 接続エラー以外のエラーはそのまま再スロー
                 logger.error(f"❌ 予期しないエラーが発生しました: {e}", exc_info=True)
                 raise
+            finally:
+                # autocommitを元に戻す（正常終了時も）
+                if conn and not conn.closed and original_autocommit is not None:
+                    try:
+                        conn.autocommit = original_autocommit
+                    except Exception:
+                        pass
         
         return None
     
@@ -1934,7 +1977,7 @@ class TrendsCache:
                 return True
         
         try:
-            result = self._execute_with_retry(query_func, max_retries=5)
+            result = self._execute_with_retry(query_func, max_retries=5, is_read_only=False)
             if result is None:
                 logger.warning(f"⚠️ データベース接続が取得できませんでした。cache_status更新をスキップします (cache_key: {cache_key})")
                 return False

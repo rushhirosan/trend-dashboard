@@ -97,7 +97,13 @@ class ProductHuntTrendsManager(BaseTrendsManager):
     def _get_from_cache(self, *args, **kwargs):
         """キャッシュからデータを取得"""
         try:
-            return self.db.get_producthunt_trends_from_cache()
+            cached_data = self.db.get_producthunt_trends_from_cache()
+            if cached_data and len(cached_data) > 0:
+                logger.info(f"✅ Product Hunt: キャッシュから{len(cached_data)}件のデータを取得")
+                return cached_data
+            else:
+                logger.warning(f"⚠️ Product Hunt: キャッシュにデータがありません (cached_data: {cached_data})")
+                return None  # Noneを返すことで、base_trends_managerでキャッシュがないと判断される
         except Exception as e:
             logger.error(f"❌ Product Hunt: キャッシュ取得エラー: {e}", exc_info=True)
             return None
@@ -105,7 +111,13 @@ class ProductHuntTrendsManager(BaseTrendsManager):
     def _save_to_cache(self, data, *args, **kwargs):
         """キャッシュにデータを保存"""
         try:
-            return self.db.save_producthunt_trends_to_cache(data)
+            logger.info(f"💾 Product Hunt: キャッシュに保存開始 (data: {len(data)}件)")
+            success = self.db.save_producthunt_trends_to_cache(data)
+            if success:
+                logger.info(f"✅ Product Hunt: キャッシュに保存完了 (data: {len(data)}件)")
+            else:
+                logger.warning(f"⚠️ Product Hunt: キャッシュ保存失敗")
+            return success
         except Exception as e:
             logger.error(f"❌ Product Hunt キャッシュ保存エラー: {e}", exc_info=True)
             return False
@@ -129,12 +141,12 @@ class ProductHuntTrendsManager(BaseTrendsManager):
     def get_trends(self, limit=25, sort='votes', force_refresh=False):
         """Product Huntトレンドを取得（キャッシュ優先、votes_countでソート）"""
         # ベースクラスのget_trendsを使用
-        # auto_fetch_on_cache_miss=Falseで、既存動作を維持（キャッシュがない場合はAPIを呼び出さない）
+        # auto_fetch_on_cache_miss=Trueで、キャッシュがない場合はAPIを呼び出してキャッシュを作成
         # sort_key='votes_count'で投票数でソート
         result = super().get_trends(
             limit=limit,
             force_refresh=force_refresh,
-            auto_fetch_on_cache_miss=False,  # 既存動作を維持
+            auto_fetch_on_cache_miss=True,  # キャッシュがない場合はAPIを呼び出してキャッシュを作成
             sort_key='votes_count',  # 投票数でソート
             sort_reverse=True,  # 降順
             sort=sort

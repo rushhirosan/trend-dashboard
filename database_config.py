@@ -1115,18 +1115,19 @@ class TrendsCache:
                         if not success:
                             # autocommit設定に失敗した場合は再接続
                             self.connection = None
-                            continue
-                        try:
-                            with self.connection.cursor() as cursor:
-                                cursor.execute("SELECT 1")
-                                cursor.fetchone()
-                            return self.connection
-                        finally:
-                            if original_autocommit is not None:
-                                try:
-                                    self.connection.autocommit = original_autocommit
-                                except Exception:
-                                    pass
+                            # 再接続処理に進む（下のforループで再接続される）
+                        else:
+                            try:
+                                with self.connection.cursor() as cursor:
+                                    cursor.execute("SELECT 1")
+                                    cursor.fetchone()
+                                return self.connection
+                            finally:
+                                if original_autocommit is not None:
+                                    try:
+                                        self.connection.autocommit = original_autocommit
+                                    except Exception:
+                                        pass
                     except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError):
                         self.connection = None
                 except (psycopg2.InterfaceError, psycopg2.OperationalError, AttributeError):

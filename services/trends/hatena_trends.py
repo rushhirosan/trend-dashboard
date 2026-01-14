@@ -36,13 +36,12 @@ class HatenaTrendsManager(BaseTrendsManager):
         """キャッシュからデータを取得"""
         try:
             category = kwargs.get('category', 'all')
+            # get_hatena_trends_from_cacheは既にcategoryでフィルタリングしている
             cached_data = self.db.get_hatena_trends_from_cache(category)
             
             if cached_data:
-                # categoryでフィルタリング（念のため）
-                category_data = [item for item in cached_data if item.get('category') == category]
-                logger.debug(f"🔍 はてなブックマーク: キャッシュから{len(category_data)}件のデータを取得 (category: {category})")
-                return category_data
+                logger.debug(f"🔍 はてなブックマーク: キャッシュから{len(cached_data)}件のデータを取得 (category: {category})")
+                return cached_data
             else:
                 logger.debug(f"🔍 はてなブックマーク: キャッシュにデータがありません (category: {category})")
                 return []

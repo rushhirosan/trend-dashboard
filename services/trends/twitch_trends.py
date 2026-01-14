@@ -244,85 +244,27 @@ class TwitchTrendsManager(BaseTrendsManager):
         try:
             logger.info(f"🔍 Twitch: データ保存開始 - {len(all_data)}件")
             
-            # 一つの接続で全ての処理を実行
-            conn = self.db.get_connection()
-            if not conn:
-                logger.warning(f"⚠️ Twitch: データベース接続が取得できませんでした")
-                return
+            # カテゴリごとにデータをグループ化
+            categories = self.get_available_categories()
+            total_saved = 0
             
-            with conn.cursor() as cursor:
-                # 既存のテーブルを削除して再作成
-                cursor.execute("DROP TABLE IF EXISTS twitch_trends_cache")
-                cursor.execute("""
-                    CREATE TABLE twitch_trends_cache (
-                            id SERIAL PRIMARY KEY,
-                            title VARCHAR(500),
-                            game_name VARCHAR(255),
-                            viewer_count INTEGER DEFAULT 0,
-                            rank INTEGER DEFAULT 0,
-                            category VARCHAR(50) NOT NULL,
-                            thumbnail_url VARCHAR(500),
-                            user_name VARCHAR(255),
-                            language VARCHAR(10),
-                            started_at VARCHAR(50),
-                            view_count INTEGER DEFAULT 0,
-                            creator_name VARCHAR(255),
-                            duration INTEGER DEFAULT 0,
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            url VARCHAR(500),
-                            box_art_url VARCHAR(500),
-                            game_id VARCHAR(255)
-                        )
-                    """)
-                
-                # データを一括保存
-                for item in all_data:
-                    cursor.execute("""
-                        INSERT INTO twitch_trends_cache 
-                        (title, game_name, viewer_count, rank, category, thumbnail_url, 
-                         user_name, language, started_at, view_count, creator_name, 
-                         duration, created_at, url, box_art_url, game_id)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        item.get('title', ''),
-                        item.get('game_name', ''),
-                        item.get('viewer_count', 0),
-                        item.get('rank', 0),
-                        item.get('category', ''),
-                        item.get('thumbnail_url', ''),
-                        item.get('user_name', ''),
-                        item.get('language', ''),
-                        item.get('started_at', ''),
-                        item.get('view_count', 0),
-                        item.get('creator_name', ''),
-                        item.get('duration', 0),
-                        item.get('created_at', ''),
-                        item.get('url', ''),
-                        item.get('box_art_url', ''),
-                        item.get('id', '')
-                    ))
-                
-                # コミット
-                conn.commit()
-                logger.info(f"✅ Twitch: データ保存完了 - {len(all_data)}件")
-                
-                # 保存確認
-                cursor.execute("SELECT COUNT(*) FROM twitch_trends_cache")
-                saved_count = cursor.fetchone()[0]
-                logger.info(f"✅ Twitch: 保存確認 - テーブル内データ件数: {saved_count}件")
-                
+            for category in categories:
+                category_data = [item for item in all_data if item.get('category') == category]
+                if category_data:
+                    logger.debug(f"🔍 Twitch: カテゴリ '{category}' のデータをキャッシュに保存中 ({len(category_data)}件)")
+                    success = self._save_to_cache(category_data, category=category)
+                    if success:
+                        total_saved += len(category_data)
+                        logger.info(f"✅ Twitch: カテゴリ '{category}' のデータをキャッシュに保存完了 ({len(category_data)}件)")
+                    else:
+                        logger.warning(f"⚠️ Twitch: カテゴリ '{category}' のデータをキャッシュに保存失敗")
+            
+            if total_saved > 0:
+                logger.info(f"✅ Twitch: 全カテゴリのデータをキャッシュに保存完了 ({total_saved}件)")
                 # cache_statusを更新
-                from datetime import datetime
-                cursor.execute("""
-                    INSERT INTO cache_status (cache_key, last_updated, data_count)
-                    VALUES ('twitch_trends', %s, %s)
-                    ON CONFLICT (cache_key) DO UPDATE SET
-                        last_updated = EXCLUDED.last_updated,
-                        data_count = EXCLUDED.data_count
-                """, (datetime.now(), len(all_data)))
-                
-                conn.commit()
-                logger.info(f"✅ Twitch: cache_status更新完了")
+                self._update_cache_status('twitch_trends', total_saved)
+            else:
+                logger.warning("⚠️ Twitch: 保存されたデータがありません")
             
         except Exception as e:
             logger.error(f"❌ Twitch: キャッシュ保存エラー: {e}", exc_info=True)

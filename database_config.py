@@ -125,17 +125,10 @@ class TrendsCache:
     def init_database(self):
         """データベースを初期化"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ データベース初期化エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                # テーブル作成のSQL
-                create_tables_sql = """
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # テーブル作成のSQL
+                    create_tables_sql = """
                 CREATE TABLE IF NOT EXISTS google_trends_cache (
                     id SERIAL PRIMARY KEY,
                     keyword VARCHAR(255) NOT NULL,
@@ -703,7 +696,7 @@ class TrendsCache:
                 conn.commit()
                 logger.info("✅ データベーステーブル作成完了")
                 return True
-                
+                    
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ データベース初期化中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
@@ -1498,8 +1491,7 @@ class TrendsCache:
         """Music Trendsデータをキャッシュから取得"""
         # 既存環境ではmusic_trends_cacheに不足カラムがあるケースがあるため、ここで補完しておく
         try:
-            conn = self.get_connection()
-            if conn:
+            with self.get_connection() as conn:
                 try:
                     with conn.cursor() as cursor:
                         # INSERT文で使用しているカラムを確認して追加
@@ -1513,21 +1505,7 @@ class TrendsCache:
                 except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
                     error_str = str(e)
                     if "server closed the connection" in error_str or "connection" in error_str.lower() or "closed" in error_str.lower():
-                        logger.warning(f"⚠️ music_trends_cacheスキーマ更新中に接続エラーが発生、再接続を試みます: {e}")
-                        self.connection = None
-                        conn = self.get_connection()
-                        if conn:
-                            try:
-                                with conn.cursor() as cursor:
-                                    cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS album TEXT")
-                                    cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS play_count INTEGER DEFAULT 0")
-                                    cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS spotify_url TEXT")
-                                    cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS rank INTEGER DEFAULT 0")
-                                    cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS region_code VARCHAR(10)")
-                                    cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS track_id VARCHAR(255)")
-                                conn.commit()
-                            except Exception as retry_e:
-                                logger.warning(f"⚠️ music_trends_cacheのスキーマ更新に失敗しました（再接続後も）: {retry_e}")
+                        logger.warning(f"⚠️ music_trends_cacheスキーマ更新中に接続エラーが発生: {e}")
         except Exception as e:
             logger.warning(f"⚠️ music_trends_cacheのスキーマ更新に失敗しました: {e}", exc_info=True)
         
@@ -1535,53 +1513,41 @@ class TrendsCache:
         max_retries = 2
         for attempt in range(max_retries):
             try:
-                conn = self.get_connection()
-                if not conn:
-                    if attempt < max_retries - 1:
-                        logger.warning(f"⚠️ Music Trendsキャッシュ取得: データベース接続が取得できませんでした。再試行します (試行 {attempt + 1}/{max_retries})")
-                        self.connection = None
-                        import time
-                        time.sleep(0.5)
-                        continue
-                    else:
-                        logger.error(f"❌ Music Trendsキャッシュ取得エラー: データベース接続取得に失敗しました（最大試行回数）")
-                        return None
-                
-                # 実際のクエリを実行（接続エラーが発生した場合は再接続を試みる）
-                try:
-                    with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                        cursor.execute("""
-                            SELECT title, artist, album, play_count, popularity, spotify_url, rank, 
-                                   service, region_code, created_at, track_id
-                            FROM music_trends_cache 
-                            WHERE service = %s AND region_code = %s
-                            ORDER BY rank
-                        """, (service, region))
-                        data = cursor.fetchall()
-                        
-                        # RealDictCursorの結果を辞書のリストに変換
-                        result = []
-                        for row in data:
-                            result.append(dict(row))
-                        
-                        return result
-                except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
-                    error_str = str(e)
-                    if "server closed the connection" in error_str or "connection" in error_str.lower() or "closed" in error_str.lower():
-                        if attempt < max_retries - 1:
-                            logger.warning(f"⚠️ Music Trendsキャッシュ取得中に接続エラーが発生、再接続を試みます (試行 {attempt + 1}/{max_retries}): {e}")
-                            self.connection = None
-                            import time
-                            time.sleep(0.5)
-                            continue
+                with self.get_connection() as conn:
+                    # 実際のクエリを実行（接続エラーが発生した場合は再接続を試みる）
+                    try:
+                        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                            cursor.execute("""
+                                SELECT title, artist, album, play_count, popularity, spotify_url, rank, 
+                                       service, region_code, created_at, track_id
+                                FROM music_trends_cache 
+                                WHERE service = %s AND region_code = %s
+                                ORDER BY rank
+                            """, (service, region))
+                            data = cursor.fetchall()
+                            
+                            # RealDictCursorの結果を辞書のリストに変換
+                            result = []
+                            for row in data:
+                                result.append(dict(row))
+                            
+                            return result
+                    except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
+                        error_str = str(e)
+                        if "server closed the connection" in error_str or "connection" in error_str.lower() or "closed" in error_str.lower():
+                            if attempt < max_retries - 1:
+                                logger.warning(f"⚠️ Music Trendsキャッシュ取得中に接続エラーが発生、再接続を試みます (試行 {attempt + 1}/{max_retries}): {e}")
+                                self.connection = None
+                                import time
+                                time.sleep(0.5)
+                                continue
+                            else:
+                                logger.error(f"❌ Music Trendsキャッシュ取得エラー: 接続エラーが継続しています（最大試行回数）: {e}")
+                                return None
                         else:
-                            logger.error(f"❌ Music Trendsキャッシュ取得エラー: 接続エラーが継続しています（最大試行回数）: {e}")
+                            # 接続エラー以外のデータベースエラー
+                            logger.error(f"❌ Music Trendsキャッシュ取得エラー: {e}", exc_info=True)
                             return None
-                    else:
-                        # 接続エラー以外のデータベースエラー
-                        logger.error(f"❌ Music Trendsキャッシュ取得エラー: {e}", exc_info=True)
-                        return None
-                        
             except Exception as e:
                 if attempt < max_retries - 1:
                     logger.warning(f"⚠️ Music Trendsキャッシュ取得エラー: {e} - 再試行します (試行 {attempt + 1}/{max_retries})")
@@ -1887,29 +1853,18 @@ class TrendsCache:
     def get_all_cache_status(self):
         """全キャッシュの状態を取得"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                # データベース接続が取得できない場合は空の状態を返す
-                logger.warning("⚠️ データベース接続が取得できないため、空のキャッシュ状態を返します")
-                return {}
-            if not conn:
-                return {}
-        except Exception as e:
-            logger.error(f"❌ 全キャッシュ状態取得エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return {}
-        
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT cache_key, last_updated, data_count FROM cache_status")
-                results = cursor.fetchall()
-                
-                status = {}
-                for row in results:
-                    status[row[0]] = {
-                        'last_updated': row[1],
-                        'data_count': row[2]
-                    }
-                return status
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT cache_key, last_updated, data_count FROM cache_status")
+                    results = cursor.fetchall()
+                    
+                    status = {}
+                    for row in results:
+                        status[row[0]] = {
+                            'last_updated': row[1],
+                            'data_count': row[2]
+                        }
+                    return status
                 
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ 全キャッシュ状態取得中に接続エラーが発生: {e}", exc_info=True)
@@ -1922,19 +1877,12 @@ class TrendsCache:
     def get_last_update_time(self):
         """最後の更新時刻を取得"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return None
-        except Exception as e:
-            logger.error(f"❌ 最終更新時刻取得エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return None
-        
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT MAX(last_updated) FROM cache_status")
-                result = cursor.fetchone()
-                return result[0] if result and result[0] else None
-                
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT MAX(last_updated) FROM cache_status")
+                    result = cursor.fetchone()
+                    return result[0] if result and result[0] else None
+                    
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ 最終更新時刻取得中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
@@ -3253,31 +3201,24 @@ class TrendsCache:
     def get_stock_trends_from_cache(self, market='US'):
         """Stock Trendsデータをキャッシュから取得"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return None
-        except Exception as e:
-            logger.error(f"❌ Stock Trendsキャッシュ取得エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return None
-        
-        try:
-            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("""
-                    SELECT symbol, name, current_price, previous_price, change, change_percent,
-                           volume, market_cap, market, rank, updated_at, cached_at
-                    FROM stock_trends_cache 
-                    WHERE market = %s 
-                    ORDER BY rank
-                """, (market,))
-                data = cursor.fetchall()
-                
-                # RealDictCursorの結果を辞書のリストに変換
-                result = []
-                for row in data:
-                    result.append(dict(row))
-                
-                return result
-                
+            with self.get_connection() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                    cursor.execute("""
+                        SELECT symbol, name, current_price, previous_price, change, change_percent,
+                               volume, market_cap, market, rank, updated_at, cached_at
+                        FROM stock_trends_cache 
+                        WHERE market = %s 
+                        ORDER BY rank
+                    """, (market,))
+                    data = cursor.fetchall()
+                    
+                    # RealDictCursorの結果を辞書のリストに変換
+                    result = []
+                    for row in data:
+                        result.append(dict(row))
+                    
+                    return result
+                    
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ Stock Trendsキャッシュ取得中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
@@ -3388,31 +3329,24 @@ class TrendsCache:
     def get_crypto_trends_from_cache(self):
         """Crypto Trendsデータをキャッシュから取得"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return None
-        except Exception as e:
-            logger.error(f"❌ Crypto Trendsキャッシュ取得エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return None
-        
-        try:
-            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("""
-                    SELECT coin_id, symbol, name, market_cap_rank, search_score,
-                           current_price, price_change_24h, price_change_percentage_24h,
-                           market_cap, volume_24h, image_url, rank, updated_at, cached_at
-                    FROM crypto_trends_cache 
-                    ORDER BY rank
-                """)
-                data = cursor.fetchall()
-                
-                # RealDictCursorの結果を辞書のリストに変換
-                result = []
-                for row in data:
-                    result.append(dict(row))
-                
-                return result
-                
+            with self.get_connection() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                    cursor.execute("""
+                        SELECT coin_id, symbol, name, market_cap_rank, search_score,
+                               current_price, price_change_24h, price_change_percentage_24h,
+                               market_cap, volume_24h, image_url, rank, updated_at, cached_at
+                        FROM crypto_trends_cache 
+                        ORDER BY rank
+                    """)
+                    data = cursor.fetchall()
+                    
+                    # RealDictCursorの結果を辞書のリストに変換
+                    result = []
+                    for row in data:
+                        result.append(dict(row))
+                    
+                    return result
+                    
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ Crypto Trendsキャッシュ取得中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
@@ -3523,32 +3457,25 @@ class TrendsCache:
     def get_movie_trends_from_cache(self, country='JP'):
         """Movie Trendsデータをキャッシュから取得"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return None
-        except Exception as e:
-            logger.error(f"❌ Movie Trendsキャッシュ取得エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return None
-        
-        try:
-            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("""
-                    SELECT country, movie_id, title, original_title, overview, popularity,
-                           vote_average, vote_count, release_date, poster_path,
-                           backdrop_path, poster_url, backdrop_url, rank, updated_at, cached_at
-                    FROM movie_trends_cache 
-                    WHERE country = %s
-                    ORDER BY rank
-                """, (country,))
-                data = cursor.fetchall()
-                
-                # RealDictCursorの結果を辞書のリストに変換
-                result = []
-                for row in data:
-                    result.append(dict(row))
-                
-                return result
-                
+            with self.get_connection() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                    cursor.execute("""
+                        SELECT country, movie_id, title, original_title, overview, popularity,
+                               vote_average, vote_count, release_date, poster_path,
+                               backdrop_path, poster_url, backdrop_url, rank, updated_at, cached_at
+                        FROM movie_trends_cache 
+                        WHERE country = %s
+                        ORDER BY rank
+                    """, (country,))
+                    data = cursor.fetchall()
+                    
+                    # RealDictCursorの結果を辞書のリストに変換
+                    result = []
+                    for row in data:
+                        result.append(dict(row))
+                    
+                    return result
+                    
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ Movie Trendsキャッシュ取得中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
@@ -3690,48 +3617,41 @@ class TrendsCache:
     def get_book_trends_from_cache(self, country='JP'):
         """Book Trendsデータをキャッシュから取得"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return None
-        except Exception as e:
-            logger.error(f"❌ Book Trendsキャッシュ取得エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return None
-        
-        try:
-            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("""
-                    SELECT country, book_id, isbn, title, subtitle, author, authors, publisher,
-                           price, sales, published_date, release_date, description, page_count,
-                           categories, average_rating, ratings_count, language, item_url,
-                           affiliate_url, preview_link, info_link, buy_link, image_url,
-                           thumbnail, small_thumbnail, medium, large, rank, updated_at, cached_at
-                    FROM book_trends_cache 
-                    WHERE country = %s
-                    ORDER BY rank ASC, cached_at DESC
-                """, (country,))
-                data = cursor.fetchall()
-                
-                logger.info(f"🔍 Book Trends キャッシュ取得: country={country}, 取得件数={len(data)}")
-                
-                # RealDictCursorの結果を辞書のリストに変換
-                result = []
-                for row in data:
-                    row_dict = dict(row)
-                    # JSON文字列を配列に変換
-                    if row_dict.get('authors'):
-                        try:
-                            row_dict['authors'] = json.loads(row_dict['authors']) if isinstance(row_dict['authors'], str) else row_dict['authors']
-                        except:
-                            row_dict['authors'] = []
-                    if row_dict.get('categories'):
-                        try:
-                            row_dict['categories'] = json.loads(row_dict['categories']) if isinstance(row_dict['categories'], str) else row_dict['categories']
-                        except:
-                            row_dict['categories'] = []
-                    result.append(row_dict)
-                
-                return result
-                
+            with self.get_connection() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                    cursor.execute("""
+                        SELECT country, book_id, isbn, title, subtitle, author, authors, publisher,
+                               price, sales, published_date, release_date, description, page_count,
+                               categories, average_rating, ratings_count, language, item_url,
+                               affiliate_url, preview_link, info_link, buy_link, image_url,
+                               thumbnail, small_thumbnail, medium, large, rank, updated_at, cached_at
+                        FROM book_trends_cache 
+                        WHERE country = %s
+                        ORDER BY rank ASC, cached_at DESC
+                    """, (country,))
+                    data = cursor.fetchall()
+                    
+                    logger.info(f"🔍 Book Trends キャッシュ取得: country={country}, 取得件数={len(data)}")
+                    
+                    # RealDictCursorの結果を辞書のリストに変換
+                    result = []
+                    for row in data:
+                        row_dict = dict(row)
+                        # JSON文字列を配列に変換
+                        if row_dict.get('authors'):
+                            try:
+                                row_dict['authors'] = json.loads(row_dict['authors']) if isinstance(row_dict['authors'], str) else row_dict['authors']
+                            except:
+                                row_dict['authors'] = []
+                        if row_dict.get('categories'):
+                            try:
+                                row_dict['categories'] = json.loads(row_dict['categories']) if isinstance(row_dict['categories'], str) else row_dict['categories']
+                            except:
+                                row_dict['categories'] = []
+                        result.append(row_dict)
+                    
+                    return result
+                    
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ Book Trendsキャッシュ取得中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None

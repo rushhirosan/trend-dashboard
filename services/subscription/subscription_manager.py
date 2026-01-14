@@ -27,16 +27,7 @@ class SubscriptionManager:
     def _ensure_subscription_table(self):
         """サブスクリプションテーブルの存在確認と作成"""
         try:
-            try:
-                conn = self.db.get_connection()
-                if not conn:
-                    logger.warning("⚠️ データベース接続が利用できません。テーブル作成をスキップします")
-                    return
-            except Exception as e:
-                logger.warning(f"⚠️ サブスクリプションテーブル作成をスキップします: データベース接続エラー ({e})")
-                return
-            
-            with conn:
+            with self.db.get_connection() as conn:
                 with conn.cursor() as cursor:
                     # サブスクリプションテーブルを作成
                     cursor.execute('''

@@ -240,35 +240,73 @@ class AppStoreTrendsManager(BaseTrendsManager):
                         # 複数のapp_idをカンマ区切りで指定
                         lookup_url = f"{self.base_url}/lookup"
                         lookup_params = {
-                            'id': ','.join(app_ids[:200])  # iTunes APIの最大制限は200
+                            'id': ','.join(app_ids[:200]),  # iTunes APIの最大制限は200
+                            'country': country.lower()  # 国コードを指定（JP, USなど）
                         }
                         
+                        logger.debug(f"📊 App Store Lookup API呼び出し: {lookup_url}, params: {lookup_params}")
                         lookup_response = requests.get(lookup_url, params=lookup_params, timeout=15)
                         
                         if lookup_response.status_code == 200:
                             lookup_data = lookup_response.json()
                             lookup_results = lookup_data.get('results', [])
                             
+                            logger.debug(f"📊 App Store Lookup API: {len(lookup_results)}件の結果を取得")
+                            
                             # app_idをキーとした辞書を作成
                             rating_dict = {}
                             for result in lookup_results:
                                 app_id_key = str(result.get('trackId', ''))
+                                average_rating = result.get('averageUserRating')
+                                user_rating_count = result.get('userRatingCount')
+                                
+                                # 評価情報がNoneの場合は、実際に評価がない可能性がある
+                                # ただし、countryパラメータを指定することで、正しい評価情報が取得できる可能性がある
+                                if average_rating is None:
+                                    logger.debug(f"  ⚠️ app_id {app_id_key}: averageUserRatingがNone (評価情報なしまたは取得失敗)")
+                                    # 実際のレスポンスのキーを確認（デバッグ用）
+                                    available_keys = [k for k in result.keys() if 'rating' in k.lower() or 'review' in k.lower()]
+                                    if available_keys:
+                                        logger.debug(f"    評価関連キー: {available_keys}")
+                                
                                 rating_dict[app_id_key] = {
-                                    'average_user_rating': result.get('averageUserRating', 0),
-                                    'user_rating_count': result.get('userRatingCount', 0),
-                                    'average_user_rating_for_current_version': result.get('averageUserRatingForCurrentVersion', 0),
-                                    'user_rating_count_for_current_version': result.get('userRatingCountForCurrentVersion', 0)
+                                    'average_user_rating': average_rating if average_rating is not None else 0,
+                                    'user_rating_count': user_rating_count if user_rating_count is not None else 0,
+                                    'average_user_rating_for_current_version': result.get('averageUserRatingForCurrentVersion'),
+                                    'user_rating_count_for_current_version': result.get('userRatingCountForCurrentVersion')
                                 }
                             
                             # 評価情報をformatted_dataに反映
+                            rating_updated_count = 0
+                            rating_not_found_apps = []
                             for item in formatted_data:
                                 app_id_key = item.get('app_id', '')
                                 if app_id_key in rating_dict:
                                     rating_info = rating_dict[app_id_key]
-                                    item['average_user_rating'] = float(rating_info.get('average_user_rating', 0)) or 0
-                                    item['user_rating_count'] = int(rating_info.get('user_rating_count', 0)) or 0
+                                    average_rating = rating_info.get('average_user_rating', 0)
+                                    user_rating_count = rating_info.get('user_rating_count', 0)
+                                    
+                                    # Noneや空の場合は0として扱う
+                                    if average_rating is None:
+                                        average_rating = 0
+                                    if user_rating_count is None:
+                                        user_rating_count = 0
+                                    
+                                    item['average_user_rating'] = float(average_rating) or 0
+                                    item['user_rating_count'] = int(user_rating_count) or 0
+                                    rating_updated_count += 1
+                                else:
+                                    # 評価情報が取得できなかったアプリを記録
+                                    rating_not_found_apps.append({
+                                        'app_id': app_id_key,
+                                        'name': item.get('name', 'N/A')
+                                    })
                             
-                            logger.info(f"✅ App Store: {len(rating_dict)}件のアプリの評価情報を取得しました")
+                            logger.info(f"✅ App Store: {rating_updated_count}件のアプリの評価情報を取得しました")
+                            if rating_not_found_apps:
+                                logger.warning(f"⚠️ App Store: {len(rating_not_found_apps)}件のアプリの評価情報が取得できませんでした")
+                                for app in rating_not_found_apps[:5]:  # 最初の5件のみログ出力
+                                    logger.debug(f"  - 評価情報なし: {app['name']} (app_id: {app['app_id']})")
                         else:
                             logger.warning(f"⚠️ App Store: 評価情報の取得に失敗しました (status: {lookup_response.status_code})")
                     except Exception as e:

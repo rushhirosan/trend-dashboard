@@ -1139,15 +1139,6 @@
                                         </div>
                                     </div>
                                 </div>
-
-                                <!-- 更新ボタン -->
-                                <div class="row mt-4">
-                                    <div class="col-12 text-center">
-                                        <button class="btn btn-primary btn-lg" id="refreshDataBtn">
-                                            <i class="fas fa-sync-alt"></i> データ鮮度情報を更新/Refresh Data Status
-                                        </button>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -1176,16 +1167,6 @@
                 setTimeout(() => {
                     switchRegion('JP');
                 }, 100);
-                
-                // 更新ボタンのイベントリスナー
-                const refreshBtn = document.getElementById('refreshDataBtn');
-                if (refreshBtn) {
-                    refreshBtn.addEventListener('click', function() {
-                        const currentRegion = document.querySelector('input[name="regionTab"]:checked').value;
-                        console.log(`🔄 手動でデータ鮮度情報を更新 (地域: ${currentRegion})`);
-                        refreshDataFreshnessForRegion(currentRegion);
-                    });
-                }
             } catch (error) {
                 console.error('ページ初期化エラー:', error);
                 // エラーが発生してもページは表示されるようにする

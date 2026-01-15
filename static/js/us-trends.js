@@ -433,7 +433,7 @@ async function fetchBookTrendsUS() {
                 statusMessage.textContent = 'ℹ️ データがありません。しばらく待ってから再度お試しください。';
                 statusMessage.style.display = 'block';
             }
-            tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">データがありません</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">データがありません</td></tr>';
             resultsElement.style.display = 'block';
             return;
         }
@@ -453,7 +453,7 @@ async function fetchBookTrendsUS() {
             statusMessage.style.display = 'block';
         }
         if (tableBody) {
-            tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">エラー: ${error.message || 'データの取得に失敗しました'}</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">エラー: ${error.message || 'データの取得に失敗しました'}</td></tr>`;
         }
         resultsElement.style.display = 'block';
     }
@@ -483,13 +483,8 @@ function displayBookResultsUS(data) {
             row.className = 'trend-card';
             
             const author = item.author || (item.authors && item.authors.length > 0 ? item.authors.join(', ') : 'N/A') || 'N/A';
-            let rating = 'N/A';
-            if (item.average_rating) {
-                const avgRating = typeof item.average_rating === 'number' ? item.average_rating : parseFloat(item.average_rating);
-                if (!isNaN(avgRating)) {
-                    rating = avgRating.toFixed(1);
-                }
-            }
+            const price = item.price ? `$${parseFloat(item.price).toFixed(2)}` : 'N/A';
+            const ratingsCount = item.ratings_count ? parseInt(item.ratings_count).toLocaleString() : 'N/A';
             const bookLink = item.info_link || item.preview_link || item.buy_link || '#';
             // 画像URLの優先順位: image_url > thumbnail > small_thumbnail
             const imageUrl = item.image_url || item.thumbnail || item.small_thumbnail || '';
@@ -501,13 +496,14 @@ function displayBookResultsUS(data) {
                     <strong><a href="${bookLink}" target="_blank">${item.title || 'N/A'}</a></strong>
                 </td>
                 <td>${author}</td>
-                <td>${rating}</td>
+                <td>${price}</td>
+                <td>${ratingsCount}</td>
             `;
             tableBody.appendChild(row);
         });
     } else {
         console.warn('📊 No book data to display', { bookData, isArray: Array.isArray(bookData), length: Array.isArray(bookData) ? bookData.length : 'N/A' });
-        tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">データがありません</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">データがありません</td></tr>';
     }
     
     // Display results
@@ -613,7 +609,7 @@ function loadBookTrendsFromCacheUS() {
                     statusMessage.style.display = 'block';
                 }
                 if (tableBody) {
-                    tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">データが取得できませんでした</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">データが取得できませんでした</td></tr>';
                 }
                 if (resultsElement) {
                     resultsElement.style.display = 'block';
@@ -656,7 +652,7 @@ function loadBookTrendsFromCacheUS() {
                     statusMessage.style.display = 'block';
                 }
                 if (tableBody) {
-                    tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">データがありません</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">データがありません</td></tr>';
                 }
                 if (resultsElement) {
                     resultsElement.style.display = 'block';
@@ -684,7 +680,7 @@ function loadBookTrendsFromCacheUS() {
                 statusMessage.style.display = 'block';
             }
             if (tableBody) {
-                tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">${errorMessage}</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">${errorMessage}</td></tr>`;
             }
             if (resultsElement) {
                 resultsElement.style.display = 'block';

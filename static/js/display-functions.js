@@ -203,13 +203,7 @@ function displayBookResults(data) {
             
             const author = item.author || (item.authors && item.authors.length > 0 ? item.authors.join(', ') : 'N/A') || 'N/A';
             const price = item.price ? `¥${parseInt(item.price).toLocaleString()}` : 'N/A';
-            let rating = 'N/A';
-            if (item.average_rating) {
-                const avgRating = typeof item.average_rating === 'number' ? item.average_rating : parseFloat(item.average_rating);
-                if (!isNaN(avgRating)) {
-                    rating = avgRating.toFixed(1);
-                }
-            }
+            const sales = item.sales ? parseInt(item.sales).toLocaleString() : 'N/A';
             const bookLink = item.item_url || '#';
             const imageUrl = item.image_url || '';
             
@@ -220,7 +214,8 @@ function displayBookResults(data) {
                     <strong><a href="${bookLink}" target="_blank">${item.title || 'N/A'}</a></strong>
                 </td>
                 <td>${author}</td>
-                <td>${price !== 'N/A' ? price : rating}</td>
+                <td>${price}</td>
+                <td>${sales}</td>
             `;
             tableBody.appendChild(row);
         });

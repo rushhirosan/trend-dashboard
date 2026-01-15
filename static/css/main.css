@@ -642,118 +642,11 @@ body {
 
 /* ZennとNoteのカード内の高さを充分に使うスタイル（Hatena/Qiitaと同じスタイルを適用） */
 /* デスクトップのみ（992px以上） */
+/* 注意: Hatenaと同じように汎用的なルール（217-223行目）で動作するため、詳細なスタイルは削除 */
+/* 必要な特別設定（.alertの非表示）のみ残す */
 @media (min-width: 992px) {
-    /* Zenn結果セクション */
-    #trends .card.h-100 .card-body #zennResults {
-        flex: 1 1 0 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        min-height: 0 !important;
-        height: 100% !important;
-        align-self: stretch !important;
-        position: relative !important;
-    }
-
-    #trends .card.h-100 .card-body #zennResults > .alert {
-        display: none !important;
-        height: 0 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        min-height: 0 !important;
-        max-height: 0 !important;
-    }
-
-    #trends .card.h-100 .card-body #zennResults > .card {
-        flex: 1 1 0 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        min-height: 0 !important;
-        max-height: none !important;
-        height: 100% !important;
-        overflow: visible !important;
-        align-self: stretch !important;
-    }
-
-    #trends .card.h-100 .card-body #zennResults > .card.category-card {
-        max-height: none !important;
-        overflow: visible !important;
-        margin-bottom: 0 !important;
-        height: 100% !important;
-    }
-
-    #trends .card.h-100 .card-body #zennResults > .card > .card-body {
-        flex: 1 1 0 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        min-height: 0 !important;
-        height: 100% !important;
-        align-self: stretch !important;
-    }
-
-    #trends .card.h-100 .card-body #zennResults > .card > .card-body > .trend-table-container {
-        flex: 1 1 0 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        min-height: 0 !important;
-        max-height: none !important;
-        height: 100% !important;
-        overflow-y: auto !important;
-        align-self: stretch !important;
-    }
-
-    #trends .card.h-100 .card-body #zennResults > .card > .card-body > .trend-table-container > .table-responsive {
-        flex: 1 1 0 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        min-height: 0 !important;
-        height: 100% !important;
-        align-self: stretch !important;
-    }
-
-    #zennResults {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-        height: 100%;
-    }
-
-    #zennResults .card {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-        max-height: none !important;
-        height: 100%;
-        overflow: visible;
-    }
-
-    #zennResults .card.category-card {
-        max-height: none !important;
-        overflow: visible;
-        margin-bottom: 0 !important;
-        height: 100%;
-    }
-
-    #zennResults .card .card-body {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-        height: 100%;
-    }
-
-    /* Note結果セクション */
-    #trends .card.h-100 .card-body #noteResults {
-        flex: 1 1 0 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        min-height: 0 !important;
-        height: 100% !important;
-        align-self: stretch !important;
-        position: relative !important;
-    }
-
+    /* ZennとNoteのステータスメッセージを非表示（Hatenaと同じ） */
+    #trends .card.h-100 .card-body #zennResults > .alert,
     #trends .card.h-100 .card-body #noteResults > .alert {
         display: none !important;
         height: 0 !important;
@@ -763,79 +656,41 @@ body {
         max-height: 0 !important;
     }
 
-    #trends .card.h-100 .card-body #noteResults > .card {
-        flex: 1 1 0 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        min-height: 0 !important;
-        max-height: none !important;
-        height: 100% !important;
-        overflow: visible !important;
-        align-self: stretch !important;
-    }
-
-    #trends .card.h-100 .card-body #noteResults > .card.category-card {
-        max-height: none !important;
-        overflow: visible !important;
-        margin-bottom: 0 !important;
-        height: 100% !important;
-    }
-
-    #trends .card.h-100 .card-body #noteResults > .card > .card-body {
-        flex: 1 1 0 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        min-height: 0 !important;
-        height: 100% !important;
-        align-self: stretch !important;
-    }
-
-    #trends .card.h-100 .card-body #noteResults > .card > .card-body > .trend-table-container {
-        flex: 1 1 0 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        min-height: 0 !important;
-        max-height: none !important;
-        height: 100% !important;
-        overflow-y: auto !important;
-        align-self: stretch !important;
-    }
-
-    #trends .card.h-100 .card-body #noteResults > .card > .card-body > .trend-table-container > .table-responsive {
-        flex: 1 1 0 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        min-height: 0 !important;
-        height: 100% !important;
-        align-self: stretch !important;
-    }
-
-    #noteResults {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-        height: 100%;
-    }
-
-    #noteResults .card {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-        max-height: none !important;
-        height: 100%;
-        overflow: visible;
-    }
-
+    /* ZennとNoteの内部カードを高さいっぱいに使う（Hatenaと同じスタイル） */
+    #zennResults .card.category-card,
     #noteResults .card.category-card {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
         max-height: none !important;
+        height: 100%;
         overflow: visible;
         margin-bottom: 0 !important;
+    }
+
+    #zennResults .card .card-body,
+    #noteResults .card .card-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
         height: 100%;
     }
 
-    #noteResults .card .card-body {
+    #zennResults .trend-table-container,
+    #noteResults .trend-table-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        max-height: none !important;
+        height: 100%;
+        overflow-y: auto;
+    }
+
+    #zennResults .trend-table-container .table-responsive,
+    #noteResults .trend-table-container .table-responsive {
         flex: 1;
         display: flex;
         flex-direction: column;

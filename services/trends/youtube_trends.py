@@ -202,46 +202,30 @@ class YouTubeTrendsManager(BaseTrendsManager):
             youtube = build('youtube', 'v3', developerKey=self.youtube_api_key)
             
             # 最近アップロードされた動画を検索（急上昇に近い動画を取得）
-            # order='date'を使って最新の動画を取得し、視聴回数密度でソートする方が確実
+            # publishedAfterは使わず、order='date'で最新動画を取得してからフィルタリングする方が確実
             from datetime import datetime, timezone, timedelta
             now_utc = datetime.now(timezone.utc)
-            seven_days_ago = (now_utc - timedelta(days=7)).isoformat()
             
-            # まず最新の動画を取得（publishedAfterを使う）
+            # publishedAfterを使わず、より多くの最新動画を取得してからフィルタリング
             try:
                 request = youtube.search().list(
                     part='snippet',
                     type='video',
                     order='date',  # 最新順
                     regionCode=region_code,
-                    maxResults=50,  # 多めに取得してフィルタリング
-                    publishedAfter=seven_days_ago  # 過去7日以内
+                    maxResults=50  # 多めに取得してフィルタリング
                 )
                 response = request.execute()
-                logger.info(f"🔍 YouTube急上昇: search APIレスポンス受信 (items数: {len(response.get('items', []))}, region: {region_code}, publishedAfter: {seven_days_ago})")
+                logger.info(f"🔍 YouTube急上昇: search APIレスポンス受信 (items数: {len(response.get('items', []))}, region: {region_code})")
             except HttpError as e:
                 logger.error(f"❌ YouTube急上昇: search API HTTPエラー (region: {region_code}): {e.resp.status} - {e.content.decode('utf-8') if e.content else 'No content'}")
-                # publishedAfterを外して再試行
-                logger.info(f"🔍 YouTube急上昇: publishedAfterパラメータなしで再試行 (region: {region_code})")
-                try:
-                    request = youtube.search().list(
-                        part='snippet',
-                        type='video',
-                        order='date',
-                        regionCode=region_code,
-                        maxResults=50
-                    )
-                    response = request.execute()
-                    logger.info(f"🔍 YouTube急上昇: search API再試行レスポンス (items数: {len(response.get('items', []))}, region: {region_code})")
-                except HttpError as e2:
-                    logger.error(f"❌ YouTube急上昇: search API再試行もHTTPエラー (region: {region_code}): {e2.resp.status} - {e2.content.decode('utf-8') if e2.content else 'No content'}")
-                    return {
-                        'success': False,
-                        'error': f'YouTube API HTTPエラー: {e2.resp.status}',
-                        'status': 'api_error',
-                        'data': [],
-                        'region_code': region_code
-                    }
+                return {
+                    'success': False,
+                    'error': f'YouTube API HTTPエラー: {e.resp.status}',
+                    'status': 'api_error',
+                    'data': [],
+                    'region_code': region_code
+                }
             
             if not response.get('items'):
                 logger.warning(f"⚠️ YouTube急上昇: 動画データが取得できませんでした (region: {region_code}, response keys: {list(response.keys())})")
@@ -298,6 +282,10 @@ class YouTubeTrendsManager(BaseTrendsManager):
             # データを整形し、トレンドスコアを計算
             trends = []
             seven_days_ago_dt = now_utc - timedelta(days=7)
+            three_days_ago_dt = now_utc - timedelta(days=3)
+            one_day_ago_dt = now_utc - timedelta(days=1)
+            
+            logger.info(f"🔍 YouTube急上昇: 動画データ処理開始 (取得数: {len(video_response['items'])}, フィルタ期間: 過去7日以内, region: {region_code})")
             
             for item in video_response['items']:
                 try:
@@ -307,7 +295,7 @@ class YouTubeTrendsManager(BaseTrendsManager):
                         published_str.replace('Z', '+00:00')
                     )
                     
-                    # 過去7日以内の動画のみをフィルタリング（publishedAfterが効かない場合の対策）
+                    # 過去7日以内の動画のみをフィルタリング
                     if published_date < seven_days_ago_dt:
                         continue
                     

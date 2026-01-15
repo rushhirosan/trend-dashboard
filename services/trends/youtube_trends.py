@@ -6,6 +6,7 @@ import os
 from datetime import datetime, timezone, timedelta
 import pytz
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from database_config import TrendsCache
 from utils.logger_config import get_logger
 from services.trends.base_trends_manager import BaseTrendsManager
@@ -200,45 +201,57 @@ class YouTubeTrendsManager(BaseTrendsManager):
             logger.info(f"🔍 YouTube急上昇: 外部API呼び出し開始 (region: {region_code}, max_results: {max_results})")
             youtube = build('youtube', 'v3', developerKey=self.youtube_api_key)
             
-            # 最近アップロードされた動画を検索（急上昇の代わり）
+            # 最近アップロードされた動画を検索（急上昇に近い動画を取得）
+            # order='date'を使って最新の動画を取得し、視聴回数密度でソートする方が確実
             from datetime import datetime, timezone, timedelta
-            seven_days_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+            now_utc = datetime.now(timezone.utc)
+            seven_days_ago = (now_utc - timedelta(days=7)).isoformat()
             
-            request = youtube.search().list(
-                part='snippet',
-                type='video',
-                order='viewCount',  # 視聴回数順（急上昇に近い）
-                regionCode=region_code,
-                maxResults=max_results * 2,  # 公開日でフィルタリングするため多めに取得
-                publishedAfter=seven_days_ago  # 過去7日以内
-            )
-            
-            response = request.execute()
-            logger.info(f"🔍 YouTube急上昇: search APIレスポンス受信 (items数: {len(response.get('items', []))}, region: {region_code}, publishedAfter: {seven_days_ago})")
-            
-            if not response.get('items'):
-                logger.warning(f"⚠️ YouTube急上昇: 動画データが取得できませんでした (region: {region_code}, response: {response.get('pageInfo', {})})")
-                # publishedAfterを外して再試行
-                logger.info(f"🔍 YouTube急上昇: publishedAfterパラメータなしで再試行 (region: {region_code})")
-                request2 = youtube.search().list(
+            # まず最新の動画を取得（publishedAfterを使う）
+            try:
+                request = youtube.search().list(
                     part='snippet',
                     type='video',
-                    order='viewCount',
+                    order='date',  # 最新順
                     regionCode=region_code,
-                    maxResults=max_results * 2
+                    maxResults=50,  # 多めに取得してフィルタリング
+                    publishedAfter=seven_days_ago  # 過去7日以内
                 )
-                response = request2.execute()
-                logger.info(f"🔍 YouTube急上昇: search API再試行レスポンス (items数: {len(response.get('items', []))}, region: {region_code})")
-                
-                if not response.get('items'):
-                    logger.error(f"❌ YouTube急上昇: 再試行後も動画データが取得できませんでした (region: {region_code})")
+                response = request.execute()
+                logger.info(f"🔍 YouTube急上昇: search APIレスポンス受信 (items数: {len(response.get('items', []))}, region: {region_code}, publishedAfter: {seven_days_ago})")
+            except HttpError as e:
+                logger.error(f"❌ YouTube急上昇: search API HTTPエラー (region: {region_code}): {e.resp.status} - {e.content.decode('utf-8') if e.content else 'No content'}")
+                # publishedAfterを外して再試行
+                logger.info(f"🔍 YouTube急上昇: publishedAfterパラメータなしで再試行 (region: {region_code})")
+                try:
+                    request = youtube.search().list(
+                        part='snippet',
+                        type='video',
+                        order='date',
+                        regionCode=region_code,
+                        maxResults=50
+                    )
+                    response = request.execute()
+                    logger.info(f"🔍 YouTube急上昇: search API再試行レスポンス (items数: {len(response.get('items', []))}, region: {region_code})")
+                except HttpError as e2:
+                    logger.error(f"❌ YouTube急上昇: search API再試行もHTTPエラー (region: {region_code}): {e2.resp.status} - {e2.content.decode('utf-8') if e2.content else 'No content'}")
                     return {
-                        'success': True,
+                        'success': False,
+                        'error': f'YouTube API HTTPエラー: {e2.resp.status}',
+                        'status': 'api_error',
                         'data': [],
-                        'status': 'no_data',
-                        'region_code': region_code,
-                        'message': '動画データが取得できませんでした'
+                        'region_code': region_code
                     }
+            
+            if not response.get('items'):
+                logger.warning(f"⚠️ YouTube急上昇: 動画データが取得できませんでした (region: {region_code}, response keys: {list(response.keys())})")
+                return {
+                    'success': True,
+                    'data': [],
+                    'status': 'no_data',
+                    'region_code': region_code,
+                    'message': '動画データが取得できませんでした'
+                }
             
             # 動画IDを収集
             video_ids = [item['id']['videoId'] for item in response['items']]
@@ -255,12 +268,22 @@ class YouTubeTrendsManager(BaseTrendsManager):
                 }
             
             # 動画の詳細情報を取得
-            video_request = youtube.videos().list(
-                part='snippet,statistics',
-                id=','.join(video_ids)
-            )
-            video_response = video_request.execute()
-            logger.info(f"🔍 YouTube急上昇: videos APIレスポンス受信 (items数: {len(video_response.get('items', []))}, region: {region_code})")
+            try:
+                video_request = youtube.videos().list(
+                    part='snippet,statistics',
+                    id=','.join(video_ids)
+                )
+                video_response = video_request.execute()
+                logger.info(f"🔍 YouTube急上昇: videos APIレスポンス受信 (items数: {len(video_response.get('items', []))}, region: {region_code})")
+            except HttpError as e:
+                logger.error(f"❌ YouTube急上昇: videos API HTTPエラー (region: {region_code}): {e.resp.status} - {e.content.decode('utf-8') if e.content else 'No content'}")
+                return {
+                    'success': False,
+                    'error': f'YouTube videos API HTTPエラー: {e.resp.status}',
+                    'status': 'api_error',
+                    'data': [],
+                    'region_code': region_code
+                }
             
             if not video_response.get('items'):
                 logger.warning(f"⚠️ YouTube急上昇: 動画詳細情報が取得できませんでした (region: {region_code})")
@@ -274,7 +297,6 @@ class YouTubeTrendsManager(BaseTrendsManager):
             
             # データを整形し、トレンドスコアを計算
             trends = []
-            now_utc = datetime.now(timezone.utc)
             seven_days_ago_dt = now_utc - timedelta(days=7)
             
             for item in video_response['items']:

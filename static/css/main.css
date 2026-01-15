@@ -1967,6 +1967,17 @@ body.data-status-active #data-status .card-body {
         -webkit-overflow-scrolling: touch;
     }
     
+    /* モバイルでの楽天商品名カラム調整 */
+    #rakutenTrendsTable td:nth-child(2) {
+        max-width: none !important;
+        min-width: 200px;
+    }
+    
+    #rakutenTrendsTable td:nth-child(2) strong,
+    #rakutenTrendsTable td:nth-child(2) a {
+        -webkit-line-clamp: 4 !important;
+    }
+    
     /* モバイルでのカードヘッダー調整 */
     .card-header h5 {
         font-size: 0.85rem;

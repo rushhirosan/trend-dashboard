@@ -207,28 +207,52 @@ class YouTubeTrendsManager(BaseTrendsManager):
             request = youtube.search().list(
                 part='snippet',
                 type='video',
-                order='date',  # 最新順
+                order='viewCount',  # 視聴回数順（急上昇に近い）
                 regionCode=region_code,
-                maxResults=max_results,
+                maxResults=max_results * 2,  # 公開日でフィルタリングするため多めに取得
                 publishedAfter=seven_days_ago  # 過去7日以内
             )
             
             response = request.execute()
-            logger.debug(f"🔍 YouTube急上昇: search APIレスポンス受信 (items数: {len(response.get('items', []))})")
+            logger.info(f"🔍 YouTube急上昇: search APIレスポンス受信 (items数: {len(response.get('items', []))}, region: {region_code}, publishedAfter: {seven_days_ago})")
             
             if not response.get('items'):
-                logger.warning(f"⚠️ YouTube急上昇: 動画データが取得できませんでした (region: {region_code})")
+                logger.warning(f"⚠️ YouTube急上昇: 動画データが取得できませんでした (region: {region_code}, response: {response.get('pageInfo', {})})")
+                # publishedAfterを外して再試行
+                logger.info(f"🔍 YouTube急上昇: publishedAfterパラメータなしで再試行 (region: {region_code})")
+                request2 = youtube.search().list(
+                    part='snippet',
+                    type='video',
+                    order='viewCount',
+                    regionCode=region_code,
+                    maxResults=max_results * 2
+                )
+                response = request2.execute()
+                logger.info(f"🔍 YouTube急上昇: search API再試行レスポンス (items数: {len(response.get('items', []))}, region: {region_code})")
+                
+                if not response.get('items'):
+                    logger.error(f"❌ YouTube急上昇: 再試行後も動画データが取得できませんでした (region: {region_code})")
+                    return {
+                        'success': True,
+                        'data': [],
+                        'status': 'no_data',
+                        'region_code': region_code,
+                        'message': '動画データが取得できませんでした'
+                    }
+            
+            # 動画IDを収集
+            video_ids = [item['id']['videoId'] for item in response['items']]
+            logger.info(f"🔍 YouTube急上昇: {len(video_ids)}件の動画IDを収集 (region: {region_code})")
+            
+            if not video_ids:
+                logger.error(f"❌ YouTube急上昇: 動画IDが収集できませんでした (region: {region_code})")
                 return {
                     'success': True,
                     'data': [],
                     'status': 'no_data',
                     'region_code': region_code,
-                    'message': '動画データが取得できませんでした'
+                    'message': '動画IDが収集できませんでした'
                 }
-            
-            # 動画IDを収集
-            video_ids = [item['id']['videoId'] for item in response['items']]
-            logger.debug(f"🔍 YouTube急上昇: {len(video_ids)}件の動画IDを収集")
             
             # 動画の詳細情報を取得
             video_request = youtube.videos().list(
@@ -236,7 +260,7 @@ class YouTubeTrendsManager(BaseTrendsManager):
                 id=','.join(video_ids)
             )
             video_response = video_request.execute()
-            logger.debug(f"🔍 YouTube急上昇: videos APIレスポンス受信 (items数: {len(video_response.get('items', []))})")
+            logger.info(f"🔍 YouTube急上昇: videos APIレスポンス受信 (items数: {len(video_response.get('items', []))}, region: {region_code})")
             
             if not video_response.get('items'):
                 logger.warning(f"⚠️ YouTube急上昇: 動画詳細情報が取得できませんでした (region: {region_code})")
@@ -250,16 +274,29 @@ class YouTubeTrendsManager(BaseTrendsManager):
             
             # データを整形し、トレンドスコアを計算
             trends = []
+            now_utc = datetime.now(timezone.utc)
+            seven_days_ago_dt = now_utc - timedelta(days=7)
+            
             for item in video_response['items']:
                 try:
                     # 投稿日時から経過日数を計算
+                    published_str = item['snippet']['publishedAt']
                     published_date = datetime.fromisoformat(
-                        item['snippet']['publishedAt'].replace('Z', '+00:00')
+                        published_str.replace('Z', '+00:00')
                     )
-                    days_since_published = max(1, (datetime.now(timezone.utc) - published_date).days)
+                    
+                    # 過去7日以内の動画のみをフィルタリング（publishedAfterが効かない場合の対策）
+                    if published_date < seven_days_ago_dt:
+                        continue
+                    
+                    days_since_published = max(1, (now_utc - published_date).days)
                     
                     # 視聴回数密度（1日あたりの視聴回数）を計算
                     view_count = int(item['statistics'].get('viewCount', 0))
+                    if view_count == 0:
+                        logger.debug(f"⚠️ YouTube急上昇: 視聴回数が0の動画をスキップ (video_id: {item.get('id', 'unknown')})")
+                        continue
+                    
                     view_density = view_count / days_since_published
                     
                     # トレンドスコア（新しい動画ほど高スコア）

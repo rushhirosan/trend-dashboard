@@ -206,19 +206,35 @@ class YouTubeTrendsManager(BaseTrendsManager):
             from datetime import datetime, timezone, timedelta
             now_utc = datetime.now(timezone.utc)
             
-            # publishedAfterを使わず、より多くの最新動画を取得してからフィルタリング
+            # publishedAfterとregionCodeを使わず、より多くの最新動画を取得してからフィルタリング
+            # regionCodeは地域の検索結果に影響するが、空の結果を返す場合があるため、まずは外して試す
             try:
+                # まずregionCodeなしで試す
                 request = youtube.search().list(
                     part='snippet',
                     type='video',
                     order='date',  # 最新順
-                    regionCode=region_code,
                     maxResults=50  # 多めに取得してフィルタリング
                 )
                 response = request.execute()
-                logger.info(f"🔍 YouTube急上昇: search APIレスポンス受信 (items数: {len(response.get('items', []))}, region: {region_code})")
+                logger.info(f"🔍 YouTube急上昇: search APIレスポンス受信 (items数: {len(response.get('items', []))}, region: {region_code}, regionCodeパラメータなし)")
+                
+                # もし空の場合は、regionCode付きで再試行
+                if not response.get('items'):
+                    logger.info(f"🔍 YouTube急上昇: regionCodeなしで空のため、regionCode={region_code}で再試行")
+                    request = youtube.search().list(
+                        part='snippet',
+                        type='video',
+                        order='date',
+                        regionCode=region_code,
+                        maxResults=50
+                    )
+                    response = request.execute()
+                    logger.info(f"🔍 YouTube急上昇: search API再試行レスポンス (items数: {len(response.get('items', []))}, region: {region_code}, regionCode={region_code})")
+                    
             except HttpError as e:
-                logger.error(f"❌ YouTube急上昇: search API HTTPエラー (region: {region_code}): {e.resp.status} - {e.content.decode('utf-8') if e.content else 'No content'}")
+                error_content = e.content.decode('utf-8') if e.content else 'No content'
+                logger.error(f"❌ YouTube急上昇: search API HTTPエラー (region: {region_code}): {e.resp.status} - {error_content}")
                 return {
                     'success': False,
                     'error': f'YouTube API HTTPエラー: {e.resp.status}',
@@ -228,7 +244,7 @@ class YouTubeTrendsManager(BaseTrendsManager):
                 }
             
             if not response.get('items'):
-                logger.warning(f"⚠️ YouTube急上昇: 動画データが取得できませんでした (region: {region_code}, response keys: {list(response.keys())})")
+                logger.warning(f"⚠️ YouTube急上昇: 動画データが取得できませんでした (region: {region_code}, response keys: {list(response.keys())}, pageInfo: {response.get('pageInfo', {})})")
                 return {
                     'success': True,
                     'data': [],

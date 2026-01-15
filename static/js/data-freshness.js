@@ -47,6 +47,22 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
             apiEndpoint = '/api/qiita-trends';
             params = '?limit=25&sort=likes_count';
             break;
+        case 'zenn':
+            apiEndpoint = '/api/zenn-trends';
+            params = '?limit=25';
+            break;
+        case 'note':
+            apiEndpoint = '/api/note-trends';
+            params = '?category=all&limit=25';
+            break;
+        case 'ipa':
+            apiEndpoint = '/api/ipa-trends';
+            params = '?limit=25';
+            break;
+        case 'jpcert':
+            apiEndpoint = '/api/jpcert-trends';
+            params = '?limit=25';
+            break;
         case 'stock':
             apiEndpoint = '/api/stock-trends';
             params = '?market=JP&limit=25';
@@ -345,6 +361,10 @@ function refreshDataFreshnessExternal() {
     updatePlatformStatusExternal('youtube', 'YouTube');
     updatePlatformStatusExternal('hatena', 'はてなブックマーク');
     updatePlatformStatusExternal('qiita', 'Qiita トレンド');
+    updatePlatformStatusExternal('zenn', 'Zenn');
+    updatePlatformStatusExternal('note', 'Note');
+    updatePlatformStatusExternal('ipa', 'IPA注意喚起');
+    updatePlatformStatusExternal('jpcert', 'JPCERT/CC');
     updatePlatformStatusExternal('stock', '株価トレンド');
     updatePlatformStatusExternal('crypto', '仮想通貨トレンド');
     updatePlatformStatusExternal('spotify', 'Spotify');

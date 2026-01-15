@@ -151,8 +151,8 @@ function showGoogleResults() {
 // YouTube Trendsキャッシュデータの読み込み（共通化）
 function loadYouTubeTrendsFromCache() {
     if (typeof loadTrendsFromCache === 'function') {
-        const trendType = document.querySelector('input[name="youtubeTrendType"]:checked')?.value || 'trending';
-        const endpoint = trendType === 'rising' ? '/api/youtube-rising-trends' : '/api/youtube-trends';
+        // Rising機能は削除されたため、常にtrendingを使用
+        const endpoint = '/api/youtube-trends';
         loadTrendsFromCache({
             serviceName: 'YouTube',
             apiEndpoint: endpoint,

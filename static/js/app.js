@@ -90,7 +90,8 @@ async function fetchYouTubeTrends() {
     console.log('fetchYouTubeTrends: 開始');
     
     const region = 'JP'; // 日本固定
-    const trendType = document.querySelector('input[name="youtubeTrendType"]:checked').value;
+    // Rising機能は削除されたため、常にtop25を使用
+    const trendType = 'top25';
     
     console.log('fetchYouTubeTrends: パラメータ', { region, trendType });
     
@@ -99,7 +100,7 @@ async function fetchYouTubeTrends() {
     console.log('fetchYouTubeTrends: ローディング表示完了');
     
     try {
-        const endpoint = trendType === 'rising' ? '/api/youtube-rising-trends' : '/api/youtube-trends';
+        const endpoint = '/api/youtube-trends';
         console.log(`YouTube API呼び出し: ${endpoint}?region=${region}`);
         
         const response = await fetch(`${endpoint}?region=${region}`);
@@ -833,16 +834,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.warn('利用可能な関数:', Object.keys(window).filter(k => k.includes('load') || k.includes('Load')));
     }
     
-    // YouTubeトレンドタイプラジオボタンの監視
-    const youtubeTrendTypeRadios = document.querySelectorAll('input[name="youtubeTrendType"]');
-    youtubeTrendTypeRadios.forEach(radio => {
-        radio.addEventListener('change', function() {
-            console.log('YouTubeトレンドタイプ変更:', this.value);
-            fetchYouTubeTrends();
-        });
-    });
-    
-    console.log('YouTubeトレンドタイプラジオボタン:', youtubeTrendTypeRadios.length, '件');
+    // YouTube急上昇機能は削除されたため、ラジオボタンの監視は不要
     
     // YouTube地域選択は削除済み（日本固定）
     

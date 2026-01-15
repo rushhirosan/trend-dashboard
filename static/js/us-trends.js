@@ -1101,8 +1101,9 @@ function loadYouTubeTrendsFromCacheUS() {
     console.log('📊 YouTube Trends cache data loading for US');
     
     const region = 'US';
-    const trendType = document.querySelector('input[name="youtubeTrendTypeUS"]:checked')?.value || 'top25';
-    const endpoint = trendType === 'rising' ? '/api/youtube-rising-trends' : '/api/youtube-trends';
+    // Rising機能は削除されたため、常にtop25を使用
+    const trendType = 'top25';
+    const endpoint = '/api/youtube-trends';
     
     console.log(`YouTube API call: ${endpoint}?region=${region}`);
     
@@ -2718,14 +2719,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load cached data first (like Japan version)
     loadCachedDataUS();
     
-    // YouTube trend type radio buttons event listener (統一パターン)
-    const youtubeTrendTypeRadios = document.querySelectorAll('input[name="youtubeTrendTypeUS"]');
-    youtubeTrendTypeRadios.forEach(radio => {
-        radio.addEventListener('change', function() {
-            console.log('YouTube trend type changed:', this.value);
-            loadYouTubeTrendsFromCacheUS();
-        });
-    });
+    // YouTube急上昇機能は削除されたため、ラジオボタンの監視は不要
     
     // Twitch type selector event listener
     const twitchTypeSelect = document.getElementById('twitchTypeSelectUS');

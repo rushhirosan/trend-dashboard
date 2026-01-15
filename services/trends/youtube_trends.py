@@ -154,7 +154,7 @@ class YouTubeTrendsManager(BaseTrendsManager):
                 cached_data = self.get_from_cache(region_code, 'rising')
                 logger.debug(f"🔍 YouTube急上昇: キャッシュデータ取得結果: {type(cached_data)}, 長さ: {len(cached_data) if cached_data else 0}")
             
-            if cached_data:
+            if cached_data and len(cached_data) > 0:
                 # 急上昇トレンドの場合は、トレンドスコアまたは視聴回数で再ソートしてランキングを設定
                 if any(item.get('trend_score') is not None for item in cached_data):
                     # トレンドスコアでソート（降順）- None値を0として扱う
@@ -166,14 +166,15 @@ class YouTubeTrendsManager(BaseTrendsManager):
                 for i, item in enumerate(cached_data, 1):
                     item['rank'] = i
                 
-                logger.info(f"✅ YouTube急上昇: キャッシュデータを使用 ({len(cached_data)}件)")
+                logger.info(f"✅ YouTube急上昇: キャッシュデータを使用 ({len(cached_data)}件, region: {region_code})")
                 return {
+                    'success': True,
                     'data': cached_data,
                     'status': 'cached',
                     'region_code': region_code
                 }
             
-            logger.warning(f"⚠️ YouTube急上昇: キャッシュ未使用のため外部APIを呼び出します")
+            logger.warning(f"⚠️ YouTube急上昇: キャッシュにデータがないため外部APIを呼び出します (region: {region_code})")
             return self._fetch_rising_trends_from_api(region_code, max_results)
                 
         except Exception as e:
@@ -272,6 +273,7 @@ class YouTubeTrendsManager(BaseTrendsManager):
             logger.info(f"✅ YouTube急上昇: 外部APIから{len(trends)}件のデータを取得し、キャッシュに保存しました")
             
             return {
+                'success': True,
                 'data': trends,
                 'status': 'api_fetched',
                 'region_code': region_code
@@ -293,29 +295,39 @@ class YouTubeTrendsManager(BaseTrendsManager):
     
     def get_from_cache(self, region_code: str, trend_type: str = 'trending'):
         """キャッシュからYouTube Trendsデータを取得（get_rising_trends用）"""
-        cached_data = self.db.get_youtube_trends_from_cache(region_code, trend_type)
-        
-        # キャッシュデータにランキングを追加（rankフィールドがない場合）
-        if cached_data:
-            # 急上昇トレンドの場合は、トレンドスコアまたは視聴回数で再ソートしてランキングを設定
-            if trend_type == 'rising':
-                # トレンドスコアがある場合はそれでソート、ない場合は視聴回数でソート
-                if any(item.get('trend_score') is not None for item in cached_data):
-                    # トレンドスコアでソート（降順）- None値を0として扱う
-                    cached_data.sort(key=lambda x: x.get('trend_score') or 0, reverse=True)
-                else:
-                    # 視聴回数でソート（降順）- None値を0として扱う
-                    cached_data.sort(key=lambda x: x.get('view_count') or 0, reverse=True)
-                # ランキングを設定
-                for i, item in enumerate(cached_data, 1):
-                    item['rank'] = i
-            else:
-                # 通常のトレンドの場合は順番通りにランキングを設定
-                for i, item in enumerate(cached_data, 1):
-                    if 'rank' not in item:
+        try:
+            cached_data = self.db.get_youtube_trends_from_cache(region_code, trend_type)
+            
+            # キャッシュデータがない場合（Noneまたは空のリスト）はNoneを返す
+            if not cached_data or len(cached_data) == 0:
+                logger.warning(f"⚠️ YouTube急上昇: キャッシュにデータがありません (region: {region_code}, trend_type: {trend_type}, cached_data: {cached_data})")
+                return None
+            
+            # キャッシュデータにランキングを追加（rankフィールドがない場合）
+            if cached_data:
+                # 急上昇トレンドの場合は、トレンドスコアまたは視聴回数で再ソートしてランキングを設定
+                if trend_type == 'rising':
+                    # トレンドスコアがある場合はそれでソート、ない場合は視聴回数でソート
+                    if any(item.get('trend_score') is not None for item in cached_data):
+                        # トレンドスコアでソート（降順）- None値を0として扱う
+                        cached_data.sort(key=lambda x: x.get('trend_score') or 0, reverse=True)
+                    else:
+                        # 視聴回数でソート（降順）- None値を0として扱う
+                        cached_data.sort(key=lambda x: x.get('view_count') or 0, reverse=True)
+                    # ランキングを設定
+                    for i, item in enumerate(cached_data, 1):
                         item['rank'] = i
-        
-        return cached_data
+                else:
+                    # 通常のトレンドの場合は順番通りにランキングを設定
+                    for i, item in enumerate(cached_data, 1):
+                        if 'rank' not in item:
+                            item['rank'] = i
+            
+            logger.info(f"✅ YouTube急上昇: キャッシュから{len(cached_data)}件のデータを取得 (region: {region_code}, trend_type: {trend_type})")
+            return cached_data
+        except Exception as e:
+            logger.error(f"❌ YouTube急上昇: キャッシュ取得エラー: {e}", exc_info=True)
+            return None
 
     def is_cache_valid(self, region_code: str, trend_type: str):
         """YouTubeキャッシュが有効かチェック"""

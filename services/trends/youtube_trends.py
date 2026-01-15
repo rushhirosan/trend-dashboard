@@ -184,12 +184,20 @@ class YouTubeTrendsManager(BaseTrendsManager):
     def _fetch_rising_trends_from_api(self, region_code: str = 'JP', max_results: int = 25):
         """YouTubeの急上昇トレンド動画を外部APIから取得"""
         if not self.youtube_api_key:
-            return {'error': 'YouTube APIキーが設定されていません'}
+            logger.error(f"❌ YouTube急上昇: APIキーが設定されていません (region: {region_code})")
+            return {
+                'success': False,
+                'error': 'YouTube APIキーが設定されていません',
+                'status': 'api_error',
+                'data': [],
+                'region_code': region_code
+            }
         
         # レート制限をチェック
         self.rate_limiter.wait_if_needed()
         
         try:
+            logger.info(f"🔍 YouTube急上昇: 外部API呼び出し開始 (region: {region_code}, max_results: {max_results})")
             youtube = build('youtube', 'v3', developerKey=self.youtube_api_key)
             
             # 最近アップロードされた動画を検索（急上昇の代わり）
@@ -206,12 +214,21 @@ class YouTubeTrendsManager(BaseTrendsManager):
             )
             
             response = request.execute()
+            logger.debug(f"🔍 YouTube急上昇: search APIレスポンス受信 (items数: {len(response.get('items', []))})")
             
             if not response.get('items'):
-                return {'error': '動画データが取得できませんでした'}
+                logger.warning(f"⚠️ YouTube急上昇: 動画データが取得できませんでした (region: {region_code})")
+                return {
+                    'success': True,
+                    'data': [],
+                    'status': 'no_data',
+                    'region_code': region_code,
+                    'message': '動画データが取得できませんでした'
+                }
             
             # 動画IDを収集
             video_ids = [item['id']['videoId'] for item in response['items']]
+            logger.debug(f"🔍 YouTube急上昇: {len(video_ids)}件の動画IDを収集")
             
             # 動画の詳細情報を取得
             video_request = youtube.videos().list(
@@ -219,6 +236,17 @@ class YouTubeTrendsManager(BaseTrendsManager):
                 id=','.join(video_ids)
             )
             video_response = video_request.execute()
+            logger.debug(f"🔍 YouTube急上昇: videos APIレスポンス受信 (items数: {len(video_response.get('items', []))})")
+            
+            if not video_response.get('items'):
+                logger.warning(f"⚠️ YouTube急上昇: 動画詳細情報が取得できませんでした (region: {region_code})")
+                return {
+                    'success': True,
+                    'data': [],
+                    'status': 'no_data',
+                    'region_code': region_code,
+                    'message': '動画詳細情報が取得できませんでした'
+                }
             
             # データを整形し、トレンドスコアを計算
             trends = []
@@ -259,29 +287,48 @@ class YouTubeTrendsManager(BaseTrendsManager):
                     logger.warning(f"動画データの処理でエラー: {e}", exc_info=True)
                     continue
             
-            # トレンドスコアでソート
-            if trends:
-                trends.sort(key=lambda x: x['trend_score'], reverse=True)
-                for i, trend in enumerate(trends, 1):
-                    trend['rank'] = i
+            if not trends:
+                logger.warning(f"⚠️ YouTube急上昇: データ処理後にtrendsが空です (region: {region_code})")
+                return {
+                    'success': True,
+                    'data': [],
+                    'status': 'no_data',
+                    'region_code': region_code,
+                    'message': '動画データの処理後にデータが空になりました'
+                }
             
-            if trends:
-                logger.info(f"急上昇トレンド計算完了: 1位={trends[0]['trend_score']:,.0f}点, 25位={trends[-1]['trend_score']:,.0f}点")
+            # トレンドスコアでソート
+            trends.sort(key=lambda x: x['trend_score'], reverse=True)
+            for i, trend in enumerate(trends, 1):
+                trend['rank'] = i
+            
+            logger.info(f"✅ YouTube急上昇: トレンド計算完了 (region: {region_code}, 1位={trends[0]['trend_score']:,.0f}点, {len(trends)}位={trends[-1]['trend_score']:,.0f}点)")
             
             # キャッシュに保存
-            self.save_to_cache(region_code, 'rising', trends)
-            logger.info(f"✅ YouTube急上昇: 外部APIから{len(trends)}件のデータを取得し、キャッシュに保存しました")
+            try:
+                self.save_to_cache(region_code, 'rising', trends)
+                logger.info(f"✅ YouTube急上昇: 外部APIから{len(trends)}件のデータを取得し、キャッシュに保存しました (region: {region_code})")
+            except Exception as e:
+                logger.error(f"❌ YouTube急上昇: キャッシュ保存エラー: {e}", exc_info=True)
+                # キャッシュ保存に失敗してもデータは返す
             
             return {
                 'success': True,
                 'data': trends,
                 'status': 'api_fetched',
-                'region_code': region_code
+                'region_code': region_code,
+                'source': 'YouTube Data API'
             }
             
         except Exception as e:
-            logger.error(f"YouTube Data APIでエラー: {e}", exc_info=True)
-            return {'error': f'YouTube Data APIでエラーが発生しました: {str(e)}'}
+            logger.error(f"❌ YouTube急上昇: Data APIでエラー (region: {region_code}): {e}", exc_info=True)
+            return {
+                'success': False,
+                'error': f'YouTube Data APIでエラーが発生しました: {str(e)}',
+                'status': 'api_error',
+                'data': [],
+                'region_code': region_code
+            }
 
     def save_to_cache(self, region_code: str, trend_type: str, trends_data: list):
         """YouTube Trendsデータをキャッシュに保存（get_rising_trends用）"""

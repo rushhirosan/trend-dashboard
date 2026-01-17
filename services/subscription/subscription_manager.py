@@ -900,8 +900,8 @@ class SubscriptionManager:
             # 日本のトレンド（トレンドページの順序通り）
             # 1. NHK ニュース
             'nhk_trends_jp',
-            # 2. ニューストレンド (World News)
-            'news_trends_jp',
+            # 2. World News トレンド
+            'worldnews_trends_jp',
             # 3. Google Trends
             'google_trends_jp',
             # 4. YouTube トレンド
@@ -910,34 +910,42 @@ class SubscriptionManager:
             'hatena_trends_jp',
             # 6. Qiita トレンド
             'qiita_trends_jp',
-            # 7. 株価トレンド
-            'stock_trends_jp',
-            # 8. 仮想通貨トレンド
-            'crypto_trends_jp',
-            # 9. 音楽トレンド (Spotify)
-            'music_trends_jp',
-            # 10. ポッドキャストトレンド
-            'podcast_trends_jp',
-            # 11. 映画トレンド
-            'movie_trends_jp',
-            # 12. 本トレンド
-            'book_trends_jp',
-            # 13. GitHub
+            # 7. Zenn
+            'zenn_trends_jp',
+            # 8. Note
+            'note_trends_jp',
+            # 9. IPA注意喚起
+            'ipa_trends_jp',
+            # 10. JPCERT/CC
+            'jpcert_trends_jp',
+            # 11. GitHub Trends
             'github_trends_jp',
-            # 14. App Store
+            # 12. App Store Trends
             'appstore_trends_jp',
-            # 15. 楽天商品トレンド
+            # 13. 株価トレンド（日本）
+            'stock_trends_jp',
+            # 14. 仮想通貨トレンド
+            'crypto_trends_jp',
+            # 15. 映画トレンド
+            'movie_trends_jp',
+            # 16. 本トレンド
+            'book_trends_jp',
+            # 17. Spotify 音楽トレンド
+            'music_trends_jp',
+            # 18. Podcast トレンド
+            'podcast_trends_jp',
+            # 19. 楽天商品トレンド
             'rakuten_trends_jp',
-            # 16. Twitchゲームトレンド
+            # 20. Twitch トレンド
             'twitch_trends_jp',
             # USのトレンド（トレンドページの順序通り）
             # 1. CNN News
             'cnn_trends_us',
-            # 2. World News
+            # 2. World News (US)
             'worldnews_trends_us',
             # 3. Google Trends
             'google_trends_us',
-            # 4. YouTube トレンド
+            # 4. YouTube Trends
             'youtube_trends_us',
             # 5. Hacker News
             'hackernews_trends_us',
@@ -951,25 +959,25 @@ class SubscriptionManager:
             'cisa_kev_trends_us',
             # 10. The Hacker News
             'thehackernews_trends_us',
-            # 11. GitHub (US)
+            # 11. GitHub Trends
             'github_trends_us',
-            # 12. App Store (US)
+            # 12. App Store Trends
             'appstore_trends_us',
-            # 13. Stock Trends
+            # 13. Stock Trends (US)
             'stock_trends_us',
             # 14. Cryptocurrency Trends
             'crypto_trends_us',
-            # 15. 映画トレンド (US)
+            # 15. Movie Trends
             'movie_trends_us',
-            # 16. 本トレンド (US)
+            # 16. Book Trends
             'book_trends_us',
-            # 17. 音楽トレンド (Spotify)
+            # 17. Spotify Music (Global Popular)
             'music_trends_us',
-            # 18. ポッドキャストトレンド
+            # 18. Podcast Trends (US)
             'podcast_trends_us',
             # 19. eBay Popular/Trending
             'ebay_trends_us',
-            # 20. Twitchゲームトレンド
+            # 20. Twitch Trends
             'twitch_trends_us',
         ]
     
@@ -1049,6 +1057,10 @@ class SubscriptionManager:
                 'producthunt_trends': 'Product Hunt',
                 'nhk_trends': 'NHK ニュース',
                 'qiita_trends': 'Qiita トレンド',
+                'zenn_trends': 'Zenn',
+                'note_trends': 'Note',
+                'ipa_trends': 'IPA注意喚起',
+                'jpcert_trends': 'JPCERT/CC',
                 'stock_trends': '株価トレンド',
                 'crypto_trends': '仮想通貨トレンド',
                 'github_trends': 'GitHub',
@@ -1157,6 +1169,18 @@ class SubscriptionManager:
                                 title = item.get('title', 'N/A')
                                 likes_count = item.get('likes_count', 0)
                                 html += f'<div class="trend-item">{i}. {title} ({likes_count}いいね)</div>'
+                            elif normalized_category == 'zenn_trends':
+                                title = item.get('title', 'N/A')
+                                html += f'<div class="trend-item">{i}. {title}</div>'
+                            elif normalized_category == 'note_trends':
+                                title = item.get('title', 'N/A')
+                                html += f'<div class="trend-item">{i}. {title}</div>'
+                            elif normalized_category == 'ipa_trends':
+                                title = item.get('title', 'N/A')
+                                html += f'<div class="trend-item">{i}. {title}</div>'
+                            elif normalized_category == 'jpcert_trends':
+                                title = item.get('title', 'N/A')
+                                html += f'<div class="trend-item">{i}. {title}</div>'
                             elif normalized_category == 'stock_trends':
                                 name = item.get('name', 'N/A')
                                 symbol = item.get('symbol', 'N/A')
@@ -1297,6 +1321,10 @@ class SubscriptionManager:
                 'producthunt_trends': 'Product Hunt',
                 'nhk_trends': 'NHK ニュース',
                 'qiita_trends': 'Qiita トレンド',
+                'zenn_trends': 'Zenn',
+                'note_trends': 'Note',
+                'ipa_trends': 'IPA注意喚起',
+                'jpcert_trends': 'JPCERT/CC',
                 'stock_trends': '株価トレンド',
                 'crypto_trends': '仮想通貨トレンド',
                 'github_trends': 'GitHub',
@@ -1401,6 +1429,18 @@ class SubscriptionManager:
                                 title = item.get('title', 'N/A')
                                 likes_count = item.get('likes_count', 0)
                                 text += f"{i}. {title} ({likes_count}いいね)\n"
+                            elif normalized_category == 'zenn_trends':
+                                title = item.get('title', 'N/A')
+                                text += f"{i}. {title}\n"
+                            elif normalized_category == 'note_trends':
+                                title = item.get('title', 'N/A')
+                                text += f"{i}. {title}\n"
+                            elif normalized_category == 'ipa_trends':
+                                title = item.get('title', 'N/A')
+                                text += f"{i}. {title}\n"
+                            elif normalized_category == 'jpcert_trends':
+                                title = item.get('title', 'N/A')
+                                text += f"{i}. {title}\n"
                             elif normalized_category == 'stock_trends':
                                 name = item.get('name', 'N/A')
                                 symbol = item.get('symbol', 'N/A')

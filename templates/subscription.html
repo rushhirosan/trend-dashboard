@@ -99,6 +99,7 @@
                                                 <strong>🇯🇵 日本のトレンド</strong>
                                             </div>
                                             <div class="row g-2 mb-3">
+                                                <!-- 1行目: NHK + World News -->
                                                 <div class="col-6">
                                                     <div class="form-check">
                                                         <input class="form-check-input" type="checkbox" value="nhk_trends_jp" id="nhkTrendsJPCheck" checked>
@@ -107,10 +108,11 @@
                                                 </div>
                                                 <div class="col-6">
                                                     <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" value="news_trends_jp" id="newsTrendsJPCheck" checked>
-                                                        <label class="form-check-label" for="newsTrendsJPCheck">ニューストレンド</label>
+                                                        <input class="form-check-input" type="checkbox" value="worldnews_trends_jp" id="worldnewsTrendsJPCheck" checked>
+                                                        <label class="form-check-label" for="worldnewsTrendsJPCheck">World News トレンド</label>
                                                     </div>
                                                 </div>
+                                                <!-- 2行目: Google Trends + YouTube Trends -->
                                                 <div class="col-6">
                                                     <div class="form-check">
                                                         <input class="form-check-input" type="checkbox" value="google_trends_jp" id="googleTrendsJPCheck" checked>
@@ -123,18 +125,7 @@
                                                         <label class="form-check-label" for="youtubeTrendsJPCheck">YouTube トレンド</label>
                                                     </div>
                                                 </div>
-                                                <div class="col-6">
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" value="ipa_trends_jp" id="ipaTrendsJPCheck" checked>
-                                                        <label class="form-check-label" for="ipaTrendsJPCheck">IPA</label>
-                                                    </div>
-                                                </div>
-                                                <div class="col-6">
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" value="jpcert_trends_jp" id="jpcertTrendsJPCheck" checked>
-                                                        <label class="form-check-label" for="jpcertTrendsJPCheck">JPCERT/CC</label>
-                                                    </div>
-                                                </div>
+                                                <!-- 3行目: はてなブックマーク + Qiita -->
                                                 <div class="col-6">
                                                     <div class="form-check">
                                                         <input class="form-check-input" type="checkbox" value="hatena_trends_jp" id="hatenaTrendsJPCheck" checked>
@@ -147,6 +138,7 @@
                                                         <label class="form-check-label" for="qiitaTrendsJPCheck">Qiita トレンド</label>
                                                     </div>
                                                 </div>
+                                                <!-- 4行目: Zenn + Note -->
                                                 <div class="col-6">
                                                     <div class="form-check">
                                                         <input class="form-check-input" type="checkbox" value="zenn_trends_jp" id="zennTrendsJPCheck" checked>
@@ -159,42 +151,20 @@
                                                         <label class="form-check-label" for="noteTrendsJPCheck">Note</label>
                                                     </div>
                                                 </div>
+                                                <!-- 5行目: IPA注意喚起 + JPCERT/CC -->
                                                 <div class="col-6">
                                                     <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" value="stock_trends_jp" id="stockTrendsJPCheck" checked>
-                                                        <label class="form-check-label" for="stockTrendsJPCheck">株価トレンド</label>
+                                                        <input class="form-check-input" type="checkbox" value="ipa_trends_jp" id="ipaTrendsJPCheck" checked>
+                                                        <label class="form-check-label" for="ipaTrendsJPCheck">IPA注意喚起</label>
                                                     </div>
                                                 </div>
                                                 <div class="col-6">
                                                     <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" value="crypto_trends_jp" id="cryptoTrendsJPCheck" checked>
-                                                        <label class="form-check-label" for="cryptoTrendsJPCheck">仮想通貨トレンド</label>
+                                                        <input class="form-check-input" type="checkbox" value="jpcert_trends_jp" id="jpcertTrendsJPCheck" checked>
+                                                        <label class="form-check-label" for="jpcertTrendsJPCheck">JPCERT/CC</label>
                                                     </div>
                                                 </div>
-                                                <div class="col-6">
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" value="music_trends_jp" id="musicTrendsJPCheck" checked>
-                                                        <label class="form-check-label" for="musicTrendsJPCheck">音楽トレンド</label>
-                                                    </div>
-                                                </div>
-                                                <div class="col-6">
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" value="podcast_trends_jp" id="podcastTrendsJPCheck" checked>
-                                                        <label class="form-check-label" for="podcastTrendsJPCheck">ポッドキャスト</label>
-                                                    </div>
-                                                </div>
-                                                <div class="col-6">
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" value="movie_trends_jp" id="movieTrendsJPCheck" checked>
-                                                        <label class="form-check-label" for="movieTrendsJPCheck">映画トレンド</label>
-                                                    </div>
-                                                </div>
-                                                <div class="col-6">
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" value="book_trends_jp" id="bookTrendsJPCheck" checked>
-                                                        <label class="form-check-label" for="bookTrendsJPCheck">本トレンド</label>
-                                                    </div>
-                                                </div>
+                                                <!-- 6行目: GitHub + App Store -->
                                                 <div class="col-6">
                                                     <div class="form-check">
                                                         <input class="form-check-input" type="checkbox" value="github_trends_jp" id="githubTrendsJPCheck" checked>
@@ -207,6 +177,46 @@
                                                         <label class="form-check-label" for="appstoreTrendsJPCheck">App Store</label>
                                                     </div>
                                                 </div>
+                                                <!-- 7行目: 株価トレンド + 仮想通貨トレンド -->
+                                                <div class="col-6">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" value="stock_trends_jp" id="stockTrendsJPCheck" checked>
+                                                        <label class="form-check-label" for="stockTrendsJPCheck">株価トレンド</label>
+                                                    </div>
+                                                </div>
+                                                <div class="col-6">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" value="crypto_trends_jp" id="cryptoTrendsJPCheck" checked>
+                                                        <label class="form-check-label" for="cryptoTrendsJPCheck">仮想通貨トレンド</label>
+                                                    </div>
+                                                </div>
+                                                <!-- 8行目: 映画トレンド + 本トレンド -->
+                                                <div class="col-6">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" value="movie_trends_jp" id="movieTrendsJPCheck" checked>
+                                                        <label class="form-check-label" for="movieTrendsJPCheck">映画トレンド</label>
+                                                    </div>
+                                                </div>
+                                                <div class="col-6">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" value="book_trends_jp" id="bookTrendsJPCheck" checked>
+                                                        <label class="form-check-label" for="bookTrendsJPCheck">本トレンド</label>
+                                                    </div>
+                                                </div>
+                                                <!-- 9行目: Spotify + Podcast -->
+                                                <div class="col-6">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" value="music_trends_jp" id="musicTrendsJPCheck" checked>
+                                                        <label class="form-check-label" for="musicTrendsJPCheck">Spotify 音楽トレンド</label>
+                                                    </div>
+                                                </div>
+                                                <div class="col-6">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" value="podcast_trends_jp" id="podcastTrendsJPCheck" checked>
+                                                        <label class="form-check-label" for="podcastTrendsJPCheck">Podcast トレンド</label>
+                                                    </div>
+                                                </div>
+                                                <!-- 10行目: 楽天商品 + Twitch -->
                                                 <div class="col-6">
                                                     <div class="form-check">
                                                         <input class="form-check-input" type="checkbox" value="rakuten_trends_jp" id="rakutenTrendsJPCheck" checked>

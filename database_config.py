@@ -710,20 +710,11 @@ class TrendsCache:
         if not data:
             return False
         
-        # get_connection() を使用して接続を取得（再接続ロジックが含まれている）
         try:
-            conn = self.get_connection()
-            if not conn:
-                logger.error("❌ キャッシュ保存エラー: データベース接続を取得できませんでした")
-                return False
-        except Exception as e:
-            logger.error(f"❌ キャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                # 既存のデータを削除
-                table_name = f"{cache_key}_cache"
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # 既存のデータを削除
+                    table_name = f"{cache_key}_cache"
                 delete_column_map = {
                     'google_trends': 'region',
                     'podcast_trends': 'region',
@@ -865,11 +856,9 @@ class TrendsCache:
                     "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
                     (cache_key, now_jst, len(data), now_jst, len(data))
                 )
-                
+                    
                 conn.commit()
                 logger.info(f"✅ {cache_key}のキャッシュを更新しました ({len(data)}件)")
-                # 接続は閉じない（get_connection()が管理している接続を共有しているため）
-                # エラーが発生した場合のみ接続をリセットする
                 return True
                 
         except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
@@ -879,32 +868,14 @@ class TrendsCache:
                 logger.warning(f"⚠️ キャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
                 # 接続エラーの場合は接続をリセット（次回のget_connection()で再接続される）
                 self.connection = None
-                # ロールバックを試みる（接続が有効な場合のみ）
-                try:
-                    if conn and not conn.closed:
-                        conn.rollback()
-                except:
-                    pass
             else:
                 # 接続エラー以外のデータベースエラー
                 logger.error(f"❌ キャッシュ保存エラー: {e}", exc_info=True)
-                # ロールバックを試みる（接続が有効な場合のみ）
-                try:
-                    if conn and not conn.closed:
-                        conn.rollback()
-                except:
-                    pass
             return False
         except Exception as e:
             logger.error(f"❌ キャッシュ保存エラー: {e}", exc_info=True)
             import traceback
             traceback.print_exc()
-            # ロールバックを試みる（接続が有効な場合のみ）
-            try:
-                if conn and not conn.closed:
-                    conn.rollback()
-            except:
-                pass
             return False
     
     def get_from_cache(self, cache_key, region='JP'):
@@ -970,42 +941,28 @@ class TrendsCache:
     
     def is_cache_valid(self, cache_key, region='JP', hours=24):
         """キャッシュが有効かどうかを確認"""
-        # 接続を取得（有効性チェックと再接続を自動で行う）
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.warning(f"⚠️ キャッシュ有効性チェック: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    "SELECT last_updated FROM cache_status WHERE cache_key = %s",
-                    (cache_key,)
-                )
-                result = cursor.fetchone()
-                
-                if not result:
-                    return False
-                
-                last_updated = result[0]
-                now = datetime.now()
-                time_diff = now - last_updated
-                
-                return time_diff.total_seconds() < (hours * 3600)
-                
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT last_updated FROM cache_status WHERE cache_key = %s",
+                        (cache_key,)
+                    )
+                    result = cursor.fetchone()
+                    
+                    if not result:
+                        return False
+                    
+                    last_updated = result[0]
+                    now = datetime.now()
+                    time_diff = now - last_updated
+                    
+                    return time_diff.total_seconds() < (hours * 3600)
+                    
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-            # 接続エラーの場合は再接続を試みる
             logger.warning(f"⚠️ キャッシュ有効性チェック中に接続エラーが発生: {e}", exc_info=True)
-            try:
-                # 接続をリセットして次回の操作で再接続されるようにする
-                self.connection = None
-                return False
-            except Exception as retry_error:
-                logger.error(f"❌ 再接続試行エラー: {retry_error}", exc_info=True)
-                return False
+            self.connection = None
+            return False
         except Exception as e:
             logger.error(f"❌ キャッシュ有効性確認エラー: {e}", exc_info=True)
             return False
@@ -1013,21 +970,14 @@ class TrendsCache:
     def clear_cache(self, cache_key, region='JP'):
         """キャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ キャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                table_name = f"{cache_key}_cache"
-                cursor.execute(f"DELETE FROM {table_name} WHERE region = %s", (region,))
-                conn.commit()
-                logger.info(f"✅ {cache_key}のキャッシュをクリアしました")
-                return True
-                
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    table_name = f"{cache_key}_cache"
+                    cursor.execute(f"DELETE FROM {table_name} WHERE region = %s", (region,))
+                    conn.commit()
+                    logger.info(f"✅ {cache_key}のキャッシュをクリアしました")
+                    return True
+                    
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ キャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
@@ -1419,8 +1369,7 @@ class TrendsCache:
         
         # 既存環境ではmusic_trends_cacheに不足カラムがあるケースがあるため、ここで補完しておく
         try:
-            conn = self.get_connection()
-            if conn:
+            with self.get_connection() as conn:
                 with conn.cursor() as cursor:
                     # INSERT文で使用しているカラムを確認して追加
                     cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS album TEXT")
@@ -1433,47 +1382,39 @@ class TrendsCache:
         except Exception as e:
             logger.warning(f"⚠️ music_trends_cacheのスキーマ更新に失敗しました: {e}", exc_info=True)
         
-        # 接続を取得（有効性チェックと再接続を自動で行う）
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ music_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                # 既存のデータを削除
-                cursor.execute("""
-                    DELETE FROM music_trends_cache 
-                    WHERE service = %s AND region_code = %s
-                """, (service, region))
-                
-                # 新しいデータを挿入
-                for item in data:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # 既存のデータを削除
                     cursor.execute("""
-                        INSERT INTO music_trends_cache 
-                        (title, artist, album, play_count, popularity, spotify_url, rank, 
-                         service, region_code, created_at, track_id)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        item.get('title', ''),
-                        item.get('artist', ''),
-                        item.get('album', ''),
-                        item.get('play_count', 0),
-                        item.get('popularity', 0),
-                        item.get('spotify_url', ''),
-                        item.get('rank', 0),
-                        service,
-                        region,
-                        item.get('created_at'),
-                        item.get('track_id', '')
-                    ))
-                
-                conn.commit()
-                logger.info(f"✅ music_trendsキャッシュを保存しました (service: {service}, region: {region}, {len(data)}件)")
-                return True
+                        DELETE FROM music_trends_cache 
+                        WHERE service = %s AND region_code = %s
+                    """, (service, region))
+                    
+                    # 新しいデータを挿入
+                    for item in data:
+                        cursor.execute("""
+                            INSERT INTO music_trends_cache 
+                            (title, artist, album, play_count, popularity, spotify_url, rank, 
+                             service, region_code, created_at, track_id)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            item.get('title', ''),
+                            item.get('artist', ''),
+                            item.get('album', ''),
+                            item.get('play_count', 0),
+                            item.get('popularity', 0),
+                            item.get('spotify_url', ''),
+                            item.get('rank', 0),
+                            service,
+                            region,
+                            item.get('created_at'),
+                            item.get('track_id', '')
+                        ))
+                    
+                    conn.commit()
+                    logger.info(f"✅ music_trendsキャッシュを保存しました (service: {service}, region: {region}, {len(data)}件)")
+                    return True
                 
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ music_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
@@ -1481,10 +1422,6 @@ class TrendsCache:
             return False
         except Exception as e:
             logger.error(f"❌ music_trendsキャッシュ保存エラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     def get_music_trends_from_cache(self, service='spotify', region='JP'):
@@ -1565,8 +1502,7 @@ class TrendsCache:
         """Music Trendsキャッシュをクリア"""
         # 既存環境ではmusic_trends_cacheに不足カラムがあるケースがあるため、ここで補完しておく
         try:
-            conn = self.get_connection()
-            if conn:
+            with self.get_connection() as conn:
                 with conn.cursor() as cursor:
                     # INSERT文で使用しているカラムを確認して追加
                     cursor.execute("ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS album TEXT")
@@ -1580,32 +1516,21 @@ class TrendsCache:
             logger.warning(f"⚠️ music_trends_cacheのスキーマ更新に失敗しました: {e}", exc_info=True)
         
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ music_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("""
-                    DELETE FROM music_trends_cache 
-                    WHERE service = %s AND region_code = %s
-                """, (service, region))
-                conn.commit()
-                logger.info(f"✅ music_trendsのキャッシュをクリアしました (service: {service}, region: {region})")
-                return True
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        DELETE FROM music_trends_cache 
+                        WHERE service = %s AND region_code = %s
+                    """, (service, region))
+                    conn.commit()
+                    logger.info(f"✅ music_trendsのキャッシュをクリアしました (service: {service}, region: {region})")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ music_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ music_trendsキャッシュクリアエラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     def is_music_cache_valid(self, service='spotify'):
@@ -1620,8 +1545,7 @@ class TrendsCache:
         
         # 既存環境ではpodcast_trends_cacheに不足カラムがあるケースがあるため、ここで補完しておく
         try:
-            conn = self.get_connection()
-            if conn:
+            with self.get_connection() as conn:
                 with conn.cursor() as cursor:
                     # INSERT文で使用しているカラムを確認して追加
                     cursor.execute("ALTER TABLE podcast_trends_cache ADD COLUMN IF NOT EXISTS cache_key VARCHAR(255)")
@@ -1666,8 +1590,7 @@ class TrendsCache:
         
         # 既存環境ではnews_trends_cacheに不足カラムがあるケースがあるため、ここで補完しておく
         try:
-            conn = self.get_connection()
-            if conn:
+            with self.get_connection() as conn:
                 with conn.cursor() as cursor:
                     cursor.execute("ALTER TABLE news_trends_cache ADD COLUMN IF NOT EXISTS article_id VARCHAR(255)")
                     cursor.execute("ALTER TABLE news_trends_cache ADD COLUMN IF NOT EXISTS title TEXT")
@@ -1699,8 +1622,7 @@ class TrendsCache:
         if not data:
             return False
         try:
-            conn = self.get_connection()
-            if conn:
+            with self.get_connection() as conn:
                 with conn.cursor() as cursor:
                     cursor.execute("ALTER TABLE worldnews_trends_cache ADD COLUMN IF NOT EXISTS url TEXT")
                     cursor.execute("ALTER TABLE worldnews_trends_cache ADD COLUMN IF NOT EXISTS description TEXT")
@@ -1744,8 +1666,7 @@ class TrendsCache:
         # 既存環境ではrakuten_trends_cacheに不足カラムがあるケースがあるため、ここで補完しておく
         # スキーマ更新は別トランザクションで実行（エラーが発生してもメイン処理に影響しないように）
         try:
-            schema_conn = self.get_connection()
-            if schema_conn:
+            with self.get_connection() as schema_conn:
                 try:
                     with schema_conn.cursor() as cursor:
                         # INSERT文で使用しているカラムを確認して追加
@@ -1763,9 +1684,6 @@ class TrendsCache:
                 except Exception as schema_error:
                     logger.warning(f"⚠️ rakuten_trends_cacheのスキーマ更新に失敗しました: {schema_error}", exc_info=True)
                     schema_conn.rollback()
-                finally:
-                    if schema_conn and not schema_conn.closed:
-                        schema_conn.close()
         except Exception as e:
             logger.warning(f"⚠️ rakuten_trends_cacheのスキーマ更新用接続取得に失敗しました: {e}", exc_info=True)
         
@@ -1820,28 +1738,21 @@ class TrendsCache:
     def get_cache_info(self, cache_key):
         """キャッシュ情報を取得"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return None
-        except Exception as e:
-            logger.error(f"❌ キャッシュ情報取得エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return None
-        
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    "SELECT last_updated, data_count FROM cache_status WHERE cache_key = %s",
-                    (cache_key,)
-                )
-                result = cursor.fetchone()
-                
-                if result:
-                    return {
-                        'last_updated': result[0].isoformat() if result[0] else None,
-                        'data_count': result[1]
-                    }
-                return None
-                
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT last_updated, data_count FROM cache_status WHERE cache_key = %s",
+                        (cache_key,)
+                    )
+                    result = cursor.fetchone()
+                    
+                    if result:
+                        return {
+                            'last_updated': result[0].isoformat() if result[0] else None,
+                            'data_count': result[1]
+                        }
+                    return None
+                    
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ キャッシュ情報取得中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
@@ -1894,47 +1805,43 @@ class TrendsCache:
     def update_all_trends_timestamp(self, timestamp):
         """全トレンドの更新時刻を一括で設定（スケジューラー実行時の時刻を統一するため）"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                logger.warning("⚠️ データベース接続が取得できませんでした。更新時刻の一括設定をスキップします")
-                return False
-            
-            with conn.cursor() as cursor:
-                # データベースからすべてのcache_keyを動的に取得
-                # これにより、新しいトレンドが追加されても自動的に対応できる
-                # JPとUSの両方のデータを含むすべてのcache_keyを取得
-                cursor.execute("""
-                    SELECT DISTINCT cache_key 
-                    FROM cache_status
-                    WHERE cache_key IS NOT NULL
-                    ORDER BY cache_key
-                """)
-                cache_keys = [row[0] for row in cursor.fetchall()]
-                
-                if not cache_keys:
-                    logger.warning("⚠️ 更新対象のcache_keyが見つかりませんでした")
-                    return False
-                
-                # JPとUSのcache_keyを分類してログ出力
-                jp_keys = [k for k in cache_keys if k.endswith('_JP') or (not k.endswith('_US') and not k.endswith('_us'))]
-                us_keys = [k for k in cache_keys if k.endswith('_US') or k.endswith('_us')]
-                logger.info(f"📊 更新対象: JP={len(jp_keys)}件, US={len(us_keys)}件, 合計={len(cache_keys)}件")
-                
-                # すべてのcache_keyに対して、更新時刻を統一
-                # データ件数は変更せず、更新時刻のみを更新
-                updated_count = 0
-                for cache_key in cache_keys:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # データベースからすべてのcache_keyを動的に取得
+                    # これにより、新しいトレンドが追加されても自動的に対応できる
+                    # JPとUSの両方のデータを含むすべてのcache_keyを取得
                     cursor.execute("""
-                        UPDATE cache_status 
-                        SET last_updated = %s
-                        WHERE cache_key = %s
-                    """, (timestamp, cache_key))
-                    updated_count += cursor.rowcount
+                        SELECT DISTINCT cache_key 
+                        FROM cache_status
+                        WHERE cache_key IS NOT NULL
+                        ORDER BY cache_key
+                    """)
+                    cache_keys = [row[0] for row in cursor.fetchall()]
                     
-                conn.commit()
-                logger.info(f"✅ 全トレンドの更新時刻を一括設定しました: {updated_count}件のcache_keyを更新 ({timestamp.strftime('%Y-%m-%d %H:%M:%S JST')})")
-                logger.info(f"📋 更新されたcache_keyの例（最初の10件）: {', '.join(cache_keys[:10])}")
-                return True
+                    if not cache_keys:
+                        logger.warning("⚠️ 更新対象のcache_keyが見つかりませんでした")
+                        return False
+                    
+                    # JPとUSのcache_keyを分類してログ出力
+                    jp_keys = [k for k in cache_keys if k.endswith('_JP') or (not k.endswith('_US') and not k.endswith('_us'))]
+                    us_keys = [k for k in cache_keys if k.endswith('_US') or k.endswith('_us')]
+                    logger.info(f"📊 更新対象: JP={len(jp_keys)}件, US={len(us_keys)}件, 合計={len(cache_keys)}件")
+                    
+                    # すべてのcache_keyに対して、更新時刻を統一
+                    # データ件数は変更せず、更新時刻のみを更新
+                    updated_count = 0
+                    for cache_key in cache_keys:
+                        cursor.execute("""
+                            UPDATE cache_status 
+                            SET last_updated = %s
+                            WHERE cache_key = %s
+                        """, (timestamp, cache_key))
+                        updated_count += cursor.rowcount
+                        
+                    conn.commit()
+                    logger.info(f"✅ 全トレンドの更新時刻を一括設定しました: {updated_count}件のcache_keyを更新 ({timestamp.strftime('%Y-%m-%d %H:%M:%S JST')})")
+                    logger.info(f"📋 更新されたcache_keyの例（最初の10件）: {', '.join(cache_keys[:10])}")
+                    return True
                 
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ 更新時刻一括設定中に接続エラーが発生: {e}", exc_info=True)
@@ -1977,38 +1884,31 @@ class TrendsCache:
     def clear_all_cache(self):
         """全キャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ 全キャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                # 全キャッシュテーブルをクリア
-                tables = [
-                    'google_trends_cache',
-                    'youtube_trends_cache',
-                    'music_trends_cache',
-                    'podcast_trends_cache',
-                    'news_trends_cache',
-                    'worldnews_trends_cache',
-                    'rakuten_trends_cache',
-                    'hatena_trends_cache',
-                    'twitch_trends_cache'
-                ]
-                
-                for table in tables:
-                    cursor.execute(f"DELETE FROM {table}")
-                
-                # cache_statusもクリア
-                cursor.execute("DELETE FROM cache_status")
-                
-                conn.commit()
-                logger.info("✅ 全キャッシュをクリアしました")
-                return True
-                
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # 全キャッシュテーブルをクリア
+                    tables = [
+                        'google_trends_cache',
+                        'youtube_trends_cache',
+                        'music_trends_cache',
+                        'podcast_trends_cache',
+                        'news_trends_cache',
+                        'worldnews_trends_cache',
+                        'rakuten_trends_cache',
+                        'hatena_trends_cache',
+                        'twitch_trends_cache'
+                    ]
+                    
+                    for table in tables:
+                        cursor.execute(f"DELETE FROM {table}")
+                    
+                    # cache_statusもクリア
+                    cursor.execute("DELETE FROM cache_status")
+                    
+                    conn.commit()
+                    logger.info("✅ 全キャッシュをクリアしました")
+                    return True
+                    
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ 全キャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
@@ -2024,19 +1924,12 @@ class TrendsCache:
             days: 削除対象となる日数（デフォルト: 2日）
         """
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ 古いキャッシュデータ削除エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
             from datetime import timedelta
             cutoff_date = datetime.now() - timedelta(days=days)
             
-            with conn.cursor() as cursor:
-                deleted_counts = {}
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    deleted_counts = {}
                 
                 # 各キャッシュテーブルから古いデータを削除
                 cache_tables = [
@@ -2106,22 +1999,15 @@ class TrendsCache:
     def clear_cache_by_type(self, cache_type):
         """特定のキャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ {cache_type}キャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                table_name = f"{cache_type}_cache"
-                cursor.execute(f"DELETE FROM {table_name}")
-                cursor.execute("DELETE FROM cache_status WHERE cache_key = %s", (cache_type,))
-                conn.commit()
-                logger.info(f"✅ {cache_type}キャッシュをクリアしました")
-                return True
-                
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    table_name = f"{cache_type}_cache"
+                    cursor.execute(f"DELETE FROM {table_name}")
+                    cursor.execute("DELETE FROM cache_status WHERE cache_key = %s", (cache_type,))
+                    conn.commit()
+                    logger.info(f"✅ {cache_type}キャッシュをクリアしました")
+                    return True
+                    
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ {cache_type}キャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
@@ -2137,47 +2023,40 @@ class TrendsCache:
             return False
         
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ reddit_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                # 既存のデータを削除
-                cursor.execute("""
-                    DELETE FROM reddit_trends_cache 
-                    WHERE subreddit = %s
-                """, (subreddit,))
-                
-                # 新しいデータを挿入
-                for item in data:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # 既存のデータを削除
                     cursor.execute("""
-                        INSERT INTO reddit_trends_cache 
-                        (post_id, title, url, subreddit, author, score, upvote_ratio, 
-                         num_comments, permalink, is_video, domain, rank, region)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        item.get('post_id', ''),
-                        item.get('title', ''),
-                        item.get('url', ''),
-                        subreddit,
-                        item.get('author', ''),
-                        item.get('score', 0),
-                        item.get('upvote_ratio', 0.0),
-                        item.get('num_comments', 0),
-                        item.get('permalink', ''),
-                        item.get('is_video', False),
-                        item.get('domain', ''),
-                        item.get('rank', 0),
-                        subreddit
-                    ))
-                
-                conn.commit()
-                logger.info(f"✅ reddit_trendsキャッシュを保存しました (subreddit: {subreddit}, {len(data)}件)")
-                return True
+                        DELETE FROM reddit_trends_cache 
+                        WHERE subreddit = %s
+                    """, (subreddit,))
+                    
+                    # 新しいデータを挿入
+                    for item in data:
+                        cursor.execute("""
+                            INSERT INTO reddit_trends_cache 
+                            (post_id, title, url, subreddit, author, score, upvote_ratio, 
+                             num_comments, permalink, is_video, domain, rank, region)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            item.get('post_id', ''),
+                            item.get('title', ''),
+                            item.get('url', ''),
+                            subreddit,
+                            item.get('author', ''),
+                            item.get('score', 0),
+                            item.get('upvote_ratio', 0.0),
+                            item.get('num_comments', 0),
+                            item.get('permalink', ''),
+                            item.get('is_video', False),
+                            item.get('domain', ''),
+                            item.get('rank', 0),
+                            subreddit
+                        ))
+                    
+                    conn.commit()
+                    logger.info(f"✅ reddit_trendsキャッシュを保存しました (subreddit: {subreddit}, {len(data)}件)")
+                    return True
                 
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ reddit_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
@@ -2185,10 +2064,6 @@ class TrendsCache:
             return False
         except Exception as e:
             logger.error(f"❌ reddit_trendsキャッシュ保存エラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     def get_reddit_trends_from_cache(self, subreddit='all'):
@@ -2220,32 +2095,21 @@ class TrendsCache:
     def clear_reddit_trends_cache(self, subreddit='all'):
         """Reddit Trendsキャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ reddit_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("""
-                    DELETE FROM reddit_trends_cache 
-                    WHERE subreddit = %s
-                """, (subreddit,))
-                conn.commit()
-                logger.info(f"✅ reddit_trendsのキャッシュをクリアしました (subreddit: {subreddit})")
-                return True
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        DELETE FROM reddit_trends_cache 
+                        WHERE subreddit = %s
+                    """, (subreddit,))
+                    conn.commit()
+                    logger.info(f"✅ reddit_trendsのキャッシュをクリアしました (subreddit: {subreddit})")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ reddit_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ reddit_trendsキャッシュクリアエラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     # Hacker News Trends キャッシュメソッド
@@ -2255,54 +2119,47 @@ class TrendsCache:
             return False
         
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ hackernews_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                # 既存のデータを削除
-                cursor.execute("""
-                    DELETE FROM hackernews_trends_cache 
-                    WHERE story_type = %s
-                """, (story_type,))
-                
-                # 新しいデータを挿入
-                for item in data:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # 既存のデータを削除
                     cursor.execute("""
-                        INSERT INTO hackernews_trends_cache 
-                        (story_id, title, url, score, author, story_time, comments, story_type, rank)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        item.get('story_id', 0),
-                        item.get('title', ''),
-                        item.get('url', ''),
-                        item.get('score', 0),
-                        item.get('by', ''),
-                        item.get('time', 0),
-                        item.get('comments', 0),
-                        story_type,
-                        item.get('rank', 0)
-                    ))
-                
-                # cache_statusテーブルを更新
-                import pytz
-                jst = pytz.timezone('Asia/Tokyo')
-                now_jst = datetime.now(jst)
-                cursor.execute("""
-                    INSERT INTO cache_status (cache_key, last_updated, data_count)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (cache_key) DO UPDATE SET
-                        last_updated = EXCLUDED.last_updated,
-                        data_count = EXCLUDED.data_count
-                """, ('hackernews_trends', now_jst, len(data)))
-                
-                conn.commit()
-                logger.info(f"✅ hackernews_trendsキャッシュを保存しました (type: {story_type}, {len(data)}件)")
-                return True
+                        DELETE FROM hackernews_trends_cache 
+                        WHERE story_type = %s
+                    """, (story_type,))
+                    
+                    # 新しいデータを挿入
+                    for item in data:
+                        cursor.execute("""
+                            INSERT INTO hackernews_trends_cache 
+                            (story_id, title, url, score, author, story_time, comments, story_type, rank)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            item.get('story_id', 0),
+                            item.get('title', ''),
+                            item.get('url', ''),
+                            item.get('score', 0),
+                            item.get('by', ''),
+                            item.get('time', 0),
+                            item.get('comments', 0),
+                            story_type,
+                            item.get('rank', 0)
+                        ))
+                    
+                    # cache_statusテーブルを更新
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cursor.execute("""
+                        INSERT INTO cache_status (cache_key, last_updated, data_count)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (cache_key) DO UPDATE SET
+                            last_updated = EXCLUDED.last_updated,
+                            data_count = EXCLUDED.data_count
+                    """, ('hackernews_trends', now_jst, len(data)))
+                    
+                    conn.commit()
+                    logger.info(f"✅ hackernews_trendsキャッシュを保存しました (type: {story_type}, {len(data)}件)")
+                    return True
                 
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ hackernews_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
@@ -2310,10 +2167,6 @@ class TrendsCache:
             return False
         except Exception as e:
             logger.error(f"❌ hackernews_trendsキャッシュ保存エラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     def get_hackernews_trends_from_cache(self, story_type='top'):
@@ -2345,32 +2198,21 @@ class TrendsCache:
     def clear_hackernews_trends_cache(self, story_type='top'):
         """Hacker News Trendsキャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ hackernews_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("""
-                    DELETE FROM hackernews_trends_cache 
-                    WHERE story_type = %s
-                """, (story_type,))
-                conn.commit()
-                logger.info(f"✅ hackernews_trendsのキャッシュをクリアしました (type: {story_type})")
-                return True
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        DELETE FROM hackernews_trends_cache 
+                        WHERE story_type = %s
+                    """, (story_type,))
+                    conn.commit()
+                    logger.info(f"✅ hackernews_trendsのキャッシュをクリアしました (type: {story_type})")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ hackernews_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ hackernews_trendsキャッシュクリアエラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     # Qiita Trends キャッシュメソッド
@@ -2380,54 +2222,47 @@ class TrendsCache:
             return False
         
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ qiita_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                # 既存のデータを削除
-                cursor.execute("""
-                    DELETE FROM qiita_trends_cache
-                """)
-                
-                # 新しいデータを挿入
-                for item in data:
-                    # タグをJSON文字列に変換
-                    tags_json = json.dumps(item.get('tags', []), ensure_ascii=False)
-                    
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # 既存のデータを削除
                     cursor.execute("""
-                        INSERT INTO qiita_trends_cache 
-                        (item_id, title, url, user_id, user_name, likes_count, stocks_count,
-                         comments_count, created_at, updated_at, tags, rank)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        item.get('item_id', ''),
-                        item.get('title', ''),
-                        item.get('url', ''),
-                        item.get('user_id', ''),
-                        item.get('user_name', ''),
-                        item.get('likes_count', 0),
-                        item.get('stocks_count', 0),
-                        item.get('comments_count', 0),
-                        item.get('created_at', ''),
-                        item.get('updated_at', ''),
-                        tags_json,
-                        item.get('rank', 0)
-                    ))
-                
-                # キャッシュステータスを更新
-                cursor.execute(
-                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                    ('qiita_trends', datetime.now(), len(data), datetime.now(), len(data))
-                )
-                
-                conn.commit()
-                logger.info(f"✅ qiita_trendsキャッシュを保存しました ({len(data)}件)")
-                return True
+                        DELETE FROM qiita_trends_cache
+                    """)
+                    
+                    # 新しいデータを挿入
+                    for item in data:
+                        # タグをJSON文字列に変換
+                        tags_json = json.dumps(item.get('tags', []), ensure_ascii=False)
+                        
+                        cursor.execute("""
+                            INSERT INTO qiita_trends_cache 
+                            (item_id, title, url, user_id, user_name, likes_count, stocks_count,
+                             comments_count, created_at, updated_at, tags, rank)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            item.get('item_id', ''),
+                            item.get('title', ''),
+                            item.get('url', ''),
+                            item.get('user_id', ''),
+                            item.get('user_name', ''),
+                            item.get('likes_count', 0),
+                            item.get('stocks_count', 0),
+                            item.get('comments_count', 0),
+                            item.get('created_at', ''),
+                            item.get('updated_at', ''),
+                            tags_json,
+                            item.get('rank', 0)
+                        ))
+                    
+                    # キャッシュステータスを更新
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        ('qiita_trends', datetime.now(), len(data), datetime.now(), len(data))
+                    )
+                    
+                    conn.commit()
+                    logger.info(f"✅ qiita_trendsキャッシュを保存しました ({len(data)}件)")
+                    return True
                 
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ qiita_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
@@ -2435,10 +2270,6 @@ class TrendsCache:
             return False
         except Exception as e:
             logger.error(f"❌ qiita_trendsキャッシュ保存エラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     def get_qiita_trends_from_cache(self):
@@ -2476,31 +2307,20 @@ class TrendsCache:
     def clear_qiita_trends_cache(self):
         """Qiita Trendsキャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ qiita_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("""
-                    DELETE FROM qiita_trends_cache
-                """)
-                conn.commit()
-                logger.info(f"✅ qiita_trendsのキャッシュをクリアしました")
-                return True
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        DELETE FROM qiita_trends_cache
+                    """)
+                    conn.commit()
+                    logger.info(f"✅ qiita_trendsのキャッシュをクリアしました")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ qiita_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ qiita_trendsキャッシュクリアエラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     # GitHub Trends キャッシュメソッド
@@ -2510,64 +2330,57 @@ class TrendsCache:
             return False
         
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ github_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                # 既存のデータを削除
-                cursor.execute("""
-                    DELETE FROM github_trends_cache
-                """)
-                
-                # 新しいデータを挿入
-                for item in data:
-                    # stars_countを取得（starsキーからも取得を試みる）
-                    stars_count = item.get('stars_count', 0) or 0
-                    if stars_count == 0:
-                        stars_count = item.get('stars', 0) or 0
-                    
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # 既存のデータを削除
                     cursor.execute("""
-                        INSERT INTO github_trends_cache 
-                        (repo_id, name, full_name, description, url, language, stars_count, forks_count,
-                         watchers_count, open_issues_count, created_at, updated_at, pushed_at,
-                         owner_login, owner_avatar_url, rank)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        item.get('repo_id', ''),
-                        item.get('name', ''),
-                        item.get('full_name', ''),
-                        item.get('description', ''),
-                        item.get('url', ''),
-                        item.get('language', ''),
-                        stars_count,
-                        item.get('forks_count', 0) or 0,
-                        item.get('watchers_count', 0) or 0,
-                        item.get('open_issues_count', 0) or 0,
-                        item.get('created_at', ''),
-                        item.get('updated_at', ''),
-                        item.get('pushed_at', ''),
-                        item.get('owner_login', ''),
-                        item.get('owner_avatar_url', ''),
-                        item.get('rank', 0)
-                    ))
-                
-                # キャッシュステータスを更新
-                from datetime import datetime
-                import pytz
-                jst = pytz.timezone('Asia/Tokyo')
-                cursor.execute(
-                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                    ('github_trends', datetime.now(jst), len(data), datetime.now(jst), len(data))
-                )
-                
-                conn.commit()
-                logger.info(f"✅ github_trendsキャッシュを保存しました ({len(data)}件)")
-                return True
+                        DELETE FROM github_trends_cache
+                    """)
+                    
+                    # 新しいデータを挿入
+                    for item in data:
+                        # stars_countを取得（starsキーからも取得を試みる）
+                        stars_count = item.get('stars_count', 0) or 0
+                        if stars_count == 0:
+                            stars_count = item.get('stars', 0) or 0
+                        
+                        cursor.execute("""
+                            INSERT INTO github_trends_cache 
+                            (repo_id, name, full_name, description, url, language, stars_count, forks_count,
+                             watchers_count, open_issues_count, created_at, updated_at, pushed_at,
+                             owner_login, owner_avatar_url, rank)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            item.get('repo_id', ''),
+                            item.get('name', ''),
+                            item.get('full_name', ''),
+                            item.get('description', ''),
+                            item.get('url', ''),
+                            item.get('language', ''),
+                            stars_count,
+                            item.get('forks_count', 0) or 0,
+                            item.get('watchers_count', 0) or 0,
+                            item.get('open_issues_count', 0) or 0,
+                            item.get('created_at', ''),
+                            item.get('updated_at', ''),
+                            item.get('pushed_at', ''),
+                            item.get('owner_login', ''),
+                            item.get('owner_avatar_url', ''),
+                            item.get('rank', 0)
+                        ))
+                    
+                    # キャッシュステータスを更新
+                    from datetime import datetime
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        ('github_trends', datetime.now(jst), len(data), datetime.now(jst), len(data))
+                    )
+                    
+                    conn.commit()
+                    logger.info(f"✅ github_trendsキャッシュを保存しました ({len(data)}件)")
+                    return True
                 
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ github_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
@@ -2575,10 +2388,6 @@ class TrendsCache:
             return False
         except Exception as e:
             logger.error(f"❌ github_trendsキャッシュ保存エラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     def get_github_trends_from_cache(self):
@@ -2610,31 +2419,20 @@ class TrendsCache:
     def clear_github_trends_cache(self):
         """GitHub Trendsキャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ github_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("""
-                    DELETE FROM github_trends_cache
-                """)
-                conn.commit()
-                logger.info(f"✅ github_trendsのキャッシュをクリアしました")
-                return True
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        DELETE FROM github_trends_cache
+                    """)
+                    conn.commit()
+                    logger.info(f"✅ github_trendsのキャッシュをクリアしました")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ github_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ github_trendsキャッシュクリアエラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     # App Store Trends キャッシュメソッド
@@ -2644,70 +2442,63 @@ class TrendsCache:
             return False
         
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ appstore_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                # 既存のデータを削除（国別）
-                cursor.execute("""
-                    DELETE FROM appstore_trends_cache WHERE country = %s
-                """, (country,))
-                
-                # 新しいデータを挿入
-                for item in data:
-                    # 配列をJSON文字列に変換
-                    genre_ids_json = json.dumps(item.get('genre_ids', []), ensure_ascii=False)
-                    screenshot_urls_json = json.dumps(item.get('screenshot_urls', []), ensure_ascii=False)
-                    
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # 既存のデータを削除（国別）
                     cursor.execute("""
-                        INSERT INTO appstore_trends_cache 
-                        (app_id, name, bundle_id, description, url, artist_name, artist_id, price, currency,
-                         category, genre_ids, average_user_rating, user_rating_count, release_date,
-                         current_version_release_date, artwork_url_60, artwork_url_100, artwork_url_512,
-                         screenshot_urls, country, rank)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        item.get('app_id', ''),
-                        item.get('name', ''),
-                        item.get('bundle_id', ''),
-                        item.get('description', ''),
-                        item.get('url', ''),
-                        item.get('artist_name', ''),
-                        item.get('artist_id', ''),
-                        item.get('price', 0),
-                        item.get('currency', ''),
-                        item.get('category', ''),
-                        genre_ids_json,
-                        item.get('average_user_rating', 0),
-                        item.get('user_rating_count', 0),
-                        item.get('release_date', ''),
-                        item.get('current_version_release_date', ''),
-                        item.get('artwork_url_60', ''),
-                        item.get('artwork_url_100', ''),
-                        item.get('artwork_url_512', ''),
-                        screenshot_urls_json,
-                        country,
-                        item.get('rank', 0)
-                    ))
-                
-                # キャッシュステータスを更新
-                from datetime import datetime
-                import pytz
-                jst = pytz.timezone('Asia/Tokyo')
-                cache_key = f'appstore_trends_{country}'
-                cursor.execute(
-                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                    (cache_key, datetime.now(jst), len(data), datetime.now(jst), len(data))
-                )
-                
-                conn.commit()
-                logger.info(f"✅ appstore_trendsキャッシュを保存しました ({len(data)}件, country={country})")
-                return True
+                        DELETE FROM appstore_trends_cache WHERE country = %s
+                    """, (country,))
+                    
+                    # 新しいデータを挿入
+                    for item in data:
+                        # 配列をJSON文字列に変換
+                        genre_ids_json = json.dumps(item.get('genre_ids', []), ensure_ascii=False)
+                        screenshot_urls_json = json.dumps(item.get('screenshot_urls', []), ensure_ascii=False)
+                        
+                        cursor.execute("""
+                            INSERT INTO appstore_trends_cache 
+                            (app_id, name, bundle_id, description, url, artist_name, artist_id, price, currency,
+                             category, genre_ids, average_user_rating, user_rating_count, release_date,
+                             current_version_release_date, artwork_url_60, artwork_url_100, artwork_url_512,
+                             screenshot_urls, country, rank)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            item.get('app_id', ''),
+                            item.get('name', ''),
+                            item.get('bundle_id', ''),
+                            item.get('description', ''),
+                            item.get('url', ''),
+                            item.get('artist_name', ''),
+                            item.get('artist_id', ''),
+                            item.get('price', 0),
+                            item.get('currency', ''),
+                            item.get('category', ''),
+                            genre_ids_json,
+                            item.get('average_user_rating', 0),
+                            item.get('user_rating_count', 0),
+                            item.get('release_date', ''),
+                            item.get('current_version_release_date', ''),
+                            item.get('artwork_url_60', ''),
+                            item.get('artwork_url_100', ''),
+                            item.get('artwork_url_512', ''),
+                            screenshot_urls_json,
+                            country,
+                            item.get('rank', 0)
+                        ))
+                    
+                    # キャッシュステータスを更新
+                    from datetime import datetime
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    cache_key = f'appstore_trends_{country}'
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        (cache_key, datetime.now(jst), len(data), datetime.now(jst), len(data))
+                    )
+                    
+                    conn.commit()
+                    logger.info(f"✅ appstore_trendsキャッシュを保存しました ({len(data)}件, country={country})")
+                    return True
                 
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ appstore_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
@@ -2715,10 +2506,6 @@ class TrendsCache:
             return False
         except Exception as e:
             logger.error(f"❌ appstore_trendsキャッシュ保存エラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     def get_appstore_trends_from_cache(self, country='JP'):
@@ -2764,31 +2551,20 @@ class TrendsCache:
     def clear_appstore_trends_cache(self, country='JP'):
         """App Store Trendsキャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ appstore_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("""
-                    DELETE FROM appstore_trends_cache WHERE country = %s
-                """, (country,))
-                conn.commit()
-                logger.info(f"✅ appstore_trendsのキャッシュをクリアしました (country={country})")
-                return True
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        DELETE FROM appstore_trends_cache WHERE country = %s
+                    """, (country,))
+                    conn.commit()
+                    logger.info(f"✅ appstore_trendsのキャッシュをクリアしました (country={country})")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ appstore_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ appstore_trendsキャッシュクリアエラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     # NHK Trends キャッシュメソッド
@@ -2797,50 +2573,40 @@ class TrendsCache:
         if not data:
             return False
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ nhk_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM nhk_trends_cache")
-                for item in data:
-                    cursor.execute("""
-                        INSERT INTO nhk_trends_cache 
-                        (title, url, published_date, description, rank)
-                        VALUES (%s, %s, %s, %s, %s)
-                    """, (
-                        item.get('title', ''),
-                        item.get('url', ''),
-                        item.get('published_date'),
-                        item.get('description', ''),
-                        item.get('rank', 0)
-                    ))
-                
-                # キャッシュステータスを更新
-                import pytz
-                jst = pytz.timezone('Asia/Tokyo')
-                now_jst = datetime.now(jst)
-                cursor.execute(
-                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                    ('nhk_trends', now_jst, len(data), now_jst, len(data))
-                )
-                
-                conn.commit()
-                logger.info(f"✅ nhk_trendsキャッシュを保存しました ({len(data)}件)")
-                return True
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM nhk_trends_cache")
+                    for item in data:
+                        cursor.execute("""
+                            INSERT INTO nhk_trends_cache 
+                            (title, url, published_date, description, rank)
+                            VALUES (%s, %s, %s, %s, %s)
+                        """, (
+                            item.get('title', ''),
+                            item.get('url', ''),
+                            item.get('published_date'),
+                            item.get('description', ''),
+                            item.get('rank', 0)
+                        ))
+                    
+                    # キャッシュステータスを更新
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        ('nhk_trends', now_jst, len(data), now_jst, len(data))
+                    )
+                    
+                    conn.commit()
+                    logger.info(f"✅ nhk_trendsキャッシュを保存しました ({len(data)}件)")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ nhk_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ nhk_trendsキャッシュ保存エラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
 
     def get_nhk_trends_from_cache(self):
@@ -2872,28 +2638,18 @@ class TrendsCache:
     def clear_nhk_trends_cache(self):
         """NHK Trendsキャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ nhk_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM nhk_trends_cache")
-                conn.commit()
-                logger.info(f"✅ nhk_trendsのキャッシュをクリアしました")
-                return True
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM nhk_trends_cache")
+                    conn.commit()
+                    logger.info(f"✅ nhk_trendsのキャッシュをクリアしました")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ nhk_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ nhk_trendsキャッシュクリアエラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     # CNN Trends キャッシュメソッド
@@ -2902,50 +2658,41 @@ class TrendsCache:
         if not data:
             return False
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ cnn_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM cnn_trends_cache")
-                for item in data:
-                    cursor.execute("""
-                        INSERT INTO cnn_trends_cache 
-                        (title, url, published_date, description, rank)
-                        VALUES (%s, %s, %s, %s, %s)
-                    """, (
-                        item.get('title', ''),
-                        item.get('url', ''),
-                        item.get('published_date'),
-                        item.get('description', ''),
-                        item.get('rank', 0)
-                    ))
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM cnn_trends_cache")
+                    for item in data:
+                        cursor.execute("""
+                            INSERT INTO cnn_trends_cache 
+                            (title, url, published_date, description, rank)
+                            VALUES (%s, %s, %s, %s, %s)
+                        """, (
+                            item.get('title', ''),
+                            item.get('url', ''),
+                            item.get('published_date'),
+                            item.get('description', ''),
+                            item.get('rank', 0)
+                        ))
+                    
+                    # キャッシュステータスを更新
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        ('cnn_trends', now_jst, len(data), now_jst, len(data))
+                    )
+                    
+                    conn.commit()
+                    logger.info(f"✅ cnn_trendsキャッシュを保存しました ({len(data)}件)")
+                    return True
                 
-                # キャッシュステータスを更新
-                import pytz
-                jst = pytz.timezone('Asia/Tokyo')
-                now_jst = datetime.now(jst)
-                cursor.execute(
-                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                    ('cnn_trends', now_jst, len(data), now_jst, len(data))
-                )
-                
-                conn.commit()
-                logger.info(f"✅ cnn_trendsキャッシュを保存しました ({len(data)}件)")
-                return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ cnn_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ cnn_trendsキャッシュ保存エラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
 
     def get_cnn_trends_from_cache(self):
@@ -2973,28 +2720,18 @@ class TrendsCache:
     def clear_cnn_trends_cache(self):
         """CNN Trendsキャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ cnn_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM cnn_trends_cache")
-                conn.commit()
-                logger.info(f"✅ cnn_trendsのキャッシュをクリアしました")
-                return True
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM cnn_trends_cache")
+                    conn.commit()
+                    logger.info(f"✅ cnn_trendsのキャッシュをクリアしました")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ cnn_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ cnn_trendsキャッシュクリアエラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     # Product Hunt Trends キャッシュメソッド
@@ -3004,61 +2741,54 @@ class TrendsCache:
             return False
         
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ producthunt_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                # 既存のデータを削除
-                cursor.execute("""
-                    DELETE FROM producthunt_trends_cache
-                """)
-                
-                # 新しいデータを挿入
-                for item in data:
-                    # トピックをJSON文字列に変換
-                    topics_json = json.dumps(item.get('topics', []), ensure_ascii=False)
-                    
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # 既存のデータを削除
                     cursor.execute("""
-                        INSERT INTO producthunt_trends_cache 
-                        (product_id, name, tagline, description, url, website, votes_count, comments_count,
-                         created_at, topics, user_name, user_username, rank)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        item.get('product_id', ''),
-                        item.get('name', ''),
-                        item.get('tagline', ''),
-                        item.get('description', ''),
-                        item.get('url', ''),
-                        item.get('website', ''),
-                        item.get('votes_count', 0),
-                        item.get('comments_count', 0),
-                        item.get('created_at', ''),
-                        topics_json,
-                        item.get('user_name', ''),
-                        item.get('user_username', ''),
-                        item.get('rank', 0)
-                    ))
-                
-                # cache_statusテーブルを更新
-                import pytz
-                jst = pytz.timezone('Asia/Tokyo')
-                now_jst = datetime.now(jst)
-                cursor.execute("""
-                    INSERT INTO cache_status (cache_key, last_updated, data_count)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (cache_key) DO UPDATE SET
-                        last_updated = EXCLUDED.last_updated,
-                        data_count = EXCLUDED.data_count
-                """, ('producthunt_trends', now_jst, len(data)))
-                
-                conn.commit()
-                logger.info(f"✅ producthunt_trendsキャッシュを保存しました ({len(data)}件)")
-                return True
+                        DELETE FROM producthunt_trends_cache
+                    """)
+                    
+                    # 新しいデータを挿入
+                    for item in data:
+                        # トピックをJSON文字列に変換
+                        topics_json = json.dumps(item.get('topics', []), ensure_ascii=False)
+                        
+                        cursor.execute("""
+                            INSERT INTO producthunt_trends_cache 
+                            (product_id, name, tagline, description, url, website, votes_count, comments_count,
+                             created_at, topics, user_name, user_username, rank)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            item.get('product_id', ''),
+                            item.get('name', ''),
+                            item.get('tagline', ''),
+                            item.get('description', ''),
+                            item.get('url', ''),
+                            item.get('website', ''),
+                            item.get('votes_count', 0),
+                            item.get('comments_count', 0),
+                            item.get('created_at', ''),
+                            topics_json,
+                            item.get('user_name', ''),
+                            item.get('user_username', ''),
+                            item.get('rank', 0)
+                        ))
+                    
+                    # cache_statusテーブルを更新
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cursor.execute("""
+                        INSERT INTO cache_status (cache_key, last_updated, data_count)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (cache_key) DO UPDATE SET
+                            last_updated = EXCLUDED.last_updated,
+                            data_count = EXCLUDED.data_count
+                    """, ('producthunt_trends', now_jst, len(data)))
+                    
+                    conn.commit()
+                    logger.info(f"✅ producthunt_trendsキャッシュを保存しました ({len(data)}件)")
+                    return True
                 
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ producthunt_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
@@ -3066,45 +2796,34 @@ class TrendsCache:
             return False
         except Exception as e:
             logger.error(f"❌ producthunt_trendsキャッシュ保存エラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     def get_producthunt_trends_from_cache(self):
         """Product Hunt Trendsデータをキャッシュから取得"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return None
-        except Exception as e:
-            logger.error(f"❌ Product Hunt Trendsキャッシュ取得エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return None
-        
-        try:
-            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("""
-                    SELECT product_id, name, tagline, description, url, website, votes_count, comments_count,
-                           created_at, topics, user_name, user_username, rank, cached_at
-                    FROM producthunt_trends_cache 
-                    ORDER BY rank
-                """)
-                data = cursor.fetchall()
-                
-                # RealDictCursorの結果を辞書のリストに変換
-                result = []
-                for row in data:
-                    item = dict(row)
-                    # トピックをJSONからリストに変換
-                    if item.get('topics'):
-                        try:
-                            item['topics'] = json.loads(item['topics'])
-                        except:
-                            item['topics'] = []
-                    result.append(item)
-                
-                return result
+            with self.get_connection() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                    cursor.execute("""
+                        SELECT product_id, name, tagline, description, url, website, votes_count, comments_count,
+                               created_at, topics, user_name, user_username, rank, cached_at
+                        FROM producthunt_trends_cache 
+                        ORDER BY rank
+                    """)
+                    data = cursor.fetchall()
+                    
+                    # RealDictCursorの結果を辞書のリストに変換
+                    result = []
+                    for row in data:
+                        item = dict(row)
+                        # トピックをJSONからリストに変換
+                        if item.get('topics'):
+                            try:
+                                item['topics'] = json.loads(item['topics'])
+                            except:
+                                item['topics'] = []
+                        result.append(item)
+                    
+                    return result
                 
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ Product Hunt Trendsキャッシュ取得中に接続エラーが発生: {e}", exc_info=True)
@@ -3117,31 +2836,20 @@ class TrendsCache:
     def clear_producthunt_trends_cache(self):
         """Product Hunt Trendsキャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ producthunt_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("""
-                    DELETE FROM producthunt_trends_cache
-                """)
-                conn.commit()
-                logger.info(f"✅ producthunt_trendsのキャッシュをクリアしました")
-                return True
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        DELETE FROM producthunt_trends_cache
+                    """)
+                    conn.commit()
+                    logger.info(f"✅ producthunt_trendsのキャッシュをクリアしました")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ producthunt_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ producthunt_trendsキャッシュクリアエラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     # Stock Trends キャッシュメソッド
@@ -3151,65 +2859,55 @@ class TrendsCache:
             return False
         
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ stock_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                # 既存のデータを削除
-                cursor.execute("""
-                    DELETE FROM stock_trends_cache 
-                    WHERE market = %s
-                """, (market,))
-                
-                # 新しいデータを挿入
-                for item in data:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # 既存のデータを削除
                     cursor.execute("""
-                        INSERT INTO stock_trends_cache
-                        (symbol, name, current_price, previous_price, change, change_percent,
-                         volume, market_cap, market, rank, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        item.get('symbol', ''),
-                        item.get('name', ''),
-                        item.get('current_price', 0),
-                        item.get('previous_price', 0),
-                        item.get('change', 0),
-                        item.get('change_percent', 0),
-                        item.get('volume', 0),
-                        item.get('market_cap', 0),
-                        market,
-                        item.get('rank', 0),
-                        item.get('updated_at')
-                    ))
-                # cache_statusテーブルを更新
-                from datetime import datetime
-                now = datetime.now()
-                cursor.execute("""
-                    INSERT INTO cache_status (cache_key, last_updated, data_count)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (cache_key) DO UPDATE SET
-                        last_updated = EXCLUDED.last_updated,
-                        data_count = EXCLUDED.data_count
-                """, ('stock_trends', now, len(data)))
+                        DELETE FROM stock_trends_cache 
+                        WHERE market = %s
+                    """, (market,))
+                    
+                    # 新しいデータを挿入
+                    for item in data:
+                        cursor.execute("""
+                            INSERT INTO stock_trends_cache
+                            (symbol, name, current_price, previous_price, change, change_percent,
+                             volume, market_cap, market, rank, updated_at)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            item.get('symbol', ''),
+                            item.get('name', ''),
+                            item.get('current_price', 0),
+                            item.get('previous_price', 0),
+                            item.get('change', 0),
+                            item.get('change_percent', 0),
+                            item.get('volume', 0),
+                            item.get('market_cap', 0),
+                            market,
+                            item.get('rank', 0),
+                            item.get('updated_at')
+                        ))
+                    # cache_statusテーブルを更新
+                    from datetime import datetime
+                    now = datetime.now()
+                    cursor.execute("""
+                        INSERT INTO cache_status (cache_key, last_updated, data_count)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (cache_key) DO UPDATE SET
+                            last_updated = EXCLUDED.last_updated,
+                            data_count = EXCLUDED.data_count
+                    """, ('stock_trends', now, len(data)))
+                    
+                    conn.commit()
+                    logger.info(f"✅ stock_trendsのキャッシュを保存しました (market: {market}, {len(data)}件)")
+                    return True
                 
-                conn.commit()
-                logger.info(f"✅ stock_trendsのキャッシュを保存しました (market: {market}, {len(data)}件)")
-                return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ stock_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ stock_trendsキャッシュ保存エラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     def get_stock_trends_from_cache(self, market='US'):
@@ -3244,32 +2942,21 @@ class TrendsCache:
     def clear_stock_trends_cache(self, market='US'):
         """Stock Trendsキャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ stock_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("""
-                    DELETE FROM stock_trends_cache 
-                    WHERE market = %s
-                """, (market,))
-                conn.commit()
-                logger.info(f"✅ stock_trendsのキャッシュをクリアしました (market: {market})")
-                return True
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        DELETE FROM stock_trends_cache 
+                        WHERE market = %s
+                    """, (market,))
+                    conn.commit()
+                    logger.info(f"✅ stock_trendsのキャッシュをクリアしました (market: {market})")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ stock_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ stock_trendsキャッシュクリアエラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     # Crypto Trends キャッシュメソッド
@@ -3279,65 +2966,55 @@ class TrendsCache:
             return False
         
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ crypto_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                # 既存のデータを削除
-                cursor.execute("DELETE FROM crypto_trends_cache")
-                
-                # 新しいデータを挿入
-                for item in data:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # 既存のデータを削除
+                    cursor.execute("DELETE FROM crypto_trends_cache")
+                    
+                    # 新しいデータを挿入
+                    for item in data:
+                        cursor.execute("""
+                            INSERT INTO crypto_trends_cache
+                            (coin_id, symbol, name, market_cap_rank, search_score,
+                             current_price, price_change_24h, price_change_percentage_24h,
+                             market_cap, volume_24h, image_url, rank, updated_at)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            item.get('coin_id', ''),
+                            item.get('symbol', ''),
+                            item.get('name', ''),
+                            item.get('market_cap_rank', 0),
+                            item.get('search_score', 0),
+                            item.get('current_price', 0),
+                            item.get('price_change_24h', 0),
+                            item.get('price_change_percentage_24h', 0),
+                            item.get('market_cap', 0),
+                            item.get('volume_24h', 0),
+                            item.get('image_url', ''),
+                            item.get('rank', 0),
+                            item.get('updated_at')
+                        ))
+                    # cache_statusテーブルを更新
+                    from datetime import datetime
+                    now = datetime.now()
                     cursor.execute("""
-                        INSERT INTO crypto_trends_cache
-                        (coin_id, symbol, name, market_cap_rank, search_score,
-                         current_price, price_change_24h, price_change_percentage_24h,
-                         market_cap, volume_24h, image_url, rank, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        item.get('coin_id', ''),
-                        item.get('symbol', ''),
-                        item.get('name', ''),
-                        item.get('market_cap_rank', 0),
-                        item.get('search_score', 0),
-                        item.get('current_price', 0),
-                        item.get('price_change_24h', 0),
-                        item.get('price_change_percentage_24h', 0),
-                        item.get('market_cap', 0),
-                        item.get('volume_24h', 0),
-                        item.get('image_url', ''),
-                        item.get('rank', 0),
-                        item.get('updated_at')
-                    ))
-                # cache_statusテーブルを更新
-                from datetime import datetime
-                now = datetime.now()
-                cursor.execute("""
-                    INSERT INTO cache_status (cache_key, last_updated, data_count)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (cache_key) DO UPDATE SET
-                        last_updated = EXCLUDED.last_updated,
-                        data_count = EXCLUDED.data_count
-                """, ('crypto_trends', now, len(data)))
+                        INSERT INTO cache_status (cache_key, last_updated, data_count)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (cache_key) DO UPDATE SET
+                            last_updated = EXCLUDED.last_updated,
+                            data_count = EXCLUDED.data_count
+                    """, ('crypto_trends', now, len(data)))
+                    
+                    conn.commit()
+                    logger.info(f"✅ crypto_trendsのキャッシュを保存しました ({len(data)}件)")
+                    return True
                 
-                conn.commit()
-                logger.info(f"✅ crypto_trendsのキャッシュを保存しました ({len(data)}件)")
-                return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ crypto_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ crypto_trendsキャッシュ保存エラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     def get_crypto_trends_from_cache(self):
@@ -3372,29 +3049,18 @@ class TrendsCache:
     def clear_crypto_trends_cache(self):
         """Crypto Trendsキャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ crypto_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM crypto_trends_cache")
-                conn.commit()
-                logger.info(f"✅ crypto_trendsのキャッシュをクリアしました")
-                return True
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM crypto_trends_cache")
+                    conn.commit()
+                    logger.info(f"✅ crypto_trendsのキャッシュをクリアしました")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ crypto_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ crypto_trendsキャッシュクリアエラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     def save_movie_trends_to_cache(self, data, country='JP'):
@@ -3403,69 +3069,59 @@ class TrendsCache:
             return False
         
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ movie_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                # 既存のデータを削除（国別）
-                cursor.execute("DELETE FROM movie_trends_cache WHERE country = %s", (country,))
-                
-                # 新しいデータを挿入
-                for item in data:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # 既存のデータを削除（国別）
+                    cursor.execute("DELETE FROM movie_trends_cache WHERE country = %s", (country,))
+                    
+                    # 新しいデータを挿入
+                    for item in data:
+                        cursor.execute("""
+                            INSERT INTO movie_trends_cache
+                            (country, movie_id, title, original_title, overview, popularity,
+                             vote_average, vote_count, release_date, poster_path,
+                             backdrop_path, poster_url, backdrop_url, rank, updated_at)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            country,
+                            item.get('id', 0),
+                            item.get('title', ''),
+                            item.get('original_title', ''),
+                            item.get('overview', ''),
+                            item.get('popularity', 0),
+                            item.get('vote_average', 0),
+                            item.get('vote_count', 0),
+                            item.get('release_date', ''),
+                            item.get('poster_path', ''),
+                            item.get('backdrop_path', ''),
+                            item.get('poster_url', ''),
+                            item.get('backdrop_url', ''),
+                            item.get('rank', 0),
+                            item.get('updated_at')
+                        ))
+                    # cache_statusテーブルを更新
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cache_key = f'movie_trends_{country}'
                     cursor.execute("""
-                        INSERT INTO movie_trends_cache
-                        (country, movie_id, title, original_title, overview, popularity,
-                         vote_average, vote_count, release_date, poster_path,
-                         backdrop_path, poster_url, backdrop_url, rank, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        country,
-                        item.get('id', 0),
-                        item.get('title', ''),
-                        item.get('original_title', ''),
-                        item.get('overview', ''),
-                        item.get('popularity', 0),
-                        item.get('vote_average', 0),
-                        item.get('vote_count', 0),
-                        item.get('release_date', ''),
-                        item.get('poster_path', ''),
-                        item.get('backdrop_path', ''),
-                        item.get('poster_url', ''),
-                        item.get('backdrop_url', ''),
-                        item.get('rank', 0),
-                        item.get('updated_at')
-                    ))
-                # cache_statusテーブルを更新
-                import pytz
-                jst = pytz.timezone('Asia/Tokyo')
-                now_jst = datetime.now(jst)
-                cache_key = f'movie_trends_{country}'
-                cursor.execute("""
-                    INSERT INTO cache_status (cache_key, last_updated, data_count)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (cache_key) DO UPDATE SET
-                        last_updated = EXCLUDED.last_updated,
-                        data_count = EXCLUDED.data_count
-                """, (cache_key, now_jst, len(data)))
+                        INSERT INTO cache_status (cache_key, last_updated, data_count)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (cache_key) DO UPDATE SET
+                            last_updated = EXCLUDED.last_updated,
+                            data_count = EXCLUDED.data_count
+                    """, (cache_key, now_jst, len(data)))
+                    
+                    conn.commit()
+                    logger.info(f"✅ movie_trendsのキャッシュを保存しました (country: {country}, {len(data)}件)")
+                    return True
                 
-                conn.commit()
-                logger.info(f"✅ movie_trendsのキャッシュを保存しました (country: {country}, {len(data)}件)")
-                return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ movie_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ movie_trendsキャッシュ保存エラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     def get_movie_trends_from_cache(self, country='JP'):
@@ -3501,29 +3157,18 @@ class TrendsCache:
     def clear_movie_trends_cache(self, country='JP'):
         """Movie Trendsキャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ movie_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM movie_trends_cache WHERE country = %s", (country,))
-                conn.commit()
-                logger.info(f"✅ movie_trendsのキャッシュをクリアしました")
-                return True
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM movie_trends_cache WHERE country = %s", (country,))
+                    conn.commit()
+                    logger.info(f"✅ movie_trendsのキャッシュをクリアしました")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ movie_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ movie_trendsキャッシュクリアエラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     def save_book_trends_to_cache(self, data, country='JP'):
@@ -3532,17 +3177,10 @@ class TrendsCache:
             return False
         
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ book_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                # 既存のデータを削除（国別）
-                cursor.execute("DELETE FROM book_trends_cache WHERE country = %s", (country,))
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # 既存のデータを削除（国別）
+                    cursor.execute("DELETE FROM book_trends_cache WHERE country = %s", (country,))
                 
                 # 新しいデータを挿入
                 for item in data:
@@ -3612,20 +3250,17 @@ class TrendsCache:
                         last_updated = EXCLUDED.last_updated,
                         data_count = EXCLUDED.data_count
                 """, (f'book_trends_{country}', now_jst, len(data)))
-                
+                    
                 conn.commit()
                 logger.info(f"✅ book_trendsのキャッシュを保存しました ({country}, {len(data)}件)")
                 return True
+                
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ book_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ book_trendsキャッシュ保存エラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     def get_book_trends_from_cache(self, country='JP'):
@@ -3677,29 +3312,18 @@ class TrendsCache:
     def clear_book_trends_cache(self, country='JP'):
         """Book Trendsキャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ book_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM book_trends_cache WHERE country = %s", (country,))
-                conn.commit()
-                logger.info(f"✅ book_trendsのキャッシュをクリアしました ({country})")
-                return True
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM book_trends_cache WHERE country = %s", (country,))
+                    conn.commit()
+                    logger.info(f"✅ book_trendsのキャッシュをクリアしました ({country})")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ book_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ book_trendsキャッシュクリアエラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
     
     # CISA KEV Trends キャッシュメソッド
@@ -3708,57 +3332,48 @@ class TrendsCache:
         if not data:
             return False
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ cisa_kev_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM cisa_kev_trends_cache")
-                for item in data:
-                    cursor.execute("""
-                        INSERT INTO cisa_kev_trends_cache 
-                        (cve_id, vendor_project, product, vulnerability_name, date_added, date_required, 
-                         due_date, short_description, required_action, notes, rank)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        item.get('cve_id', ''),
-                        item.get('vendor_project', ''),
-                        item.get('product', ''),
-                        item.get('vulnerability_name', ''),
-                        item.get('date_added', ''),
-                        item.get('date_required', ''),
-                        item.get('due_date', ''),
-                        item.get('short_description', ''),
-                        item.get('required_action', ''),
-                        item.get('notes', ''),
-                        item.get('rank', 0)
-                    ))
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM cisa_kev_trends_cache")
+                    for item in data:
+                        cursor.execute("""
+                            INSERT INTO cisa_kev_trends_cache 
+                            (cve_id, vendor_project, product, vulnerability_name, date_added, date_required, 
+                             due_date, short_description, required_action, notes, rank)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            item.get('cve_id', ''),
+                            item.get('vendor_project', ''),
+                            item.get('product', ''),
+                            item.get('vulnerability_name', ''),
+                            item.get('date_added', ''),
+                            item.get('date_required', ''),
+                            item.get('due_date', ''),
+                            item.get('short_description', ''),
+                            item.get('required_action', ''),
+                            item.get('notes', ''),
+                            item.get('rank', 0)
+                        ))
+                    
+                    # キャッシュステータスを更新
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        ('cisa_kev_trends', now_jst, len(data), now_jst, len(data))
+                    )
+                    
+                    conn.commit()
+                    logger.info(f"✅ cisa_kev_trendsキャッシュを保存しました ({len(data)}件)")
+                    return True
                 
-                # キャッシュステータスを更新
-                import pytz
-                jst = pytz.timezone('Asia/Tokyo')
-                now_jst = datetime.now(jst)
-                cursor.execute(
-                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                    ('cisa_kev_trends', now_jst, len(data), now_jst, len(data))
-                )
-                
-                conn.commit()
-                logger.info(f"✅ cisa_kev_trendsキャッシュを保存しました ({len(data)}件)")
-                return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ cisa_kev_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ cisa_kev_trendsキャッシュ保存エラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
 
     def get_cisa_kev_trends_from_cache(self):
@@ -3778,28 +3393,18 @@ class TrendsCache:
     def clear_cisa_kev_trends_cache(self):
         """CISA KEV Trendsキャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ cisa_kev_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM cisa_kev_trends_cache")
-                conn.commit()
-                logger.info(f"✅ cisa_kev_trendsのキャッシュをクリアしました")
-                return True
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM cisa_kev_trends_cache")
+                    conn.commit()
+                    logger.info(f"✅ cisa_kev_trendsのキャッシュをクリアしました")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ cisa_kev_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ cisa_kev_trendsキャッシュクリアエラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
 
     # The Hacker News Trends キャッシュメソッド
@@ -3808,51 +3413,41 @@ class TrendsCache:
         if not data:
             return False
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ thehackernews_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM thehackernews_trends_cache")
-                for item in data:
-                    cursor.execute("""
-                        INSERT INTO thehackernews_trends_cache 
-                        (title, url, published_date, description, author, rank)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                    """, (
-                        item.get('title', ''),
-                        item.get('url', ''),
-                        item.get('published_date'),
-                        item.get('description', ''),
-                        item.get('author', ''),
-                        item.get('rank', 0)
-                    ))
-                
-                # キャッシュステータスを更新
-                import pytz
-                jst = pytz.timezone('Asia/Tokyo')
-                now_jst = datetime.now(jst)
-                cursor.execute(
-                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                    ('thehackernews_trends', now_jst, len(data), now_jst, len(data))
-                )
-                
-                conn.commit()
-                logger.info(f"✅ thehackernews_trendsキャッシュを保存しました ({len(data)}件)")
-                return True
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM thehackernews_trends_cache")
+                    for item in data:
+                        cursor.execute("""
+                            INSERT INTO thehackernews_trends_cache 
+                            (title, url, published_date, description, author, rank)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                        """, (
+                            item.get('title', ''),
+                            item.get('url', ''),
+                            item.get('published_date'),
+                            item.get('description', ''),
+                            item.get('author', ''),
+                            item.get('rank', 0)
+                        ))
+                    
+                    # キャッシュステータスを更新
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        ('thehackernews_trends', now_jst, len(data), now_jst, len(data))
+                    )
+                    
+                    conn.commit()
+                    logger.info(f"✅ thehackernews_trendsキャッシュを保存しました ({len(data)}件)")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ thehackernews_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ thehackernews_trendsキャッシュ保存エラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
 
     def get_thehackernews_trends_from_cache(self):
@@ -3880,28 +3475,18 @@ class TrendsCache:
     def clear_thehackernews_trends_cache(self):
         """The Hacker News Trendsキャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ thehackernews_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM thehackernews_trends_cache")
-                conn.commit()
-                logger.info(f"✅ thehackernews_trendsのキャッシュをクリアしました")
-                return True
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM thehackernews_trends_cache")
+                    conn.commit()
+                    logger.info(f"✅ thehackernews_trendsのキャッシュをクリアしました")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ thehackernews_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ thehackernews_trendsキャッシュクリアエラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
 
     # IPA Trends キャッシュメソッド
@@ -3910,51 +3495,41 @@ class TrendsCache:
         if not data:
             return False
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ ipa_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM ipa_trends_cache")
-                for item in data:
-                    cursor.execute("""
-                        INSERT INTO ipa_trends_cache 
-                        (title, url, published_date, description, author, rank)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                    """, (
-                        item.get('title', ''),
-                        item.get('url', ''),
-                        item.get('published_date'),
-                        item.get('description', ''),
-                        item.get('author', ''),
-                        item.get('rank', 0)
-                    ))
-                
-                # キャッシュステータスを更新
-                import pytz
-                jst = pytz.timezone('Asia/Tokyo')
-                now_jst = datetime.now(jst)
-                cursor.execute(
-                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                    ('ipa_trends', now_jst, len(data), now_jst, len(data))
-                )
-                
-                conn.commit()
-                logger.info(f"✅ ipa_trendsキャッシュを保存しました ({len(data)}件)")
-                return True
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM ipa_trends_cache")
+                    for item in data:
+                        cursor.execute("""
+                            INSERT INTO ipa_trends_cache 
+                            (title, url, published_date, description, author, rank)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                        """, (
+                            item.get('title', ''),
+                            item.get('url', ''),
+                            item.get('published_date'),
+                            item.get('description', ''),
+                            item.get('author', ''),
+                            item.get('rank', 0)
+                        ))
+                    
+                    # キャッシュステータスを更新
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        ('ipa_trends', now_jst, len(data), now_jst, len(data))
+                    )
+                    
+                    conn.commit()
+                    logger.info(f"✅ ipa_trendsキャッシュを保存しました ({len(data)}件)")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ ipa_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ ipa_trendsキャッシュ保存エラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
 
     def get_ipa_trends_from_cache(self):
@@ -3982,18 +3557,12 @@ class TrendsCache:
     def clear_ipa_trends_cache(self):
         """IPA Trendsキャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ ipa_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM ipa_trends_cache")
-                conn.commit()
-                logger.info(f"✅ ipa_trendsのキャッシュをクリアしました")
-                return True
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM ipa_trends_cache")
+                    conn.commit()
+                    logger.info(f"✅ ipa_trendsのキャッシュをクリアしました")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ ipa_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
@@ -4012,17 +3581,11 @@ class TrendsCache:
         if not data:
             return False
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ jpcert_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM jpcert_trends_cache")
-                for item in data:
-                    cursor.execute("""
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM jpcert_trends_cache")
+                    for item in data:
+                        cursor.execute("""
                         INSERT INTO jpcert_trends_cache 
                         (title, url, published_date, description, author, rank)
                         VALUES (%s, %s, %s, %s, %s, %s)
@@ -4084,16 +3647,10 @@ class TrendsCache:
     def clear_jpcert_trends_cache(self):
         """JPCERT/CC Trendsキャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ jpcert_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM jpcert_trends_cache")
-                conn.commit()
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM jpcert_trends_cache")
+                    conn.commit()
                 logger.info(f"✅ jpcert_trendsのキャッシュをクリアしました")
                 return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
@@ -4114,17 +3671,11 @@ class TrendsCache:
         if not data:
             return False
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ hackernoon_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM hackernoon_trends_cache")
-                for item in data:
-                    cursor.execute("""
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM hackernoon_trends_cache")
+                    for item in data:
+                        cursor.execute("""
                         INSERT INTO hackernoon_trends_cache 
                         (title, url, published_date, description, author, rank)
                         VALUES (%s, %s, %s, %s, %s, %s)
@@ -4186,16 +3737,10 @@ class TrendsCache:
     def clear_hackernoon_trends_cache(self):
         """Hacker Noon Trendsキャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ hackernoon_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM hackernoon_trends_cache")
-                conn.commit()
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM hackernoon_trends_cache")
+                    conn.commit()
                 logger.info(f"✅ hackernoon_trendsのキャッシュをクリアしました")
                 return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
@@ -4216,17 +3761,11 @@ class TrendsCache:
         if not data:
             return False
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ zenn_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM zenn_trends_cache")
-                for item in data:
-                    cursor.execute("""
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM zenn_trends_cache")
+                    for item in data:
+                        cursor.execute("""
                         INSERT INTO zenn_trends_cache 
                         (title, url, published_date, description, author, rank)
                         VALUES (%s, %s, %s, %s, %s, %s)
@@ -4283,16 +3822,10 @@ class TrendsCache:
     def clear_zenn_trends_cache(self):
         """Zenn Trendsキャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ zenn_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM zenn_trends_cache")
-                conn.commit()
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM zenn_trends_cache")
+                    conn.commit()
                 logger.info(f"✅ zenn_trendsのキャッシュをクリアしました")
                 return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
@@ -4313,133 +3846,10 @@ class TrendsCache:
         if not data:
             return False
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ amazon_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            # スキーマ更新（既存テーブルにcategoryカラムを追加）
-            try:
-                schema_conn = self.get_connection()
-                if schema_conn:
-                    try:
-                        with schema_conn.cursor() as cursor:
-                            # categoryカラムを追加（既存テーブル用）
-                            cursor.execute("ALTER TABLE amazon_trends_cache ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'books'")
-                        schema_conn.commit()
-                        logger.info("✅ amazon_trends_cacheテーブルにcategoryカラムを追加しました")
-                    except Exception as schema_error:
-                        logger.warning(f"⚠️ amazon_trends_cacheのスキーマ更新に失敗しました（処理は継続）: {schema_error}")
-                        schema_conn.rollback()
-                    finally:
-                        if schema_conn and not schema_conn.closed:
-                            schema_conn.close()
-            except Exception as e:
-                logger.warning(f"⚠️ amazon_trends_cacheスキーマ更新時の接続エラー（処理は継続）: {e}")
-            
-            with conn.cursor() as cursor:
-                # カテゴリーでフィルタリングして削除（同じカテゴリーのデータのみ削除）
-                category = data[0].get('category', 'books') if data else 'books'
-                cursor.execute("DELETE FROM amazon_trends_cache WHERE category = %s", (category,))
-                for item in data:
-                    cursor.execute("""
-                        INSERT INTO amazon_trends_cache 
-                        (title, url, asin, published_date, description, rank, category)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        item.get('title', ''),
-                        item.get('url', ''),
-                        item.get('asin'),
-                        item.get('published_date'),
-                        item.get('description', ''),
-                        item.get('rank', 0),
-                        item.get('category', 'books')
-                    ))
-                import pytz
-                jst = pytz.timezone('Asia/Tokyo')
-                now_jst = datetime.now(jst)
-                cursor.execute(
-                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                    ('amazon_trends', now_jst, len(data), now_jst, len(data))
-                )
-                conn.commit()
-                logger.info(f"✅ amazon_trendsキャッシュを保存しました ({len(data)}件)")
-                return True
-        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-            logger.warning(f"⚠️ amazon_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
-            self.connection = None
-            return False
-        except Exception as e:
-            logger.error(f"❌ amazon_trendsキャッシュ保存エラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
-            return False
-
-    def get_amazon_trends_from_cache(self, category='books'):
-        """Amazon Best Sellers Trendsデータをキャッシュから取得
-        
-        Args:
-            category (str): カテゴリー ('books', 'electronics', 'computers')
-        """
-        def query_func(conn):
-            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                # まず、categoryカラムが存在するか確認
-                try:
-                    cursor.execute("""
-                        SELECT column_name 
-                        FROM information_schema.columns 
-                        WHERE table_name='amazon_trends_cache' AND column_name='category'
-                    """)
-                    has_category_column = cursor.fetchone() is not None
-                except Exception:
-                    has_category_column = False
-                
-                # categoryカラムがない場合は、全データを取得して後でフィルタリング
-                if not has_category_column:
-                    cursor.execute("""
-                        SELECT title, url, asin, published_date, description, rank, cached_at
-                        FROM amazon_trends_cache 
-                        ORDER BY rank
-                    """)
-                else:
-                    cursor.execute("""
-                        SELECT title, url, asin, published_date, description, rank, category, cached_at
-                        FROM amazon_trends_cache 
-                        WHERE category = %s
-                        ORDER BY rank
-                    """, (category,))
-                
-                data = cursor.fetchall()
-                result = []
-                for row in data:
-                    row_dict = dict(row)
-                    if row_dict.get('published_date'):
-                        if isinstance(row_dict['published_date'], datetime):
-                            row_dict['published_date'] = row_dict['published_date'].isoformat()
-                    # categoryカラムがない場合は、デフォルト値を設定
-                    if 'category' not in row_dict:
-                        row_dict['category'] = category
-                    result.append(row_dict)
-                return result
-        return self._execute_with_retry(query_func)
-
-    def clear_amazon_trends_cache(self):
-        """Amazon Best Sellers Trendsキャッシュをクリア"""
-        try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ amazon_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM amazon_trends_cache")
-                conn.commit()
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM amazon_trends_cache")
+                    conn.commit()
                 logger.info(f"✅ amazon_trendsのキャッシュをクリアしました")
                 return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
@@ -4460,55 +3870,45 @@ class TrendsCache:
         if not data:
             return False
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ ebay_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                # カテゴリ別に削除
-                cursor.execute("DELETE FROM ebay_trends_cache WHERE category = %s", (category,))
-                for item in data:
-                    cursor.execute("""
-                        INSERT INTO ebay_trends_cache 
-                        (title, url, item_id, price, currency, image_url, condition, seller, shipping, rank, category, published_date)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        item.get('title', ''),
-                        item.get('url', ''),
-                        item.get('item_id'),
-                        item.get('price'),
-                        item.get('currency', 'USD'),
-                        item.get('image_url'),
-                        item.get('condition'),
-                        item.get('seller'),
-                        item.get('shipping'),
-                        item.get('rank', 0),
-                        item.get('category', category),
-                        item.get('published_date')
-                    ))
-                import pytz
-                jst = pytz.timezone('Asia/Tokyo')
-                now_jst = datetime.now(jst)
-                cursor.execute(
-                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                    ('ebay_trends', now_jst, len(data), now_jst, len(data))
-                )
-                conn.commit()
-                logger.info(f"✅ ebay_trendsキャッシュを保存しました (category: {category}, {len(data)}件)")
-                return True
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # カテゴリ別に削除
+                    cursor.execute("DELETE FROM ebay_trends_cache WHERE category = %s", (category,))
+                    for item in data:
+                        cursor.execute("""
+                            INSERT INTO ebay_trends_cache 
+                            (title, url, item_id, price, currency, image_url, condition, seller, shipping, rank, category, published_date)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            item.get('title', ''),
+                            item.get('url', ''),
+                            item.get('item_id'),
+                            item.get('price'),
+                            item.get('currency', 'USD'),
+                            item.get('image_url'),
+                            item.get('condition'),
+                            item.get('seller'),
+                            item.get('shipping'),
+                            item.get('rank', 0),
+                            item.get('category', category),
+                            item.get('published_date')
+                        ))
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        ('ebay_trends', now_jst, len(data), now_jst, len(data))
+                    )
+                    conn.commit()
+                    logger.info(f"✅ ebay_trendsキャッシュを保存しました (category: {category}, {len(data)}件)")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ ebay_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
             return False
         except Exception as e:
             logger.error(f"❌ ebay_trendsキャッシュ保存エラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
             return False
 
     def get_ebay_trends_from_cache(self, category='electronics'):
@@ -4535,22 +3935,16 @@ class TrendsCache:
     def clear_ebay_trends_cache(self, category=None):
         """eBay Popular/Trending Trendsキャッシュをクリア（カテゴリ対応）"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ ebay_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                if category:
-                    cursor.execute("DELETE FROM ebay_trends_cache WHERE category = %s", (category,))
-                    logger.info(f"✅ ebay_trendsのキャッシュをクリアしました (category: {category})")
-                else:
-                    cursor.execute("DELETE FROM ebay_trends_cache")
-                    logger.info(f"✅ ebay_trendsのキャッシュをクリアしました（全カテゴリ）")
-                conn.commit()
-                return True
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    if category:
+                        cursor.execute("DELETE FROM ebay_trends_cache WHERE category = %s", (category,))
+                        logger.info(f"✅ ebay_trendsのキャッシュをクリアしました (category: {category})")
+                    else:
+                        cursor.execute("DELETE FROM ebay_trends_cache")
+                        logger.info(f"✅ ebay_trendsのキャッシュをクリアしました（全カテゴリ）")
+                    conn.commit()
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ ebay_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
@@ -4569,17 +3963,11 @@ class TrendsCache:
         if not data:
             return False
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ medium_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM medium_trends_cache")
-                for item in data:
-                    cursor.execute("""
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM medium_trends_cache")
+                    for item in data:
+                        cursor.execute("""
                         INSERT INTO medium_trends_cache 
                         (title, url, slug, published_date, description, author, rank)
                         VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -4637,16 +4025,10 @@ class TrendsCache:
     def clear_medium_trends_cache(self):
         """Medium Trendsキャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ medium_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM medium_trends_cache")
-                conn.commit()
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM medium_trends_cache")
+                    conn.commit()
                 logger.info(f"✅ medium_trendsのキャッシュをクリアしました")
                 return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
@@ -4667,19 +4049,13 @@ class TrendsCache:
         if not data:
             return False
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ devto_trendsキャッシュ保存エラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM devto_trends_cache")
-                for item in data:
-                    # tagsを文字列として保存（JSON形式）
-                    tags_str = ', '.join(item.get('tags', [])) if isinstance(item.get('tags'), list) else str(item.get('tags', ''))
-                    cursor.execute("""
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM devto_trends_cache")
+                    for item in data:
+                        # tagsを文字列として保存（JSON形式）
+                        tags_str = ', '.join(item.get('tags', [])) if isinstance(item.get('tags'), list) else str(item.get('tags', ''))
+                        cursor.execute("""
                         INSERT INTO devto_trends_cache 
                         (article_id, title, url, canonical_url, description, published_at, published_date, 
                          positive_reactions_count, comments_count, reading_time_minutes, tags, author, rank)
@@ -4753,16 +4129,10 @@ class TrendsCache:
     def clear_devto_trends_cache(self):
         """DEV.to Trendsキャッシュをクリア"""
         try:
-            conn = self.get_connection()
-            if not conn:
-                return False
-        except Exception as e:
-            logger.error(f"❌ devto_trendsキャッシュクリアエラー: データベース接続取得に失敗しました: {e}", exc_info=True)
-            return False
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM devto_trends_cache")
-                conn.commit()
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM devto_trends_cache")
+                    conn.commit()
                 logger.info(f"✅ devto_trendsのキャッシュをクリアしました")
                 return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:

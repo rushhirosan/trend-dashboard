@@ -147,12 +147,8 @@ class TwitchTrendsManager(BaseTrendsManager):
         try:
             logger.debug(f"🔍 Twitch: カテゴリ別キャッシュ保存開始 (category: {category}, data: {len(data)}件)")
             
-            conn = self.db.get_connection()
-            if not conn:
-                logger.warning(f"⚠️ Twitch: データベース接続が取得できませんでした (category: {category})")
-                return
-            
-            with conn.cursor() as cursor:
+            with self.db.get_connection() as conn:
+                with conn.cursor() as cursor:
                 # 既存のデータを削除
                 cursor.execute("DELETE FROM twitch_trends_cache WHERE category = %s", (category,))
                 
@@ -589,12 +585,8 @@ class TwitchTrendsManager(BaseTrendsManager):
     def _get_cache_info(self, cache_key):
         """キャッシュ情報を取得"""
         try:
-            conn = self.db.get_connection()
-            if not conn:
-                logger.warning(f"⚠️ Twitch: データベース接続が取得できませんでした (_get_cache_info)")
-                return None
-            
-            with conn.cursor() as cursor:
+            with self.db.get_connection() as conn:
+                with conn.cursor() as cursor:
                     cursor.execute("""
                         SELECT last_updated, data_count 
                         FROM cache_status 

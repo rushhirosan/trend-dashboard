@@ -487,12 +487,7 @@ class HatenaTrendsManager(BaseTrendsManager):
                 return False
             
             # データベースから最後の更新日時を取得
-            conn = self.db.get_connection()
-            if not conn:
-                logger.warning("⚠️ データベース接続が取得できませんでした。キャッシュチェックをスキップします")
-                return False
-            
-            with conn:
+            with self.db.get_connection() as conn:
                 with conn.cursor() as cursor:
                     cursor.execute("""
                         SELECT last_updated 
@@ -517,12 +512,7 @@ class HatenaTrendsManager(BaseTrendsManager):
             # 日本時間で現在時刻を取得
             jst = pytz.timezone('Asia/Tokyo')
             now = datetime.now(jst)
-            conn = self.db.get_connection()
-            if not conn:
-                logger.warning("⚠️ データベース接続が取得できませんでした。更新日時記録をスキップします")
-                return
-            
-            with conn:
+            with self.db.get_connection() as conn:
                 with conn.cursor() as cursor:
                     cursor.execute("""
                         INSERT INTO cache_status (cache_key, last_updated, data_count)
@@ -547,12 +537,7 @@ class HatenaTrendsManager(BaseTrendsManager):
     def _get_cache_info(self, cache_key):
         """キャッシュ情報を取得"""
         try:
-            conn = self.db.get_connection()
-            if not conn:
-                logger.warning("⚠️ データベース接続が取得できませんでした。キャッシュ情報取得をスキップします")
-                return {'last_updated': None, 'data_count': 0}
-            
-            with conn:
+            with self.db.get_connection() as conn:
                 with conn.cursor() as cursor:
                     cursor.execute("""
                         SELECT last_updated, data_count 

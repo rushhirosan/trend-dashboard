@@ -377,6 +377,12 @@ class TrendsScheduler:
     def _send_trends_summary_emails(self):
         """トレンドサマリーメールを自動送信"""
         try:
+            # サブスクリプション機能が無効化されている場合はスキップ
+            from config.app_config import AppConfig
+            if not AppConfig.ENABLE_SUBSCRIPTION_UI:
+                logger.info("⏭️ サブスクリプション機能が無効化されているため、メール自動送信をスキップします")
+                return
+            
             if self.subscription_manager is None:
                 logger.warning("📧 SubscriptionManagerが初期化されていないため、メール自動送信をスキップします")
                 return

@@ -19,8 +19,13 @@ subscription_manager = SubscriptionManager()
 
 @subscription_bp.route('/')
 def subscription_page():
-    """サブスクリプションページを表示"""
+    """サブスクリプションページを表示（UI非表示時は404を返す）"""
     try:
+        from config.app_config import AppConfig
+        from flask import abort
+        if not AppConfig.ENABLE_SUBSCRIPTION_UI:
+            # UIが無効化されている場合は404を返す
+            abort(404)
         from flask import current_app
         # Google Analytics IDをテンプレートに渡す
         ga_id = current_app.config.get('GOOGLE_ANALYTICS_ID')

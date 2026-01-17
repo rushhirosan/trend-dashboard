@@ -138,6 +138,14 @@ def create_app():
         scheduler = None
         app.config['SCHEDULER'] = None
     
+    # テンプレートにグローバル変数を提供
+    @app.context_processor
+    def inject_config():
+        """テンプレートで使用できる設定を注入"""
+        return {
+            'ENABLE_SUBSCRIPTION_UI': AppConfig.ENABLE_SUBSCRIPTION_UI
+        }
+    
     # ルートを定義（エラーが発生しても続行）
     # パフォーマンス最適化: キャッシュヘッダーの設定
     @app.after_request

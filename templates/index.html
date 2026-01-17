@@ -1671,7 +1671,9 @@
                         <li class="mb-2"><a href="/" class="text-decoration-none text-muted">🇯🇵 日本トレンド</a></li>
                         <li class="mb-2"><a href="/us" class="text-decoration-none text-muted">🇺🇸 USトレンド</a></li>
                         <li class="mb-2"><a href="/data-status" class="text-decoration-none text-muted">📊 データ鮮度情報</a></li>
+                        {% if ENABLE_SUBSCRIPTION_UI %}
                         <li class="mb-2"><a href="/subscription" class="text-decoration-none text-muted">📧 メールサブスクリプション</a></li>
+                        {% endif %}
                         <li class="mb-2"><a href="/about" class="text-decoration-none text-muted">ℹ️ このサイトについて</a></li>
                     </ul>
                 </div>

@@ -33,6 +33,10 @@ class AppConfig:
     # スケジューラー設定（デフォルトは有効）
     ENABLE_SCHEDULER = os.getenv('ENABLE_SCHEDULER', 'true').lower() == 'true'
     
+    # サブスクリプション機能の表示設定（デフォルトは非表示）
+    # 今後使う可能性があるため、コードは残すがUIからは非表示
+    ENABLE_SUBSCRIPTION_UI = os.getenv('ENABLE_SUBSCRIPTION_UI', 'false').lower() == 'true'
+    
     @classmethod
     def get_config_dict(cls):
         """設定を辞書形式で取得"""
@@ -46,7 +50,8 @@ class AppConfig:
             'GOOGLE_ANALYTICS_ID': cls.GOOGLE_ANALYTICS_ID,
             'CACHE_VALIDITY_HOURS': cls.CACHE_VALIDITY_HOURS,
             'MAX_RESULTS': cls.MAX_RESULTS,
-            'ENABLE_SCHEDULER': cls.ENABLE_SCHEDULER
+            'ENABLE_SCHEDULER': cls.ENABLE_SCHEDULER,
+            'ENABLE_SUBSCRIPTION_UI': cls.ENABLE_SUBSCRIPTION_UI
         }
 
 

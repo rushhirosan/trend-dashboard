@@ -149,54 +149,54 @@ class TwitchTrendsManager(BaseTrendsManager):
             
             with self.db.get_connection() as conn:
                 with conn.cursor() as cursor:
-                # 既存のデータを削除
-                cursor.execute("DELETE FROM twitch_trends_cache WHERE category = %s", (category,))
-                
-                # 新しいデータを保存
-                for item in data:
-                    # created_atフィールドの値を適切に処理
-                    created_at = item.get('created_at', '')
-                    if created_at == '' or created_at is None:
-                        created_at = None
+                    # 既存のデータを削除
+                    cursor.execute("DELETE FROM twitch_trends_cache WHERE category = %s", (category,))
                     
+                    # 新しいデータを保存
+                    for item in data:
+                        # created_atフィールドの値を適切に処理
+                        created_at = item.get('created_at', '')
+                        if created_at == '' or created_at is None:
+                            created_at = None
+                        
+                        cursor.execute("""
+                            INSERT INTO twitch_trends_cache 
+                            (title, game_name, viewer_count, rank, category, thumbnail_url, 
+                             user_name, language, started_at, view_count, creator_name, 
+                             duration, created_at, url, box_art_url, game_id)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            item.get('title', ''),
+                            item.get('game_name', ''),
+                            item.get('viewer_count', 0),
+                            item.get('rank', 0),
+                            item.get('category', category),
+                            item.get('thumbnail_url', ''),
+                            item.get('user_name', ''),
+                            item.get('language', ''),
+                            item.get('started_at', ''),
+                            item.get('view_count', 0),
+                            item.get('creator_name', ''),
+                            item.get('duration', 0),
+                            created_at,  # NULLまたは有効な値
+                            item.get('url', ''),
+                            item.get('box_art_url', ''),
+                            item.get('id', '')
+                        ))
+                    
+                    conn.commit()
+                    logger.info(f"✅ Twitch: カテゴリ別キャッシュ保存完了 (category: {category}, data: {len(data)}件)")
+                    
+                    # cache_statusを更新
+                    from datetime import datetime
                     cursor.execute("""
-                        INSERT INTO twitch_trends_cache 
-                        (title, game_name, viewer_count, rank, category, thumbnail_url, 
-                         user_name, language, started_at, view_count, creator_name, 
-                         duration, created_at, url, box_art_url, game_id)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        item.get('title', ''),
-                        item.get('game_name', ''),
-                        item.get('viewer_count', 0),
-                        item.get('rank', 0),
-                        item.get('category', category),
-                        item.get('thumbnail_url', ''),
-                        item.get('user_name', ''),
-                        item.get('language', ''),
-                        item.get('started_at', ''),
-                        item.get('view_count', 0),
-                        item.get('creator_name', ''),
-                        item.get('duration', 0),
-                        created_at,  # NULLまたは有効な値
-                        item.get('url', ''),
-                        item.get('box_art_url', ''),
-                        item.get('id', '')
-                    ))
-                
-                conn.commit()
-                logger.info(f"✅ Twitch: カテゴリ別キャッシュ保存完了 (category: {category}, data: {len(data)}件)")
-                
-                # cache_statusを更新
-                from datetime import datetime
-                cursor.execute("""
-                    INSERT INTO cache_status (cache_key, last_updated, data_count)
-                    VALUES ('twitch_trends', %s, %s)
-                    ON CONFLICT (cache_key) DO UPDATE SET
-                        last_updated = EXCLUDED.last_updated,
-                        data_count = EXCLUDED.data_count
-                """, (datetime.now(), len(data)))
-                conn.commit()
+                        INSERT INTO cache_status (cache_key, last_updated, data_count)
+                        VALUES ('twitch_trends', %s, %s)
+                        ON CONFLICT (cache_key) DO UPDATE SET
+                            last_updated = EXCLUDED.last_updated,
+                            data_count = EXCLUDED.data_count
+                    """, (datetime.now(), len(data)))
+                    conn.commit()
                     
         except Exception as e:
             logger.error(f"❌ Twitch: カテゴリ別キャッシュ保存エラー: {e}", exc_info=True)

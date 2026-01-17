@@ -274,10 +274,9 @@ class TrendsScheduler:
                 # 既存のrefresh_all_trends()関数を使用
                 # スケジューラー実行時（7時・14時）は強制更新（force_refresh=True）で実行
                 # これにより、既存のキャッシュがあっても最新データを取得する
-                # Amazon Best Sellersは別スケジュールで取得するため除外
-                from managers.trend_managers import refresh_all_trends_except_amazon
-                logger.info("🔄 refresh_all_trends実行開始 (force_refresh=True, Amazon除外)")
-                result = refresh_all_trends_except_amazon(managers, force_refresh=True)
+                from managers.trend_managers import refresh_all_trends
+                logger.info("🔄 refresh_all_trends実行開始 (force_refresh=True)")
+                result = refresh_all_trends(managers, force_refresh=True)
                 logger.info(f"🔄 refresh_all_trends実行完了: success={result.get('success')}")
             
             # 結果をログ出力
@@ -304,11 +303,27 @@ class TrendsScheduler:
             
             # 全トレンド取得完了後、すべてのトレンドに対して同じ更新時刻を設定
             # これにより、更新時刻のバラつきを防ぐ
-            try:
-                logger.info(f"🔄 全トレンドの更新時刻を統一します（開始時刻: {start_time.strftime('%Y-%m-%d %H:%M:%S JST')}）")
-                self.db.update_all_trends_timestamp(start_time)
-            except Exception as e:
-                logger.warning(f"⚠️ 全トレンド更新時刻の統一に失敗しました（処理は継続）: {e}", exc_info=True)
+            # この処理は必須であり、失敗した場合は再試行する
+            timestamp_updated = False
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    logger.info(f"🔄 全トレンドの更新時刻を統一します（開始時刻: {start_time.strftime('%Y-%m-%d %H:%M:%S JST')}）[試行 {attempt + 1}/{max_retries}]")
+                    success = self.db.update_all_trends_timestamp(start_time)
+                    if success:
+                        timestamp_updated = True
+                        logger.info(f"✅ 全トレンドの更新時刻を統一しました: {start_time.strftime('%Y-%m-%d %H:%M:%S JST')}")
+                        break
+                    else:
+                        logger.warning(f"⚠️ 更新時刻の統一が失敗しました（戻り値がFalse）。再試行します...")
+                except Exception as e:
+                    logger.warning(f"⚠️ 全トレンド更新時刻の統一に失敗しました（試行 {attempt + 1}/{max_retries}）: {e}", exc_info=True)
+                    if attempt < max_retries - 1:
+                        import time
+                        time.sleep(1)  # 1秒待ってから再試行
+            
+            if not timestamp_updated:
+                logger.error(f"❌ 全トレンド更新時刻の統一に失敗しました（{max_retries}回試行後）。これは重大な問題です。")
             
             # 実行日付を記録（7時のジョブが実行されたことを記録）
             now_jst = datetime.now(jst)

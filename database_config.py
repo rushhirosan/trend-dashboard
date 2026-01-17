@@ -1899,27 +1899,41 @@ class TrendsCache:
                 logger.warning("⚠️ データベース接続が取得できませんでした。更新時刻の一括設定をスキップします")
                 return False
             
-            # 主要なトレンドのcache_keyリスト
-            cache_keys = [
-                'google_trends', 'youtube_trends', 'music_trends', 'worldnews_trends',
-                'podcast_trends', 'rakuten_trends', 'hatena_trends', 'twitch_trends',
-                'nhk_trends', 'qiita_trends', 'stock_trends', 'crypto_trends',
-                'movie_trends', 'book_trends', 'cnn_trends', 'producthunt_trends',
-                'reddit_trends', 'hackernews_trends'
-            ]
-            
             with conn.cursor() as cursor:
-                # 各cache_keyに対して、既存のレコードがあれば更新時刻を設定
+                # データベースからすべてのcache_keyを動的に取得
+                # これにより、新しいトレンドが追加されても自動的に対応できる
+                # JPとUSの両方のデータを含むすべてのcache_keyを取得
+                cursor.execute("""
+                    SELECT DISTINCT cache_key 
+                    FROM cache_status
+                    WHERE cache_key IS NOT NULL
+                    ORDER BY cache_key
+                """)
+                cache_keys = [row[0] for row in cursor.fetchall()]
+                
+                if not cache_keys:
+                    logger.warning("⚠️ 更新対象のcache_keyが見つかりませんでした")
+                    return False
+                
+                # JPとUSのcache_keyを分類してログ出力
+                jp_keys = [k for k in cache_keys if k.endswith('_JP') or (not k.endswith('_US') and not k.endswith('_us'))]
+                us_keys = [k for k in cache_keys if k.endswith('_US') or k.endswith('_us')]
+                logger.info(f"📊 更新対象: JP={len(jp_keys)}件, US={len(us_keys)}件, 合計={len(cache_keys)}件")
+                
+                # すべてのcache_keyに対して、更新時刻を統一
                 # データ件数は変更せず、更新時刻のみを更新
+                updated_count = 0
                 for cache_key in cache_keys:
                     cursor.execute("""
                         UPDATE cache_status 
                         SET last_updated = %s
                         WHERE cache_key = %s
                     """, (timestamp, cache_key))
+                    updated_count += cursor.rowcount
                     
                 conn.commit()
-                logger.info(f"✅ 全トレンドの更新時刻を一括設定しました: {timestamp.strftime('%Y-%m-%d %H:%M:%S JST')}")
+                logger.info(f"✅ 全トレンドの更新時刻を一括設定しました: {updated_count}件のcache_keyを更新 ({timestamp.strftime('%Y-%m-%d %H:%M:%S JST')})")
+                logger.info(f"📋 更新されたcache_keyの例（最初の10件）: {', '.join(cache_keys[:10])}")
                 return True
                 
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:

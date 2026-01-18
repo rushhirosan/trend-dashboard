@@ -864,12 +864,19 @@ class TrendsCache:
         except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
             # 接続エラーの場合
             error_str = str(e)
-            if "server closed the connection" in error_str or "connection" in error_str.lower() or "closed" in error_str.lower():
+            if "cursor already closed" in error_str.lower() or "server closed the connection" in error_str or "connection" in error_str.lower() or "closed" in error_str.lower():
                 logger.warning(f"⚠️ キャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
                 # 接続エラーの場合は接続をリセット（次回のget_connection()で再接続される）
                 self.connection = None
             else:
                 # 接続エラー以外のデータベースエラー
+                logger.error(f"❌ キャッシュ保存エラー: {e}", exc_info=True)
+            return False
+        except RuntimeError as e:
+            # コンテキストマネージャーのエラー（generator didn't stop after throw()など）
+            if "generator didn't stop" in str(e):
+                logger.warning(f"⚠️ キャッシュ保存中にコンテキストマネージャーエラーが発生: {e}", exc_info=True)
+            else:
                 logger.error(f"❌ キャッシュ保存エラー: {e}", exc_info=True)
             return False
         except Exception as e:
@@ -1094,23 +1101,35 @@ class TrendsCache:
                     # 使用後に接続を返却
                     if conn:
                         try:
-                            # トランザクション状態を確認してクリーンアップ
-                            transaction_status = conn.get_transaction_status()
-                            if transaction_status == extensions.TRANSACTION_STATUS_INTRANS:
-                                # トランザクションが開いている場合はロールバック
-                                try:
-                                    conn.rollback()
-                                except Exception:
-                                    pass
-                            elif transaction_status == extensions.TRANSACTION_STATUS_INERROR:
-                                # エラー状態の場合はロールバック
-                                try:
-                                    conn.rollback()
-                                except Exception:
-                                    pass
+                            # 接続が有効か確認
+                            try:
+                                # トランザクション状態を確認してクリーンアップ
+                                transaction_status = conn.get_transaction_status()
+                                if transaction_status == extensions.TRANSACTION_STATUS_INTRANS:
+                                    # トランザクションが開いている場合はロールバック
+                                    try:
+                                        conn.rollback()
+                                    except Exception:
+                                        pass
+                                elif transaction_status == extensions.TRANSACTION_STATUS_INERROR:
+                                    # エラー状態の場合はロールバック
+                                    try:
+                                        conn.rollback()
+                                    except Exception:
+                                        pass
+                            except (psycopg2.InterfaceError, psycopg2.OperationalError, AttributeError):
+                                # 接続が無効な場合は、そのまま接続を閉じて返却
+                                pass
                             
                             # 接続を返却
-                            self.pool.putconn(conn)
+                            try:
+                                self.pool.putconn(conn)
+                            except (psycopg2.InterfaceError, psycopg2.OperationalError):
+                                # 接続が無効な場合は閉じて返却
+                                try:
+                                    self.pool.putconn(conn, close=True)
+                                except Exception:
+                                    pass
                         except Exception as put_error:
                             logger.warning(f"⚠️ 接続の返却中にエラーが発生しました: {put_error}")
                             # エラーが発生した場合は接続を閉じて返却
@@ -3256,9 +3275,23 @@ class TrendsCache:
                     logger.info(f"✅ book_trendsのキャッシュを保存しました ({country}, {len(data)}件)")
                     return True
                 
-        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-            logger.warning(f"⚠️ book_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
-            self.connection = None
+        except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
+            # 接続エラーの場合
+            error_str = str(e)
+            if "cursor already closed" in error_str.lower() or "server closed the connection" in error_str or "connection" in error_str.lower() or "closed" in error_str.lower():
+                logger.warning(f"⚠️ book_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
+                # 接続エラーの場合は接続をリセット（次回のget_connection()で再接続される）
+                self.connection = None
+            else:
+                # 接続エラー以外のデータベースエラー
+                logger.error(f"❌ book_trendsキャッシュ保存エラー: {e}", exc_info=True)
+            return False
+        except RuntimeError as e:
+            # コンテキストマネージャーのエラー（generator didn't stop after throw()など）
+            if "generator didn't stop" in str(e):
+                logger.warning(f"⚠️ book_trendsキャッシュ保存中にコンテキストマネージャーエラーが発生: {e}", exc_info=True)
+            else:
+                logger.error(f"❌ book_trendsキャッシュ保存エラー: {e}", exc_info=True)
             return False
         except Exception as e:
             logger.error(f"❌ book_trendsキャッシュ保存エラー: {e}", exc_info=True)
@@ -3993,9 +4026,23 @@ class TrendsCache:
                     conn.commit()
                     logger.info(f"✅ medium_trendsキャッシュを保存しました ({len(data)}件)")
                     return True
-        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-            logger.warning(f"⚠️ medium_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
-            self.connection = None
+        except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
+            # 接続エラーの場合
+            error_str = str(e)
+            if "cursor already closed" in error_str.lower() or "server closed the connection" in error_str or "connection" in error_str.lower() or "closed" in error_str.lower():
+                logger.warning(f"⚠️ medium_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
+                # 接続エラーの場合は接続をリセット（次回のget_connection()で再接続される）
+                self.connection = None
+            else:
+                # 接続エラー以外のデータベースエラー
+                logger.error(f"❌ medium_trendsキャッシュ保存エラー: {e}", exc_info=True)
+            return False
+        except RuntimeError as e:
+            # コンテキストマネージャーのエラー（generator didn't stop after throw()など）
+            if "generator didn't stop" in str(e):
+                logger.warning(f"⚠️ medium_trendsキャッシュ保存中にコンテキストマネージャーエラーが発生: {e}", exc_info=True)
+            else:
+                logger.error(f"❌ medium_trendsキャッシュ保存エラー: {e}", exc_info=True)
             return False
         except Exception as e:
             logger.error(f"❌ medium_trendsキャッシュ保存エラー: {e}", exc_info=True)

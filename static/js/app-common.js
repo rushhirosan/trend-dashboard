@@ -219,11 +219,7 @@ function createDropdownTrendsManager(config) {
     // データ取得関数
     const fetchTrends = () => {
         showLoading();
-        // 結果セクションを非表示にせず、テーブルボディだけをクリア（高さの変動を防ぐ）
-        const tableBody = document.getElementById(uiIds.tableBody);
-        if (tableBody) {
-            tableBody.innerHTML = '';
-        }
+        hideResults();
         
         const selectElement = document.getElementById(selectId);
         const selectedValue = selectElement ? selectElement.value : defaultValue;

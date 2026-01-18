@@ -218,23 +218,6 @@ def get_music_trends(manager):
         return handle_api_error('音楽トレンド', e)
 
 
-@trend_bp.route('/news-trends')
-@require_manager('news')
-def get_news_trends(manager):
-    """ニューストレンド APIエンドポイント"""
-    try:
-        country = request.args.get('country', 'jp')
-        category = request.args.get('category', 'general')
-        force_refresh = get_force_refresh()
-        
-        result = manager.get_trends(country, category, force_refresh=force_refresh)
-        return handle_trend_response(result, 'ニューストレンド', 'News API',
-                                    country=country, category=category)
-        
-    except Exception as e:
-        return handle_api_error('ニューストレンド', e)
-
-
 @trend_bp.route('/worldnews-trends')
 @require_manager('worldnews')
 def get_worldnews_trends(manager):

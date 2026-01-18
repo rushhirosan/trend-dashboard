@@ -611,7 +611,6 @@ class SubscriptionManager:
             from services.trends.google_trends import GoogleTrendsManager
             from services.trends.youtube_trends import YouTubeTrendsManager
             from services.trends.music_trends import MusicTrendsManager
-            from services.trends.news_trends import NewsTrendsManager
             from services.trends.worldnews_trends import WorldNewsTrendsManager
             from services.trends.podcast_trends import PodcastTrendsManager
             from services.trends.rakuten_trends import RakutenTrendsManager
@@ -639,7 +638,6 @@ class SubscriptionManager:
                 'google_trends': GoogleTrendsManager(),
                 'youtube_trends': YouTubeTrendsManager(),
                 'music_trends': MusicTrendsManager(),
-                'news_trends': WorldNewsTrendsManager(),  # news_trends_jpはWorld News APIの日本版データを使用
                 'worldnews_trends': WorldNewsTrendsManager(),
                 'podcast_trends': PodcastTrendsManager(),
                 'rakuten_trends': RakutenTrendsManager(),
@@ -685,9 +683,6 @@ class SubscriptionManager:
                     elif normalized_cat == 'music_trends':
                         result = manager.get_trends(service='spotify', region=region)
                     elif normalized_cat == 'worldnews_trends':
-                        result = manager.get_trends(country=country, force_refresh=False)
-                    elif normalized_cat == 'news_trends':
-                        # news_trends_jpはWorld News APIの日本版データを使用
                         result = manager.get_trends(country=country, force_refresh=False)
                     elif normalized_cat == 'podcast_trends':
                         result = manager.get_trends(trend_type='best_podcasts', region=country, force_refresh=False)
@@ -1046,7 +1041,6 @@ class SubscriptionManager:
                 'youtube_trends': 'YouTube',
                 'music_trends': 'Spotify',
                 'worldnews_trends': 'World News',
-                'news_trends': 'World News',  # news_trends_jpはWorld News APIの日本版データを使用
                 'podcast_trends': 'Podcast',
                 'rakuten_trends': '楽天',
                 'hatena_trends': 'はてなブックマーク',
@@ -1110,7 +1104,7 @@ class SubscriptionManager:
                                 title = item.get('title', 'N/A')
                                 artist = item.get('artist', 'N/A')
                                 html += f'<div class="trend-item">{i}. {title} - {artist}</div>'
-                            elif normalized_category == 'worldnews_trends' or normalized_category == 'news_trends':
+                            elif normalized_category == 'worldnews_trends':
                                 title = item.get('title', 'N/A')
                                 html += f'<div class="trend-item">{i}. {title}</div>'
                             elif normalized_category == 'podcast_trends':
@@ -1310,7 +1304,6 @@ class SubscriptionManager:
                 'youtube_trends': 'YouTube',
                 'music_trends': 'Spotify',
                 'worldnews_trends': 'World News',
-                'news_trends': 'World News',  # news_trends_jpはWorld News APIの日本版データを使用
                 'podcast_trends': 'Podcast',
                 'rakuten_trends': '楽天',
                 'hatena_trends': 'はてなブックマーク',
@@ -1370,7 +1363,7 @@ class SubscriptionManager:
                                 title = item.get('title', 'N/A')
                                 artist = item.get('artist', 'N/A')
                                 text += f"{i}. {title} - {artist}\n"
-                            elif normalized_category == 'worldnews_trends' or normalized_category == 'news_trends':
+                            elif normalized_category == 'worldnews_trends':
                                 title = item.get('title', 'N/A')
                                 text += f"{i}. {title}\n"
                             elif normalized_category == 'podcast_trends':
@@ -1538,7 +1531,6 @@ class SubscriptionManager:
             'google_trends_jp': 'Google Trends (日本)',
             'youtube_trends_jp': 'YouTube トレンド (日本)',
             'music_trends_jp': '音楽トレンド (日本)',
-            'news_trends_jp': 'ニューストレンド (日本)',
             'podcast_trends_jp': 'ポッドキャストトレンド (日本)',
             'rakuten_trends_jp': '楽天商品トレンド (日本)',
             'hatena_trends_jp': 'はてなブックマークトレンド (日本)',
@@ -1665,7 +1657,6 @@ class SubscriptionManager:
             'google_trends_jp': 'Google Trends (日本)',
             'youtube_trends_jp': 'YouTube トレンド (日本)',
             'music_trends_jp': '音楽トレンド (日本)',
-            'news_trends_jp': 'ニューストレンド (日本)',
             'podcast_trends_jp': 'ポッドキャストトレンド (日本)',
             'rakuten_trends_jp': '楽天商品トレンド (日本)',
             'hatena_trends_jp': 'はてなブックマークトレンド (日本)',

@@ -718,7 +718,6 @@ class TrendsCache:
                     delete_column_map = {
                         'google_trends': 'region',
                         'podcast_trends': 'region',
-                        'news_trends': 'country',
                         'worldnews_trends': 'country',
                         'rakuten_trends': 'genre_id',
                         'hatena_trends': 'category',
@@ -795,11 +794,6 @@ class TrendsCache:
                             cursor.execute(
                                 "INSERT INTO podcast_trends_cache (podcast_id, cache_key, region_code, title, description, publisher, url, image_url, language, country, score, rank, trend_type, region) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                                 (podcast_id, cache_key, region, item.get('title', ''), item.get('description', ''), item.get('publisher', ''), item.get('url', ''), item.get('image_url', ''), item.get('language', ''), item.get('country', ''), item.get('score', 0), item.get('rank', 0), item.get('trend_type', ''), region)
-                            )
-                        elif cache_key == 'news_trends':
-                            cursor.execute(
-                                "INSERT INTO news_trends_cache (article_id, title, source, published_at, category, country) VALUES (%s, %s, %s, %s, %s, %s)",
-                                (item.get('article_id', ''), item.get('title', ''), item.get('source', ''), item.get('published_at', ''), item.get('category', ''), item.get('country', ''))
                             )
                         elif cache_key == 'worldnews_trends':
                             cursor.execute(
@@ -1600,54 +1594,6 @@ class TrendsCache:
     def is_podcast_cache_valid(self, trend_type='best_podcasts', region='JP'):
         """Podcast Trendsキャッシュが有効かどうかを確認"""
         return self.is_cache_valid('podcast_trends', region, 24)
-    
-    # News Trends キャッシュメソッド
-    def save_news_trends_to_cache(self, data, category='general', country='JP'):
-        """News Trendsデータをキャッシュに保存"""
-        if not data:
-            return False
-        
-        # 既存環境ではnews_trends_cacheに不足カラムがあるケースがあるため、ここで補完しておく
-        try:
-            with self.get_connection() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("ALTER TABLE news_trends_cache ADD COLUMN IF NOT EXISTS article_id VARCHAR(255)")
-                    cursor.execute("ALTER TABLE news_trends_cache ADD COLUMN IF NOT EXISTS title TEXT")
-                    cursor.execute("ALTER TABLE news_trends_cache ADD COLUMN IF NOT EXISTS source VARCHAR(255)")
-                    cursor.execute("ALTER TABLE news_trends_cache ADD COLUMN IF NOT EXISTS published_at TIMESTAMP")
-                    cursor.execute("ALTER TABLE news_trends_cache ADD COLUMN IF NOT EXISTS category VARCHAR(50)")
-                    cursor.execute("ALTER TABLE news_trends_cache ADD COLUMN IF NOT EXISTS country VARCHAR(10)")
-                conn.commit()
-        except Exception as e:
-            logger.warning(f"⚠️ news_trends_cacheのスキーマ更新に失敗しました: {e}", exc_info=True)
-        
-        return self.save_to_cache(data, 'news_trends', country)
-    
-    def get_news_trends_from_cache(self, category='general', country='JP'):
-        """News Trendsデータをキャッシュから取得"""
-        return self.get_from_cache('news_trends', country)
-    
-    def clear_news_trends_cache(self, category='general', country='JP'):
-        """News Trendsキャッシュをクリア"""
-        try:
-            with self.get_connection() as conn:
-                with conn.cursor() as cursor:
-                    # news_trends_cacheテーブルはcountryカラムを使用（regionカラムは存在しない）
-                    cursor.execute("DELETE FROM news_trends_cache WHERE country = %s", (country.upper(),))
-                    conn.commit()
-                    logger.info(f"✅ news_trendsのキャッシュをクリアしました (country: {country})")
-                    return True
-        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-            logger.warning(f"⚠️ news_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
-            self.connection = None
-            return False
-        except Exception as e:
-            logger.error(f"❌ news_trendsキャッシュクリアエラー: {e}", exc_info=True)
-            return False
-    
-    def is_news_cache_valid(self, category='general', country='JP'):
-        """News Trendsキャッシュが有効かどうかを確認"""
-        return self.is_cache_valid('news_trends', country, 24)
     
     # World News Trends キャッシュメソッド
     def save_worldnews_trends_to_cache(self, data, cache_key='worldnews_trends', country='JP'):

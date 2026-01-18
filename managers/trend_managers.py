@@ -6,7 +6,6 @@
 from services.trends.google_trends import GoogleTrendsManager
 from services.trends.youtube_trends import YouTubeTrendsManager
 from services.trends.music_trends import MusicTrendsManager
-from services.trends.news_trends import NewsTrendsManager
 from services.trends.worldnews_trends import WorldNewsTrendsManager
 from services.trends.podcast_trends import PodcastTrendsManager
 from services.trends.rakuten_trends import RakutenTrendsManager
@@ -44,7 +43,6 @@ MANAGER_CONFIGS = [
     ('google', GoogleTrendsManager, 'Google Trends'),
     ('youtube', YouTubeTrendsManager, 'YouTube'),
     ('music', MusicTrendsManager, 'Music'),
-    ('news', NewsTrendsManager, 'News'),
     ('worldnews', WorldNewsTrendsManager, 'World News'),
     ('podcast', PodcastTrendsManager, 'Podcast'),
     ('rakuten', RakutenTrendsManager, 'Rakuten'),
@@ -174,7 +172,6 @@ def refresh_all_trends(managers, force_refresh=True):
     call_manager('google', lambda m: m.get_trends('JP', force_refresh=force_refresh), 'JP')
     call_manager('youtube', lambda m: m.get_trends('JP', force_refresh=force_refresh), 'JP')
     call_manager('music', lambda m: m.get_trends('spotify', 'JP', force_refresh=force_refresh), 'JP')
-    call_manager('news', lambda m: m.get_trends(country='jp', category='general', force_refresh=force_refresh), 'JP')
     call_manager('worldnews', lambda m: m.get_trends(country='jp', category=None, force_refresh=force_refresh), 'JP')
     call_manager('podcast', lambda m: m.get_trends('best_podcasts', region='jp', force_refresh=force_refresh), 'JP')
     call_manager('rakuten', lambda m: m.get_trends(force_refresh=force_refresh), 'JP')

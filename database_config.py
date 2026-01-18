@@ -1629,7 +1629,21 @@ class TrendsCache:
     
     def clear_news_trends_cache(self, category='general', country='JP'):
         """News Trendsキャッシュをクリア"""
-        return self.clear_cache('news_trends', country)
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # news_trends_cacheテーブルはcountryカラムを使用（regionカラムは存在しない）
+                    cursor.execute("DELETE FROM news_trends_cache WHERE country = %s", (country.upper(),))
+                    conn.commit()
+                    logger.info(f"✅ news_trendsのキャッシュをクリアしました (country: {country})")
+                    return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ news_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ news_trendsキャッシュクリアエラー: {e}", exc_info=True)
+            return False
     
     def is_news_cache_valid(self, category='general', country='JP'):
         """News Trendsキャッシュが有効かどうかを確認"""
@@ -1670,7 +1684,21 @@ class TrendsCache:
     
     def clear_worldnews_trends_cache(self, category='general', country='JP'):
         """World News Trendsキャッシュをクリア"""
-        return self.clear_cache('worldnews_trends', country)
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # worldnews_trends_cacheテーブルはcountryカラムを使用（regionカラムは存在しない）
+                    cursor.execute("DELETE FROM worldnews_trends_cache WHERE country = %s", (country.lower(),))
+                    conn.commit()
+                    logger.info(f"✅ worldnews_trendsのキャッシュをクリアしました (country: {country})")
+                    return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ worldnews_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ worldnews_trendsキャッシュクリアエラー: {e}", exc_info=True)
+            return False
     
     def is_worldnews_cache_valid(self, category='general', country='JP'):
         """World News Trendsキャッシュが有効かどうかを確認"""

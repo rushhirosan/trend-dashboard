@@ -192,7 +192,7 @@ def refresh_all_trends(managers, force_refresh=True):
     call_manager('ipa', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP')
     call_manager('jpcert', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP')
     call_manager('zenn', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP')
-    call_manager('note', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP')
+    call_manager('note', lambda m: m.get_trends(category='all', limit=25, force_refresh=force_refresh, fetch_all_categories=True), 'JP')
     
     # USのデータを更新
     logger.info("🇺🇸 USのデータを更新中...")

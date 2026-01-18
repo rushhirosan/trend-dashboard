@@ -715,151 +715,151 @@ class TrendsCache:
                 with conn.cursor() as cursor:
                     # 既存のデータを削除
                     table_name = f"{cache_key}_cache"
-                delete_column_map = {
-                    'google_trends': 'region',
-                    'podcast_trends': 'region',
-                    'news_trends': 'country',
-                    'worldnews_trends': 'country',
-                    'rakuten_trends': 'genre_id',
-                    'hatena_trends': 'category',
-                    'twitch_trends': 'category'
-                }
-                
-                if cache_key == 'music_trends':
-                    cursor.execute(f"DELETE FROM {table_name} WHERE service = %s", (region,))
-                elif cache_key == 'podcast_trends':
-                    cursor.execute(f"DELETE FROM podcast_trends_cache WHERE region = %s", (region,))
-                elif cache_key == 'youtube_trends':
-                    # YouTubeはregionとtrend_typeで削除
-                    # dataの最初のitemからtrend_typeを取得
-                    trend_type = data[0].get('trend_type', 'trending') if data else 'trending'
-                    cursor.execute(f"DELETE FROM {table_name} WHERE region = %s AND trend_type = %s", (region, trend_type))
-                elif cache_key == 'reddit_trends':
-                    cursor.execute(f"DELETE FROM {table_name} WHERE subreddit = %s", (region,))
-                elif cache_key == 'hackernews_trends':
-                    cursor.execute(f"DELETE FROM {table_name} WHERE story_type = %s", (region,))
-                elif cache_key == 'qiita_trends':
-                    cursor.execute(f"DELETE FROM {table_name}")
-                elif cache_key == 'nhk_trends':
-                    cursor.execute(f"DELETE FROM {table_name}")
-                elif cache_key == 'producthunt_trends':
-                    cursor.execute(f"DELETE FROM {table_name}")
-                elif cache_key == 'hatena_trends':
-                    # hatena_trendsの場合はcategoryで削除
-                    if region and region != '':
-                        cursor.execute(f"DELETE FROM {table_name} WHERE category = %s", (region,))
-                    else:
-                        # regionが空の場合は全データを削除
-                        cursor.execute(f"DELETE FROM {table_name}")
-                elif cache_key == 'note_trends':
-                    # note_trendsの場合はcategoryで削除
-                    if region and region != '':
-                        cursor.execute(f"DELETE FROM {table_name} WHERE category = %s", (region,))
-                    else:
-                        # regionが空の場合は全データを削除
-                        cursor.execute(f"DELETE FROM {table_name}")
-                else:
-                    delete_column = delete_column_map.get(cache_key, 'region')
-                    if delete_column and region is not None:
-                        cursor.execute(f"DELETE FROM {table_name} WHERE {delete_column} = %s", (region,))
-                    else:
-                        cursor.execute(f"DELETE FROM {table_name}")
-                
-                # 新しいデータを挿入
-                for item in data:
-                    if cache_key == 'google_trends':
-                        cursor.execute(
-                            "INSERT INTO google_trends_cache (keyword, score, region) VALUES (%s, %s, %s)",
-                            (item.get('keyword', ''), item.get('score', 0), region)
-                        )
-                    elif cache_key == 'youtube_trends':
-                        cursor.execute(
-                            "INSERT INTO youtube_trends_cache (region_code, trend_type, video_id, title, channel_title, view_count, like_count, comment_count, published_at, thumbnail_url, rank, region) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                            (region, item.get('trend_type', 'trending'), item.get('video_id', ''), item.get('title', ''), item.get('channel_title', ''), item.get('view_count', 0), item.get('like_count', 0), item.get('comment_count', 0), item.get('published_at') or None, item.get('thumbnail_url', ''), item.get('rank', 0), region)
-                        )
-                    elif cache_key == 'music_trends':
-                        cursor.execute(
-                            "INSERT INTO music_trends_cache (service, region_code, title, artist, album, play_count, popularity, spotify_url, rank, track_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                            (item.get('service', 'spotify'), region, item.get('title', ''), item.get('artist', ''), item.get('album', ''), item.get('play_count', 0), item.get('popularity', 0), item.get('spotify_url', ''), item.get('rank', 0), item.get('track_id', ''))
-                        )
-                    elif cache_key == 'podcast_trends':
-                        # podcast_idはitemのidまたはpodcast_idまたはlistennotes_urlから抽出
-                        podcast_id = item.get('id', '') or item.get('podcast_id', '')
-                        if not podcast_id and item.get('listennotes_url'):
-                            # listennotes_urlからIDを抽出: https://www.listennotes.com/c/{id}/
-                            url_parts = item.get('listennotes_url', '').rstrip('/').split('/')
-                            podcast_id = url_parts[-1] if url_parts else ''
-                        # podcast_idが空の場合は、タイトルとpublisherから生成（フォールバック）
-                        if not podcast_id:
-                            podcast_id = f"{item.get('title', '')[:50]}_{item.get('publisher', '')[:30]}".replace(' ', '_')[:100]
-                        cursor.execute(
-                            "INSERT INTO podcast_trends_cache (podcast_id, cache_key, region_code, title, description, publisher, url, image_url, language, country, score, rank, trend_type, region) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                            (podcast_id, cache_key, region, item.get('title', ''), item.get('description', ''), item.get('publisher', ''), item.get('url', ''), item.get('image_url', ''), item.get('language', ''), item.get('country', ''), item.get('score', 0), item.get('rank', 0), item.get('trend_type', ''), region)
-                        )
-                    elif cache_key == 'news_trends':
-                        cursor.execute(
-                            "INSERT INTO news_trends_cache (article_id, title, source, published_at, category, country) VALUES (%s, %s, %s, %s, %s, %s)",
-                            (item.get('article_id', ''), item.get('title', ''), item.get('source', ''), item.get('published_at', ''), item.get('category', ''), item.get('country', ''))
-                        )
-                    elif cache_key == 'worldnews_trends':
-                        cursor.execute(
-                            "INSERT INTO worldnews_trends_cache (article_id, title, source, published_at, category, country, url, description, image_url) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                            (
-                                item.get('article_id', ''),
-                                item.get('title', ''),
-                                item.get('source', ''),
-                                item.get('published_at') or None,
-                                item.get('category', ''),
-                                item.get('country', ''),
-                                item.get('url', ''),
-                                item.get('description', ''),
-                                item.get('image_url', '')
-                            )
-                        )
-                    elif cache_key == 'rakuten_trends':
-                        # rakuten_trendsの場合、genre_idカラムにはリクエスト時のgenre_id（regionパラメータ）を保存
-                        # 各アイテムのgenreIdではなく、リクエスト時のgenre_idを使用
-                        # item_idはitemCodeから取得（例: 'alpen:10499596'）
-                        item_id = item.get('item_id', '') or item.get('itemCode', '')
-                        if not item_id:
-                            # item_idが取得できない場合は、URLから生成するか、スキップする
-                            logger.warning(f"⚠️ Rakuten: item_idが取得できませんでした。item keys: {list(item.keys())}")
-                            continue
-                        # デバッグ: 最初のアイテムのみログ出力
-                        if data.index(item) == 0:
-                            logger.debug(f"🔍 Rakuten: item_id={item_id}, genre_id={region}, title={item.get('title', '')[:30]}")
-                        cursor.execute(
-                            "INSERT INTO rakuten_trends_cache (item_id, genre_id, title, price, category, review_count, review_average, image_url, url, shop_name, sales_rank, sales_count, rank, region) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                            (item_id, region, item.get('title', ''), item.get('price', 0), region or 'all', item.get('review_count', 0), item.get('review_average', 0.0), item.get('image_url', ''), item.get('url', ''), item.get('shop_name', ''), item.get('sales_rank', ''), item.get('sales_count', ''), item.get('rank', 0), region)
-                        )
-                    elif cache_key == 'hatena_trends':
-                        cursor.execute(
-                            "INSERT INTO hatena_trends_cache (category, title, url, description, bookmark_count, published, author, rank, region, entry_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                            (item.get('category', ''), item.get('title', ''), item.get('url', ''), item.get('description', ''), item.get('bookmark_count', 0), item.get('published', ''), item.get('author', ''), item.get('rank', 0), region, item.get('entry_id', ''))
-                        )
-                    elif cache_key == 'twitch_trends':
-                        cursor.execute(
-                            "INSERT INTO twitch_trends_cache (category, title, game_name, viewer_count, view_count, user_name, creator_name, thumbnail_url, url, rank, box_art_url, game_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                            (region, item.get('title', ''), item.get('game_name', '') or item.get('name', ''), item.get('viewer_count', 0), item.get('view_count', 0), item.get('user_name', ''), item.get('creator_name', ''), item.get('thumbnail_url', ''), item.get('url', ''), item.get('rank', 0), item.get('box_art_url', ''), item.get('id', '') or item.get('game_id', ''))
-                        )
-                    elif cache_key == 'note_trends':
-                        cursor.execute(
-                            "INSERT INTO note_trends_cache (title, url, published_date, description, author, rank, category) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                            (item.get('title', ''), item.get('url', ''), item.get('published_date') or None, item.get('description', ''), item.get('author', ''), item.get('rank', 0), item.get('category', region) or region or 'all')
-                        )
-                
-                # キャッシュステータスを更新
-                import pytz
-                jst = pytz.timezone('Asia/Tokyo')
-                now_jst = datetime.now(jst)
-                cursor.execute(
-                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                    (cache_key, now_jst, len(data), now_jst, len(data))
-                )
+                    delete_column_map = {
+                        'google_trends': 'region',
+                        'podcast_trends': 'region',
+                        'news_trends': 'country',
+                        'worldnews_trends': 'country',
+                        'rakuten_trends': 'genre_id',
+                        'hatena_trends': 'category',
+                        'twitch_trends': 'category'
+                    }
                     
-                conn.commit()
-                logger.info(f"✅ {cache_key}のキャッシュを更新しました ({len(data)}件)")
-                return True
+                    if cache_key == 'music_trends':
+                        cursor.execute(f"DELETE FROM {table_name} WHERE service = %s", (region,))
+                    elif cache_key == 'podcast_trends':
+                        cursor.execute(f"DELETE FROM podcast_trends_cache WHERE region = %s", (region,))
+                    elif cache_key == 'youtube_trends':
+                        # YouTubeはregionとtrend_typeで削除
+                        # dataの最初のitemからtrend_typeを取得
+                        trend_type = data[0].get('trend_type', 'trending') if data else 'trending'
+                        cursor.execute(f"DELETE FROM {table_name} WHERE region = %s AND trend_type = %s", (region, trend_type))
+                    elif cache_key == 'reddit_trends':
+                        cursor.execute(f"DELETE FROM {table_name} WHERE subreddit = %s", (region,))
+                    elif cache_key == 'hackernews_trends':
+                        cursor.execute(f"DELETE FROM {table_name} WHERE story_type = %s", (region,))
+                    elif cache_key == 'qiita_trends':
+                        cursor.execute(f"DELETE FROM {table_name}")
+                    elif cache_key == 'nhk_trends':
+                        cursor.execute(f"DELETE FROM {table_name}")
+                    elif cache_key == 'producthunt_trends':
+                        cursor.execute(f"DELETE FROM {table_name}")
+                    elif cache_key == 'hatena_trends':
+                        # hatena_trendsの場合はcategoryで削除
+                        if region and region != '':
+                            cursor.execute(f"DELETE FROM {table_name} WHERE category = %s", (region,))
+                        else:
+                            # regionが空の場合は全データを削除
+                            cursor.execute(f"DELETE FROM {table_name}")
+                    elif cache_key == 'note_trends':
+                        # note_trendsの場合はcategoryで削除
+                        if region and region != '':
+                            cursor.execute(f"DELETE FROM {table_name} WHERE category = %s", (region,))
+                        else:
+                            # regionが空の場合は全データを削除
+                            cursor.execute(f"DELETE FROM {table_name}")
+                    else:
+                        delete_column = delete_column_map.get(cache_key, 'region')
+                        if delete_column and region is not None:
+                            cursor.execute(f"DELETE FROM {table_name} WHERE {delete_column} = %s", (region,))
+                        else:
+                            cursor.execute(f"DELETE FROM {table_name}")
+                    
+                    # 新しいデータを挿入
+                    for item in data:
+                        if cache_key == 'google_trends':
+                            cursor.execute(
+                                "INSERT INTO google_trends_cache (keyword, score, region) VALUES (%s, %s, %s)",
+                                (item.get('keyword', ''), item.get('score', 0), region)
+                            )
+                        elif cache_key == 'youtube_trends':
+                            cursor.execute(
+                                "INSERT INTO youtube_trends_cache (region_code, trend_type, video_id, title, channel_title, view_count, like_count, comment_count, published_at, thumbnail_url, rank, region) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                                (region, item.get('trend_type', 'trending'), item.get('video_id', ''), item.get('title', ''), item.get('channel_title', ''), item.get('view_count', 0), item.get('like_count', 0), item.get('comment_count', 0), item.get('published_at') or None, item.get('thumbnail_url', ''), item.get('rank', 0), region)
+                            )
+                        elif cache_key == 'music_trends':
+                            cursor.execute(
+                                "INSERT INTO music_trends_cache (service, region_code, title, artist, album, play_count, popularity, spotify_url, rank, track_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                                (item.get('service', 'spotify'), region, item.get('title', ''), item.get('artist', ''), item.get('album', ''), item.get('play_count', 0), item.get('popularity', 0), item.get('spotify_url', ''), item.get('rank', 0), item.get('track_id', ''))
+                            )
+                        elif cache_key == 'podcast_trends':
+                            # podcast_idはitemのidまたはpodcast_idまたはlistennotes_urlから抽出
+                            podcast_id = item.get('id', '') or item.get('podcast_id', '')
+                            if not podcast_id and item.get('listennotes_url'):
+                                # listennotes_urlからIDを抽出: https://www.listennotes.com/c/{id}/
+                                url_parts = item.get('listennotes_url', '').rstrip('/').split('/')
+                                podcast_id = url_parts[-1] if url_parts else ''
+                            # podcast_idが空の場合は、タイトルとpublisherから生成（フォールバック）
+                            if not podcast_id:
+                                podcast_id = f"{item.get('title', '')[:50]}_{item.get('publisher', '')[:30]}".replace(' ', '_')[:100]
+                            cursor.execute(
+                                "INSERT INTO podcast_trends_cache (podcast_id, cache_key, region_code, title, description, publisher, url, image_url, language, country, score, rank, trend_type, region) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                                (podcast_id, cache_key, region, item.get('title', ''), item.get('description', ''), item.get('publisher', ''), item.get('url', ''), item.get('image_url', ''), item.get('language', ''), item.get('country', ''), item.get('score', 0), item.get('rank', 0), item.get('trend_type', ''), region)
+                            )
+                        elif cache_key == 'news_trends':
+                            cursor.execute(
+                                "INSERT INTO news_trends_cache (article_id, title, source, published_at, category, country) VALUES (%s, %s, %s, %s, %s, %s)",
+                                (item.get('article_id', ''), item.get('title', ''), item.get('source', ''), item.get('published_at', ''), item.get('category', ''), item.get('country', ''))
+                            )
+                        elif cache_key == 'worldnews_trends':
+                            cursor.execute(
+                                "INSERT INTO worldnews_trends_cache (article_id, title, source, published_at, category, country, url, description, image_url) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                                (
+                                    item.get('article_id', ''),
+                                    item.get('title', ''),
+                                    item.get('source', ''),
+                                    item.get('published_at') or None,
+                                    item.get('category', ''),
+                                    item.get('country', ''),
+                                    item.get('url', ''),
+                                    item.get('description', ''),
+                                    item.get('image_url', '')
+                                )
+                            )
+                        elif cache_key == 'rakuten_trends':
+                            # rakuten_trendsの場合、genre_idカラムにはリクエスト時のgenre_id（regionパラメータ）を保存
+                            # 各アイテムのgenreIdではなく、リクエスト時のgenre_idを使用
+                            # item_idはitemCodeから取得（例: 'alpen:10499596'）
+                            item_id = item.get('item_id', '') or item.get('itemCode', '')
+                            if not item_id:
+                                # item_idが取得できない場合は、URLから生成するか、スキップする
+                                logger.warning(f"⚠️ Rakuten: item_idが取得できませんでした。item keys: {list(item.keys())}")
+                                continue
+                            # デバッグ: 最初のアイテムのみログ出力
+                            if data.index(item) == 0:
+                                logger.debug(f"🔍 Rakuten: item_id={item_id}, genre_id={region}, title={item.get('title', '')[:30]}")
+                            cursor.execute(
+                                "INSERT INTO rakuten_trends_cache (item_id, genre_id, title, price, category, review_count, review_average, image_url, url, shop_name, sales_rank, sales_count, rank, region) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                                (item_id, region, item.get('title', ''), item.get('price', 0), region or 'all', item.get('review_count', 0), item.get('review_average', 0.0), item.get('image_url', ''), item.get('url', ''), item.get('shop_name', ''), item.get('sales_rank', ''), item.get('sales_count', ''), item.get('rank', 0), region)
+                            )
+                        elif cache_key == 'hatena_trends':
+                            cursor.execute(
+                                "INSERT INTO hatena_trends_cache (category, title, url, description, bookmark_count, published, author, rank, region, entry_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                                (item.get('category', ''), item.get('title', ''), item.get('url', ''), item.get('description', ''), item.get('bookmark_count', 0), item.get('published', ''), item.get('author', ''), item.get('rank', 0), region, item.get('entry_id', ''))
+                            )
+                        elif cache_key == 'twitch_trends':
+                            cursor.execute(
+                                "INSERT INTO twitch_trends_cache (category, title, game_name, viewer_count, view_count, user_name, creator_name, thumbnail_url, url, rank, box_art_url, game_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                                (region, item.get('title', ''), item.get('game_name', '') or item.get('name', ''), item.get('viewer_count', 0), item.get('view_count', 0), item.get('user_name', ''), item.get('creator_name', ''), item.get('thumbnail_url', ''), item.get('url', ''), item.get('rank', 0), item.get('box_art_url', ''), item.get('id', '') or item.get('game_id', ''))
+                            )
+                        elif cache_key == 'note_trends':
+                            cursor.execute(
+                                "INSERT INTO note_trends_cache (title, url, published_date, description, author, rank, category) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                                (item.get('title', ''), item.get('url', ''), item.get('published_date') or None, item.get('description', ''), item.get('author', ''), item.get('rank', 0), item.get('category', region) or region or 'all')
+                            )
+                    
+                    # キャッシュステータスを更新
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        (cache_key, now_jst, len(data), now_jst, len(data))
+                    )
+                    
+                    conn.commit()
+                    logger.info(f"✅ {cache_key}のキャッシュを更新しました ({len(data)}件)")
+                    return True
                 
         except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
             # 接続エラーの場合
@@ -3181,79 +3181,80 @@ class TrendsCache:
                 with conn.cursor() as cursor:
                     # 既存のデータを削除（国別）
                     cursor.execute("DELETE FROM book_trends_cache WHERE country = %s", (country,))
-                
-                # 新しいデータを挿入
-                for item in data:
-                    # 配列や辞書をJSON文字列に変換
-                    authors = item.get('authors', [])
-                    authors_str = json.dumps(authors, ensure_ascii=False) if isinstance(authors, list) else str(authors)
-                    categories = item.get('categories', [])
-                    categories_str = json.dumps(categories, ensure_ascii=False) if isinstance(categories, list) else str(categories)
                     
-                    # updated_atの処理
-                    updated_at = item.get('updated_at')
-                    if not updated_at:
-                        from datetime import timezone
-                        updated_at = datetime.now(timezone.utc)
+                    # 新しいデータを挿入
+                    for item in data:
+                        # 配列や辞書をJSON文字列に変換
+                        authors = item.get('authors', [])
+                        authors_str = json.dumps(authors, ensure_ascii=False) if isinstance(authors, list) else str(authors)
+                        categories = item.get('categories', [])
+                        categories_str = json.dumps(categories, ensure_ascii=False) if isinstance(categories, list) else str(categories)
+                        
+                        # updated_atの処理
+                        updated_at = item.get('updated_at')
+                        if not updated_at:
+                            from datetime import timezone
+                            updated_at = datetime.now(timezone.utc)
+                        
+                        # パラメータの準備
+                        params = (
+                            country,
+                            item.get('id', ''),
+                            item.get('isbn', ''),
+                            item.get('title', ''),
+                            item.get('subtitle', ''),
+                            item.get('author', ''),
+                            authors_str,
+                            item.get('publisher', ''),
+                            item.get('price', 0),
+                            item.get('sales', 0),
+                            item.get('published_date', ''),
+                            item.get('release_date', ''),
+                            item.get('description', ''),
+                            item.get('page_count', 0),
+                            categories_str,
+                            item.get('average_rating', 0),
+                            item.get('ratings_count', 0),
+                            item.get('language', ''),
+                            item.get('item_url', ''),
+                            item.get('affiliate_url', ''),
+                            item.get('preview_link', ''),
+                            item.get('info_link', ''),
+                            item.get('buy_link', ''),
+                            item.get('image_url', ''),
+                            item.get('thumbnail', ''),
+                            item.get('small_thumbnail', ''),
+                            item.get('medium', ''),
+                            item.get('large', ''),
+                            item.get('rank', 0),
+                            updated_at
+                        )
+                        
+                        cursor.execute("""
+                            INSERT INTO book_trends_cache
+                            (country, book_id, isbn, title, subtitle, author, authors, publisher,
+                             price, sales, published_date, release_date, description, page_count,
+                             categories, average_rating, ratings_count, language, item_url,
+                             affiliate_url, preview_link, info_link, buy_link, image_url,
+                             thumbnail, small_thumbnail, medium, large, rank, updated_at)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, params)
                     
-                    # パラメータの準備
-                    params = (
-                        country,
-                        item.get('id', ''),
-                        item.get('isbn', ''),
-                        item.get('title', ''),
-                        item.get('subtitle', ''),
-                        item.get('author', ''),
-                        authors_str,
-                        item.get('publisher', ''),
-                        item.get('price', 0),
-                        item.get('sales', 0),
-                        item.get('published_date', ''),
-                        item.get('release_date', ''),
-                        item.get('description', ''),
-                        item.get('page_count', 0),
-                        categories_str,
-                        item.get('average_rating', 0),
-                        item.get('ratings_count', 0),
-                        item.get('language', ''),
-                        item.get('item_url', ''),
-                        item.get('affiliate_url', ''),
-                        item.get('preview_link', ''),
-                        item.get('info_link', ''),
-                        item.get('buy_link', ''),
-                        item.get('image_url', ''),
-                        item.get('thumbnail', ''),
-                        item.get('small_thumbnail', ''),
-                        item.get('medium', ''),
-                        item.get('large', ''),
-                        item.get('rank', 0),
-                        updated_at
-                    )
-                    
+                    # cache_statusテーブルを更新
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
                     cursor.execute("""
-                        INSERT INTO book_trends_cache
-                        (country, book_id, isbn, title, subtitle, author, authors, publisher,
-                         price, sales, published_date, release_date, description, page_count,
-                         categories, average_rating, ratings_count, language, item_url,
-                         affiliate_url, preview_link, info_link, buy_link, image_url,
-                         thumbnail, small_thumbnail, medium, large, rank, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, params)
-                # cache_statusテーブルを更新
-                import pytz
-                jst = pytz.timezone('Asia/Tokyo')
-                now_jst = datetime.now(jst)
-                cursor.execute("""
-                    INSERT INTO cache_status (cache_key, last_updated, data_count)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (cache_key) DO UPDATE SET
-                        last_updated = EXCLUDED.last_updated,
-                        data_count = EXCLUDED.data_count
-                """, (f'book_trends_{country}', now_jst, len(data)))
+                        INSERT INTO cache_status (cache_key, last_updated, data_count)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (cache_key) DO UPDATE SET
+                            last_updated = EXCLUDED.last_updated,
+                            data_count = EXCLUDED.data_count
+                    """, (f'book_trends_{country}', now_jst, len(data)))
                     
-                conn.commit()
-                logger.info(f"✅ book_trendsのキャッシュを保存しました ({country}, {len(data)}件)")
-                return True
+                    conn.commit()
+                    logger.info(f"✅ book_trendsのキャッシュを保存しました ({country}, {len(data)}件)")
+                    return True
                 
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ book_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
@@ -3597,19 +3598,19 @@ class TrendsCache:
                         item.get('author', ''),
                         item.get('rank', 0)
                     ))
-                
-                # キャッシュステータスを更新
-                import pytz
-                jst = pytz.timezone('Asia/Tokyo')
-                now_jst = datetime.now(jst)
-                cursor.execute(
-                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                    ('jpcert_trends', now_jst, len(data), now_jst, len(data))
-                )
-                
-                conn.commit()
-                logger.info(f"✅ jpcert_trendsキャッシュを保存しました ({len(data)}件)")
-                return True
+                    
+                    # キャッシュステータスを更新
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        ('jpcert_trends', now_jst, len(data), now_jst, len(data))
+                    )
+                    
+                    conn.commit()
+                    logger.info(f"✅ jpcert_trendsキャッシュを保存しました ({len(data)}件)")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ jpcert_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
@@ -3687,19 +3688,19 @@ class TrendsCache:
                         item.get('author', ''),
                         item.get('rank', 0)
                     ))
-                
-                # キャッシュステータスを更新
-                import pytz
-                jst = pytz.timezone('Asia/Tokyo')
-                now_jst = datetime.now(jst)
-                cursor.execute(
-                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                    ('hackernoon_trends', now_jst, len(data), now_jst, len(data))
-                )
-                
-                conn.commit()
-                logger.info(f"✅ hackernoon_trendsキャッシュを保存しました ({len(data)}件)")
-                return True
+                    
+                    # キャッシュステータスを更新
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        ('hackernoon_trends', now_jst, len(data), now_jst, len(data))
+                    )
+                    
+                    conn.commit()
+                    logger.info(f"✅ hackernoon_trendsキャッシュを保存しました ({len(data)}件)")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ hackernoon_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
@@ -3777,16 +3778,17 @@ class TrendsCache:
                         item.get('author', ''),
                         item.get('rank', 0)
                     ))
-                import pytz
-                jst = pytz.timezone('Asia/Tokyo')
-                now_jst = datetime.now(jst)
-                cursor.execute(
-                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                    ('zenn_trends', now_jst, len(data), now_jst, len(data))
-                )
-                conn.commit()
-                logger.info(f"✅ zenn_trendsキャッシュを保存しました ({len(data)}件)")
-                return True
+                    
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        ('zenn_trends', now_jst, len(data), now_jst, len(data))
+                    )
+                    conn.commit()
+                    logger.info(f"✅ zenn_trendsキャッシュを保存しました ({len(data)}件)")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ zenn_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
@@ -3980,16 +3982,17 @@ class TrendsCache:
                         item.get('author', ''),
                         item.get('rank', 0)
                     ))
-                import pytz
-                jst = pytz.timezone('Asia/Tokyo')
-                now_jst = datetime.now(jst)
-                cursor.execute(
-                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                    ('medium_trends', now_jst, len(data), now_jst, len(data))
-                )
-                conn.commit()
-                logger.info(f"✅ medium_trendsキャッシュを保存しました ({len(data)}件)")
-                return True
+                    
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        ('medium_trends', now_jst, len(data), now_jst, len(data))
+                    )
+                    conn.commit()
+                    logger.info(f"✅ medium_trendsキャッシュを保存しました ({len(data)}件)")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ medium_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
@@ -4075,16 +4078,17 @@ class TrendsCache:
                         item.get('author', ''),
                         item.get('rank', 0)
                     ))
-                import pytz
-                jst = pytz.timezone('Asia/Tokyo')
-                now_jst = datetime.now(jst)
-                cursor.execute(
-                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                    ('devto_trends', now_jst, len(data), now_jst, len(data))
-                )
-                conn.commit()
-                logger.info(f"✅ devto_trendsキャッシュを保存しました ({len(data)}件)")
-                return True
+                    
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        ('devto_trends', now_jst, len(data), now_jst, len(data))
+                    )
+                    conn.commit()
+                    logger.info(f"✅ devto_trendsキャッシュを保存しました ({len(data)}件)")
+                    return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ devto_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None

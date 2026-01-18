@@ -246,12 +246,17 @@ body {
         min-height: 0;
     }
     
-    /* ZennとNoteの.trend-table-containerはmax-heightを無効化して高さを充分に使う */
+    /* Zennの.trend-table-containerはmax-heightを無効化して高さを充分に使う */
     #trends .card.h-100 .card-body #zennResults .trend-table-container,
-    #trends .card.h-100 .card-body #noteResults .trend-table-container,
-    #zennResults .trend-table-container,
-    #noteResults .trend-table-container {
+    #zennResults .trend-table-container {
         max-height: none !important;
+    }
+    
+    /* Noteの.trend-table-containerはHatenaと同じスタイル（スクロールバー表示） */
+    #trends .card.h-100 .card-body #noteResults .trend-table-container,
+    #noteResults .trend-table-container {
+        max-height: 400px !important;
+        overflow-y: auto !important;
     }
 }
 

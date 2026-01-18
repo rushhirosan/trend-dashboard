@@ -95,6 +95,14 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
             apiEndpoint = '/api/producthunt-trends';
             params = '?limit=25&sort=votes';
             break;
+        case 'devto':
+            apiEndpoint = '/api/devto-trends';
+            params = '?limit=25';
+            break;
+        case 'medium':
+            apiEndpoint = '/api/medium-trends';
+            params = '?limit=25';
+            break;
         default:
             console.warn(`⚠️ 未知のプラットフォーム: ${platform}`);
             return;
@@ -142,7 +150,9 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                     'Spotify': 'Spotify',
                     'Podcast': 'Podcast',
                     '楽天': '楽天',
-                    'Twitch': 'Twitch'
+                    'Twitch': 'Twitch',
+                    'DEV.to': 'DEV.to',
+                    'Medium': 'Medium'
                 };
                 
                 const displayName = platformNameMap[platformName] || platformName;

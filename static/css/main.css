@@ -744,7 +744,7 @@ body {
         height: 100%;
     }
 
-    /* Note結果セクション - Hatenaと同じスタイル（汎用的なルールに依存） */
+    /* Note結果セクション - Zennと同じスタイル */
     #trends .card.h-100 .card-body #noteResults > .alert {
         display: none !important;
         height: 0 !important;
@@ -752,6 +752,86 @@ body {
         padding: 0 !important;
         min-height: 0 !important;
         max-height: 0 !important;
+    }
+
+    #trends .card.h-100 .card-body #noteResults > .card {
+        flex: 1 1 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        height: 100% !important;
+        overflow: visible !important;
+        align-self: stretch !important;
+    }
+
+    #trends .card.h-100 .card-body #noteResults > .card.category-card {
+        max-height: none !important;
+        overflow: visible !important;
+        margin-bottom: 0 !important;
+        height: 100% !important;
+    }
+
+    #trends .card.h-100 .card-body #noteResults > .card > .card-body {
+        flex: 1 1 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: 100% !important;
+        align-self: stretch !important;
+    }
+
+    #trends .card.h-100 .card-body #noteResults > .card > .card-body > .trend-table-container {
+        flex: 1 1 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        height: 100% !important;
+        overflow-y: auto !important;
+        align-self: stretch !important;
+    }
+
+    #trends .card.h-100 .card-body #noteResults > .card > .card-body > .trend-table-container > .table-responsive {
+        flex: 1 1 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: 100% !important;
+        align-self: stretch !important;
+    }
+
+    #noteResults {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        height: 100%;
+    }
+
+    #noteResults .card {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        max-height: none !important;
+        height: 100%;
+        overflow: visible;
+    }
+
+    #noteResults .card.category-card {
+        max-height: none !important;
+        overflow: visible;
+        margin-bottom: 0 !important;
+        height: 100%;
+    }
+
+    #noteResults .card .card-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        height: 100%;
     }
 }
 

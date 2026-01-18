@@ -2383,10 +2383,10 @@ body.data-status-active #data-status .card-body {
     }
     
     /* 他の結果セクションも同様に処理 */
+    /* Noteはデスクトップ表示でZennと同じスタイルを使用するため、モバイル表示から除外 */
     #trends .card.h-100 .card-body #podcastResults,
     #trends .card.h-100 .card-body #hackernewsResults,
     #trends .card.h-100 .card-body #hatenaResults,
-    #trends .card.h-100 .card-body #noteResults,
     #trends .card.h-100 .card-body #rakutenResults,
     #trends .card.h-100 .card-body #twitchResults,
     #trends .card.h-100 .card-body #musicResults,
@@ -2396,7 +2396,6 @@ body.data-status-active #data-status .card-body {
     #trends .row .col-md-6 .card .card-body #podcastResults,
     #trends .row .col-md-6 .card .card-body #hackernewsResults,
     #trends .row .col-md-6 .card .card-body #hatenaResults,
-    #trends .row .col-md-6 .card .card-body #noteResults,
     #trends .row .col-md-6 .card .card-body #rakutenResults,
     #trends .row .col-md-6 .card .card-body #twitchResults,
     #trends .row .col-md-6 .card .card-body #musicResults,
@@ -2412,14 +2411,13 @@ body.data-status-active #data-status .card-body {
     }
     
     /* 他の結果セクションのネストされたカードも同様に処理 */
+    /* Noteはデスクトップ表示でZennと同じスタイルを使用するため、モバイル表示から除外 */
     #trends .card.h-100 .card-body #podcastResults > .card,
     #trends .card.h-100 .card-body #podcastResults > .card.category-card,
     #trends .card.h-100 .card-body #hackernewsResults > .card,
     #trends .card.h-100 .card-body #hackernewsResults > .card.category-card,
     #trends .card.h-100 .card-body #hatenaResults > .card,
     #trends .card.h-100 .card-body #hatenaResults > .card.category-card,
-    #trends .card.h-100 .card-body #noteResults > .card,
-    #trends .card.h-100 .card-body #noteResults > .card.category-card,
     #trends .card.h-100 .card-body #rakutenResults > .card,
     #trends .card.h-100 .card-body #rakutenResults > .card.category-card,
     #trends .card.h-100 .card-body #musicResults > .card,
@@ -2436,8 +2434,6 @@ body.data-status-active #data-status .card-body {
     #trends .row .col-md-6 .card .card-body #hackernewsResults .card.category-card,
     #trends .row .col-md-6 .card .card-body #hatenaResults .card,
     #trends .row .col-md-6 .card .card-body #hatenaResults .card.category-card,
-    #trends .row .col-md-6 .card .card-body #noteResults .card,
-    #trends .row .col-md-6 .card .card-body #noteResults .card.category-card,
     #trends .row .col-md-6 .card .card-body #rakutenResults .card,
     #trends .row .col-md-6 .card .card-body #rakutenResults .card.category-card,
     #trends .row .col-md-6 .card .card-body #musicResults .card,
@@ -2460,11 +2456,11 @@ body.data-status-active #data-status .card-body {
     
     /* 他の結果セクションのカードボディも同様に処理 */
     /* QiitaとPodcastも他のカテゴリと同じスタイルに */
+    /* Noteはデスクトップ表示でZennと同じスタイルを使用するため、モバイル表示から除外 */
     #trends .card.h-100 .card-body #qiitaResults > .card > .card-body,
     #trends .card.h-100 .card-body #podcastResults > .card > .card-body,
     #trends .card.h-100 .card-body #hackernewsResults > .card > .card-body,
     #trends .card.h-100 .card-body #hatenaResults > .card > .card-body,
-    #trends .card.h-100 .card-body #noteResults > .card > .card-body,
     #trends .card.h-100 .card-body #rakutenResults > .card > .card-body,
     #trends .card.h-100 .card-body #musicResults > .card > .card-body,
     #trends .card.h-100 .card-body #googleResults > .card > .card-body,
@@ -2479,11 +2475,11 @@ body.data-status-active #data-status .card-body {
     
     /* 他の結果セクションのトレンドテーブルコンテナも同様に処理 */
     /* QiitaとPodcastも他のカテゴリと同じスタイルに */
+    /* Noteはデスクトップ表示でZennと同じスタイルを使用するため、モバイル表示から除外 */
     #trends .card.h-100 .card-body #qiitaResults > .card > .card-body > .trend-table-container,
     #trends .card.h-100 .card-body #podcastResults > .card > .card-body > .trend-table-container,
     #trends .card.h-100 .card-body #hackernewsResults > .card > .card-body > .trend-table-container,
     #trends .card.h-100 .card-body #hatenaResults > .card > .card-body > .trend-table-container,
-    #trends .card.h-100 .card-body #noteResults > .card > .card-body > .trend-table-container,
     #trends .card.h-100 .card-body #rakutenResults > .card > .card-body > .trend-table-container,
     #trends .card.h-100 .card-body #musicResults > .card > .card-body > .trend-table-container,
     #trends .card.h-100 .card-body #googleResults > .card > .card-body > .trend-table-container,
@@ -2500,11 +2496,11 @@ body.data-status-active #data-status .card-body {
     
     /* 他の結果セクションのテーブルレスポンシブも同様に処理 */
     /* QiitaとPodcastも他のカテゴリと同じスタイルに */
+    /* Noteはデスクトップ表示でZennと同じスタイルを使用するため、モバイル表示から除外 */
     #trends .card.h-100 .card-body #qiitaResults > .card > .card-body > .trend-table-container > .table-responsive,
     #trends .card.h-100 .card-body #podcastResults > .card > .card-body > .trend-table-container > .table-responsive,
     #trends .card.h-100 .card-body #hackernewsResults > .card > .card-body > .trend-table-container > .table-responsive,
     #trends .card.h-100 .card-body #hatenaResults > .card > .card-body > .trend-table-container > .table-responsive,
-    #trends .card.h-100 .card-body #noteResults > .card > .card-body > .trend-table-container > .table-responsive,
     #trends .card.h-100 .card-body #rakutenResults > .card > .card-body > .trend-table-container > .table-responsive,
     #trends .card.h-100 .card-body #musicResults > .card > .card-body > .trend-table-container > .table-responsive,
     #trends .card.h-100 .card-body #googleResults > .card > .card-body > .trend-table-container > .table-responsive,
@@ -2526,8 +2522,6 @@ body.data-status-active #data-status .card-body {
     #trends .row .col-md-6 .card .card-body #hackernewsResults .trend-table-container,
     #trends .card.h-100 .card-body #hatenaResults > .card > .card-body > .trend-table-container,
     #trends .row .col-md-6 .card .card-body #hatenaResults .trend-table-container,
-    #trends .card.h-100 .card-body #noteResults > .card > .card-body > .trend-table-container,
-    #trends .row .col-md-6 .card .card-body #noteResults .trend-table-container,
     #trends .card.h-100 .card-body #rakutenResults > .card > .card-body > .trend-table-container,
     #trends .row .col-md-6 .card .card-body #rakutenResults .trend-table-container,
     #trends .card.h-100 .card-body #twitchResults > .trend-table-container,
@@ -2560,8 +2554,6 @@ body.data-status-active #data-status .card-body {
     #trends .row .col-md-6 .card .card-body #hackernewsResults .card .card-body,
     #trends .card.h-100 .card-body #hatenaResults > .card > .card-body,
     #trends .row .col-md-6 .card .card-body #hatenaResults .card .card-body,
-    #trends .card.h-100 .card-body #noteResults > .card > .card-body,
-    #trends .row .col-md-6 .card .card-body #noteResults .card .card-body,
     #trends .card.h-100 .card-body #rakutenResults > .card > .card-body,
     #trends .row .col-md-6 .card .card-body #rakutenResults .card .card-body,
     #trends .card.h-100 .card-body #musicResults > .card > .card-body,
@@ -2588,8 +2580,6 @@ body.data-status-active #data-status .card-body {
     #trends .row .col-md-6 .card .card-body #hackernewsResults .trend-table-container .table-responsive,
     #trends .card.h-100 .card-body #hatenaResults > .card > .card-body > .trend-table-container > .table-responsive,
     #trends .row .col-md-6 .card .card-body #hatenaResults .trend-table-container .table-responsive,
-    #trends .card.h-100 .card-body #noteResults > .card > .card-body > .trend-table-container > .table-responsive,
-    #trends .row .col-md-6 .card .card-body #noteResults .trend-table-container .table-responsive,
     #trends .card.h-100 .card-body #rakutenResults > .card > .card-body > .trend-table-container > .table-responsive,
     #trends .row .col-md-6 .card .card-body #rakutenResults .trend-table-container .table-responsive,
     #trends .card.h-100 .card-body #musicResults > .card > .card-body > .trend-table-container > .table-responsive,
@@ -2625,9 +2615,9 @@ body.data-status-active #data-status .card-body {
         position: static !important;
     }
     
+    /* Noteはデスクトップ表示でZennと同じスタイルを使用するため、モバイル表示から除外 */
     #hackernewsResults,
     #hatenaResults,
-    #noteResults,
     #rakutenResults,
     #twitchResults,
     #musicResults,
@@ -2666,9 +2656,9 @@ body.data-status-active #data-status .card-body {
         overflow: visible !important;
     }
     
+    /* Noteはデスクトップ表示でZennと同じスタイルを使用するため、モバイル表示から除外 */
     #hackernewsResults .card,
     #hatenaResults .card,
-    #noteResults .card,
     #rakutenResults .card,
     #musicResults .card,
     #googleResults .card,
@@ -2702,9 +2692,9 @@ body.data-status-active #data-status .card-body {
         width: 100% !important;
     }
     
+    /* Noteはデスクトップ表示でZennと同じスタイルを使用するため、モバイル表示から除外 */
     #hackernewsResults .card .card-body,
     #hatenaResults .card .card-body,
-    #noteResults .card .card-body,
     #rakutenResults .card .card-body,
     #musicResults .card .card-body,
     #googleResults .card .card-body,
@@ -2740,9 +2730,9 @@ body.data-status-active #data-status .card-body {
         overflow-y: visible !important;
     }
     
+    /* Noteはデスクトップ表示でZennと同じスタイルを使用するため、モバイル表示から除外 */
     #hackernewsResults .trend-table-container,
     #hatenaResults .trend-table-container,
-    #noteResults .trend-table-container,
     #rakutenResults .trend-table-container,
     #musicResults .trend-table-container,
     #googleResults .trend-table-container,
@@ -2774,9 +2764,9 @@ body.data-status-active #data-status .card-body {
         width: 100% !important;
     }
     
+    /* Noteはデスクトップ表示でZennと同じスタイルを使用するため、モバイル表示から除外 */
     #hackernewsResults .trend-table-container .table-responsive,
     #hatenaResults .trend-table-container .table-responsive,
-    #noteResults .trend-table-container .table-responsive,
     #rakutenResults .trend-table-container .table-responsive,
     #musicResults .trend-table-container .table-responsive,
     #googleResults .trend-table-container .table-responsive,
@@ -2791,9 +2781,9 @@ body.data-status-active #data-status .card-body {
     /* モバイル表示でテーブル要素も確実に表示 */
     #qiitaResults table,
     #podcastResults table,
+    /* Noteはデスクトップ表示でZennと同じスタイルを使用するため、モバイル表示から除外 */
     #hackernewsResults table,
     #hatenaResults table,
-    #noteResults table,
     #rakutenResults table,
     #musicResults table,
     #googleResults table,
@@ -2807,9 +2797,9 @@ body.data-status-active #data-status .card-body {
     /* モバイル表示でテーブルボディも確実に表示 */
     #qiitaResults tbody,
     #podcastResults tbody,
+    /* Noteはデスクトップ表示でZennと同じスタイルを使用するため、モバイル表示から除外 */
     #hackernewsResults tbody,
     #hatenaResults tbody,
-    #noteResults tbody,
     #rakutenResults tbody,
     #musicResults tbody,
     #googleResults tbody,
@@ -2822,9 +2812,9 @@ body.data-status-active #data-status .card-body {
     /* モバイル表示でテーブル行も確実に表示 */
     #qiitaResults tr,
     #podcastResults tr,
+    /* Noteはデスクトップ表示でZennと同じスタイルを使用するため、モバイル表示から除外 */
     #hackernewsResults tr,
     #hatenaResults tr,
-    #noteResults tr,
     #rakutenResults tr,
     #musicResults tr,
     #googleResults tr,

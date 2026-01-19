@@ -39,20 +39,21 @@ class IPATrendsManager(BaseTrendsManager):
         try:
             # パターン1: /YYYY/alertYYYYMMDD.html
             # 例: /2025/alert20250827.html → 2025年8月27日
+            # 例: /2025/alert20260119.html → 2026年1月19日（年が異なる場合も対応）
             pattern1 = r'/(\d{4})/alert(\d{8})\.html'
             match1 = re.search(pattern1, url)
             if match1:
-                year = int(match1.group(1))
+                year_path = int(match1.group(1))
                 date_str = match1.group(2)  # YYYYMMDD形式
                 if len(date_str) == 8:
-                    year_from_date = int(date_str[:4])
+                    year = int(date_str[:4])
                     month = int(date_str[4:6])
                     day = int(date_str[6:8])
-                    if year_from_date == year:
-                        try:
-                            return datetime(year, month, day)
-                        except ValueError as e:
-                            logger.debug(f"IPA URL日付パースエラー: {url}, {e}")
+                    # パスの年と日付の年が異なる場合でも、日付の年を優先
+                    try:
+                        return datetime(year, month, day)
+                    except ValueError as e:
+                        logger.debug(f"IPA URL日付パースエラー: {url}, {e}")
             
             # パターン2: /YYYY/YYYYMMDD-suffix.html
             # 例: /2025/20250827-jvn.html → 2025年8月27日
@@ -101,11 +102,28 @@ class IPATrendsManager(BaseTrendsManager):
                     except ValueError as e:
                         logger.debug(f"IPA URL日付パースエラー: {url}, {e}")
             
-            # パターン5: alertYYYYMMDD.html（年がパスにない場合のフォールバック）
-            pattern5 = r'alert(\d{8})\.html'
+            # パターン5: /YYYY/YYYYMMDD.html（サフィックスなし）
+            # 例: /2025/20251208.html → 2025年12月8日
+            pattern5 = r'/(\d{4})/(\d{8})\.html'
             match5 = re.search(pattern5, url)
             if match5:
-                date_str = match5.group(1)
+                year = int(match5.group(1))
+                date_str = match5.group(2)  # YYYYMMDD形式
+                if len(date_str) == 8:
+                    year_from_date = int(date_str[:4])
+                    month = int(date_str[4:6])
+                    day = int(date_str[6:8])
+                    if year_from_date == year:
+                        try:
+                            return datetime(year, month, day)
+                        except ValueError as e:
+                            logger.debug(f"IPA URL日付パースエラー: {url}, {e}")
+            
+            # パターン6: alertYYYYMMDD.html（年がパスにない場合のフォールバック）
+            pattern7 = r'alert(\d{8})\.html'
+            match7 = re.search(pattern7, url)
+            if match7:
+                date_str = match7.group(1)
                 if len(date_str) == 8:
                     year = int(date_str[:4])
                     month = int(date_str[4:6])

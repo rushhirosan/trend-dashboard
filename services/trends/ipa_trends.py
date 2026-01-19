@@ -300,10 +300,12 @@ class IPATrendsManager(BaseTrendsManager):
                     original_published_date = self._extract_published_date_from_url(entry_url)
                     
                     # URLパターンから抽出できない場合、HTMLページから取得を試す
-                    # ただし、パフォーマンスを考慮して、限定的に使用（特定のパターンのみ）
+                    # パフォーマンスを考慮して、限定的に使用（日付が含まれていないパターンのみ）
                     if not original_published_date:
-                        # win10_eos.html のような日付が含まれていないパターンのみ
-                        if 'win10_eos' in entry_url or 'eos' in entry_url.lower():
+                        # ファイル名に日付パターン（8桁の数字）が含まれていない場合のみ
+                        filename = entry_url.split('/')[-1] if '/' in entry_url else entry_url
+                        if not re.search(r'\d{8}', filename):
+                            # 日付が含まれていないパターン（例：win10_eos.html）
                             original_published_date = self._fetch_original_published_date_from_html(entry_url)
                     
                     # タイトルを取得

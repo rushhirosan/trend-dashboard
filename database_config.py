@@ -878,13 +878,21 @@ class TrendsCache:
                     import pytz
                     jst = pytz.timezone('Asia/Tokyo')
                     now_jst = datetime.now(jst)
+                    
+                    # Noteの場合はカテゴリ別のキャッシュキーで更新
+                    if cache_key == 'note_trends':
+                        # regionパラメータがカテゴリ（all, tech, business, lifestyle, entertainment）を表す
+                        cache_status_key = f'{cache_key}_{region}' if region else f'{cache_key}_all'
+                    else:
+                        cache_status_key = cache_key
+                    
                     cursor.execute(
                         "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                        (cache_key, now_jst, len(data), now_jst, len(data))
+                        (cache_status_key, now_jst, len(data), now_jst, len(data))
                     )
                     
                     conn.commit()
-                    logger.info(f"✅ {cache_key}のキャッシュを更新しました ({len(data)}件)")
+                    logger.info(f"✅ {cache_status_key}のキャッシュを更新しました ({len(data)}件)")
                     return True
                 
         except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:

@@ -396,8 +396,9 @@ class TrendsScheduler:
                     # eBayは複数のカテゴリがあるが、cache_keyは統合されている
                     return 'ebay_trends'
                 elif key == 'note':
-                    # Noteは複数のカテゴリがあるが、cache_keyは統合されている
-                    return 'note_trends'
+                    # Noteは複数のカテゴリがあるため、全てのカテゴリのキャッシュキーを返す
+                    # リストを返すことで、呼び出し側で展開できる
+                    return ['note_trends_all', 'note_trends_tech', 'note_trends_business', 'note_trends_lifestyle', 'note_trends_entertainment']
                 else:
                     # 通常のケース: {key}_trends
                     return f'{key}_trends'
@@ -408,7 +409,11 @@ class TrendsScheduler:
                 if result_data.get('success', False):
                     cache_key = map_result_key_to_cache_key(result_key)
                     if cache_key:
-                        successful_cache_keys.append(cache_key)
+                        # Noteの場合はリストなので展開する
+                        if isinstance(cache_key, list):
+                            successful_cache_keys.extend(cache_key)
+                        else:
+                            successful_cache_keys.append(cache_key)
             
             # 成功したトレンドのみタイムスタンプを更新（更新完了時刻を使用）
             timestamp_updated = False

@@ -25,7 +25,7 @@ class GitHubTrendsManager(BaseTrendsManager):
         logger.info(f"  API URL: {self.base_url}")
         logger.info(f"  Access Token: {'設定済み' if self.access_token else '未設定（認証なし、1時間60回制限）'}")
     
-    def _get_cache_key(self):
+    def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
         return 'github_trends'
 

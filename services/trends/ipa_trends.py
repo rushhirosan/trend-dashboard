@@ -1,5 +1,6 @@
 import requests
 import feedparser
+import re
 from datetime import datetime
 from database_config import TrendsCache
 from utils.logger_config import get_logger
@@ -22,6 +23,66 @@ class IPATrendsManager(BaseTrendsManager):
         
         logger.info("IPA Trends Manager初期化:")
         logger.info(f"  RSS URL: {self.rss_url}")
+    
+    def _extract_published_date_from_url(self, url):
+        """
+        IPAのURLパターンから実際の公開日を抽出
+        例: https://www.ipa.go.jp/security/security-alert/2025/alert20250827.html
+        パターン: /YYYY/alertYYYYMMDD.html
+        """
+        if not url:
+            return None
+        
+        try:
+            # URLパターンを抽出: /YYYY/alertYYYYMMDD.html
+            # 例: /2025/alert20250827.html → 2025年8月27日
+            pattern = r'/(\d{4})/alert(\d{8})\.html'
+            match = re.search(pattern, url)
+            
+            if match:
+                year = int(match.group(1))
+                date_str = match.group(2)  # YYYYMMDD形式
+                
+                # YYYYMMDDをパース
+                if len(date_str) == 8:
+                    year_from_date = int(date_str[:4])
+                    month = int(date_str[4:6])
+                    day = int(date_str[6:8])
+                    
+                    # パスから取得した年と一致するか確認
+                    if year_from_date == year:
+                        try:
+                            return datetime(year, month, day)
+                        except ValueError as e:
+                            logger.debug(f"IPA URL日付パースエラー: {url}, {e}")
+            
+            # 別のパターンも試す: alertYYYYMMDD.html（年がパスにない場合）
+            pattern2 = r'alert(\d{8})\.html'
+            match2 = re.search(pattern2, url)
+            if match2:
+                date_str = match2.group(1)
+                year = int(date_str[:4])
+                month = int(date_str[4:6])
+                day = int(date_str[6:8])
+                try:
+                    return datetime(year, month, day)
+                except ValueError as e:
+                    logger.debug(f"IPA URL日付パースエラー: {url}, {e}")
+                    
+        except Exception as e:
+            logger.debug(f"IPA URL日付抽出エラー: {url}, {e}")
+        
+        return None
+    
+    def _is_updated_alert(self, title):
+        """
+        タイトルに「更新：」が含まれているかチェック
+        実際に内容が更新された情報かどうかを判定
+        """
+        if not title:
+            return False
+        # 「更新：」「更新:」のいずれかが含まれているか
+        return '更新：' in title or '更新:' in title
     
     def _get_cache_key(self):
         """キャッシュキーを返す"""
@@ -56,15 +117,15 @@ class IPATrendsManager(BaseTrendsManager):
             return False
 
     def get_trends(self, limit=25, force_refresh=False):
-        """IPA注意喚起トレンドを取得（キャッシュ優先、published_dateでソート）"""
+        """IPA注意喚起トレンドを取得（キャッシュ優先、実際の公開日でソート）"""
         # ベースクラスのget_trendsを使用
         # auto_fetch_on_cache_miss=Falseで、既存動作を維持（キャッシュがない場合はAPIを呼び出さない）
-        # sort_key='published_date'で公開日でソート
+        # sort_key='published_date'で実際の公開日でソート
         return super().get_trends(
             limit=limit,
             force_refresh=force_refresh,
             auto_fetch_on_cache_miss=False,  # 既存動作を維持
-            sort_key='published_date',  # 公開日でソート
+            sort_key='published_date',  # 実際の公開日でソート
             sort_reverse=True  # 降順（新しい順）
         )
     
@@ -101,23 +162,35 @@ class IPATrendsManager(BaseTrendsManager):
             formatted_data = []
             for entry in feed.entries[:limit]:
                 try:
-                    # 公開日をパース
-                    published_date = None
+                    # RSSフィードの公開日（RSS配信日）を取得
+                    rss_published_date = None
                     if hasattr(entry, 'published_parsed') and entry.published_parsed:
                         try:
-                            published_date = datetime(*entry.published_parsed[:6])
+                            rss_published_date = datetime(*entry.published_parsed[:6])
                         except Exception as e:
                             logger.debug(f"日付パースエラー: {e}")
-                            published_date = datetime.now()
+                            rss_published_date = datetime.now()
                     elif hasattr(entry, 'published'):
                         try:
                             from email.utils import parsedate_to_datetime
-                            published_date = parsedate_to_datetime(entry.published)
+                            rss_published_date = parsedate_to_datetime(entry.published)
                         except Exception as e:
                             logger.debug(f"日付パースエラー: {e}")
-                            published_date = datetime.now()
+                            rss_published_date = datetime.now()
                     else:
-                        published_date = datetime.now()
+                        rss_published_date = datetime.now()
+                    
+                    # URLから実際の公開日を抽出
+                    entry_url = entry.get('link', '')
+                    original_published_date = self._extract_published_date_from_url(entry_url)
+                    
+                    # タイトルを取得
+                    title = entry.get('title', 'No Title')
+                    
+                    # 実際の公開日を優先（取得できた場合）
+                    # タイトルに「更新：」がある場合は、更新情報として扱うが、
+                    # ソートは元の公開日で行う（更新日ではない）
+                    published_date = original_published_date if original_published_date else rss_published_date
                     
                     # 説明文を取得
                     description = ''
@@ -126,10 +199,16 @@ class IPATrendsManager(BaseTrendsManager):
                     elif hasattr(entry, 'summary'):
                         description = entry.summary
                     
+                    # 更新情報かどうかを判定
+                    is_updated = self._is_updated_alert(title)
+                    
                     formatted_item = {
-                        'title': entry.get('title', 'No Title'),
-                        'url': entry.get('link', ''),
+                        'title': title,
+                        'url': entry_url,
                         'published_date': published_date.isoformat() if published_date else None,
+                        'original_published_date': original_published_date.isoformat() if original_published_date else None,
+                        'rss_published_date': rss_published_date.isoformat() if rss_published_date else None,
+                        'is_updated': is_updated,  # 更新情報かどうか
                         'description': description,
                         'author': entry.get('author', ''),
                         'source': 'IPA'
@@ -139,8 +218,16 @@ class IPATrendsManager(BaseTrendsManager):
                     logger.warning(f"⚠️ IPA エントリーパースエラー: {e}")
                     continue
             
-            # 公開日でソート（新しい順）
-            formatted_data.sort(key=lambda x: x.get('published_date') or '', reverse=True)
+            # 実際の公開日（original_published_date）でソート、なければpublished_dateでソート
+            # 更新情報（is_updated=True）の場合は、元の公開日でソートするが、
+            # 同じ公開日の場合は更新情報を少し優先（ただし、これは元の公開日が同じ場合のみ）
+            formatted_data.sort(
+                key=lambda x: (
+                    x.get('original_published_date') or x.get('published_date') or '',
+                    x.get('is_updated', False)  # 更新情報は同じ日付内で少し優先
+                ),
+                reverse=True
+            )
             
             # 制限数まで取得
             formatted_data = formatted_data[:limit]

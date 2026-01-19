@@ -202,15 +202,43 @@ class GoogleTrendsManager(BaseTrendsManager):
             df = pandas_gbq.read_gbq(query, project_id=self.project_id, credentials=self.credentials)
             
             if df.empty:
-                logger.warning("❌ Google Trends: USデータが取得できませんでした")
+                logger.warning(f"❌ Google Trends: {region}データが取得できませんでした")
                 return {
                     'success': False,
-                    'error': 'USデータが取得できませんでした',
+                    'error': f'{region}データが取得できませんでした',
                     'data': [],
                     'status': 'api_error',
                     'source': 'BigQuery',
                     'country': region
                 }
+            
+            # refresh_dateを確認（データ変換の前）
+            refresh_dates = df['refresh_date'].unique() if 'refresh_date' in df.columns else []
+            latest_refresh_date = None
+            days_old = None
+            latest_refresh_date_str = None
+            
+            if len(refresh_dates) > 0:
+                latest_refresh_date = max(refresh_dates)
+                if isinstance(latest_refresh_date, pd.Timestamp):
+                    days_old = (datetime.now() - latest_refresh_date.to_pydatetime()).days
+                    latest_refresh_date_str = latest_refresh_date.strftime('%Y-%m-%d')
+                    logger.info(f"📅 Google Trends: BigQueryデータのrefresh_date = {latest_refresh_date_str} ({days_old}日前, region={region})")
+                    
+                    # 7日以上古い場合はデータを返さない
+                    if days_old >= 7:
+                        error_msg = f"データが{days_old}日前のもので、表示可能期間（7日）を超えています。BigQueryのデータは通常数日遅れで更新されるため、最新データが利用可能になるまでお待ちください。"
+                        logger.warning(f"⚠️ Google Trends ({region}): {error_msg}")
+                        return {
+                            'success': False,
+                            'error': error_msg,
+                            'data': [],
+                            'status': 'data_too_old',
+                            'source': 'BigQuery',
+                            'country': region,
+                            'refresh_date': latest_refresh_date_str,
+                            'days_old': days_old
+                        }
             
             # データを辞書形式に変換
             trends_data = []
@@ -233,8 +261,14 @@ class GoogleTrendsManager(BaseTrendsManager):
                     
                 seen_keywords.add(keyword)
                 
-                # Google検索URLを生成
-                google_search_url = f"https://www.google.com/search?q={keyword.replace(' ', '+')}&geo=US"
+                # Google検索URLを生成（regionに応じてgeoパラメータを設定）
+                geo_param = region if region in ['JP', 'US'] else 'US'
+                google_search_url = f"https://www.google.com/search?q={keyword.replace(' ', '+')}&geo={geo_param}"
+                
+                # refresh_dateを取得
+                refresh_date_str = row['refresh_date'].strftime('%Y-%m-%d') if pd.notna(row['refresh_date']) else None
+                if refresh_date_str and not latest_refresh_date_str:
+                    latest_refresh_date_str = refresh_date_str
                 
                 trends_data.append({
                     'keyword': keyword,
@@ -242,27 +276,45 @@ class GoogleTrendsManager(BaseTrendsManager):
                     'popularity': int(row['score']),
                     'score': int(row['score']),
                     'country_code': row['country_code'],
-                    'refresh_date': row['refresh_date'].strftime('%Y-%m-%d') if pd.notna(row['refresh_date']) else None,
+                    'refresh_date': refresh_date_str,
                     'google_search_url': google_search_url
                 })
                 
                 # 最初の3件だけログ出力
                 if len(trends_data) <= 3:
-                    logger.debug(f"行 {len(trends_data)}: keyword='{keyword}', rank={len(trends_data)}, score={row['score']}")
+                    logger.debug(f"行 {len(trends_data)}: keyword='{keyword}', rank={len(trends_data)}, score={row['score']}, refresh_date={refresh_date_str}")
                     logger.debug(f"  変換後: rank={len(trends_data)}, popularity={int(row['score'])}")
             
-            logger.info(f"✅ Google Trends: {len(trends_data)}件のデータを取得しました (国コード: {region})")
+            # データの古さに応じてステータスとメッセージを設定
+            status = 'success'
+            warning_message = None
+            
+            if days_old is not None:
+                if days_old > 3:
+                    # 3-7日: 警告とともに表示
+                    status = 'data_stale'
+                    warning_message = f"⚠️ このデータは{days_old}日前のものです。BigQueryのデータは通常数日遅れで更新されます。"
+                    logger.warning(f"⚠️ Google Trends ({region}): {warning_message}")
+                else:
+                    # 3日以内: 通常表示
+                    logger.info(f"✅ Google Trends ({region}): データは{days_old}日前のもので、問題ありません")
+            
+            logger.info(f"✅ Google Trends: {len(trends_data)}件のデータを取得しました (国コード: {region}, データ日付: {latest_refresh_date_str})")
             
             # キャッシュに保存はBaseTrendsManager.get_trends()が自動的に行うため、ここでは不要
             
             return {
                 'success': True,
                 'data': trends_data,
-                'status': 'success',
+                'status': status,
                 'source': 'BigQuery',
                 'country': region,
                 'actual_country': region,  # 実際に使用された国コード
-                'total_count': len(trends_data)
+                'total_count': len(trends_data),
+                'refresh_date': latest_refresh_date_str,  # データの日付
+                'data_date': latest_refresh_date_str,  # データの日付（互換性のため）
+                'days_old': days_old,  # データの古さ（日数）
+                'warning': warning_message  # 警告メッセージ（3-7日の場合のみ）
             }
             
         except Exception as e:

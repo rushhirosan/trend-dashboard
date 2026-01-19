@@ -33,9 +33,13 @@ class BookTrendsManager(BaseTrendsManager):
         self.google_books_base_url = "https://www.googleapis.com/books/v1"
         self.google_books_api_key = os.getenv('GOOGLE_BOOKS_API_KEY')
         
+        # AmazonアソシエイトID設定
+        self.amazon_affiliate_id = os.getenv('AMAZON_AFFILIATE_ID', '').strip()
+        
         logger.info("Book Trends Manager初期化完了")
         logger.info(f"  楽天ブックス App ID: {'設定済み' if self.rakuten_app_id else '未設定'}")
         logger.info(f"  Google Books API Key: {'設定済み' if self.google_books_api_key else '未設定'}")
+        logger.info(f"  Amazon Affiliate ID: {'設定済み' if self.amazon_affiliate_id else '未設定'}")
     
     def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
@@ -76,6 +80,35 @@ class BookTrendsManager(BaseTrendsManager):
         except Exception as e:
             logger.warning(f"⚠️ Book: cache_status更新エラー: {e}")
             return False
+    
+    def _generate_amazon_link(self, title, isbn=None, country='JP'):
+        """書籍タイトルからAmazonアソシエイトリンクを生成
+        
+        Args:
+            title: 書籍タイトル
+            isbn: ISBN（オプション）
+            country: 国コード ('JP' または 'US')
+        
+        Returns:
+            str: Amazonアソシエイトリンク、またはNone（アフィリエイトID未設定時）
+        """
+        if not self.amazon_affiliate_id:
+            return None
+        
+        # 国コードに応じてドメインを決定
+        domain = 'amazon.co.jp' if country == 'JP' else 'amazon.com'
+        
+        # ISBNがあれば使用、なければタイトルで検索
+        if isbn:
+            # ISBNから直接リンクを生成
+            url = f"https://www.{domain}/dp/{isbn}?tag={self.amazon_affiliate_id}"
+        else:
+            # タイトルで検索
+            from urllib.parse import quote
+            search_query = quote(title)
+            url = f"https://www.{domain}/s?k={search_query}&tag={self.amazon_affiliate_id}"
+        
+        return url
     
     def _fetch_trends(self, country='JP', limit=25, *args, **kwargs):
         """外部APIから書籍データを取得"""
@@ -277,9 +310,10 @@ class BookTrendsManager(BaseTrendsManager):
                     item_data = item.get('Item', {})
                     
                     # 書籍情報を整形
+                    isbn = item_data.get('isbn', '')
                     book_data = {
                         'rank': idx,
-                        'isbn': item_data.get('isbn', ''),
+                        'isbn': isbn,
                         'title': item_data.get('title', 'タイトル不明'),
                         'author': item_data.get('author', ''),
                         'publisher': item_data.get('publisherName', ''),
@@ -287,6 +321,11 @@ class BookTrendsManager(BaseTrendsManager):
                         'sales': item_data.get('sales', 0),
                         'item_url': item_data.get('itemUrl', ''),
                         'affiliate_url': item_data.get('affiliateUrl', ''),
+                        'amazon_link': self._generate_amazon_link(
+                            item_data.get('title', ''),
+                            isbn,
+                            'JP'
+                        ),
                         'image_url': item_data.get('largeImageUrl', ''),
                         'release_date': item_data.get('salesDate', ''),
                         'updated_at': datetime.now().isoformat()
@@ -500,6 +539,21 @@ class BookTrendsManager(BaseTrendsManager):
                     volume_info = volume.get('volumeInfo', {})
                     sale_info = volume.get('saleInfo', {})
                     
+                    # ISBNを取得（Amazonリンク生成用）
+                    isbn = None
+                    industry_identifiers = volume_info.get('industryIdentifiers', [])
+                    if industry_identifiers:
+                        # ISBN-13を優先、なければISBN-10を使用
+                        for identifier in industry_identifiers:
+                            if identifier.get('type') == 'ISBN_13':
+                                isbn = identifier.get('identifier')
+                                break
+                        if not isbn:
+                            for identifier in industry_identifiers:
+                                if identifier.get('type') == 'ISBN_10':
+                                    isbn = identifier.get('identifier')
+                                    break
+                    
                     # 書籍情報を整形（言語フィルタリングは既に適用済み）
                     book_data = {
                         'rank': idx,
@@ -521,6 +575,11 @@ class BookTrendsManager(BaseTrendsManager):
                         'price': sale_info.get('retailPrice', {}).get('amount', 0),
                         'currency': sale_info.get('retailPrice', {}).get('currencyCode', 'USD'),
                         'buy_link': sale_info.get('buyLink', ''),
+                        'amazon_link': self._generate_amazon_link(
+                            volume_info.get('title', ''),
+                            isbn,
+                            'US'
+                        ),
                         'updated_at': datetime.now().isoformat()
                     }
                     

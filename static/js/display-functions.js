@@ -146,8 +146,8 @@ function displayMovieResults(data) {
             const rating = item.vote_average ? (typeof item.vote_average === 'number' ? item.vote_average.toFixed(1) : parseFloat(item.vote_average).toFixed(1)) : 'N/A';
             const releaseDate = item.release_date || 'N/A';
             const posterUrl = item.poster_url || '';
-            // item_urlが存在しない場合は、idまたはmovie_idから生成
-            let movieLink = item.item_url;
+            // リンクの優先順位: amazon_link > item_url > TMDBリンク
+            let movieLink = item.amazon_link || item.item_url;
             const movieId = item.id || item.movie_id;
             if (!movieLink && movieId) {
                 movieLink = `https://www.themoviedb.org/movie/${movieId}`;
@@ -204,7 +204,8 @@ function displayBookResults(data) {
             const author = item.author || (item.authors && item.authors.length > 0 ? item.authors.join(', ') : 'N/A') || 'N/A';
             const price = item.price ? `¥${parseInt(item.price).toLocaleString()}` : 'N/A';
             const sales = item.sales ? parseInt(item.sales).toLocaleString() : 'N/A';
-            const bookLink = item.item_url || '#';
+            // リンクの優先順位: amazon_link > item_url > affiliate_url
+            const bookLink = item.amazon_link || item.item_url || item.affiliate_url || '#';
             const imageUrl = item.image_url || '';
             
             row.innerHTML = `

@@ -24,11 +24,15 @@ class MovieTrendsManager(BaseTrendsManager):
         self.base_url = "https://api.themoviedb.org/3"
         self.api_key = os.getenv('TMDB_API_KEY')
         
+        # AmazonアソシエイトID設定
+        self.amazon_affiliate_id = os.getenv('AMAZON_AFFILIATE_ID', '').strip()
+        
         if not self.api_key:
             logger.warning("⚠️ TMDB_API_KEYが設定されていません。TMDB APIは使用できません。")
         else:
             logger.info("Movie Trends Manager初期化完了")
             logger.info(f"  Base URL: {self.base_url}")
+            logger.info(f"  Amazon Affiliate ID: {'設定済み' if self.amazon_affiliate_id else '未設定'}")
     
     def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
@@ -82,6 +86,30 @@ class MovieTrendsManager(BaseTrendsManager):
         except Exception as e:
             logger.warning(f"⚠️ Movie: cache_status更新エラー: {e}")
             return False
+
+    def _generate_amazon_link(self, title, country='JP'):
+        """映画タイトルからAmazon Prime Video/DVDリンクを生成
+        
+        Args:
+            title: 映画タイトル
+            country: 国コード ('JP' または 'US')
+        
+        Returns:
+            str: Amazonアソシエイトリンク、またはNone（アフィリエイトID未設定時）
+        """
+        if not self.amazon_affiliate_id:
+            return None
+        
+        # 国コードに応じてドメインを決定
+        domain = 'amazon.co.jp' if country == 'JP' else 'amazon.com'
+        
+        # タイトルで検索（Prime VideoとDVDの両方をカバー）
+        from urllib.parse import quote
+        search_query = quote(title)
+        # Prime VideoとDVDの両方を検索できるように
+        url = f"https://www.{domain}/s?k={search_query}&i=prime-instant-video&tag={self.amazon_affiliate_id}"
+        
+        return url
 
     def get_trends(self, country='JP', time_window='day', limit=25, force_refresh=False):
         """
@@ -206,6 +234,10 @@ class MovieTrendsManager(BaseTrendsManager):
                         'release_date': movie.get('release_date', ''),
                         'poster_path': movie.get('poster_path', ''),
                         'backdrop_path': movie.get('backdrop_path', ''),
+                        'amazon_link': self._generate_amazon_link(
+                            movie.get('title', ''),
+                            country
+                        ),
                         'updated_at': datetime.now().isoformat()
                     }
                     

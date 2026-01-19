@@ -21,9 +21,10 @@ class AppStoreTrendsManager(BaseTrendsManager):
         logger.info(f"App Store Trends Manager初期化:")
         logger.info(f"  API URL: {self.base_url}")
     
-    def _get_cache_key(self):
-        """キャッシュキーを返す"""
-        return 'appstore_trends'
+    def _get_cache_key(self, *args, **kwargs):
+        """キャッシュキーを返す（国別に分ける）"""
+        country = kwargs.get('country', 'JP')
+        return f'appstore_trends_{country}'
 
     def _get_from_cache(self, *args, **kwargs):
         """キャッシュからデータを取得"""
@@ -49,11 +50,10 @@ class AppStoreTrendsManager(BaseTrendsManager):
             return False
 
     def _update_cache_status(self, cache_key, data_count, *args, **kwargs):
-        """cache_statusテーブルを更新"""
+        """cache_statusテーブルを更新（cache_keyは既に国別になっている）"""
         try:
-            country = kwargs.get('country', 'JP')
-            cache_key_with_country = f'{cache_key}_{country}'
-            return self.db.update_cache_status(cache_key_with_country, data_count)
+            # cache_keyは既に_get_cache_key()で国別になっているので、そのまま使用
+            return self.db.update_cache_status(cache_key, data_count)
         except Exception as e:
             logger.warning(f"⚠️ App Store: cache_status更新エラー: {e}")
             return False

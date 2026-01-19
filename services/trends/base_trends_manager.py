@@ -51,7 +51,7 @@ class BaseTrendsManager(ABC):
         """
         pass
     
-    def _get_cache_key(self) -> str:
+    def _get_cache_key(self, *args, **kwargs) -> str:
         """キャッシュキーを返す（オプション、デフォルト実装）
         
         各マネージャーで必要に応じてオーバーライド
@@ -77,7 +77,7 @@ class BaseTrendsManager(ABC):
         """
         return False
     
-    def _update_cache_status(self, cache_key: str, data_count: int) -> bool:
+    def _update_cache_status(self, cache_key: str, data_count: int, *args, **kwargs) -> bool:
         """cache_statusテーブルを更新する（オプション）
         
         各マネージャーで必要に応じて実装
@@ -86,6 +86,7 @@ class BaseTrendsManager(ABC):
         Args:
             cache_key: キャッシュキー
             data_count: データ件数
+            *args, **kwargs: 追加パラメータ（countryなど）
         
         Returns:
             bool: 更新が成功した場合はTrue、失敗または未実装の場合はFalse
@@ -219,8 +220,8 @@ class BaseTrendsManager(ABC):
                         
                         # cache_statusを更新（オプション）
                         try:
-                            cache_key = self._get_cache_key()
-                            update_success = self._update_cache_status(cache_key, len(trends_data))
+                            cache_key = self._get_cache_key(*args, **kwargs)
+                            update_success = self._update_cache_status(cache_key, len(trends_data), *args, **kwargs)
                             if not update_success:
                                 logger.debug(f"⚠️ {self.service_name}: cache_statusの更新をスキップしました（未実装または失敗）")
                         except Exception as e:

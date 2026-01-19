@@ -138,6 +138,57 @@ class IPATrendsManager(BaseTrendsManager):
         
         return None
     
+    def _fetch_original_published_date_from_html(self, url):
+        """
+        HTMLページから実際の公開日を取得（URLパターンから抽出できない場合のフォールバック）
+        """
+        if not url:
+            return None
+        
+        try:
+            # レート制限をチェック
+            self.rate_limiter.wait_if_needed()
+            
+            response = requests.get(url, timeout=10, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            })
+            
+            if response.status_code == 200:
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(response.text, 'html.parser')
+                
+                # テキストから日付を抽出
+                text = soup.get_text()
+                
+                # パターン1: 公開日：2024年10月15日
+                date_pattern1 = r'公開日[：:]\s*(\d{4})年(\d{1,2})月(\d{1,2})日'
+                match1 = re.search(date_pattern1, text)
+                if match1:
+                    year = int(match1.group(1))
+                    month = int(match1.group(2))
+                    day = int(match1.group(3))
+                    try:
+                        return datetime(year, month, day)
+                    except ValueError as e:
+                        logger.debug(f"IPA HTML日付パースエラー: {url}, {e}")
+                
+                # パターン2: 公開日：2024/10/15
+                date_pattern2 = r'公開日[：:]\s*(\d{4})/(\d{1,2})/(\d{1,2})'
+                match2 = re.search(date_pattern2, text)
+                if match2:
+                    year = int(match2.group(1))
+                    month = int(match2.group(2))
+                    day = int(match2.group(3))
+                    try:
+                        return datetime(year, month, day)
+                    except ValueError as e:
+                        logger.debug(f"IPA HTML日付パースエラー: {url}, {e}")
+                        
+        except Exception as e:
+            logger.debug(f"IPA HTML日付取得エラー: {url}, {e}")
+        
+        return None
+    
     def _is_updated_alert(self, title):
         """
         タイトルに「更新：」が含まれているかチェック
@@ -247,6 +298,13 @@ class IPATrendsManager(BaseTrendsManager):
                     # URLから実際の公開日を抽出
                     entry_url = entry.get('link', '')
                     original_published_date = self._extract_published_date_from_url(entry_url)
+                    
+                    # URLパターンから抽出できない場合、HTMLページから取得を試す
+                    # ただし、パフォーマンスを考慮して、限定的に使用（特定のパターンのみ）
+                    if not original_published_date:
+                        # win10_eos.html のような日付が含まれていないパターンのみ
+                        if 'win10_eos' in entry_url or 'eos' in entry_url.lower():
+                            original_published_date = self._fetch_original_published_date_from_html(entry_url)
                     
                     # タイトルを取得
                     title = entry.get('title', 'No Title')

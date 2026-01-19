@@ -27,47 +27,93 @@ class IPATrendsManager(BaseTrendsManager):
     def _extract_published_date_from_url(self, url):
         """
         IPAのURLパターンから実際の公開日を抽出
-        例: https://www.ipa.go.jp/security/security-alert/2025/alert20250827.html
-        パターン: /YYYY/alertYYYYMMDD.html
+        対応パターン:
+        - /YYYY/alertYYYYMMDD.html → /2025/alert20250827.html
+        - /YYYY/YYYYMMDD-suffix.html → /2025/20250827-jvn.html
+        - /YYYY/MMDD-suffix.html → /2025/0910-ms.html（年はパスから）
+        - alertYYYYMMDD_suffix.html → alert20251031_router.html
         """
         if not url:
             return None
         
         try:
-            # URLパターンを抽出: /YYYY/alertYYYYMMDD.html
+            # パターン1: /YYYY/alertYYYYMMDD.html
             # 例: /2025/alert20250827.html → 2025年8月27日
-            pattern = r'/(\d{4})/alert(\d{8})\.html'
-            match = re.search(pattern, url)
-            
-            if match:
-                year = int(match.group(1))
-                date_str = match.group(2)  # YYYYMMDD形式
-                
-                # YYYYMMDDをパース
+            pattern1 = r'/(\d{4})/alert(\d{8})\.html'
+            match1 = re.search(pattern1, url)
+            if match1:
+                year = int(match1.group(1))
+                date_str = match1.group(2)  # YYYYMMDD形式
                 if len(date_str) == 8:
                     year_from_date = int(date_str[:4])
                     month = int(date_str[4:6])
                     day = int(date_str[6:8])
-                    
-                    # パスから取得した年と一致するか確認
                     if year_from_date == year:
                         try:
                             return datetime(year, month, day)
                         except ValueError as e:
                             logger.debug(f"IPA URL日付パースエラー: {url}, {e}")
             
-            # 別のパターンも試す: alertYYYYMMDD.html（年がパスにない場合）
-            pattern2 = r'alert(\d{8})\.html'
+            # パターン2: /YYYY/YYYYMMDD-suffix.html
+            # 例: /2025/20250827-jvn.html → 2025年8月27日
+            pattern2 = r'/(\d{4})/(\d{8})-[\w-]+\.html'
             match2 = re.search(pattern2, url)
             if match2:
-                date_str = match2.group(1)
-                year = int(date_str[:4])
-                month = int(date_str[4:6])
-                day = int(date_str[6:8])
-                try:
-                    return datetime(year, month, day)
-                except ValueError as e:
-                    logger.debug(f"IPA URL日付パースエラー: {url}, {e}")
+                year = int(match2.group(1))
+                date_str = match2.group(2)  # YYYYMMDD形式
+                if len(date_str) == 8:
+                    year_from_date = int(date_str[:4])
+                    month = int(date_str[4:6])
+                    day = int(date_str[6:8])
+                    if year_from_date == year:
+                        try:
+                            return datetime(year, month, day)
+                        except ValueError as e:
+                            logger.debug(f"IPA URL日付パースエラー: {url}, {e}")
+            
+            # パターン3: /YYYY/MMDD-suffix.html
+            # 例: /2025/0910-ms.html → 2025年9月10日（年はパスから）
+            pattern3 = r'/(\d{4})/(\d{4})-[\w-]+\.html'
+            match3 = re.search(pattern3, url)
+            if match3:
+                year = int(match3.group(1))
+                date_str = match3.group(2)  # MMDD形式
+                if len(date_str) == 4:
+                    month = int(date_str[:2])
+                    day = int(date_str[2:4])
+                    try:
+                        return datetime(year, month, day)
+                    except ValueError as e:
+                        logger.debug(f"IPA URL日付パースエラー: {url}, {e}")
+            
+            # パターン4: alertYYYYMMDD_suffix.html
+            # 例: alert20251031_router.html → 2025年10月31日
+            pattern4 = r'alert(\d{8})_[\w-]+\.html'
+            match4 = re.search(pattern4, url)
+            if match4:
+                date_str = match4.group(1)  # YYYYMMDD形式
+                if len(date_str) == 8:
+                    year = int(date_str[:4])
+                    month = int(date_str[4:6])
+                    day = int(date_str[6:8])
+                    try:
+                        return datetime(year, month, day)
+                    except ValueError as e:
+                        logger.debug(f"IPA URL日付パースエラー: {url}, {e}")
+            
+            # パターン5: alertYYYYMMDD.html（年がパスにない場合のフォールバック）
+            pattern5 = r'alert(\d{8})\.html'
+            match5 = re.search(pattern5, url)
+            if match5:
+                date_str = match5.group(1)
+                if len(date_str) == 8:
+                    year = int(date_str[:4])
+                    month = int(date_str[4:6])
+                    day = int(date_str[6:8])
+                    try:
+                        return datetime(year, month, day)
+                    except ValueError as e:
+                        logger.debug(f"IPA URL日付パースエラー: {url}, {e}")
                     
         except Exception as e:
             logger.debug(f"IPA URL日付抽出エラー: {url}, {e}")

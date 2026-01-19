@@ -337,6 +337,25 @@ class TrendsScheduler:
             total_count = len(results)
             failed_count = total_count - success_count
             
+            # 失敗したトレンドをログに詳細出力
+            failed_trends = []
+            for key, result_data in results.items():
+                success = result_data.get('success', False)
+                if not success:
+                    failed_trends.append(key)
+                    response = result_data.get('response', {})
+                    error = result_data.get('error', 'unknown')
+                    if isinstance(response, dict):
+                        status = response.get('status', 'unknown')
+                        data_count = len(response.get('data', []))
+                    else:
+                        status = 'unknown'
+                        data_count = 0
+                    logger.warning(f"❌ 失敗: {key} - error={error}, status={status}, data_count={data_count}")
+            
+            if failed_trends:
+                logger.warning(f"⚠️ 失敗したトレンド ({len(failed_trends)}件): {', '.join(failed_trends)}")
+            
             # Stock Trendsの結果を詳細にログ出力
             for key in ['stock_JP', 'stock_US']:
                 if key in results:
@@ -353,29 +372,65 @@ class TrendsScheduler:
             logger.info(f"✅ 自動トレンド取得完了: {success_count}/{total_count} 成功")
             logger.info(f"⏱️ 実行時間: {duration:.2f}秒")
             
-            # 全トレンド取得完了後、すべてのトレンドに対して同じ更新時刻を設定
-            # これにより、更新時刻のバラつきを防ぐ
-            # この処理は必須であり、失敗した場合は再試行する
+            # 成功したトレンドのみタイムスタンプを更新
+            # refresh_all_trendsの結果キー（例：google_JP）をcache_key（例：google_trends）にマッピング
+            def map_result_key_to_cache_key(result_key):
+                """refresh_all_trendsの結果キーをcache_keyにマッピング"""
+                if '_' not in result_key:
+                    return None
+                
+                parts = result_key.rsplit('_', 1)
+                if len(parts) != 2:
+                    return None
+                
+                key, region = parts
+                
+                # 特殊なケース
+                if key == 'stock':
+                    return f'stock_trends_{region}'
+                elif key == 'book':
+                    return f'book_trends_{region}'
+                elif key == 'movie':
+                    return f'movie_trends_{region}'
+                elif key == 'ebay':
+                    # eBayは複数のカテゴリがあるが、cache_keyは統合されている
+                    return 'ebay_trends'
+                elif key == 'note':
+                    # Noteは複数のカテゴリがあるが、cache_keyは統合されている
+                    return 'note_trends'
+                else:
+                    # 通常のケース: {key}_trends
+                    return f'{key}_trends'
+            
+            # 成功したトレンドのcache_keyを収集
+            successful_cache_keys = []
+            for result_key, result_data in results.items():
+                if result_data.get('success', False):
+                    cache_key = map_result_key_to_cache_key(result_key)
+                    if cache_key:
+                        successful_cache_keys.append(cache_key)
+            
+            # 成功したトレンドのみタイムスタンプを更新
             timestamp_updated = False
             max_retries = 3
             for attempt in range(max_retries):
                 try:
-                    logger.info(f"🔄 全トレンドの更新時刻を統一します（開始時刻: {start_time.strftime('%Y-%m-%d %H:%M:%S JST')}）[試行 {attempt + 1}/{max_retries}]")
-                    success = self.db.update_all_trends_timestamp(start_time)
+                    logger.info(f"🔄 成功したトレンドの更新時刻を更新します（{len(successful_cache_keys)}件）[試行 {attempt + 1}/{max_retries}]")
+                    success = self.db.update_successful_trends_timestamp(successful_cache_keys, start_time)
                     if success:
                         timestamp_updated = True
-                        logger.info(f"✅ 全トレンドの更新時刻を統一しました: {start_time.strftime('%Y-%m-%d %H:%M:%S JST')}")
+                        logger.info(f"✅ 成功したトレンドの更新時刻を更新しました: {len(successful_cache_keys)}件 ({start_time.strftime('%Y-%m-%d %H:%M:%S JST')})")
                         break
                     else:
-                        logger.warning(f"⚠️ 更新時刻の統一が失敗しました（戻り値がFalse）。再試行します...")
+                        logger.warning(f"⚠️ 更新時刻の更新が失敗しました（戻り値がFalse）。再試行します...")
                 except Exception as e:
-                    logger.warning(f"⚠️ 全トレンド更新時刻の統一に失敗しました（試行 {attempt + 1}/{max_retries}）: {e}", exc_info=True)
+                    logger.warning(f"⚠️ 成功したトレンドの更新時刻更新に失敗しました（試行 {attempt + 1}/{max_retries}）: {e}", exc_info=True)
                     if attempt < max_retries - 1:
                         import time
                         time.sleep(1)  # 1秒待ってから再試行
             
             if not timestamp_updated:
-                logger.error(f"❌ 全トレンド更新時刻の統一に失敗しました（{max_retries}回試行後）。これは重大な問題です。")
+                logger.error(f"❌ 成功したトレンドの更新時刻更新に失敗しました（{max_retries}回試行後）。これは重大な問題です。")
             
             # 実行日付を記録（7時のジョブが実行されたことを記録）
             now_jst = datetime.now(jst)

@@ -1844,6 +1844,42 @@ class TrendsCache:
             logger.error(f"❌ 全トレンド更新時刻一括設定エラー: {e}", exc_info=True)
             return False
     
+    def update_successful_trends_timestamp(self, cache_keys, timestamp):
+        """成功したトレンドのみタイムスタンプを更新"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    if not cache_keys:
+                        logger.warning("⚠️ 更新対象のcache_keyが空です")
+                        return False
+                    
+                    # 重複を除去
+                    unique_cache_keys = list(set(cache_keys))
+                    
+                    # 成功したcache_keyのみタイムスタンプを更新
+                    updated_count = 0
+                    for cache_key in unique_cache_keys:
+                        cursor.execute("""
+                            UPDATE cache_status 
+                            SET last_updated = %s
+                            WHERE cache_key = %s
+                        """, (timestamp, cache_key))
+                        updated_count += cursor.rowcount
+                    
+                    conn.commit()
+                    logger.info(f"✅ 成功したトレンドの更新時刻を更新しました: {updated_count}件のcache_keyを更新 ({timestamp.strftime('%Y-%m-%d %H:%M:%S JST')})")
+                    if unique_cache_keys:
+                        logger.info(f"📋 更新されたcache_keyの例（最初の10件）: {', '.join(unique_cache_keys[:10])}")
+                    return True
+                
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ 更新時刻設定中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ 成功したトレンド更新時刻設定エラー: {e}", exc_info=True)
+            return False
+    
     def update_cache_status(self, cache_key, data_count, timestamp=None):
         """特定のトレンドのcache_statusを更新"""
         import pytz

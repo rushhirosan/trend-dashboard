@@ -690,6 +690,38 @@ class TrendsCache:
                 CREATE INDEX IF NOT EXISTS idx_subscriptions_email ON subscriptions(email);
                 CREATE INDEX IF NOT EXISTS idx_subscriptions_active ON subscriptions(is_active);
                 CREATE INDEX IF NOT EXISTS idx_subscriptions_token ON subscriptions(unsubscribe_token);
+                
+                -- すべてのキャッシュテーブルのrankカラムにインデックスを追加（パフォーマンス向上）
+                CREATE INDEX IF NOT EXISTS idx_google_trends_cache_rank ON google_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_youtube_trends_cache_rank ON youtube_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_music_trends_cache_rank ON music_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_podcast_trends_cache_rank ON podcast_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_worldnews_trends_cache_rank ON worldnews_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_rakuten_trends_cache_rank ON rakuten_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_hatena_trends_cache_rank ON hatena_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_twitch_trends_cache_rank ON twitch_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_reddit_trends_cache_rank ON reddit_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_hackernews_trends_cache_rank ON hackernews_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_qiita_trends_cache_rank ON qiita_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_github_trends_cache_rank ON github_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_appstore_trends_cache_rank ON appstore_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_nhk_trends_cache_rank ON nhk_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_cnn_trends_cache_rank ON cnn_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_producthunt_trends_cache_rank ON producthunt_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_stock_trends_cache_rank ON stock_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_crypto_trends_cache_rank ON crypto_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_movie_trends_cache_rank ON movie_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_book_trends_cache_rank ON book_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_cisa_kev_trends_cache_rank ON cisa_kev_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_thehackernews_trends_cache_rank ON thehackernews_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_ipa_trends_cache_rank ON ipa_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_jpcert_trends_cache_rank ON jpcert_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_hackernoon_trends_cache_rank ON hackernoon_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_zenn_trends_cache_rank ON zenn_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_ebay_trends_cache_rank ON ebay_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_medium_trends_cache_rank ON medium_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_devto_trends_cache_rank ON devto_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_note_trends_cache_rank ON note_trends_cache(rank);
                 """
                 
                 cursor.execute(create_tables_sql)
@@ -894,25 +926,25 @@ class TrendsCache:
                 # hatena_trends、twitch_trends、note_trendsの場合はcategoryでフィルタリング
                 if cache_key == 'hatena_trends':
                     if region and region != '':
-                        cursor.execute(f"SELECT * FROM {table_name} WHERE category = %s ORDER BY rank ASC, created_at DESC", (region,))
+                        cursor.execute(f"SELECT * FROM {table_name} WHERE category = %s ORDER BY rank ASC, created_at DESC LIMIT 50", (region,))
                     else:
-                        cursor.execute(f"SELECT * FROM {table_name} ORDER BY rank ASC, created_at DESC")
+                        cursor.execute(f"SELECT * FROM {table_name} ORDER BY rank ASC, created_at DESC LIMIT 50")
                 elif cache_key == 'twitch_trends':
                     if region and region != '':
-                        cursor.execute(f"SELECT * FROM {table_name} WHERE category = %s ORDER BY rank ASC, created_at DESC", (region,))
+                        cursor.execute(f"SELECT * FROM {table_name} WHERE category = %s ORDER BY rank ASC, created_at DESC LIMIT 50", (region,))
                     else:
-                        cursor.execute(f"SELECT * FROM {table_name} ORDER BY rank ASC, created_at DESC")
+                        cursor.execute(f"SELECT * FROM {table_name} ORDER BY rank ASC, created_at DESC LIMIT 50")
                 elif cache_key == 'note_trends':
                     if region and region != '':
-                        cursor.execute(f"SELECT * FROM {table_name} WHERE category = %s ORDER BY rank ASC, cached_at DESC", (region,))
+                        cursor.execute(f"SELECT * FROM {table_name} WHERE category = %s ORDER BY rank ASC, cached_at DESC LIMIT 50", (region,))
                     else:
-                        cursor.execute(f"SELECT * FROM {table_name} ORDER BY rank ASC, cached_at DESC")
+                        cursor.execute(f"SELECT * FROM {table_name} ORDER BY rank ASC, cached_at DESC LIMIT 50")
                 # rakuten_trendsの場合はgenre_idでフィルタリング（regionパラメータがgenre_idとして渡される）
                 elif cache_key == 'rakuten_trends':
                     if region and region != '':
-                        cursor.execute(f"SELECT * FROM {table_name} WHERE genre_id = %s ORDER BY rank ASC, created_at DESC", (region,))
+                        cursor.execute(f"SELECT * FROM {table_name} WHERE genre_id = %s ORDER BY rank ASC, created_at DESC LIMIT 50", (region,))
                     else:
-                        cursor.execute(f"SELECT * FROM {table_name} ORDER BY rank ASC, created_at DESC")
+                        cursor.execute(f"SELECT * FROM {table_name} ORDER BY rank ASC, created_at DESC LIMIT 50")
                 # regionが空の場合はregion条件を除外
                 elif region and region != '':
                     cursor.execute(f"SELECT * FROM {table_name} WHERE region = %s ORDER BY created_at DESC", (region,))
@@ -1473,6 +1505,7 @@ class TrendsCache:
                                 FROM music_trends_cache 
                                 WHERE service = %s AND region_code = %s
                                 ORDER BY rank
+                                LIMIT 50
                             """, (service, region))
                             data = cursor.fetchall()
                             
@@ -2105,6 +2138,7 @@ class TrendsCache:
                     FROM reddit_trends_cache 
                     WHERE subreddit = %s 
                     ORDER BY rank
+                    LIMIT 50
                 """, (subreddit,))
                 data = cursor.fetchall()
                 
@@ -2208,6 +2242,7 @@ class TrendsCache:
                     FROM hackernews_trends_cache 
                     WHERE story_type = %s 
                     ORDER BY rank
+                    LIMIT 50
                 """, (story_type,))
                 data = cursor.fetchall()
                 
@@ -2310,6 +2345,7 @@ class TrendsCache:
                            comments_count, created_at, updated_at, tags, rank, cached_at
                     FROM qiita_trends_cache 
                     ORDER BY rank
+                    LIMIT 50
                 """)
                 data = cursor.fetchall()
                 
@@ -2429,6 +2465,7 @@ class TrendsCache:
                            owner_login, owner_avatar_url, rank, cached_at
                     FROM github_trends_cache 
                     ORDER BY rank
+                    LIMIT 50
                 """)
                 data = cursor.fetchall()
                 
@@ -2549,6 +2586,7 @@ class TrendsCache:
                     FROM appstore_trends_cache 
                     WHERE country = %s
                     ORDER BY rank
+                    LIMIT 50
                 """, (country,))
                 data = cursor.fetchall()
                 
@@ -2646,6 +2684,7 @@ class TrendsCache:
                     SELECT title, url, published_date, description, rank, cached_at
                     FROM nhk_trends_cache 
                     ORDER BY rank
+                    LIMIT 50
                 """)
                 data = cursor.fetchall()
                 result = []
@@ -2732,6 +2771,7 @@ class TrendsCache:
                     SELECT title, url, published_date, description, rank, cached_at
                     FROM cnn_trends_cache 
                     ORDER BY rank
+                    LIMIT 50
                 """)
                 data = cursor.fetchall()
                 result = []
@@ -2837,6 +2877,7 @@ class TrendsCache:
                                created_at, topics, user_name, user_username, rank, cached_at
                         FROM producthunt_trends_cache 
                         ORDER BY rank
+                        LIMIT 50
                     """)
                     data = cursor.fetchall()
                     
@@ -2950,6 +2991,7 @@ class TrendsCache:
                         FROM stock_trends_cache 
                         WHERE market = %s 
                         ORDER BY rank
+                        LIMIT 50
                     """, (market,))
                     data = cursor.fetchall()
                     
@@ -3057,6 +3099,7 @@ class TrendsCache:
                                market_cap, volume_24h, image_url, rank, updated_at, cached_at
                         FROM crypto_trends_cache 
                         ORDER BY rank
+                        LIMIT 50
                     """)
                     data = cursor.fetchall()
                     
@@ -3165,6 +3208,7 @@ class TrendsCache:
                         FROM movie_trends_cache 
                         WHERE country = %s
                         ORDER BY rank
+                        LIMIT 50
                     """, (country,))
                     data = cursor.fetchall()
                     
@@ -3321,6 +3365,7 @@ class TrendsCache:
                         FROM book_trends_cache 
                         WHERE country = %s
                         ORDER BY rank ASC, cached_at DESC
+                        LIMIT 50
                     """, (country,))
                     data = cursor.fetchall()
                     
@@ -3429,6 +3474,7 @@ class TrendsCache:
                            due_date, short_description, required_action, notes, rank, cached_at
                     FROM cisa_kev_trends_cache 
                     ORDER BY rank
+                    LIMIT 50
                 """)
                 return [dict(row) for row in cursor.fetchall()]
         
@@ -3502,6 +3548,7 @@ class TrendsCache:
                     SELECT title, url, published_date, description, author, rank, cached_at
                     FROM thehackernews_trends_cache 
                     ORDER BY rank
+                    LIMIT 50
                 """)
                 data = cursor.fetchall()
                 result = []
@@ -3584,6 +3631,7 @@ class TrendsCache:
                     SELECT title, url, published_date, description, author, rank, cached_at
                     FROM ipa_trends_cache 
                     ORDER BY rank
+                    LIMIT 50
                 """)
                 data = cursor.fetchall()
                 result = []
@@ -3674,6 +3722,7 @@ class TrendsCache:
                     SELECT title, url, published_date, description, author, rank, cached_at
                     FROM jpcert_trends_cache 
                     ORDER BY rank
+                    LIMIT 50
                 """)
                 data = cursor.fetchall()
                 result = []
@@ -3764,6 +3813,7 @@ class TrendsCache:
                     SELECT title, url, published_date, description, author, rank, cached_at
                     FROM hackernoon_trends_cache 
                     ORDER BY rank
+                    LIMIT 50
                 """)
                 data = cursor.fetchall()
                 result = []
@@ -3852,6 +3902,7 @@ class TrendsCache:
                     SELECT title, url, published_date, description, author, rank, cached_at
                     FROM zenn_trends_cache 
                     ORDER BY rank
+                    LIMIT 50
                 """)
                 data = cursor.fetchall()
                 result = []
@@ -3965,6 +4016,7 @@ class TrendsCache:
                     FROM ebay_trends_cache 
                     WHERE category = %s
                     ORDER BY rank
+                    LIMIT 50
                 """, (category,))
                 data = cursor.fetchall()
                 result = []
@@ -4070,6 +4122,7 @@ class TrendsCache:
                     SELECT title, url, slug, published_date, description, author, rank, cached_at
                     FROM medium_trends_cache 
                     ORDER BY rank
+                    LIMIT 50
                 """)
                 data = cursor.fetchall()
                 result = []
@@ -4167,6 +4220,7 @@ class TrendsCache:
                            positive_reactions_count, comments_count, reading_time_minutes, tags, author, rank, cached_at
                     FROM devto_trends_cache 
                     ORDER BY rank
+                    LIMIT 50
                 """)
                 data = cursor.fetchall()
                 result = []

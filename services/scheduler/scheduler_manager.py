@@ -410,16 +410,16 @@ class TrendsScheduler:
                     if cache_key:
                         successful_cache_keys.append(cache_key)
             
-            # 成功したトレンドのみタイムスタンプを更新
+            # 成功したトレンドのみタイムスタンプを更新（更新完了時刻を使用）
             timestamp_updated = False
             max_retries = 3
             for attempt in range(max_retries):
                 try:
                     logger.info(f"🔄 成功したトレンドの更新時刻を更新します（{len(successful_cache_keys)}件）[試行 {attempt + 1}/{max_retries}]")
-                    success = self.db.update_successful_trends_timestamp(successful_cache_keys, start_time)
+                    success = self.db.update_successful_trends_timestamp(successful_cache_keys, end_time)
                     if success:
                         timestamp_updated = True
-                        logger.info(f"✅ 成功したトレンドの更新時刻を更新しました: {len(successful_cache_keys)}件 ({start_time.strftime('%Y-%m-%d %H:%M:%S JST')})")
+                        logger.info(f"✅ 成功したトレンドの更新時刻を更新しました: {len(successful_cache_keys)}件 ({end_time.strftime('%Y-%m-%d %H:%M:%S JST')})")
                         break
                     else:
                         logger.warning(f"⚠️ 更新時刻の更新が失敗しました（戻り値がFalse）。再試行します...")

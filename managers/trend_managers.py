@@ -11,7 +11,8 @@ from services.trends.podcast_trends import PodcastTrendsManager
 from services.trends.rakuten_trends import RakutenTrendsManager
 from services.trends.hatena_trends import HatenaTrendsManager
 from services.trends.twitch_trends import TwitchTrendsManager
-from services.trends.reddit_trends import RedditTrendsManager
+# Redditは使用していないため無効化
+# from services.trends.reddit_trends import RedditTrendsManager
 from services.trends.hackernews_trends import HackerNewsTrendsManager
 from services.trends.qiita_trends import QiitaTrendsManager
 from services.trends.producthunt_trends import ProductHuntTrendsManager
@@ -48,7 +49,8 @@ MANAGER_CONFIGS = [
     ('rakuten', RakutenTrendsManager, 'Rakuten'),
     ('hatena', HatenaTrendsManager, 'Hatena'),
     ('twitch', TwitchTrendsManager, 'Twitch'),
-    ('reddit', RedditTrendsManager, 'Reddit'),
+    # Redditは使用していないため無効化
+    # ('reddit', RedditTrendsManager, 'Reddit'),
     ('hackernews', HackerNewsTrendsManager, 'Hacker News'),
     ('qiita', QiitaTrendsManager, 'Qiita'),
     ('producthunt', ProductHuntTrendsManager, 'Product Hunt'),
@@ -208,7 +210,8 @@ def refresh_all_trends(managers, force_refresh=True):
             def ebay_handler(m, cat=category):
                 return m.get_trends(category=cat, limit=25, force_refresh=force_refresh)
             call_manager('ebay', ebay_handler, 'US')
-    call_manager('reddit', lambda m: m.get_trends('all', limit=25, time_filter='day', force_refresh=force_refresh), 'US')
+    # Redditは使用していないため無効化
+    # call_manager('reddit', lambda m: m.get_trends('all', limit=25, time_filter='day', force_refresh=force_refresh), 'US')
     call_manager('hackernews', lambda m: m.get_trends('top', limit=25, force_refresh=force_refresh), 'US')
     call_manager('producthunt', lambda m: m.get_trends(limit=25, sort='votes', force_refresh=force_refresh), 'US')
     call_manager('cnn', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')

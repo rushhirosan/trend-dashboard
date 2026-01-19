@@ -206,40 +206,81 @@ class TwitchTrendsManager(BaseTrendsManager):
         try:
             logger.info("🔍 Twitch: 全カテゴリのデータを取得開始")
             
+            # 認証情報の確認
+            if not self.client_id or not self.client_secret:
+                error_msg = "Twitch API認証情報が設定されていません（TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET）"
+                logger.error(f"❌ {error_msg}")
+                return {
+                    'success': False,
+                    'error': error_msg,
+                    'data': []
+                }
+            
             all_data = []
             categories = self.get_available_categories()
+            errors = []
             
             for category in categories:
                 logger.debug(f"🔍 カテゴリ '{category}': データ取得中...")
                 
-                if category == 'games':
-                    result = self._get_top_games_from_api(25)
-                elif category == 'streams':
-                    result = self._get_top_streams_from_api(25)
-                elif category == 'clips':
-                    result = self._get_top_clips_from_api(25)
-                else:
-                    continue
-                
-                if result and result.get('data'):
-                    trends_data = result['data']
-                    # カテゴリ情報を追加
-                    for item in trends_data:
-                        item['category'] = category
-                    all_data.extend(trends_data)
-                    logger.info(f"✅ カテゴリ '{category}': {len(trends_data)}件取得")
-                else:
-                    logger.warning(f"⚠️ カテゴリ '{category}': データ取得失敗")
+                try:
+                    if category == 'games':
+                        result = self._get_top_games_from_api(25)
+                    elif category == 'streams':
+                        result = self._get_top_streams_from_api(25)
+                    elif category == 'clips':
+                        result = self._get_top_clips_from_api(25)
+                    else:
+                        continue
+                    
+                    if result and result.get('data'):
+                        trends_data = result['data']
+                        # カテゴリ情報を追加
+                        for item in trends_data:
+                            item['category'] = category
+                        all_data.extend(trends_data)
+                        logger.info(f"✅ カテゴリ '{category}': {len(trends_data)}件取得")
+                    else:
+                        error_msg = result.get('error', 'Unknown error') if result else 'API call failed'
+                        logger.warning(f"⚠️ カテゴリ '{category}': データ取得失敗 - {error_msg}")
+                        errors.append(f"{category}: {error_msg}")
+                except Exception as e:
+                    error_msg = f"カテゴリ '{category}' 取得エラー: {str(e)}"
+                    logger.error(f"❌ {error_msg}", exc_info=True)
+                    errors.append(error_msg)
             
             if all_data:
                 logger.info(f"🔍 Twitch: 全カテゴリのデータをキャッシュに保存開始 ({len(all_data)}件)")
                 self._save_all_categories_to_cache(all_data)
                 logger.info(f"✅ Twitch: 全カテゴリのデータをキャッシュに保存完了 ({len(all_data)}件)")
+                return {
+                    'success': True,
+                    'data': all_data,
+                    'status': 'api_fetched',
+                    'source': 'Twitch API',
+                    'total_count': len(all_data),
+                    'errors': errors if errors else None
+                }
             else:
-                logger.warning("⚠️ Twitch: 取得できるデータがありませんでした")
+                error_msg = "取得できるデータがありませんでした"
+                if errors:
+                    error_msg += f" (エラー: {', '.join(errors)})"
+                logger.warning(f"⚠️ Twitch: {error_msg}")
+                return {
+                    'success': False,
+                    'error': error_msg,
+                    'data': [],
+                    'errors': errors
+                }
                 
         except Exception as e:
-            logger.error(f"❌ Twitch: 全カテゴリ取得エラー: {e}", exc_info=True)
+            error_msg = f"全カテゴリ取得エラー: {str(e)}"
+            logger.error(f"❌ Twitch: {error_msg}", exc_info=True)
+            return {
+                'success': False,
+                'error': error_msg,
+                'data': []
+            }
     
     def _save_all_categories_to_cache(self, all_data):
         """全カテゴリのデータをキャッシュに保存"""

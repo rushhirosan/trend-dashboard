@@ -1052,8 +1052,10 @@ function loadCachedDataUS() {
     // Load Medium from cache
     loadMediumFromCacheUS();
     
-    // Load eBay from cache (default: fashion)
-    loadEbayFromCacheUS('fashion');
+    // Load eBay from cache (default: cell_phones to match initial select option)
+    const ebayCategorySelect = document.getElementById('ebayCategorySelectUS');
+    const initialCategory = ebayCategorySelect ? ebayCategorySelect.value : 'cell_phones';
+    loadEbayFromCacheUS(initialCategory);
     
     // Load Twitch from cache
     loadTwitchFromCacheUS();
@@ -2423,6 +2425,11 @@ function loadEbayFromCacheUS(category = 'fashion') {
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
             
+            // カテゴリー情報を明示的に追加（APIレスポンスに含まれていない場合）
+            if (data && !data.category) {
+                data.category = category;
+            }
+            
             if (data.success && data.data && data.data.length > 0) {
                 displayEbayResults(data);
             } else {
@@ -2473,6 +2480,11 @@ function loadEbayFromCacheUSWithRefresh(category = 'fashion') {
         .then(data => {
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
+            
+            // カテゴリー情報を明示的に追加（APIレスポンスに含まれていない場合）
+            if (data && !data.category) {
+                data.category = category;
+            }
             
             if (data.success && data.data && data.data.length > 0) {
                 displayEbayResults(data);
@@ -2597,11 +2609,25 @@ function displayEbayResults(data) {
     const errorElement = document.getElementById('ebayErrorMessage');
     const resultsElement = document.getElementById('ebayResults');
     const loadingElement = document.getElementById('ebayLoading');
+    const categoryNameElement = document.getElementById('ebayCategoryName');
     
     if (!tableBody || !resultsElement) {
         console.error('eBay Popular/Trending DOM elements not found');
         return;
     }
+    
+    // カテゴリー名のマッピング
+    const categoryNameMap = {
+        'cell_phones': 'Cell Phones & Accessories',
+        'fashion': 'Fashion',
+        'home_garden': 'Home & Garden',
+        'computers': 'Computers/Tablets',
+        'video_games': 'Video Games & Consoles',
+        'beauty': 'Beauty & Health',
+        'toys': 'Toys & Hobbies',
+        'sports': 'Sports & Outdoors',
+        'automotive': 'Automotive Parts & Accessories'
+    };
     
     if (loadingElement) loadingElement.style.display = 'none';
     if (errorElement) errorElement.style.display = 'none';
@@ -2613,6 +2639,43 @@ function displayEbayResults(data) {
     
     // Hide status message
     statusMessage.style.display = 'none';
+    
+    // カテゴリー名を更新
+    // APIレスポンスからカテゴリー情報を取得（data.category または data.data[0].category）
+    let category = data.category;
+    if (!category && data.data && data.data.length > 0 && data.data[0].category) {
+        category = data.data[0].category;
+    }
+    
+    // 選択されているカテゴリーを取得
+    const ebayCategorySelect = document.getElementById('ebayCategorySelectUS');
+    let selectedCategory = null;
+    if (ebayCategorySelect) {
+        selectedCategory = ebayCategorySelect.value;
+    }
+    
+    // カテゴリーが取得できない場合は、選択されているカテゴリーを使用
+    if (!category) {
+        category = selectedCategory || 'cell_phones';
+    }
+    
+    // 選択されているカテゴリーと表示されているデータのカテゴリーが一致しない場合に警告
+    if (selectedCategory && category && selectedCategory !== category) {
+        console.warn(`⚠️ eBay category mismatch: selected=${selectedCategory}, displayed=${category}`);
+        // 選択されているカテゴリーに合わせてデータを再取得
+        if (ebayCategorySelect) {
+            console.log(`🔄 Reloading eBay data for selected category: ${selectedCategory}`);
+            loadEbayFromCacheUS(selectedCategory);
+            return;
+        }
+    }
+    
+    // カテゴリー名を表示
+    if (categoryNameElement && category) {
+        const categoryName = categoryNameMap[category] || category;
+        categoryNameElement.textContent = categoryName;
+        console.log(`📊 eBay category displayed: ${categoryName} (${category})`);
+    }
     
     // Clear table
     tableBody.innerHTML = '';

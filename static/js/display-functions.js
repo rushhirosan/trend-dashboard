@@ -204,8 +204,8 @@ function displayBookResults(data) {
             const author = item.author || (item.authors && item.authors.length > 0 ? item.authors.join(', ') : 'N/A') || 'N/A';
             const price = item.price ? `¥${parseInt(item.price).toLocaleString()}` : 'N/A';
             const sales = item.sales ? parseInt(item.sales).toLocaleString() : 'N/A';
-            // リンクの優先順位: amazon_link > item_url > affiliate_url
-            const bookLink = item.amazon_link || item.item_url || item.affiliate_url || '#';
+        // リンクの優先順位: amazon_link > affiliate_url > item_url
+        const bookLink = item.amazon_link || item.affiliate_url || item.item_url || '#';
             const imageUrl = item.image_url || '';
             
             row.innerHTML = `

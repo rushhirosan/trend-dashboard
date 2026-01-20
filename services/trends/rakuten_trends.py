@@ -27,6 +27,22 @@ class RakutenTrendsManager(BaseTrendsManager):
         logger.info(f"  App ID: {'設定済み' if self.rakuten_app_id else '未設定'}")
         logger.info(f"  Affiliate ID: {'設定済み' if self.rakuten_affiliate_id else '未設定'}")
     
+    def _add_affiliate_params(self, url: str) -> str:
+        """楽天アイテムURLにaffiliateIdを付与（既に付与済みなら何もしない）"""
+        if not url or not self.rakuten_affiliate_id:
+            return url
+        try:
+            from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
+            parsed = urlparse(url)
+            query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+            if query.get('affiliateId'):
+                return url
+            query['affiliateId'] = self.rakuten_affiliate_id
+            new_query = urlencode(query, doseq=True)
+            return urlunparse(parsed._replace(query=new_query))
+        except Exception:
+            return url
+    
     def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
         genre_id = kwargs.get('genre_id', None)
@@ -220,7 +236,7 @@ class RakutenTrendsManager(BaseTrendsManager):
                         'review_count': item_info.get('reviewCount', 0),
                         'review_average': item_info.get('reviewAverage', 0),
                         'image_url': item_info.get('mediumImageUrls', [{}])[0].get('imageUrl', ''),
-                        'url': item_info.get('itemUrl', ''),
+                        'url': self._add_affiliate_params(item_info.get('itemUrl', '')),
                         'shop_name': item_info.get('shopName', ''),
                         'genre_id': item_info.get('genreId', ''),
                         'sales_rank': item_info.get('salesRank', 'N/A'),  # 売上ランク
@@ -297,7 +313,7 @@ class RakutenTrendsManager(BaseTrendsManager):
                         'review_count': item_info.get('reviewCount', 0),
                         'review_average': item_info.get('reviewAverage', 0),
                         'image_url': item_info.get('mediumImageUrls', [{}])[0].get('imageUrl', ''),
-                        'url': item_info.get('itemUrl', ''),
+                        'url': self._add_affiliate_params(item_info.get('itemUrl', '')),
                         'shop_name': item_info.get('shopName', ''),
                         'genre_id': item_info.get('genreId', ''),
                         'sales_rank': item_info.get('salesRank', 'N/A'),  # 売上ランク

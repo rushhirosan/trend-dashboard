@@ -27,7 +27,6 @@ class BookTrendsManager(BaseTrendsManager):
         self.rakuten_base_url = "https://app.rakuten.co.jp/services/api/BooksTotal/Search/20170404"
         self.rakuten_ranking_url = "https://app.rakuten.co.jp/services/api/BooksBook/Search/20170404"
         self.rakuten_app_id = os.getenv('RAKUTEN_APP_ID')
-        self.rakuten_affiliate_id = os.getenv('RAKUTEN_AFFILIATE_ID')
         
         # Google Books API設定（US向け）
         self.google_books_base_url = "https://www.googleapis.com/books/v1"
@@ -35,11 +34,14 @@ class BookTrendsManager(BaseTrendsManager):
         
         # AmazonアソシエイトID設定
         self.amazon_affiliate_id = os.getenv('AMAZON_AFFILIATE_ID', '').strip()
+        # 楽天アフィリエイトID設定（楽天ブックス用）
+        self.rakuten_affiliate_id = os.getenv('RAKUTEN_AFFILIATE_ID', '').strip()
         
         logger.info("Book Trends Manager初期化完了")
         logger.info(f"  楽天ブックス App ID: {'設定済み' if self.rakuten_app_id else '未設定'}")
         logger.info(f"  Google Books API Key: {'設定済み' if self.google_books_api_key else '未設定'}")
         logger.info(f"  Amazon Affiliate ID: {'設定済み' if self.amazon_affiliate_id else '未設定'}")
+        logger.info(f"  Rakuten Affiliate ID: {'設定済み' if self.rakuten_affiliate_id else '未設定'}")
     
     def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
@@ -109,6 +111,31 @@ class BookTrendsManager(BaseTrendsManager):
             url = f"https://www.{domain}/s?k={search_query}&tag={self.amazon_affiliate_id}"
         
         return url
+    
+    def _add_rakuten_affiliate(self, url: str) -> str:
+        """楽天アイテムURLへaffiliateIdを付与（既存クエリは保持）
+        
+        Args:
+            url: 楽天商品/ブックスのURL
+        """
+        if not url or not self.rakuten_affiliate_id:
+            return url
+        
+        try:
+            from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
+            parsed = urlparse(url)
+            query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+            
+            # 既にaffiliateIdが付いていればそのまま
+            if 'affiliateId' in query and query['affiliateId']:
+                return url
+            
+            query['affiliateId'] = self.rakuten_affiliate_id
+            new_query = urlencode(query, doseq=True)
+            return urlunparse(parsed._replace(query=new_query))
+        except Exception:
+            # パース失敗時は元URLを返す
+            return url
     
     def _fetch_trends(self, country='JP', limit=25, *args, **kwargs):
         """外部APIから書籍データを取得"""
@@ -319,8 +346,10 @@ class BookTrendsManager(BaseTrendsManager):
                         'publisher': item_data.get('publisherName', ''),
                         'price': item_data.get('itemPrice', 0),
                         'sales': item_data.get('sales', 0),
-                        'item_url': item_data.get('itemUrl', ''),
-                        'affiliate_url': item_data.get('affiliateUrl', ''),
+                        # itemUrlを優先し、affiliateIdが未付与なら付ける
+                        'item_url': self._add_rakuten_affiliate(item_data.get('itemUrl', '')),
+                        # 楽天APIが返すaffiliateUrlがあれば使い、なければitemUrlを補完
+                        'affiliate_url': item_data.get('affiliateUrl', '') or self._add_rakuten_affiliate(item_data.get('itemUrl', '')),
                         'amazon_link': self._generate_amazon_link(
                             item_data.get('title', ''),
                             isbn,

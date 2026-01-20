@@ -27,7 +27,7 @@ def update_google_trends():
         logger.info("=" * 60)
         logger.info("🇯🇵 日本のGoogleトレンドを更新中...")
         logger.info("=" * 60)
-        result_jp = manager.get_trends('JP', limit=25, force_refresh=True)
+        result_jp = manager.get_trends('JP', limit=20, force_refresh=True)
         
         if result_jp.get('success'):
             data_count = len(result_jp.get('data', []))
@@ -53,7 +53,7 @@ def update_google_trends():
         logger.info("=" * 60)
         logger.info("🇺🇸 USのGoogleトレンドを更新中...")
         logger.info("=" * 60)
-        result_us = manager.get_trends('US', limit=25, force_refresh=True)
+        result_us = manager.get_trends('US', limit=20, force_refresh=True)
         
         if result_us.get('success'):
             data_count = len(result_us.get('data', []))

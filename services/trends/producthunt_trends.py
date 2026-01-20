@@ -90,7 +90,7 @@ class ProductHuntTrendsManager(BaseTrendsManager):
             logger.error(f"⚠️ Product Hunt アクセストークン取得エラー: {e}", exc_info=True)
             self.access_token = None
     
-    def _get_cache_key(self):
+    def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
         return 'producthunt_trends'
 
@@ -130,7 +130,7 @@ class ProductHuntTrendsManager(BaseTrendsManager):
             logger.error(f"❌ Product Hunt キャッシュクリアエラー: {e}", exc_info=True)
             return False
 
-    def _update_cache_status(self, cache_key, data_count):
+    def _update_cache_status(self, cache_key, data_count, *args, **kwargs):
         """cache_statusテーブルを更新"""
         try:
             return self.db.update_cache_status(cache_key, data_count)

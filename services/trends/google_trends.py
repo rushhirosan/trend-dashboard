@@ -150,6 +150,38 @@ class GoogleTrendsManager(BaseTrendsManager):
                     'data': []
                 }
             
+            # まず、利用可能な最新のrefresh_dateを確認（デバッグ用）
+            if region == 'US':
+                check_query = """
+                SELECT DISTINCT refresh_date
+                FROM `bigquery-public-data.google_trends.top_terms`
+                ORDER BY refresh_date DESC
+                LIMIT 10
+                """
+            else:
+                check_query = f"""
+                SELECT DISTINCT refresh_date
+                FROM `bigquery-public-data.google_trends.international_top_terms`
+                WHERE country_code = '{region}'
+                ORDER BY refresh_date DESC
+                LIMIT 10
+                """
+            
+            try:
+                check_df = pandas_gbq.read_gbq(check_query, project_id=self.project_id, credentials=self.credentials)
+                if not check_df.empty:
+                    available_dates = []
+                    for date_val in check_df['refresh_date'].head(5):
+                        if isinstance(date_val, pd.Timestamp):
+                            date_str = date_val.strftime('%Y-%m-%d')
+                            days_old = (datetime.now() - date_val.to_pydatetime()).days
+                            available_dates.append(f"{date_str} ({days_old}日前)")
+                        else:
+                            available_dates.append(str(date_val))
+                    logger.info(f"📅 利用可能な最新のrefresh_date（上位5件）: {', '.join(available_dates)}")
+            except Exception as e:
+                logger.warning(f"⚠️ refresh_date確認クエリエラー: {e}")
+            
             # USデータの場合はtop_termsテーブルを使用
             if region == 'US':
                 logger.info(f"{region}のデータを取得するため、top_termsテーブルを使用します")

@@ -240,10 +240,16 @@ function displayGoogleResults(data) {
                 <i class="fas fa-search"></i> 検索URLなし
             </button>`;
         
+        // トラフィック情報を表示
+        const trafficDisplay = trend.traffic ? 
+            `<span class="badge bg-info">${trend.traffic}</span>` : 
+            `<span class="text-muted">-</span>`;
+        
         row.innerHTML = `
             <td><span class="badge bg-primary">${index + 1}</span></td>
             <td><strong>${trend.keyword || trend.term || 'N/A'}</strong></td>
-            <td><strong>${trend.score.toLocaleString()}</strong></td>
+            <td><strong>${Math.round(trend.score).toLocaleString()}</strong></td>
+            <td>${trafficDisplay}</td>
             <td>${searchLink}</td>
         `;
         tableBody.appendChild(row);

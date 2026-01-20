@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime
 from database_config import TrendsCache
 from dotenv import load_dotenv
@@ -22,6 +23,50 @@ class GoogleTrendsManager(BaseTrendsManager):
         super().__init__(service_name='google', max_requests=10, window_seconds=60)
         
         logger.info(f"Google Trends Manager初期化完了 (trendspyg使用)")
+    
+    def _parse_traffic_to_score(self, traffic_str):
+        """
+        traffic文字列（例: "200+", "500+", "1M+"）を数値スコアに変換
+        
+        Args:
+            traffic_str: trendspygから取得したtraffic文字列
+            
+        Returns:
+            int: トラフィックに基づくスコア（0-100）
+        """
+        if not traffic_str or not isinstance(traffic_str, str):
+            return 0
+        
+        # 数値と単位を抽出
+        # 例: "200+", "500+", "1M+", "10K+"
+        match = re.search(r'([\d.]+)([KMB]?)\+?', traffic_str.upper())
+        if not match:
+            return 0
+        
+        value = float(match.group(1))
+        unit = match.group(2)
+        
+        # 単位を数値に変換
+        multipliers = {
+            'K': 1000,
+            'M': 1000000,
+            'B': 1000000000
+        }
+        
+        if unit in multipliers:
+            value = value * multipliers[unit]
+        
+        # スコアに変換（100万+ = 100点、10万+ = 50点、1万+ = 25点、1000+ = 10点）
+        if value >= 1000000:
+            return 100
+        elif value >= 100000:
+            return 50
+        elif value >= 10000:
+            return 25
+        elif value >= 1000:
+            return 10
+        else:
+            return 5
     
     def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す（regionなどの追加引数も受け取れるようにする）"""
@@ -76,11 +121,11 @@ class GoogleTrendsManager(BaseTrendsManager):
             logger.warning(f"⚠️ Google Trends: cache_status更新エラー: {e}")
             return False
     
-    def _fetch_trends(self, region='JP', limit=25, *args, **kwargs):
+    def _fetch_trends(self, region='JP', limit=20, *args, **kwargs):
         """外部APIからGoogle Trendsデータを取得（trendspyg使用）"""
         return self.get_trendspyg_data(region, limit)
     
-    def get_trends(self, region='JP', limit=25, force_refresh=False):
+    def get_trends(self, region='JP', limit=20, force_refresh=False):
         """Google Trendsを取得（キャッシュ優先、フォールバックでtrendspyg）"""
         # BaseTrendsManagerの共通処理を使用
         # auto_fetch_on_cache_miss=Trueで、キャッシュがない場合はtrendspygを呼び出す
@@ -96,7 +141,7 @@ class GoogleTrendsManager(BaseTrendsManager):
             result['country'] = region
         return result
     
-    def get_trendspyg_data(self, region='JP', limit=25):
+    def get_trendspyg_data(self, region='JP', limit=20):
         """trendspygを使用してGoogle Trendsデータを取得"""
         try:
             logger.info(f"=== Google Trends trendspyg取得開始 ===")
@@ -137,6 +182,10 @@ class GoogleTrendsManager(BaseTrendsManager):
                 
                 logger.info(f"✅ trendspygから{len(trends_list)}件のデータを取得しました")
                 
+                # 取得可能な最大件数を確認（trendspygが返す全件数とlimitの小さい方）
+                available_count = min(limit, len(trends_list))
+                logger.info(f"📊 取得件数: {available_count}件 (limit={limit}, 取得可能={len(trends_list)}件)")
+                
                 # データを辞書形式に変換
                 trends_data = []
                 current_date = datetime.now().strftime('%Y-%m-%d')
@@ -154,13 +203,23 @@ class GoogleTrendsManager(BaseTrendsManager):
                     # トラフィック情報を取得（存在する場合）
                     traffic = trend_item.get('traffic', '')
                     
+                    # トラフィック情報からスコアを計算
+                    traffic_score = self._parse_traffic_to_score(traffic)
+                    
                     # ニュース記事の最初のURLを取得（存在する場合）
                     news_articles = trend_item.get('news_articles', [])
                     news_url = news_articles[0].get('url', '') if news_articles else ''
                     
                     # ランクに基づくスコアを計算（上位ほど高いスコア）
                     rank = idx + 1
-                    score = 100 - (rank - 1) * (100 / min(limit, len(trends_list)))
+                    rank_score = 100 - (rank - 1) * (100 / min(limit, len(trends_list)))
+                    
+                    # トラフィックスコアとランクスコアを組み合わせ（trafficが優先）
+                    # traffic_scoreがある場合はそれを使用、ない場合はrank_scoreを使用
+                    if traffic_score > 0:
+                        score = traffic_score + (rank_score * 0.2)  # トラフィックスコアを優先、ランクで微調整
+                    else:
+                        score = rank_score  # trafficがない場合はrank_scoreを使用
                     
                     trends_data.append({
                         'keyword': keyword,
@@ -171,12 +230,13 @@ class GoogleTrendsManager(BaseTrendsManager):
                         'refresh_date': current_date,
                         'google_search_url': google_search_url,
                         'traffic': traffic,
+                        'traffic_score': traffic_score,  # トラフィックスコアも含める
                         'news_url': news_url
                     })
                     
                     # 最初の3件だけログ出力
                     if rank <= 3:
-                        logger.debug(f"行 {rank}: keyword='{keyword}', traffic='{traffic}'")
+                        logger.debug(f"行 {rank}: keyword='{keyword}', traffic='{traffic}', traffic_score={traffic_score:.1f}, final_score={score:.1f}")
                 
                 logger.info(f"✅ Google Trends: {len(trends_data)}件のデータを変換しました (国コード: {region})")
                 

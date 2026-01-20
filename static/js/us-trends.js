@@ -867,10 +867,16 @@ function displayGoogleResults(data) {
         
         const googleSearchUrl = item.google_search_url || `https://www.google.com/search?q=${encodeURIComponent(keyword)}&geo=US`;
         
+        // トラフィック情報を表示
+        const trafficDisplay = item.traffic ? 
+            `<span class="badge bg-info">${item.traffic}</span>` : 
+            `<span class="text-muted">-</span>`;
+        
         row.innerHTML = `
             <td><span class="badge bg-primary">${rank}</span></td>
             <td><a href="${googleSearchUrl}" target="_blank" class="text-decoration-none"><strong>${keyword}</strong></a></td>
-            <td>${popularity}</td>
+            <td>${Math.round(popularity).toLocaleString()}</td>
+            <td>${trafficDisplay}</td>
             <td>
                 <a href="${googleSearchUrl}" 
                    target="_blank" class="btn btn-sm btn-outline-primary">

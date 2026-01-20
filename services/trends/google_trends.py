@@ -150,9 +150,6 @@ class GoogleTrendsManager(BaseTrendsManager):
                     'data': []
                 }
             
-            # USデータの取得のみに集中
-            logger.info("USデータを取得します")
-            
             # USデータの場合はtop_termsテーブルを使用
             if region == 'US':
                 logger.info(f"{region}のデータを取得するため、top_termsテーブルを使用します")

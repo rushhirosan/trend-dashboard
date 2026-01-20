@@ -63,7 +63,8 @@ try:
                 elif table_name == 'youtube_trends_cache':
                     cursor.execute(f"SELECT COUNT(*) as count FROM {table_name} WHERE region_code = %s", (filter_value,))
                 elif table_name == 'google_trends_cache':
-                    cursor.execute(f"SELECT COUNT(*) as count FROM {table_name} WHERE country = %s", (filter_value,))
+                    # regionカラムを使用（countryカラムではない）
+                    cursor.execute(f"SELECT COUNT(*) as count FROM {table_name} WHERE region = %s", (filter_value,))
                 elif table_name == 'music_trends_cache':
                     cursor.execute(f"SELECT COUNT(*) as count FROM {table_name} WHERE region_code = %s", (filter_value,))
                 elif table_name == 'podcast_trends_cache':
@@ -154,6 +155,55 @@ try:
         print(f"  ❌ cache_statusテーブルの確認エラー: {e}")
         import traceback
         traceback.print_exc()
+    
+    # Googleトレンドの詳細確認を追加
+    print("\n" + "=" * 60)
+    print("Googleトレンドの詳細確認")
+    print("=" * 60)
+    
+    for region in ['JP', 'US']:
+        try:
+            # キャッシュデータの件数と最新の更新日時を確認
+            cursor.execute("""
+                SELECT COUNT(*) as count, MAX(created_at) as latest_created
+                FROM google_trends_cache 
+                WHERE region = %s
+            """, (region,))
+            result = cursor.fetchone()
+            count = result['count'] if result else 0
+            latest_created = result['latest_created'] if result else None
+            
+            # 最新のキーワードを取得
+            cursor.execute("""
+                SELECT keyword, score, created_at
+                FROM google_trends_cache 
+                WHERE region = %s
+                ORDER BY created_at DESC, score DESC
+                LIMIT 5
+            """, (region,))
+            keywords = cursor.fetchall()
+            
+            status = "✅" if count > 0 else "❌"
+            print(f"\n{status} Google Trends ({region}): {count}件")
+            if latest_created:
+                if isinstance(latest_created, datetime):
+                    if latest_created.tzinfo is None:
+                        latest_created_jst = jst.localize(latest_created)
+                    else:
+                        latest_created_jst = latest_created.astimezone(jst)
+                    time_str = latest_created_jst.strftime('%Y-%m-%d %H:%M:%S JST')
+                    print(f"   最新更新: {time_str}")
+                else:
+                    print(f"   最新更新: {latest_created}")
+            
+            if keywords:
+                print(f"   最新のキーワード（上位5件）:")
+                for i, kw in enumerate(keywords, 1):
+                    print(f"     {i}. {kw['keyword']} (score: {kw['score']})")
+            else:
+                print(f"   ⚠️ キーワードデータがありません")
+        except Exception as e:
+            print(f"❌ Google Trends ({region}) 確認エラー: {e}")
     
     cursor.close()
     conn.close()

@@ -52,6 +52,13 @@ class eBayTrendsManager(BaseTrendsManager):
         self.access_token = None
         self.token_expires_at = None
         
+        # eBayアフィリエイトID設定
+        self.ebay_affiliate_id = os.getenv('EBAY_AFFILIATE_ID', '').strip()
+        if self.ebay_affiliate_id:
+            logger.info(f"  eBay Affiliate ID: 設定済み")
+        else:
+            logger.info(f"  eBay Affiliate ID: 未設定")
+        
         # カテゴリ定義（カテゴリID、表示名、キーワード）
         self.categories = {
             'cell_phones': {
@@ -172,6 +179,23 @@ class eBayTrendsManager(BaseTrendsManager):
             logger.error(f"❌ eBay トレンド取得エラー: {e}", exc_info=True)
             return {'error': f'eBayトレンドの取得に失敗しました: {str(e)}', 'success': False}
     
+    def _add_affiliate_params(self, url):
+        """eBay URLにアフィリエイトパラメータを追加
+        
+        Args:
+            url: eBay商品URL
+        
+        Returns:
+            str: アフィリエイトパラメータが追加されたURL、または元のURL（アフィリエイトID未設定時）
+        """
+        if not self.ebay_affiliate_id or not url:
+            return url
+        
+        # URLに既にパラメータがあるかチェック
+        separator = '&' if '?' in url else '?'
+        affiliate_url = f"{url}{separator}mkevt=1&mkcid=1&mkrid={self.ebay_affiliate_id}"
+        return affiliate_url
+    
     def _fetch_trends(self, category='fashion', limit=25, *args, **kwargs):
         """eBay Browse APIから人気商品を取得
         
@@ -271,7 +295,7 @@ class eBayTrendsManager(BaseTrendsManager):
                     formatted_item = {
                         'rank': i,
                         'title': item.get('title', 'No Title'),
-                        'url': item.get('itemWebUrl', ''),
+                        'url': self._add_affiliate_params(item.get('itemWebUrl', '')),
                         'item_id': item.get('itemId', ''),
                         'price': item.get('price', {}).get('value', '') if item.get('price') else '',
                         'currency': item.get('price', {}).get('currency', 'USD') if item.get('price') else 'USD',

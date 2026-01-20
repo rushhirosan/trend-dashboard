@@ -1736,6 +1736,21 @@ function loadHackerNewsFromCacheUS() {
         })
         .then(data => {
             console.log('Hacker News API data:', data);
+            // キャッシュがない場合は自動的にAPIから取得を試みる
+            if (data.success && data.status === 'cache_not_found' && (!data.data || data.data.length === 0)) {
+                console.log('Hacker News: キャッシュが見つかりません。APIから取得を試みます...');
+                return fetchWithRetry('/api/hackernews-trends?type=top&limit=25&force_refresh=true')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}`);
+                        }
+                        return response.json();
+                    });
+            }
+            return data;
+        })
+        .then(data => {
+            console.log('Hacker News final data:', data);
             if (data.success && data.data && data.data.length > 0) {
                 console.log('Hacker News data display starting');
                 displayHackerNewsResults(data);

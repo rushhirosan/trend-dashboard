@@ -58,12 +58,12 @@ class HackerNewsTrendsManager(BaseTrendsManager):
     def get_trends(self, story_type='top', limit=25, force_refresh=False):
         """Hacker Newsトレンドを取得（キャッシュ優先、scoreでソート）"""
         # ベースクラスのget_trendsを使用
-        # auto_fetch_on_cache_miss=Falseで、既存動作を維持（キャッシュがない場合はAPIを呼び出さない）
+        # auto_fetch_on_cache_miss=Trueで、キャッシュがない場合はAPIを呼び出す
         # sort_key='score'でスコアでソート
         result = super().get_trends(
             limit=limit,
             force_refresh=force_refresh,
-            auto_fetch_on_cache_miss=False,  # 既存動作を維持
+            auto_fetch_on_cache_miss=True,  # キャッシュがない場合はAPIを呼び出す
             sort_key='score',  # スコアでソート
             sort_reverse=True,  # 降順
             story_type=story_type

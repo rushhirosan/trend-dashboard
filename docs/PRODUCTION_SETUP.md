@@ -44,6 +44,11 @@ YOUTUBE_API_KEY="your-youtube-api-key"
 # Spotify API（音楽トレンド）
 SPOTIFY_CLIENT_ID="your-spotify-client-id"
 SPOTIFY_CLIENT_SECRET="your-spotify-client-secret"
+
+# GitHub API（GitHubトレンド、オプション）
+# 未設定でも動作しますが、認証なしは1時間60回制限があります
+# 認証ありは1時間5,000回まで可能です
+GITHUB_ACCESS_TOKEN="your-github-access-token"
 ```
 
 ### 3. Google Cloud認証（Google Trends用）
@@ -88,6 +93,7 @@ fly secrets set \
   YOUTUBE_API_KEY="your-youtube-api-key" \
   SPOTIFY_CLIENT_ID="your-spotify-client-id" \
   SPOTIFY_CLIENT_SECRET="your-spotify-client-secret" \
+  GITHUB_ACCESS_TOKEN="your-github-access-token" \
   SENDER_EMAIL="your-email@gmail.com" \
   SENDER_PASSWORD="your-email-password" \
   SMTP_SERVER="smtp.gmail.com" \

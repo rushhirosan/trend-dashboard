@@ -82,11 +82,11 @@ if app is None:
     app = fallback_app
 
 # スケジューラーを開始（gunicornのworkerプロセスで実行、エラーが発生しても続行）
+# 詳細なログはscheduler_manager.pyで出力されるため、ここでは簡潔に記録
 if scheduler:
     try:
         scheduler.start()
-        logger.info("🚀 スケジューラー開始完了")
-        logger.info("📅 毎日朝7:00（日本時間）に全トレンドを自動取得します")
+        logger.debug("✅ スケジューラー開始（詳細ログはscheduler_managerを参照）")
     except Exception as e:
         logger.warning(f"⚠️ スケジューラー開始エラー: {e}", exc_info=True)
         scheduler = None

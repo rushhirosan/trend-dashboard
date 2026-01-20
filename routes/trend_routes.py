@@ -162,7 +162,7 @@ def get_google_trends(manager):
         
         logger.info(f"📊 Google Trends API呼び出し: country={country}, force_refresh={force_refresh}")
 
-        result = manager.get_trends(country, force_refresh=force_refresh)
+        result = manager.get_trends(region=country, force_refresh=force_refresh)
         logger.info(f"✅ Google Trends API成功: result keys={list(result.keys()) if isinstance(result, dict) else 'N/A'}")
         return handle_trend_response(result, 'Google Trends', 'Google Trends', country=country)
 

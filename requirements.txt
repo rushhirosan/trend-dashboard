@@ -29,7 +29,7 @@ tweepy==4.4.0
 Janome==0.4.1
 pandas>=1.5.3
 pandas-gbq>=0.19.0
-trendspyg>=1.0.0
+trendspyg>=0.4.2
 yfinance>=0.2.0
 yahooquery>=2.4.0
 feedparser==6.0.12

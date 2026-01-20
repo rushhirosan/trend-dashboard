@@ -23,8 +23,8 @@ class GoogleTrendsManager(BaseTrendsManager):
         
         logger.info(f"Google Trends Manager初期化完了 (trendspyg使用)")
     
-    def _get_cache_key(self):
-        """キャッシュキーを返す"""
+    def _get_cache_key(self, *args, **kwargs):
+        """キャッシュキーを返す（regionなどの追加引数も受け取れるようにする）"""
         return 'google_trends'
     
     def _get_from_cache(self, *args, **kwargs):
@@ -68,8 +68,8 @@ class GoogleTrendsManager(BaseTrendsManager):
             logger.error(f"❌ Google Trends キャッシュクリアエラー: {e}", exc_info=True)
             return False
     
-    def _update_cache_status(self, cache_key, data_count):
-        """cache_statusテーブルを更新"""
+    def _update_cache_status(self, cache_key, data_count, *args, **kwargs):
+        """cache_statusテーブルを更新（regionなど追加引数を許容）"""
         try:
             return self.db.update_cache_status(cache_key, data_count)
         except Exception as e:

@@ -3239,6 +3239,7 @@ class TrendsCache:
                     for row in data:
                         result.append(dict(row))
                     
+                    logger.debug(f"✅ movie_trendsキャッシュから{len(result)}件のデータを取得しました (country: {country})")
                     return result
                     
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:

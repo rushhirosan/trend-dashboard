@@ -435,6 +435,8 @@ class TrendsCache:
                     backdrop_path VARCHAR(500),
                     poster_url TEXT,
                     backdrop_url TEXT,
+                    item_url TEXT,
+                    amazon_link TEXT,
                     rank INTEGER,
                     updated_at TIMESTAMP,
                     cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -726,6 +728,16 @@ class TrendsCache:
                 
                 cursor.execute(create_tables_sql)
                 conn.commit()
+                
+                # movie_trends_cacheテーブルのスキーマ更新（既存テーブルにカラムを追加）
+                try:
+                    cursor.execute("ALTER TABLE movie_trends_cache ADD COLUMN IF NOT EXISTS item_url TEXT")
+                    cursor.execute("ALTER TABLE movie_trends_cache ADD COLUMN IF NOT EXISTS amazon_link TEXT")
+                    conn.commit()
+                    logger.info("✅ movie_trends_cacheテーブルのスキーマ更新完了")
+                except Exception as e:
+                    logger.warning(f"⚠️ movie_trends_cacheのスキーマ更新に失敗しました: {e}", exc_info=True)
+                
                 logger.info("✅ データベーステーブル作成完了")
                 return True
                     
@@ -3160,8 +3172,8 @@ class TrendsCache:
                             INSERT INTO movie_trends_cache
                             (country, movie_id, title, original_title, overview, popularity,
                              vote_average, vote_count, release_date, poster_path,
-                             backdrop_path, poster_url, backdrop_url, rank, updated_at)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                             backdrop_path, poster_url, backdrop_url, item_url, amazon_link, rank, updated_at)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """, (
                             country,
                             item.get('id', 0),
@@ -3176,6 +3188,8 @@ class TrendsCache:
                             item.get('backdrop_path', ''),
                             item.get('poster_url', ''),
                             item.get('backdrop_url', ''),
+                            item.get('item_url', ''),
+                            item.get('amazon_link', ''),
                             item.get('rank', 0),
                             item.get('updated_at')
                         ))
@@ -3212,7 +3226,7 @@ class TrendsCache:
                     cursor.execute("""
                         SELECT country, movie_id, title, original_title, overview, popularity,
                                vote_average, vote_count, release_date, poster_path,
-                               backdrop_path, poster_url, backdrop_url, rank, updated_at, cached_at
+                               backdrop_path, poster_url, backdrop_url, item_url, amazon_link, rank, updated_at, cached_at
                         FROM movie_trends_cache 
                         WHERE country = %s
                         ORDER BY rank

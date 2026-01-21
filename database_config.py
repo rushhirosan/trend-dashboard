@@ -3167,32 +3167,37 @@ class TrendsCache:
                     cursor.execute("DELETE FROM movie_trends_cache WHERE country = %s", (country,))
                     
                     # 新しいデータを挿入
-                    for item in data:
-                        cursor.execute("""
-                            INSERT INTO movie_trends_cache
-                            (country, movie_id, title, original_title, overview, popularity,
-                             vote_average, vote_count, release_date, poster_path,
-                             backdrop_path, poster_url, backdrop_url, item_url, amazon_link, rank, updated_at)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        """, (
-                            country,
-                            item.get('id', 0),
-                            item.get('title', ''),
-                            item.get('original_title', ''),
-                            item.get('overview', ''),
-                            item.get('popularity', 0),
-                            item.get('vote_average', 0),
-                            item.get('vote_count', 0),
-                            item.get('release_date', ''),
-                            item.get('poster_path', ''),
-                            item.get('backdrop_path', ''),
-                            item.get('poster_url', ''),
-                            item.get('backdrop_url', ''),
-                            item.get('item_url', ''),
-                            item.get('amazon_link', ''),
-                            item.get('rank', 0),
-                            item.get('updated_at')
-                        ))
+                    for idx, item in enumerate(data):
+                        try:
+                            cursor.execute("""
+                                INSERT INTO movie_trends_cache
+                                (country, movie_id, title, original_title, overview, popularity,
+                                 vote_average, vote_count, release_date, poster_path,
+                                 backdrop_path, poster_url, backdrop_url, item_url, amazon_link, rank, updated_at)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            """, (
+                                country,
+                                item.get('id', 0),
+                                item.get('title', ''),
+                                item.get('original_title', ''),
+                                item.get('overview', ''),
+                                item.get('popularity', 0),
+                                item.get('vote_average', 0),
+                                item.get('vote_count', 0),
+                                item.get('release_date', ''),
+                                item.get('poster_path', ''),
+                                item.get('backdrop_path', ''),
+                                item.get('poster_url', ''),
+                                item.get('backdrop_url', ''),
+                                item.get('item_url', ''),
+                                item.get('amazon_link', ''),
+                                item.get('rank', 0),
+                                item.get('updated_at')
+                            ))
+                        except Exception as item_error:
+                            logger.error(f"❌ movie_trendsキャッシュ保存エラー (item {idx}): {item_error}", exc_info=True)
+                            logger.error(f"Item data: {item}")
+                            raise
                     # cache_statusテーブルを更新
                     import pytz
                     jst = pytz.timezone('Asia/Tokyo')

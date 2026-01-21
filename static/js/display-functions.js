@@ -146,22 +146,31 @@ function displayMovieResults(data) {
             const rating = item.vote_average ? (typeof item.vote_average === 'number' ? item.vote_average.toFixed(1) : parseFloat(item.vote_average).toFixed(1)) : 'N/A';
             const releaseDate = item.release_date || 'N/A';
             const posterUrl = item.poster_url || '';
-            // リンクの優先順位: amazon_link > item_url > TMDBリンク
-            let movieLink = item.amazon_link || item.item_url;
+            
+            // TMDBリンクを生成（タイトルは常にTMDBリンク）
             const movieId = item.id || item.movie_id;
-            if (!movieLink && movieId) {
-                movieLink = `https://www.themoviedb.org/movie/${movieId}`;
+            let tmdbLink = item.item_url;
+            if (!tmdbLink && movieId) {
+                tmdbLink = `https://www.themoviedb.org/movie/${movieId}`;
             }
-            if (!movieLink) {
-                movieLink = '#';
+            if (!tmdbLink) {
+                tmdbLink = '#';
             }
+            
+            // Amazonリンクが存在する場合は「Amazonで見る」ボタンを追加
+            const amazonButton = item.amazon_link 
+                ? `<br><a href="${item.amazon_link}" target="_blank" class="btn btn-sm btn-warning mt-1" style="font-size: 0.75rem;">
+                    <i class="fas fa-shopping-cart"></i> Amazonで見る
+                   </a>`
+                : '';
             
             row.innerHTML = `
                 <td><span class="badge bg-primary">${item.rank || index + 1}</span></td>
                 <td>
                     ${posterUrl ? `<img src="${posterUrl}" alt="${item.title}" style="width: 50px; height: 75px; object-fit: cover; margin-right: 10px; float: left;">` : ''}
-                    <strong><a href="${movieLink}" target="_blank">${item.title || 'N/A'}</a></strong>
+                    <strong><a href="${tmdbLink}" target="_blank">${item.title || 'N/A'}</a></strong>
                     ${item.original_title && item.original_title !== item.title ? `<br><small class="text-muted">${item.original_title}</small>` : ''}
+                    ${amazonButton}
                 </td>
                 <td>${rating}</td>
                 <td>${releaseDate}</td>

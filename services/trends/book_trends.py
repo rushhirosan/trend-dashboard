@@ -420,7 +420,7 @@ class BookTrendsManager(BaseTrendsManager):
             
             if force_refresh:
                 logger.info(f"🔄 Book (Google) force_refresh: キャッシュをクリアします")
-                self.db.clear_book_trends_cache('US')
+                self._clear_cache(country='US')
             
             # キャッシュからデータを取得
             cached_data = self.db.get_book_trends_from_cache('US')

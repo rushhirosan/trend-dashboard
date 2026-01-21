@@ -304,7 +304,11 @@ class IPATrendsManager(BaseTrendsManager):
                 reverse=True
             )
             # 制限数まで取得
-            result['data'] = data[:limit]
+            data = data[:limit]
+            # rankを再設定（1から始まる）
+            for i, item in enumerate(data, 1):
+                item['rank'] = i
+            result['data'] = data
         
         return result
     
@@ -431,6 +435,10 @@ class IPATrendsManager(BaseTrendsManager):
             # sort_dateは内部用なので削除
             for item in formatted_data:
                 item.pop('sort_date', None)
+            
+            # rankを設定（1から始まる）
+            for i, item in enumerate(formatted_data, 1):
+                item['rank'] = i
             
             logger.info(f"✅ IPA: {len(formatted_data)}件の注意喚起情報を取得しました")
             

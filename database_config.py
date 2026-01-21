@@ -3163,6 +3163,18 @@ class TrendsCache:
         try:
             with self.get_connection() as conn:
                 with conn.cursor() as cursor:
+                    # テーブルスキーマを確認し、必要に応じてカラムを追加
+                    try:
+                        cursor.execute("ALTER TABLE movie_trends_cache ADD COLUMN IF NOT EXISTS item_url TEXT")
+                        cursor.execute("ALTER TABLE movie_trends_cache ADD COLUMN IF NOT EXISTS amazon_link TEXT")
+                        conn.commit()
+                        logger.info("✅ movie_trends_cacheテーブルのスキーマ更新完了（item_url, amazon_link）")
+                    except Exception as schema_error:
+                        # カラムが既に存在する場合やその他のエラーは無視
+                        conn.rollback()
+                        if "already exists" not in str(schema_error).lower() and "duplicate" not in str(schema_error).lower():
+                            logger.debug(f"⚠️ movie_trends_cacheスキーマ更新: {schema_error}")
+                    
                     # 既存のデータを削除（国別）
                     cursor.execute("DELETE FROM movie_trends_cache WHERE country = %s", (country,))
                     
@@ -3227,6 +3239,16 @@ class TrendsCache:
         """Movie Trendsデータをキャッシュから取得"""
         try:
             with self.get_connection() as conn:
+                # テーブルスキーマを確認し、必要に応じてカラムを追加
+                with conn.cursor() as schema_cursor:
+                    try:
+                        schema_cursor.execute("ALTER TABLE movie_trends_cache ADD COLUMN IF NOT EXISTS item_url TEXT")
+                        schema_cursor.execute("ALTER TABLE movie_trends_cache ADD COLUMN IF NOT EXISTS amazon_link TEXT")
+                        conn.commit()
+                    except Exception as schema_error:
+                        # カラムが既に存在する場合やその他のエラーは無視
+                        conn.rollback()
+                
                 with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                     cursor.execute("""
                         SELECT country, movie_id, title, original_title, overview, popularity,

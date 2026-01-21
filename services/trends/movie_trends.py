@@ -67,10 +67,16 @@ class MovieTrendsManager(BaseTrendsManager):
         """キャッシュにデータを保存"""
         try:
             country = kwargs.get('country', 'JP')
+            logger.info(f"🎬 Movie: キャッシュ保存開始 (country: {country}, data count: {len(data) if data else 0})")
             # 各データに国コードを追加
             for item in data:
                 item['country'] = country
-            return self.db.save_movie_trends_to_cache(data, country=country)
+            result = self.db.save_movie_trends_to_cache(data, country=country)
+            if result:
+                logger.info(f"✅ Movie: キャッシュ保存成功 (country: {country}, {len(data)}件)")
+            else:
+                logger.warning(f"⚠️ Movie: キャッシュ保存失敗 (country: {country})")
+            return result
         except Exception as e:
             logger.error(f"❌ Movie キャッシュ保存エラー: {e}", exc_info=True)
             return False

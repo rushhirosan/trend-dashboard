@@ -45,8 +45,13 @@ class MovieTrendsManager(BaseTrendsManager):
             country = kwargs.get('country', 'JP')
             cached_data = self.db.get_movie_trends_from_cache(country=country)
             if cached_data:
-                # item_urlを生成（キャッシュデータに含まれていない場合）
+                # データベースから取得したデータのフィールド名を統一
                 for item in cached_data:
+                    # movie_idをidにマッピング（フロントエンドとの互換性のため）
+                    if 'movie_id' in item and 'id' not in item:
+                        item['id'] = item['movie_id']
+                    
+                    # item_urlを生成（キャッシュデータに含まれていない場合）
                     if 'item_url' not in item or not item.get('item_url'):
                         movie_id = item.get('id') or item.get('movie_id')
                         if movie_id:

@@ -509,6 +509,7 @@ class TrendsCache:
                     title TEXT NOT NULL,
                     url TEXT,
                     published_date TIMESTAMP WITH TIME ZONE,
+                    last_updated_date TIMESTAMP WITH TIME ZONE,
                     description TEXT,
                     author VARCHAR(255),
                     rank INTEGER DEFAULT 0,
@@ -728,6 +729,14 @@ class TrendsCache:
                 
                 cursor.execute(create_tables_sql)
                 conn.commit()
+                
+                # ipa_trends_cacheテーブルのスキーマ更新（既存テーブルにカラムを追加）
+                try:
+                    cursor.execute("ALTER TABLE ipa_trends_cache ADD COLUMN IF NOT EXISTS last_updated_date TIMESTAMP WITH TIME ZONE")
+                    conn.commit()
+                    logger.info("✅ ipa_trends_cacheテーブルのスキーマ更新完了")
+                except Exception as e:
+                    logger.warning(f"⚠️ ipa_trends_cacheのスキーマ更新に失敗しました: {e}", exc_info=True)
                 
                 # movie_trends_cacheテーブルのスキーマ更新（既存テーブルにカラムを追加）
                 try:
@@ -3642,12 +3651,13 @@ class TrendsCache:
                     for item in data:
                         cursor.execute("""
                             INSERT INTO ipa_trends_cache 
-                            (title, url, published_date, description, author, rank)
-                            VALUES (%s, %s, %s, %s, %s, %s)
+                            (title, url, published_date, last_updated_date, description, author, rank)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
                         """, (
                             item.get('title', ''),
                             item.get('url', ''),
                             item.get('published_date'),
+                            item.get('last_updated_date'),
                             item.get('description', ''),
                             item.get('author', ''),
                             item.get('rank', 0)
@@ -3678,7 +3688,7 @@ class TrendsCache:
         def query_func(conn):
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute("""
-                    SELECT title, url, published_date, description, author, rank, cached_at
+                    SELECT title, url, published_date, last_updated_date, description, author, rank, cached_at
                     FROM ipa_trends_cache 
                     ORDER BY rank
                     LIMIT 50
@@ -3691,6 +3701,10 @@ class TrendsCache:
                     if row_dict.get('published_date'):
                         if isinstance(row_dict['published_date'], datetime):
                             row_dict['published_date'] = row_dict['published_date'].isoformat()
+                    # last_updated_dateをISO形式の文字列に変換
+                    if row_dict.get('last_updated_date'):
+                        if isinstance(row_dict['last_updated_date'], datetime):
+                            row_dict['last_updated_date'] = row_dict['last_updated_date'].isoformat()
                     result.append(row_dict)
                 return result
         

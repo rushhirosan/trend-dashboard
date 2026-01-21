@@ -189,6 +189,57 @@ class IPATrendsManager(BaseTrendsManager):
         
         return None
     
+    def _fetch_last_updated_date_from_html(self, url):
+        """
+        HTMLページから最終更新日を取得
+        """
+        if not url:
+            return None
+        
+        try:
+            # レート制限をチェック
+            self.rate_limiter.wait_if_needed()
+            
+            response = requests.get(url, timeout=10, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            })
+            
+            if response.status_code == 200:
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(response.text, 'html.parser')
+                
+                # テキストから日付を抽出
+                text = soup.get_text()
+                
+                # パターン1: 最終更新日：2025年10月16日
+                date_pattern1 = r'最終更新日[：:]\s*(\d{4})年(\d{1,2})月(\d{1,2})日'
+                match1 = re.search(date_pattern1, text)
+                if match1:
+                    year = int(match1.group(1))
+                    month = int(match1.group(2))
+                    day = int(match1.group(3))
+                    try:
+                        return datetime(year, month, day)
+                    except ValueError as e:
+                        logger.debug(f"IPA HTML最終更新日パースエラー: {url}, {e}")
+                
+                # パターン2: 最終更新日：2025/10/16
+                date_pattern2 = r'最終更新日[：:]\s*(\d{4})/(\d{1,2})/(\d{1,2})'
+                match2 = re.search(date_pattern2, text)
+                if match2:
+                    year = int(match2.group(1))
+                    month = int(match2.group(2))
+                    day = int(match2.group(3))
+                    try:
+                        return datetime(year, month, day)
+                    except ValueError as e:
+                        logger.debug(f"IPA HTML最終更新日パースエラー: {url}, {e}")
+                        
+        except Exception as e:
+            logger.debug(f"IPA HTML最終更新日取得エラー: {url}, {e}")
+        
+        return None
+    
     def _is_updated_alert(self, title):
         """
         タイトルに「更新：」が含まれているかチェック
@@ -232,17 +283,30 @@ class IPATrendsManager(BaseTrendsManager):
             return False
 
     def get_trends(self, limit=25, force_refresh=False):
-        """IPA注意喚起トレンドを取得（キャッシュ優先、実際の公開日でソート）"""
-        # ベースクラスのget_trendsを使用
-        # auto_fetch_on_cache_miss=Falseで、既存動作を維持（キャッシュがない場合はAPIを呼び出さない）
-        # sort_key='published_date'で実際の公開日でソート
-        return super().get_trends(
-            limit=limit,
+        """IPA注意喚起トレンドを取得（キャッシュ優先、最終更新日を優先してソート）"""
+        # ベースクラスのget_trendsを使用（sort_keyはNoneにして、後でカスタムソートを適用）
+        result = super().get_trends(
+            limit=limit * 2,  # ソートのために少し多めに取得
             force_refresh=force_refresh,
-            auto_fetch_on_cache_miss=False,  # 既存動作を維持
-            sort_key='published_date',  # 実際の公開日でソート
+            auto_fetch_on_cache_miss=False,  # 既存動作を維持（キャッシュがない場合はAPIを呼び出さない）
+            sort_key=None,  # カスタムソートを適用するためNone
             sort_reverse=True  # 降順（新しい順）
         )
+        
+        # 最終更新日を優先してソート
+        if result.get('success') and result.get('data'):
+            data = result['data']
+            # 最終更新日を優先してソート（最終更新日がある場合はそれでソート、ない場合は公開日でソート）
+            data.sort(
+                key=lambda x: (
+                    x.get('last_updated_date') or x.get('original_published_date') or x.get('published_date') or ''
+                ),
+                reverse=True
+            )
+            # 制限数まで取得
+            result['data'] = data[:limit]
+        
+        return result
     
     def _fetch_trends(self, limit=25, *args, **kwargs):
         """IPA注意喚起RSSフィードからトレンドデータを取得"""
@@ -311,10 +375,21 @@ class IPATrendsManager(BaseTrendsManager):
                     # タイトルを取得
                     title = entry.get('title', 'No Title')
                     
+                    # 更新情報かどうかを判定
+                    is_updated = self._is_updated_alert(title)
+                    
+                    # 最終更新日を取得（更新された記事のみHTMLから取得）
+                    # パフォーマンスを考慮して、更新された記事のみHTMLから取得
+                    last_updated_date = None
+                    if is_updated:
+                        # 更新された記事はHTMLから最終更新日を取得
+                        last_updated_date = self._fetch_last_updated_date_from_html(entry_url)
+                    
                     # 実際の公開日を優先（取得できた場合）
-                    # タイトルに「更新：」がある場合は、更新情報として扱うが、
-                    # ソートは元の公開日で行う（更新日ではない）
                     published_date = original_published_date if original_published_date else rss_published_date
+                    
+                    # ソート用の日付：最終更新日がある場合はそれを使用、ない場合は公開日を使用
+                    sort_date = last_updated_date if last_updated_date else published_date
                     
                     # 説明文を取得
                     description = ''
@@ -323,38 +398,39 @@ class IPATrendsManager(BaseTrendsManager):
                     elif hasattr(entry, 'summary'):
                         description = entry.summary
                     
-                    # 更新情報かどうかを判定
-                    is_updated = self._is_updated_alert(title)
-                    
                     formatted_item = {
                         'title': title,
                         'url': entry_url,
                         'published_date': published_date.isoformat() if published_date else None,
                         'original_published_date': original_published_date.isoformat() if original_published_date else None,
                         'rss_published_date': rss_published_date.isoformat() if rss_published_date else None,
+                        'last_updated_date': last_updated_date.isoformat() if last_updated_date else None,
                         'is_updated': is_updated,  # 更新情報かどうか
                         'description': description,
                         'author': entry.get('author', ''),
-                        'source': 'IPA'
+                        'source': 'IPA',
+                        # ソート用の日付（最終更新日を優先）
+                        'sort_date': sort_date.isoformat() if sort_date else None
                     }
                     formatted_data.append(formatted_item)
                 except Exception as e:
                     logger.warning(f"⚠️ IPA エントリーパースエラー: {e}")
                     continue
             
-            # 実際の公開日（original_published_date）でソート、なければpublished_dateでソート
-            # 更新情報（is_updated=True）の場合は、元の公開日でソートするが、
-            # 同じ公開日の場合は更新情報を少し優先（ただし、これは元の公開日が同じ場合のみ）
+            # 最終更新日を優先してソート（最終更新日がある場合はそれでソート、ない場合は公開日でソート）
             formatted_data.sort(
                 key=lambda x: (
-                    x.get('original_published_date') or x.get('published_date') or '',
-                    x.get('is_updated', False)  # 更新情報は同じ日付内で少し優先
+                    x.get('sort_date') or x.get('last_updated_date') or x.get('original_published_date') or x.get('published_date') or ''
                 ),
                 reverse=True
             )
             
             # 制限数まで取得
             formatted_data = formatted_data[:limit]
+            
+            # sort_dateは内部用なので削除
+            for item in formatted_data:
+                item.pop('sort_date', None)
             
             logger.info(f"✅ IPA: {len(formatted_data)}件の注意喚起情報を取得しました")
             

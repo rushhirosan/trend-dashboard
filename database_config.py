@@ -3647,6 +3647,14 @@ class TrendsCache:
         try:
             with self.get_connection() as conn:
                 with conn.cursor() as cursor:
+                    # カラムが存在しない場合は追加（既存データベース対応）
+                    try:
+                        cursor.execute("ALTER TABLE ipa_trends_cache ADD COLUMN IF NOT EXISTS last_updated_date TIMESTAMP WITH TIME ZONE")
+                        conn.commit()
+                    except Exception as e:
+                        # カラムが既に存在する場合は無視
+                        conn.rollback()
+                    
                     cursor.execute("DELETE FROM ipa_trends_cache")
                     for item in data:
                         cursor.execute("""

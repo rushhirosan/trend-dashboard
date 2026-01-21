@@ -250,6 +250,71 @@ class IPATrendsManager(BaseTrendsManager):
         # 「更新：」「更新:」のいずれかが含まれているか
         return '更新：' in title or '更新:' in title
     
+    def _normalize_title(self, title):
+        """
+        タイトルを正規化して比較用のキーを生成
+        「更新：」や「更新:」を除去して、同じトピックかどうかを判定
+        """
+        if not title:
+            return ''
+        # 「更新：」「更新:」を除去
+        normalized = re.sub(r'^更新[：:]\s*', '', title)
+        return normalized.strip()
+    
+    def _remove_duplicates(self, data):
+        """
+        重複する記事を除去
+        同じトピック（タイトルから「更新：」を除去したもの）が複数ある場合、
+        以下の優先順位で1つだけ残す：
+        1. 最終更新日がある記事（更新版）を優先
+        2. 最終更新日がない場合は、公開日が新しいものを優先
+        3. それでも同じ場合は、タイトルに「更新：」が含まれているものを優先
+        """
+        if not data:
+            return data
+        
+        # タイトルを正規化してグループ化
+        title_groups = {}
+        for item in data:
+            normalized_title = self._normalize_title(item.get('title', ''))
+            if normalized_title not in title_groups:
+                title_groups[normalized_title] = []
+            title_groups[normalized_title].append(item)
+        
+        # 各グループから最適な記事を1つだけ選択
+        result = []
+        for normalized_title, items in title_groups.items():
+            if len(items) == 1:
+                # 重複がない場合はそのまま追加
+                result.append(items[0])
+            else:
+                # 重複がある場合は優先順位で選択
+                # 1. 最終更新日がある記事を優先
+                items_with_update = [item for item in items if item.get('last_updated_date')]
+                items_without_update = [item for item in items if not item.get('last_updated_date')]
+                
+                if items_with_update:
+                    # 最終更新日がある記事の中から、最新のものを選択
+                    selected = max(items_with_update, key=lambda x: (
+                        x.get('last_updated_date') or '',
+                        x.get('original_published_date') or x.get('published_date') or '',
+                        self._is_updated_alert(x.get('title', ''))
+                    ))
+                elif items_without_update:
+                    # 最終更新日がない記事の中から、最新のものを選択
+                    selected = max(items_without_update, key=lambda x: (
+                        x.get('original_published_date') or x.get('published_date') or '',
+                        self._is_updated_alert(x.get('title', ''))
+                    ))
+                else:
+                    # フォールバック（通常は発生しない）
+                    selected = items[0]
+                
+                result.append(selected)
+                logger.debug(f"重複除去: '{normalized_title}' から {len(items)}件中1件を選択")
+        
+        return result
+    
     def _get_cache_key(self):
         """キャッシュキーを返す"""
         return 'ipa_trends'
@@ -296,6 +361,12 @@ class IPATrendsManager(BaseTrendsManager):
         # 最終更新日を優先してソート
         if result.get('success') and result.get('data'):
             data = result['data']
+            # 重複除去を実行（ソートの前に行う）
+            original_count = len(data)
+            data = self._remove_duplicates(data)
+            removed_count = original_count - len(data)
+            if removed_count > 0:
+                logger.info(f"✅ IPA: キャッシュから取得したデータから {removed_count}件の重複記事を除去しました（{original_count}件 → {len(data)}件）")
             # 最終更新日を優先してソート（最終更新日がある場合はそれでソート、ない場合は公開日でソート）
             data.sort(
                 key=lambda x: (
@@ -420,6 +491,13 @@ class IPATrendsManager(BaseTrendsManager):
                 except Exception as e:
                     logger.warning(f"⚠️ IPA エントリーパースエラー: {e}")
                     continue
+            
+            # 重複除去を実行（ソートの前に行う）
+            original_count = len(formatted_data)
+            formatted_data = self._remove_duplicates(formatted_data)
+            removed_count = original_count - len(formatted_data)
+            if removed_count > 0:
+                logger.info(f"✅ IPA: {removed_count}件の重複記事を除去しました（{original_count}件 → {len(formatted_data)}件）")
             
             # 最終更新日を優先してソート（最終更新日がある場合はそれでソート、ない場合は公開日でソート）
             formatted_data.sort(

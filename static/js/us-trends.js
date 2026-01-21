@@ -854,38 +854,38 @@ function displayGoogleResults(data) {
     // Clear table
     tableBody.innerHTML = '';
     
-    // Add data to table
-    console.log('Data structure check:', data.data[0]); // Debug: Check first item structure
-    console.log('All data keys:', Object.keys(data.data[0] || {})); // Debug: Check all available keys
+    // Popularity（score/popularity）の降順でソート
+    const sortedData = [...data.data].sort((a, b) => {
+        const scoreA = a.score || a.popularity || 0;
+        const scoreB = b.score || b.popularity || 0;
+        return scoreB - scoreA; // 降順
+    });
     
-    data.data.forEach((item, index) => {
+    // Add data to table
+    console.log('Data structure check:', sortedData[0]); // Debug: Check first item structure
+    console.log('All data keys:', Object.keys(sortedData[0] || {})); // Debug: Check all available keys
+    
+    sortedData.forEach((item, index) => {
         const row = document.createElement('tr');
         const keyword = item.keyword || item.term || item.name || 'N/A';
-        const popularity = item.popularity || item.score || 'N/A';
-        const rank = item.rank || (index + 1); // Fallback to index if rank is missing
+        const popularity = item.popularity || item.score || 0;
         
         // Debug: Log each item
         if (index < 3) {
             console.log(`Item ${index}:`, {
                 keyword: keyword,
                 popularity: popularity,
-                rank: rank,
+                rank: index + 1,
                 allKeys: Object.keys(item)
             });
         }
         
         const googleSearchUrl = item.google_search_url || `https://www.google.com/search?q=${encodeURIComponent(keyword)}&geo=US`;
         
-        // トラフィック情報を表示
-        const trafficDisplay = item.traffic ? 
-            `<span class="badge bg-info">${item.traffic}</span>` : 
-            `<span class="text-muted">-</span>`;
-        
         row.innerHTML = `
-            <td><span class="badge bg-primary">${rank}</span></td>
+            <td><span class="badge bg-primary">${index + 1}</span></td>
             <td><a href="${googleSearchUrl}" target="_blank" class="text-decoration-none"><strong>${keyword}</strong></a></td>
             <td>${Math.round(popularity).toLocaleString()}</td>
-            <td>${trafficDisplay}</td>
             <td>
                 <a href="${googleSearchUrl}" 
                    target="_blank" class="btn btn-sm btn-outline-primary">

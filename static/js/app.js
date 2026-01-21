@@ -220,8 +220,16 @@ function displayGoogleResults(data) {
 
     // テーブルを更新
     console.log('displayGoogleResults: テーブル更新開始', { dataLength: data.data.length });
+    
+    // Popularity（score）の降順でソート
+    const sortedData = [...data.data].sort((a, b) => {
+        const scoreA = a.score || a.popularity || 0;
+        const scoreB = b.score || b.popularity || 0;
+        return scoreB - scoreA; // 降順
+    });
+    
     tableBody.innerHTML = '';
-    data.data.forEach((trend, index) => {
+    sortedData.forEach((trend, index) => {
         const row = document.createElement('tr');
         row.className = 'trend-card';
         row.style.minHeight = '100px';
@@ -240,16 +248,12 @@ function displayGoogleResults(data) {
                 <i class="fas fa-search"></i> 検索URLなし
             </button>`;
         
-        // トラフィック情報を表示
-        const trafficDisplay = trend.traffic ? 
-            `<span class="badge bg-info">${trend.traffic}</span>` : 
-            `<span class="text-muted">-</span>`;
+        const popularity = trend.score || trend.popularity || 0;
         
         row.innerHTML = `
             <td><span class="badge bg-primary">${index + 1}</span></td>
             <td><strong>${trend.keyword || trend.term || 'N/A'}</strong></td>
-            <td><strong>${Math.round(trend.score).toLocaleString()}</strong></td>
-            <td>${trafficDisplay}</td>
+            <td><strong>${Math.round(popularity).toLocaleString()}</strong></td>
             <td>${searchLink}</td>
         `;
         tableBody.appendChild(row);
@@ -259,14 +263,14 @@ function displayGoogleResults(data) {
                 rank: index + 1,
                 keyword: trend.keyword,
                 term: trend.term,
-                score: trend.score
+                score: popularity
             });
         }
     });
 
-    // グラフを更新
+    // グラフを更新（ソート済みデータを使用）
     console.log('displayGoogleResults: グラフ更新開始');
-    updateGoogleChart(data.data);
+    updateGoogleChart(sortedData);
 
     // 結果を表示
     console.log('displayGoogleResults: 結果表示開始');

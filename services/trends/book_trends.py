@@ -67,10 +67,22 @@ class BookTrendsManager(BaseTrendsManager):
             return False
 
     def _clear_cache(self, *args, **kwargs):
-        """キャッシュをクリア"""
+        """キャッシュをクリア（cache_statusも同時にクリア）"""
         try:
             country = kwargs.get('country', 'JP')
-            return self.db.clear_book_trends_cache(country)
+            cache_key = f'book_trends_{country}'
+            
+            # キャッシュテーブルをクリア
+            cache_cleared = self.db.clear_book_trends_cache(country)
+            
+            # cache_statusもクリア（data_countを0に設定）
+            try:
+                self.db.update_cache_status(cache_key, 0)
+                logger.debug(f"✅ Book ({country}): cache_statusもクリアしました")
+            except Exception as e:
+                logger.warning(f"⚠️ Book ({country}): cache_statusクリアエラー（処理は継続）: {e}")
+            
+            return cache_cleared
         except Exception as e:
             logger.error(f"❌ Book キャッシュクリアエラー: {e}", exc_info=True)
             return False

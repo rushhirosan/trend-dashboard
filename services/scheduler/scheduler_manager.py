@@ -374,6 +374,7 @@ class TrendsScheduler:
             
             # 成功したトレンドのみタイムスタンプを更新
             # refresh_all_trendsの結果キー（例：google_JP）をcache_key（例：google_trends）にマッピング
+            # 注意: 1つのトレンドが複数のcache_keyに展開される場合がある（例：note→5つのcache_key、stock_JP/stock_US→2つのcache_key）
             def map_result_key_to_cache_key(result_key):
                 """refresh_all_trendsの結果キーをcache_keyにマッピング"""
                 if '_' not in result_key:
@@ -424,7 +425,12 @@ class TrendsScheduler:
                     success = self.db.update_successful_trends_timestamp(successful_cache_keys, end_time)
                     if success:
                         timestamp_updated = True
-                        logger.info(f"✅ 成功したトレンドの更新時刻を更新しました: {len(successful_cache_keys)}件 ({end_time.strftime('%Y-%m-%d %H:%M:%S JST')})")
+                        # 注記: 更新されたcache_key数が成功したトレンド数より多い場合がある
+                        # これは、1つのトレンドが複数のcache_keyに展開されるため（例：note→5つ、stock_JP/stock_US→2つ）
+                        if len(successful_cache_keys) > success_count:
+                            logger.info(f"✅ 成功したトレンドの更新時刻を更新しました: {len(successful_cache_keys)}件のcache_key ({success_count}件のトレンドから展開) ({end_time.strftime('%Y-%m-%d %H:%M:%S JST')})")
+                        else:
+                            logger.info(f"✅ 成功したトレンドの更新時刻を更新しました: {len(successful_cache_keys)}件 ({end_time.strftime('%Y-%m-%d %H:%M:%S JST')})")
                         break
                     else:
                         logger.warning(f"⚠️ 更新時刻の更新が失敗しました（戻り値がFalse）。再試行します...")

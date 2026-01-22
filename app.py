@@ -607,7 +607,7 @@ def main():
         if scheduler:
             scheduler.start()
             logger.info("🚀 スケジューラー開始完了")
-            logger.info("📅 毎日朝7:00、昼14:00、夜19:00（日本時間）に全トレンドを自動取得します")
+            logger.info("📅 毎日朝7:00、昼13:00、夜19:00（日本時間）に全トレンドを自動取得します")
         else:
             logger.warning("⚠️ スケジューラーは無効です")
         

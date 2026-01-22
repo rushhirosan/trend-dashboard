@@ -78,6 +78,14 @@
     align-items: center;
     gap: 0.6rem;
     color: #0d6efd;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+}
+
+#mainHeader .header-title:hover {
+    color: #0a58ca;
+    opacity: 0.85;
 }
 
 #mainHeader .header-title .header-title-icon {

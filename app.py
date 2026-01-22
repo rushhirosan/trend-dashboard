@@ -265,31 +265,32 @@ Sitemap: https://trends-dashboard.fly.dev/sitemap.xml
                 import pytz
                 
                 jst = pytz.timezone('Asia/Tokyo')
-                now = datetime.now(jst).strftime('%Y-%m-%d')
+                now = datetime.now(jst)
+                now_str = now.strftime('%Y-%m-%dT%H:%M:%S') + '+09:00'
                 
                 sitemap_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://trends-dashboard.fly.dev/</loc>
-    <lastmod>{now}</lastmod>
+    <lastmod>{now_str}</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://trends-dashboard.fly.dev/us</loc>
-    <lastmod>{now}</lastmod>
+    <lastmod>{now_str}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://trends-dashboard.fly.dev/data-status</loc>
-    <lastmod>{now}</lastmod>
+    <lastmod>{now_str}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://trends-dashboard.fly.dev/subscription</loc>
-    <lastmod>{now}</lastmod>
+    <lastmod>{now_str}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>

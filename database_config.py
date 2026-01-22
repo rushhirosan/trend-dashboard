@@ -1919,19 +1919,35 @@ class TrendsCache:
                     unique_cache_keys = list(set(cache_keys))
                     
                     # 成功したcache_keyのみタイムスタンプを更新
+                    # INSERT ... ON CONFLICTを使用して、存在しないcache_keyも自動的にINSERTする
+                    # data_countは既存の値を保持（存在しない場合は0）
                     updated_count = 0
+                    inserted_count = 0
                     for cache_key in unique_cache_keys:
                         cursor.execute("""
-                            UPDATE cache_status 
-                            SET last_updated = %s
-                            WHERE cache_key = %s
-                        """, (timestamp, cache_key))
-                        updated_count += cursor.rowcount
+                            INSERT INTO cache_status (cache_key, last_updated, data_count)
+                            VALUES (%s, %s, 0)
+                            ON CONFLICT (cache_key) DO UPDATE SET
+                                last_updated = EXCLUDED.last_updated
+                        """, (cache_key, timestamp))
+                        # rowcountでINSERT/UPDATEのどちらが実行されたかを判定
+                        if cursor.rowcount == 1:
+                            # 既存のレコードを更新した場合
+                            updated_count += 1
+                        else:
+                            # 新規にINSERTした場合
+                            inserted_count += 1
                     
                     conn.commit()
-                    logger.info(f"✅ 成功したトレンドの更新時刻を更新しました: {updated_count}件のcache_keyを更新 ({timestamp.strftime('%Y-%m-%d %H:%M:%S JST')})")
+                    total_count = updated_count + inserted_count
+                    logger.info(f"✅ 成功したトレンドの更新時刻を更新しました: {total_count}件のcache_keyを処理 (更新: {updated_count}件, 新規: {inserted_count}件) ({timestamp.strftime('%Y-%m-%d %H:%M:%S JST')})")
                     if unique_cache_keys:
                         logger.info(f"📋 更新されたcache_keyの例（最初の10件）: {', '.join(unique_cache_keys[:10])}")
+                    
+                    # 処理したcache_key数と実際のcache_key数が一致しない場合に警告
+                    if total_count != len(unique_cache_keys):
+                        logger.warning(f"⚠️ 処理したcache_key数({total_count})と対象cache_key数({len(unique_cache_keys)})が一致しません")
+                    
                     return True
                 
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
@@ -3173,16 +3189,32 @@ class TrendsCache:
             with self.get_connection() as conn:
                 with conn.cursor() as cursor:
                     # テーブルスキーマを確認し、必要に応じてカラムを追加
+                    # 既にカラムが存在するかチェックしてから追加（ログの冗長性を避ける）
                     try:
-                        cursor.execute("ALTER TABLE movie_trends_cache ADD COLUMN IF NOT EXISTS item_url TEXT")
-                        cursor.execute("ALTER TABLE movie_trends_cache ADD COLUMN IF NOT EXISTS amazon_link TEXT")
-                        conn.commit()
-                        logger.info("✅ movie_trends_cacheテーブルのスキーマ更新完了（item_url, amazon_link）")
+                        cursor.execute("""
+                            SELECT column_name 
+                            FROM information_schema.columns 
+                            WHERE table_name = 'movie_trends_cache' 
+                            AND column_name IN ('item_url', 'amazon_link')
+                        """)
+                        existing_columns = {row[0] for row in cursor.fetchall()}
+                        
+                        columns_added = []
+                        if 'item_url' not in existing_columns:
+                            cursor.execute("ALTER TABLE movie_trends_cache ADD COLUMN item_url TEXT")
+                            columns_added.append('item_url')
+                        if 'amazon_link' not in existing_columns:
+                            cursor.execute("ALTER TABLE movie_trends_cache ADD COLUMN amazon_link TEXT")
+                            columns_added.append('amazon_link')
+                        
+                        if columns_added:
+                            conn.commit()
+                            logger.info(f"✅ movie_trends_cacheテーブルのスキーマ更新完了（{', '.join(columns_added)}）")
+                        # 既に全てのカラムが存在する場合はログを出さない
                     except Exception as schema_error:
-                        # カラムが既に存在する場合やその他のエラーは無視
+                        # エラーが発生した場合はログに記録
                         conn.rollback()
-                        if "already exists" not in str(schema_error).lower() and "duplicate" not in str(schema_error).lower():
-                            logger.debug(f"⚠️ movie_trends_cacheスキーマ更新: {schema_error}")
+                        logger.debug(f"⚠️ movie_trends_cacheスキーマ更新: {schema_error}")
                     
                     # 既存のデータを削除（国別）
                     cursor.execute("DELETE FROM movie_trends_cache WHERE country = %s", (country,))

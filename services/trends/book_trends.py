@@ -428,9 +428,13 @@ class BookTrendsManager(BaseTrendsManager):
             # Noneの場合は空配列に変換
             if cached_data is None:
                 cached_data = []
-                logger.warning("⚠️ Book (Google): get_book_trends_from_cacheがNoneを返しました")
+                logger.debug("🔍 Book (Google): キャッシュデータが存在しません (None)")
             
-            logger.info(f"🔍 Book (Google): キャッシュ取得結果 - cached_data is None: {cached_data is None}, length: {len(cached_data) if cached_data else 0}")
+            # ログメッセージを改善（空リストの場合も明確に表示）
+            if cached_data and len(cached_data) > 0:
+                logger.debug(f"🔍 Book (Google): キャッシュから{len(cached_data)}件のデータを取得")
+            else:
+                logger.debug("🔍 Book (Google): キャッシュデータが空です")
             
             if cached_data and len(cached_data) > 0:
                 # ランキング順でソート

@@ -22,6 +22,7 @@ class TrendsScheduler:
         self.scheduler = BackgroundScheduler()
         self.db = TrendsCache()
         self.is_running = False
+        self.last_night_execution_time = None  # 最後に1時のジョブが実行された時刻（datetime形式）
         self.last_daily_execution_date = None  # 最後に7時のジョブが実行された日付（YYYY-MM-DD形式）
         self.last_afternoon_execution_time = None  # 最後に13時のジョブが実行された時刻（datetime形式）
         self.last_evening_execution_time = None  # 最後に19時のジョブが実行された時刻（datetime形式）
@@ -52,6 +53,20 @@ class TrendsScheduler:
             try:
                 # 日本時間（JST）のタイムゾーンを設定
                 jst = pytz.timezone('Asia/Tokyo')
+                
+                # 毎日深夜1時（日本時間）に自動取得を実行
+                # misfire_grace_time: 実行時刻を逃しても最大3600秒（60分）以内なら実行する
+                # coalesce: 複数の実行が遅延した場合、1回だけ実行する
+                self.scheduler.add_job(
+                    func=self._fetch_all_trends,
+                    trigger=CronTrigger(hour=1, minute=0, timezone=jst),
+                    id='daily_trends_fetch_night',
+                    name='毎日深夜1時（日本時間）のトレンド取得',
+                    replace_existing=True,
+                    misfire_grace_time=3600,  # 60分以内なら実行（1時から2時まで）
+                    coalesce=True,  # 複数の遅延実行を1回にまとめる
+                    max_instances=1  # 同時実行は1つのみ
+                )
                 
                 # 毎日朝7時（日本時間）に自動取得を実行
                 # misfire_grace_time: 実行時刻を逃しても最大3600秒（60分）以内なら実行する
@@ -96,7 +111,7 @@ class TrendsScheduler:
                 self.is_running = True
                 
                 logger.info("✅ スケジューラー開始完了")
-                logger.info("📅 毎日朝7:00、昼13:00、夜19:00（日本時間）に全トレンドを自動取得します")
+                logger.info("📅 毎日深夜1:00、朝7:00、昼13:00、夜19:00（日本時間）に全トレンドを自動取得します")
                 
                 # 起動時の自動実行は無効化（デプロイ時の不要なAPI呼び出しとメール送信を防ぐ）
                 # 環境変数SKIP_STARTUP_EXECUTION=trueの場合はスキップ
@@ -148,23 +163,41 @@ class TrendsScheduler:
     
     def _check_and_execute_missed_job(self, jst):
         """
-        起動時に当日の7時、13時、または19時を過ぎている場合は自動実行
+        起動時に当日の1時、7時、13時、または19時を過ぎている場合は自動実行
         （マシンが停止していた場合の補完処理）
         
-        マシンが何時に再起動されても、当日の7時、13時、または19時を過ぎていれば実行する。
+        マシンが何時に再起動されても、当日の1時、7時、13時、または19時を過ぎていれば実行する。
         ただし、既に実行済みの場合は実行しない。
         """
         try:
             now_jst = datetime.now(jst)
             today = now_jst.date()
+            today_1am = now_jst.replace(hour=1, minute=0, second=0, microsecond=0)
             today_7am = now_jst.replace(hour=7, minute=0, second=0, microsecond=0)
             today_1pm = now_jst.replace(hour=13, minute=0, second=0, microsecond=0)
             today_7pm = now_jst.replace(hour=19, minute=0, second=0, microsecond=0)
             
-            # 7時、13時、19時の全てをチェックし、必要に応じて1回だけ実行
+            # 1時、7時、13時、19時の全てをチェックし、必要に応じて1回だけ実行
+            should_execute_1am = False
             should_execute_7am = False
             should_execute_1pm = False
             should_execute_7pm = False
+            
+            # 当日の1時を過ぎているかチェック
+            if now_jst >= today_1am:
+                # 既に実行済みかどうかをチェック（1時間以内に実行されていればスキップ）
+                if self.last_night_execution_time:
+                    time_diff = (now_jst - self.last_night_execution_time).total_seconds()
+                    if time_diff < 3600:  # 1時間以内
+                        logger.info(f"⏰ 起動時チェック: 当日の1時のジョブは既に実行済みです（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
+                    else:
+                        logger.info(f"⏰ 起動時チェック: 当日の1時を過ぎています（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
+                        should_execute_1am = True
+                else:
+                    logger.info(f"⏰ 起動時チェック: 当日の1時を過ぎています（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
+                    should_execute_1am = True
+            else:
+                logger.info(f"⏰ 起動時チェック: 当日の1時前です（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
             
             # 当日の7時を過ぎているかチェック
             if now_jst >= today_7am:
@@ -209,9 +242,11 @@ class TrendsScheduler:
             else:
                 logger.info(f"⏰ 起動時チェック: 当日の19時前です（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
             
-            # 7時、13時、または19時のジョブが必要な場合、1回だけ実行
-            if should_execute_7am or should_execute_1pm or should_execute_7pm:
+            # 1時、7時、13時、または19時のジョブが必要な場合、1回だけ実行
+            if should_execute_1am or should_execute_7am or should_execute_1pm or should_execute_7pm:
                 missed_times = []
+                if should_execute_1am:
+                    missed_times.append("1時")
                 if should_execute_7am:
                     missed_times.append("7時")
                 if should_execute_1pm:
@@ -254,8 +289,14 @@ class TrendsScheduler:
             
             # 既に当日実行済みかチェック（重複実行を防ぐ）
             # force=Trueの場合はスキップしない
-            # ただし、13時や19時のジョブの場合は7時のチェックをスキップ
             if not force:
+                # 1時前後（0:00-2:00）の実行の場合、1時間以内に1時ジョブが実行済みかチェック
+                if 0 <= now_jst.hour < 2 and self.last_night_execution_time:
+                    time_diff = (now_jst - self.last_night_execution_time).total_seconds()
+                    if time_diff < 3600:  # 1時間以内
+                        logger.info(f"⏰ 当日の1時のジョブは既に実行済みです（{time_diff:.0f}秒前）。重複実行をスキップします。")
+                        self._fetching_in_progress = False
+                        return
                 # 7時前後（6:00-8:00）の実行の場合、当日の7時ジョブが既に実行済みかチェック
                 if 6 <= now_jst.hour < 8 and self.last_daily_execution_date == today:
                     logger.info(f"⏰ 当日の7時のジョブは既に実行済みです（{today}）。重複実行をスキップします。")
@@ -414,9 +455,14 @@ class TrendsScheduler:
             if not timestamp_updated:
                 logger.error(f"❌ 成功したトレンドの更新時刻更新に失敗しました（{max_retries}回試行後）。これは重大な問題です。")
             
-            # 実行日付を記録（7時のジョブが実行されたことを記録）
+            # 実行日付を記録（各時刻のジョブが実行されたことを記録）
             now_jst = datetime.now(jst)
             today = now_jst.date()
+            
+            # 1時前後（0:00-2:00）の実行は1時のジョブとして記録
+            if 0 <= now_jst.hour < 2:
+                self.last_night_execution_time = now_jst
+                logger.debug(f"📅 1時のジョブ実行時刻を記録: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}")
             
             # 7時前後（6:00-8:00）の実行は7時のジョブとして記録
             if 6 <= now_jst.hour < 8:
@@ -437,7 +483,7 @@ class TrendsScheduler:
             self._save_execution_log(execution_id, start_time, end_time, total_count, success_count, failed_count, duration)
             
             # データ保存完了後、メール自動送信を実行
-            # スケジューラー実行時（朝7時・昼13時・夜19時）のみメール送信
+            # スケジューラー実行時（深夜1時・朝7時・昼13時・夜19時）のみメール送信
             # デプロイ時や手動実行時は、明示的に指示された場合のみメール送信
             # 環境変数SKIP_EMAIL_ON_UPDATE=trueの場合はスキップ
             skip_email = os.getenv('SKIP_EMAIL_ON_UPDATE', 'false').lower() == 'true'

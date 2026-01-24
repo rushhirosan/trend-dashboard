@@ -4167,20 +4167,59 @@ class TrendsCache:
             with self.get_connection() as conn:
                 with conn.cursor() as cursor:
                     cursor.execute("DELETE FROM medium_trends_cache")
-                    for item in data:
-                        cursor.execute("""
-                        INSERT INTO medium_trends_cache 
-                        (title, url, slug, published_date, description, author, rank)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        item.get('title', ''),
-                        item.get('url', ''),
-                        item.get('slug'),
-                        item.get('published_date'),
-                        item.get('description', ''),
-                        item.get('author', ''),
-                        item.get('rank', 0)
-                    ))
+                    for idx, item in enumerate(data):
+                        try:
+                            # VARCHAR(255)フィールドを255文字に切り詰める
+                            slug = item.get('slug')
+                            slug_original_len = len(slug) if slug else 0
+                            if slug and len(slug) > 255:
+                                slug = slug[:255]
+                                logger.warning(f"⚠️ medium_trends: slugが長すぎるため切り詰めました (rank={item.get('rank', idx+1)}, 元の長さ={slug_original_len})")
+                            
+                            author = item.get('author', '')
+                            author_original_len = len(author) if author else 0
+                            if author and len(author) > 255:
+                                author = author[:255]
+                                logger.warning(f"⚠️ medium_trends: authorが長すぎるため切り詰めました (rank={item.get('rank', idx+1)}, 元の長さ={author_original_len})")
+                            
+                            # 他のフィールドの長さもチェック（デバッグ用）
+                            title = item.get('title', '')
+                            url = item.get('url', '')
+                            description = item.get('description', '')
+                            
+                            if len(title) > 1000:
+                                logger.warning(f"⚠️ medium_trends: titleが長いです (rank={item.get('rank', idx+1)}, 長さ={len(title)})")
+                            if len(url) > 1000:
+                                logger.warning(f"⚠️ medium_trends: urlが長いです (rank={item.get('rank', idx+1)}, 長さ={len(url)})")
+                            if len(description) > 5000:
+                                logger.warning(f"⚠️ medium_trends: descriptionが長いです (rank={item.get('rank', idx+1)}, 長さ={len(description)})")
+                            
+                            cursor.execute("""
+                            INSERT INTO medium_trends_cache 
+                            (title, url, slug, published_date, description, author, rank)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            title,
+                            url,
+                            slug,
+                            item.get('published_date'),
+                            description,
+                            author,
+                            item.get('rank', 0)
+                        ))
+                        except Exception as item_error:
+                            # 個別のアイテムでエラーが発生した場合
+                            error_info = {
+                                'rank': item.get('rank', idx+1),
+                                'title': item.get('title', '')[:100],
+                                'url': item.get('url', '')[:100],
+                                'slug_len': len(item.get('slug', '')) if item.get('slug') else 0,
+                                'author_len': len(item.get('author', '')) if item.get('author') else 0,
+                                'error': str(item_error)
+                            }
+                            logger.error(f"❌ medium_trends: アイテム保存エラー (rank={error_info['rank']}): {item_error}", exc_info=True)
+                            # エラー情報を例外に含める
+                            raise Exception(f"アイテム保存エラー (rank={error_info['rank']}, title={error_info['title']}, slug_len={error_info['slug_len']}, author_len={error_info['author_len']}): {item_error}") from item_error
                     
                     import pytz
                     jst = pytz.timezone('Asia/Tokyo')
@@ -4192,6 +4231,35 @@ class TrendsCache:
                     conn.commit()
                     logger.info(f"✅ medium_trendsキャッシュを保存しました ({len(data)}件)")
                     return True
+        except psycopg2.errors.StringDataRightTruncation as e:
+            # 文字列長超過エラー（既に切り詰め処理を追加しているが、念のため）
+            # エラーの詳細情報をログに記録
+            error_details = []
+            for idx, item in enumerate(data[:10]):  # 最初の10件をチェック
+                item_info = {
+                    'rank': item.get('rank', idx+1),
+                    'title_len': len(item.get('title', '')),
+                    'url_len': len(item.get('url', '')),
+                    'slug_len': len(item.get('slug', '')) if item.get('slug') else 0,
+                    'author_len': len(item.get('author', '')) if item.get('author') else 0,
+                    'description_len': len(item.get('description', '')) if item.get('description') else 0,
+                }
+                # 255文字を超えるフィールドを特定
+                long_fields = []
+                if item_info['slug_len'] > 255:
+                    long_fields.append(f"slug({item_info['slug_len']}文字)")
+                if item_info['author_len'] > 255:
+                    long_fields.append(f"author({item_info['author_len']}文字)")
+                if long_fields:
+                    error_details.append(f"rank={item_info['rank']}: {', '.join(long_fields)}")
+            
+            error_msg = f"データが長すぎます: {e}"
+            if error_details:
+                error_msg += f"\n長いフィールド検出: {'; '.join(error_details)}"
+            
+            logger.error(f"❌ medium_trendsキャッシュ保存エラー: {error_msg}", exc_info=True)
+            # エラー情報を例外に含めて再発生させる（base_trends_managerでキャッチされる）
+            raise Exception(error_msg) from e
         except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
             # 接続エラーの場合
             error_str = str(e)
@@ -4199,24 +4267,39 @@ class TrendsCache:
                 logger.warning(f"⚠️ medium_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
                 # 接続エラーの場合は接続をリセット（次回のget_connection()で再接続される）
                 self.connection = None
+                return False
             else:
                 # 接続エラー以外のデータベースエラー
-                logger.error(f"❌ medium_trendsキャッシュ保存エラー: {e}", exc_info=True)
-            return False
+                # データの詳細情報を含めてエラーを再発生させる
+                error_details = f"データベースエラー: {e}"
+                if data:
+                    sample_info = []
+                    for idx, item in enumerate(data[:3]):
+                        sample_info.append(f"rank={item.get('rank', idx+1)}, title={item.get('title', '')[:50]}")
+                    error_details += f" | サンプルデータ: {'; '.join(sample_info)}"
+                logger.error(f"❌ medium_trendsキャッシュ保存エラー: {error_details}", exc_info=True)
+                # エラー情報を例外に含めて再発生させる
+                raise Exception(error_details) from e
         except RuntimeError as e:
             # コンテキストマネージャーのエラー（generator didn't stop after throw()など）
+            error_details = f"コンテキストマネージャーエラー: {e}"
             if "generator didn't stop" in str(e):
                 logger.warning(f"⚠️ medium_trendsキャッシュ保存中にコンテキストマネージャーエラーが発生: {e}", exc_info=True)
             else:
                 logger.error(f"❌ medium_trendsキャッシュ保存エラー: {e}", exc_info=True)
-            return False
+            # エラー情報を例外に含めて再発生させる
+            raise Exception(error_details) from e
         except Exception as e:
-            logger.error(f"❌ medium_trendsキャッシュ保存エラー: {e}", exc_info=True)
-            try:
-                conn.rollback()
-            except:
-                pass
-            return False
+            # 既に再発生させた例外の場合はそのまま再発生
+            if "アイテム保存エラー" in str(e) or "データが長すぎます" in str(e) or "データベースエラー" in str(e) or "コンテキストマネージャーエラー" in str(e):
+                raise
+            # その他の予期しないエラー
+            error_details = f"予期しないエラー: {e}"
+            if data:
+                error_details += f" | データ件数: {len(data)}"
+            logger.error(f"❌ medium_trendsキャッシュ保存エラー: {error_details}", exc_info=True)
+            # エラー情報を例外に含めて再発生させる
+            raise Exception(error_details) from e
 
     def get_medium_trends_from_cache(self):
         """Medium Trendsデータをキャッシュから取得"""

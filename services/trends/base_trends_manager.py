@@ -11,6 +11,21 @@ from utils.rate_limiter import get_rate_limiter
 
 logger = get_logger(__name__)
 
+# AlertServiceを遅延インポート（オプション）
+_alert_service = None
+
+def _get_alert_service():
+    """AlertServiceを取得（シングルトン）"""
+    global _alert_service
+    if _alert_service is None:
+        try:
+            from utils.alert_service import AlertService
+            _alert_service = AlertService()
+        except Exception as e:
+            logger.debug(f"AlertService初期化エラー（アラート無効）: {e}")
+            _alert_service = None
+    return _alert_service
+
 
 class BaseTrendsManager(ABC):
     """トレンドマネージャーのベースクラス
@@ -100,6 +115,65 @@ class BaseTrendsManager(ABC):
         デフォルトではFalseを返す（キャッシュをクリアしない）
         """
         return False
+    
+    def _format_source_data_for_alert(self, trends_data: List[Dict[str, Any]], error_exception: Optional[Exception] = None) -> Dict[str, str]:
+        """エラーアラート用にソースデータをフォーマット
+        
+        Args:
+            trends_data: 保存しようとしたデータ
+            error_exception: 発生した例外（あれば）
+        
+        Returns:
+            Dict: フォーマットされたデータ情報
+        """
+        info = {}
+        
+        # データの基本情報
+        info["データ総件数"] = str(len(trends_data))
+        
+        # 最初の3件のサンプルデータ
+        sample_count = min(3, len(trends_data))
+        if sample_count > 0:
+            samples = []
+            for i, item in enumerate(trends_data[:sample_count]):
+                # 各アイテムの主要フィールドを抽出（長すぎる場合は切り詰め）
+                sample_item = {}
+                for key, value in item.items():
+                    if isinstance(value, str):
+                        # 文字列は200文字に制限
+                        sample_item[key] = value[:200] + "..." if len(value) > 200 else value
+                    elif isinstance(value, (int, float, bool)) or value is None:
+                        sample_item[key] = value
+                    else:
+                        sample_item[key] = str(value)[:200]
+                samples.append(f"アイテム{i+1}: {sample_item}")
+            
+            info["サンプルデータ（最初の3件）"] = "\n".join(samples)
+        
+        # エラーに関連する可能性のあるデータを特定
+        if error_exception:
+            error_str = str(error_exception).lower()
+            
+            # StringDataRightTruncationエラーの場合、長いフィールドを特定
+            if "stringdata" in error_str or "too long" in error_str or "truncation" in error_str:
+                long_fields = []
+                for i, item in enumerate(trends_data):
+                    item_info = []
+                    for key, value in item.items():
+                        if isinstance(value, str) and len(value) > 255:
+                            item_info.append(f"{key}: {len(value)}文字")
+                    if item_info:
+                        long_fields.append(f"アイテム{i+1} (rank={item.get('rank', 'N/A')}): {', '.join(item_info)}")
+                
+                if long_fields:
+                    info["長いフィールド検出"] = "\n".join(long_fields[:5])  # 最初の5件まで
+        
+        # データの構造情報
+        if trends_data:
+            first_item = trends_data[0]
+            info["データフィールド"] = ", ".join(list(first_item.keys())[:20])  # 最初の20フィールドまで
+        
+        return info
     
     def _apply_default_sorting(self, data: List[Dict[str, Any]], sort_key: Optional[str] = None, reverse: bool = True) -> List[Dict[str, Any]]:
         """デフォルトのソート処理
@@ -213,6 +287,9 @@ class BaseTrendsManager(ABC):
                 trends_data = api_result.get('data', [])
                 
                 # キャッシュに保存を試みる
+                cache_save_error = None
+                save_success = False
+                error_exception = None
                 try:
                     save_success = self._save_to_cache(trends_data, *args, **kwargs)
                     if save_success:
@@ -228,8 +305,49 @@ class BaseTrendsManager(ABC):
                             logger.warning(f"⚠️ {self.service_name}: cache_status更新中にエラーが発生しました: {e}")
                     else:
                         logger.warning(f"⚠️ {self.service_name}: データ取得成功しましたが、キャッシュ保存に失敗しました")
+                        cache_save_error = "キャッシュ保存が失敗しました（_save_to_cacheがFalseを返しました）"
                 except Exception as e:
-                    logger.warning(f"⚠️ {self.service_name}: キャッシュ保存中にエラーが発生しました: {e}")
+                    error_msg = str(e)
+                    error_exception = e
+                    logger.warning(f"⚠️ {self.service_name}: キャッシュ保存中にエラーが発生しました: {e}", exc_info=True)
+                    cache_save_error = f"キャッシュ保存中にエラーが発生しました: {error_msg}"
+                
+                # キャッシュ保存失敗時にDiscordにアラートを送信（エラー内容とソースデータを含める）
+                if cache_save_error:
+                    alert_service = _get_alert_service()
+                    if alert_service:
+                        try:
+                            cache_key = self._get_cache_key(*args, **kwargs)
+                            
+                            # ソースデータの詳細を準備（最初の3件のサンプルと、問題のあるデータの詳細）
+                            source_data_info = self._format_source_data_for_alert(trends_data, error_exception)
+                            
+                            # エラーの詳細情報を準備
+                            error_details = {
+                                "サービス名": self.service_name,
+                                "キャッシュキー": cache_key,
+                                "データ件数": str(len(trends_data)),
+                                "エラーメッセージ": cache_save_error[:1000],  # 長すぎる場合は切り詰め
+                            }
+                            
+                            # エラーの種類とスタックトレース
+                            if error_exception:
+                                import traceback
+                                error_details["エラータイプ"] = type(error_exception).__name__
+                                tb_str = ''.join(traceback.format_exception(type(error_exception), error_exception, error_exception.__traceback__))
+                                error_details["スタックトレース"] = tb_str[:2000]  # 長すぎる場合は切り詰め
+                            
+                            # ソースデータの情報を追加
+                            error_details.update(source_data_info)
+                            
+                            alert_service.send_alert(
+                                "error",
+                                f"キャッシュ保存エラー: {self.service_name}",
+                                f"{self.service_name}のデータ取得は成功しましたが、キャッシュ保存に失敗しました。",
+                                error_details
+                            )
+                        except Exception as alert_error:
+                            logger.warning(f"⚠️ Discordアラート送信エラー: {alert_error}")
                 
                 # デフォルトソートを適用
                 trends_data = self._apply_default_sorting(trends_data, sort_key=sort_key, reverse=sort_reverse)

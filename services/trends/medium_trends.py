@@ -32,11 +32,8 @@ class MediumTrendsManager(BaseTrendsManager):
 
     def _save_to_cache(self, data, *args, **kwargs):
         """キャッシュにデータを保存"""
-        try:
-            return self.db.save_medium_trends_to_cache(data)
-        except Exception as e:
-            logger.error(f"❌ Medium キャッシュ保存エラー: {e}", exc_info=True)
-            return False
+        # 例外を再発生させて、base_trends_managerで詳細なエラー情報を取得できるようにする
+        return self.db.save_medium_trends_to_cache(data)
 
     def _clear_cache(self, *args, **kwargs):
         """キャッシュをクリア"""

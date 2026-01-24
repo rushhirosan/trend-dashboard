@@ -503,10 +503,17 @@ class TrendsScheduler:
             self._save_execution_log(execution_id, start_time, end_time, total_count, success_count, failed_count, duration)
 
             # 異常検出 → Discord アラート
-            self._check_and_alert_anomalies(
+            has_anomaly = self._check_and_alert_anomalies(
                 execution_id, start_time, end_time,
                 total_count, success_count, failed_count, duration, failed_trends,
             )
+            
+            # 正常終了時（異常検出がない場合）にDiscord通知を送信
+            if not has_anomaly:
+                self._send_success_notification(
+                    execution_id, start_time, end_time,
+                    total_count, success_count, failed_count, duration,
+                )
 
             # データ保存完了後、メール自動送信を実行
             # スケジューラー実行時（深夜1時・朝7時・昼13時・夜19時）のみメール送信
@@ -595,12 +602,17 @@ class TrendsScheduler:
         failed_count: int,
         duration: float,
         failed_trends: list,
-    ) -> None:
-        """異常を検出して Discord アラート送信"""
+    ) -> bool:
+        """異常を検出して Discord アラート送信
+        
+        Returns:
+            異常が検出された場合 True、正常終了の場合 False
+        """
         if not self.alert_service or total_count <= 0:
-            return
+            return False
 
         failure_rate = (failed_count / total_count) * 100
+        has_anomaly = False
 
         # 全失敗
         if success_count == 0:
@@ -614,7 +626,7 @@ class TrendsScheduler:
                     "失敗トレンド": ", ".join(failed_trends) if failed_trends else "全て",
                 },
             )
-            return
+            return True
 
         # 失敗率 50% 以上
         if failure_rate >= 50:
@@ -631,6 +643,7 @@ class TrendsScheduler:
                     "失敗トレンド": ", ".join(failed_trends) if failed_trends else "なし",
                 },
             )
+            has_anomaly = True
 
         # 実行時間 30 分以上
         if duration >= 1800:
@@ -645,6 +658,50 @@ class TrendsScheduler:
                     "終了": end_time.strftime("%Y-%m-%d %H:%M:%S JST"),
                 },
             )
+            has_anomaly = True
+        
+        return has_anomaly
+    
+    def _send_success_notification(
+        self,
+        execution_id: str,
+        start_time: datetime,
+        end_time: datetime,
+        total_count: int,
+        success_count: int,
+        failed_count: int,
+        duration: float,
+    ) -> None:
+        """正常終了時にDiscord通知を送信"""
+        if not self.alert_service:
+            return
+        
+        jst = pytz.timezone('Asia/Tokyo')
+        duration_min = duration / 60
+        
+        # 失敗率を計算
+        failure_rate = (failed_count / total_count) * 100 if total_count > 0 else 0
+        
+        # メッセージを構築
+        if failed_count == 0:
+            message = f"全てのトレンド取得が正常に完了しました。"
+        else:
+            message = f"トレンド取得が完了しました（一部失敗あり）。"
+        
+        self._send_alert(
+            "success",
+            "✅ トレンド取得正常終了",
+            message,
+            {
+                "実行ID": execution_id,
+                "成功": f"{success_count}/{total_count}",
+                "失敗": str(failed_count),
+                "失敗率": f"{failure_rate:.1f}%",
+                "実行時間": f"{duration_min:.1f}分 ({duration:.2f}秒)",
+                "開始時刻": start_time.strftime("%Y-%m-%d %H:%M:%S JST"),
+                "終了時刻": end_time.strftime("%Y-%m-%d %H:%M:%S JST"),
+            },
+        )
 
     def _save_to_trends_cache(self, platform: str, data: dict, data_count: int):
         """trends_cacheテーブルにデータを保存（Google Trends専用）"""

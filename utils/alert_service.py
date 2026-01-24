@@ -40,7 +40,7 @@ class AlertService:
         アラートを Discord に送信
 
         Args:
-            alert_type: 'error' | 'warning' | 'critical'
+            alert_type: 'error' | 'warning' | 'critical' | 'success'
             title: アラートタイトル
             message: 本文
             details: 追加情報（key -> value）
@@ -73,7 +73,8 @@ class AlertService:
         colors = {
             "error": 15158332,   # 赤
             "warning": 16776960, # 黄
-            "critical": 15158332 # 赤
+            "critical": 15158332, # 赤
+            "success": 3066993   # 緑
         }
         color = colors.get(alert_type, colors["error"])
 

@@ -161,10 +161,15 @@
                                 <i class="fas fa-user text-secondary me-2"></i>
                                 運営者について
                             </h3>
-                            <p class="mb-0">
+                            <p class="mb-3">
                                 これは個人の独立プロジェクトです。
                                 ご利用いただき、フィードバックやサポートをいただければ幸いです。
                             </p>
+                            {% if BUY_ME_A_COFFEE_USERNAME %}
+                            <div class="buy-me-a-coffee-container mb-3">
+                                <script type="text/javascript" src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js" data-name="bmc-button" data-slug="{{ BUY_ME_A_COFFEE_USERNAME }}" data-color="#FFDD00" data-emoji="☕" data-font="Comic" data-text="Buy me a coffee" data-outline-color="#000000" data-font-color="#000000" data-coffee-color="#ffffff"></script>
+                            </div>
+                            {% endif %}
                         </section>
                     </div>
                 </div>
@@ -290,10 +295,15 @@
                                 <i class="fas fa-user text-secondary me-2"></i>
                                 About the creator
                             </h3>
-                            <p class="mb-0">
+                            <p class="mb-3">
                                 This is an independent personal project.
                                 If you find it useful, feedback or support is always welcome.
                             </p>
+                            {% if BUY_ME_A_COFFEE_USERNAME %}
+                            <div class="buy-me-a-coffee-container mb-3">
+                                <script type="text/javascript" src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js" data-name="bmc-button" data-slug="{{ BUY_ME_A_COFFEE_USERNAME }}" data-color="#FFDD00" data-emoji="☕" data-font="Comic" data-text="Buy me a coffee" data-outline-color="#000000" data-font-color="#000000" data-coffee-color="#ffffff"></script>
+                            </div>
+                            {% endif %}
                         </section>
                     </div>
                 </div>

@@ -143,7 +143,8 @@ def create_app():
     def inject_config():
         """テンプレートで使用できる設定を注入"""
         return {
-            'ENABLE_SUBSCRIPTION_UI': AppConfig.ENABLE_SUBSCRIPTION_UI
+            'ENABLE_SUBSCRIPTION_UI': AppConfig.ENABLE_SUBSCRIPTION_UI,
+            'BUY_ME_A_COFFEE_USERNAME': AppConfig.BUY_ME_A_COFFEE_USERNAME
         }
     
     # ルートを定義（エラーが発生しても続行）

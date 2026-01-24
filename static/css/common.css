@@ -205,3 +205,21 @@ h6, .h6 { font-size: 0.9rem; }
 .text-warning { color: #ffc107 !important; }
 .text-info { color: #17a2b8 !important; }
 .text-muted { color: #6c757d !important; }
+
+/* Buy Me a Coffee スタイル */
+.buy-me-a-coffee-container {
+    margin-top: 1rem;
+    text-align: center;
+}
+
+.buy-me-a-coffee-container iframe {
+    border: none;
+    max-width: 100%;
+}
+
+/* モバイル対応 */
+@media (max-width: 768px) {
+    .buy-me-a-coffee-container {
+        margin-top: 0.75rem;
+    }
+}

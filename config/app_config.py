@@ -37,6 +37,9 @@ class AppConfig:
     # 今後使う可能性があるため、コードは残すがUIからは非表示
     ENABLE_SUBSCRIPTION_UI = os.getenv('ENABLE_SUBSCRIPTION_UI', 'false').lower() == 'true'
     
+    # Buy Me a Coffee設定
+    BUY_ME_A_COFFEE_USERNAME = os.getenv('BUY_ME_A_COFFEE_USERNAME', '')
+    
     @classmethod
     def get_config_dict(cls):
         """設定を辞書形式で取得"""
@@ -51,7 +54,8 @@ class AppConfig:
             'CACHE_VALIDITY_HOURS': cls.CACHE_VALIDITY_HOURS,
             'MAX_RESULTS': cls.MAX_RESULTS,
             'ENABLE_SCHEDULER': cls.ENABLE_SCHEDULER,
-            'ENABLE_SUBSCRIPTION_UI': cls.ENABLE_SUBSCRIPTION_UI
+            'ENABLE_SUBSCRIPTION_UI': cls.ENABLE_SUBSCRIPTION_UI,
+            'BUY_ME_A_COFFEE_USERNAME': cls.BUY_ME_A_COFFEE_USERNAME
         }
 
 

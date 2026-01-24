@@ -307,3 +307,30 @@ def execute_scheduler():
     except Exception as e:
         return handle_data_error('スケジューラー実行', e)
 
+
+@data_bp.route('/alert/test', methods=['POST'])
+def test_alert():
+    """Discord アラートのテスト送信（Webhook 動作確認用）"""
+    try:
+        from utils.alert_service import AlertService
+        svc = AlertService()
+        if not svc.webhook_url:
+            return jsonify({
+                'success': False,
+                'error': 'DISCORD_WEBHOOK_URL が未設定です。.env に設定してください。'
+            }), 400
+        ok = svc.send_alert(
+            'warning',
+            'アラートテスト',
+            'Discord アラートのテスト送信です。このメッセージが届いていれば Webhook は正常です。',
+            {'環境': 'test', 'エンドポイント': '/api/alert/test'},
+        )
+        if not ok:
+            return jsonify({'success': False, 'error': 'Discord 送信に失敗しました。'}), 500
+        return jsonify({
+            'success': True,
+            'message': 'Discord にテストアラートを送信しました。チャンネルを確認してください。'
+        })
+    except Exception as e:
+        return handle_data_error('アラートテスト', e)
+

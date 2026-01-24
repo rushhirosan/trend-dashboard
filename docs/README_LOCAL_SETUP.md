@@ -57,6 +57,11 @@ DB_PASSWORD=password
 # 例: AMAZON_RSS_URLS=https://livdir.com/am-tb/xxxx.rss,https://livdir.com/am-tb/yyyy.rss
 # 注意: 1時間に1回以上の取得は避けてください（AmaranRSSの推奨）
 AMAZON_RSS_URLS=
+
+# Discord アラート（オプション）
+# 更新エラー・異常検出時に Discord に通知。チャンネル → 連携サービス → Webhook で URL を取得
+# 未設定ならアラートは無効
+DISCORD_WEBHOOK_URL=
 ```
 
 ### 4. アプリケーションの起動

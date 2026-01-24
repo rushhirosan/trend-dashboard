@@ -34,7 +34,15 @@ class TrendsScheduler:
         except Exception as e:
             logger.warning(f"⚠️ SubscriptionManager初期化エラー（メール自動送信は無効）: {e}")
             self.subscription_manager = None
-        
+
+        # アラート送信（Discord Webhook）を初期化
+        try:
+            from utils.alert_service import AlertService
+            self.alert_service = AlertService()
+        except Exception as e:
+            logger.warning("⚠️ AlertService初期化エラー（アラート無効）: %s", e)
+            self.alert_service = None
+
         logger.info("TrendsScheduler初期化完了")
     
     def _execute_with_timeout(self, func, timeout_seconds=30):
@@ -454,7 +462,19 @@ class TrendsScheduler:
             
             if not timestamp_updated:
                 logger.error(f"❌ 成功したトレンドの更新時刻更新に失敗しました（{max_retries}回試行後）。これは重大な問題です。")
-            
+                self._send_alert(
+                    "critical",
+                    "タイムスタンプ更新失敗",
+                    f"成功トレンドの更新時刻更新に失敗しました（{max_retries}回試行後）。",
+                    {
+                        "実行ID": execution_id,
+                        "成功数": str(success_count),
+                        "総数": str(total_count),
+                        "失敗数": str(failed_count),
+                        "実行時間（秒）": f"{duration:.2f}",
+                    },
+                )
+
             # 実行日付を記録（各時刻のジョブが実行されたことを記録）
             now_jst = datetime.now(jst)
             today = now_jst.date()
@@ -481,7 +501,13 @@ class TrendsScheduler:
             
             # 実行履歴をデータベースに保存（簡易版）
             self._save_execution_log(execution_id, start_time, end_time, total_count, success_count, failed_count, duration)
-            
+
+            # 異常検出 → Discord アラート
+            self._check_and_alert_anomalies(
+                execution_id, start_time, end_time,
+                total_count, success_count, failed_count, duration, failed_trends,
+            )
+
             # データ保存完了後、メール自動送信を実行
             # スケジューラー実行時（深夜1時・朝7時・昼13時・夜19時）のみメール送信
             # デプロイ時や手動実行時は、明示的に指示された場合のみメール送信
@@ -499,6 +525,12 @@ class TrendsScheduler:
             
         except Exception as e:
             logger.error(f"❌ 自動トレンド取得エラー: {e}", exc_info=True)
+            self._send_alert(
+                "critical",
+                "トレンド取得処理エラー",
+                f"自動トレンド取得中にエラーが発生しました: {str(e)}",
+                {"エラータイプ": type(e).__name__},
+            )
             # エラーが発生してもメール送信を試みる（ただし、SKIP_EMAIL_ON_UPDATE=trueの場合はスキップ）
             skip_email = os.getenv('SKIP_EMAIL_ON_UPDATE', 'false').lower() == 'true'
             if not skip_email:
@@ -542,7 +574,78 @@ class TrendsScheduler:
             logger.error("=" * 60)
             import traceback
             traceback.print_exc()
-    
+
+    def _send_alert(self, alert_type: str, title: str, message: str, details: dict | None = None) -> bool:
+        """アラートを送信（Discord Webhook）"""
+        if not self.alert_service:
+            return False
+        try:
+            return self.alert_service.send_alert(alert_type, title, message, details)
+        except Exception as e:
+            logger.error("アラート送信エラー: %s", e, exc_info=True)
+            return False
+
+    def _check_and_alert_anomalies(
+        self,
+        execution_id: str,
+        start_time: datetime,
+        end_time: datetime,
+        total_count: int,
+        success_count: int,
+        failed_count: int,
+        duration: float,
+        failed_trends: list,
+    ) -> None:
+        """異常を検出して Discord アラート送信"""
+        if not self.alert_service or total_count <= 0:
+            return
+
+        failure_rate = (failed_count / total_count) * 100
+
+        # 全失敗
+        if success_count == 0:
+            self._send_alert(
+                "critical",
+                "全トレンド取得失敗",
+                "全てのトレンド取得に失敗しました。",
+                {
+                    "実行ID": execution_id,
+                    "総数": str(total_count),
+                    "失敗トレンド": ", ".join(failed_trends) if failed_trends else "全て",
+                },
+            )
+            return
+
+        # 失敗率 50% 以上
+        if failure_rate >= 50:
+            self._send_alert(
+                "critical",
+                "高失敗率検出",
+                f"トレンド取得の失敗率が {failure_rate:.1f}% です（閾値: 50%）。",
+                {
+                    "実行ID": execution_id,
+                    "成功": str(success_count),
+                    "失敗": str(failed_count),
+                    "総数": str(total_count),
+                    "失敗率": f"{failure_rate:.1f}%",
+                    "失敗トレンド": ", ".join(failed_trends) if failed_trends else "なし",
+                },
+            )
+
+        # 実行時間 30 分以上
+        if duration >= 1800:
+            self._send_alert(
+                "warning",
+                "実行時間が異常に長い",
+                f"トレンド取得の実行時間が {duration / 60:.1f} 分です（閾値: 30 分）。",
+                {
+                    "実行ID": execution_id,
+                    "実行時間（秒）": f"{duration:.2f}",
+                    "開始": start_time.strftime("%Y-%m-%d %H:%M:%S JST"),
+                    "終了": end_time.strftime("%Y-%m-%d %H:%M:%S JST"),
+                },
+            )
+
     def _save_to_trends_cache(self, platform: str, data: dict, data_count: int):
         """trends_cacheテーブルにデータを保存（Google Trends専用）"""
         try:

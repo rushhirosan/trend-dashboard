@@ -26,5 +26,5 @@ EXPOSE 8080
 ENV PORT=8080
 ENV FLASK_PORT=8080
 
-# gunicornでアプリケーションを起動（既存アプリと同じ設定）
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--timeout", "300", "--workers", "1", "wsgi:app"]
+# gunicornでアプリケーションを起動（並列実行に対応してタイムアウトを延長）
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--timeout", "1200", "--workers", "1", "wsgi:app"]

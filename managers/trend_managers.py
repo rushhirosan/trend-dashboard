@@ -3,6 +3,8 @@
 各トレンドマネージャーのインスタンスを作成・管理
 """
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 from services.trends.google_trends import GoogleTrendsManager
 from services.trends.youtube_trends import YouTubeTrendsManager
 from services.trends.music_trends import MusicTrendsManager
@@ -78,12 +80,12 @@ MANAGER_CONFIGS = [
 def _initialize_single_manager(key, manager_class, display_name):
     """
     単一のマネージャーを初期化
-    
+
     Args:
         key: マネージャーのキー
         manager_class: マネージャークラス
         display_name: 表示名
-    
+
     Returns:
         初期化されたマネージャーインスタンス、またはNone
     """
@@ -102,14 +104,14 @@ def initialize_managers():
     """
     全トレンドマネージャーを初期化
     一部のマネージャーが失敗しても、成功したマネージャーは返す
-    
+
     Returns:
         dict: 初期化されたマネージャーの辞書（失敗したものはNoneまたは含まれない）
     """
     managers = {}
     success_count = 0
     fail_count = 0
-    
+
     for key, manager_class, display_name in MANAGER_CONFIGS:
         manager = _initialize_single_manager(key, manager_class, display_name)
         if manager is not None:
@@ -118,7 +120,7 @@ def initialize_managers():
         else:
             fail_count += 1
             logger.warning(f"⚠️ {display_name} Managerの初期化に失敗しましたが、続行します")
-    
+
     logger.info(f"✅ マネージャー初期化完了: 成功{success_count}個、失敗{fail_count}個")
     return managers
 
@@ -127,25 +129,26 @@ def refresh_all_trends(managers, force_refresh=True):
     """
     すべてのトレンドカテゴリを強制更新するユーティリティ関数
     日本（JP）と米国（US）の両方のデータを更新します
-    
+    並列実行により実行時間を短縮します。
+
     Args:
         managers (dict): initialize_managers で生成されたマネージャー辞書
         force_refresh (bool): キャッシュを無視して取得するかどうか
-    
+
     Returns:
         dict: 各カテゴリの更新結果
     """
     results = {}
-    
+    results_lock = threading.Lock()
+
     def call_manager(key, handler, region='JP'):
-        """マネージャーを呼び出して結果を記録"""
+        """マネージャーを呼び出して結果を返す（並列実行用）"""
         manager = managers.get(key)
         if not manager:
-            results[f"{key}_{region}"] = {
+            return f"{key}_{region}", {
                 'success': False,
                 'error': 'manager_not_initialized'
             }
-            return
         try:
             response = handler(manager)
             success = False
@@ -159,49 +162,51 @@ def refresh_all_trends(managers, force_refresh=True):
                     success = True
             else:
                 success = response is not None
-            results[f"{key}_{region}"] = {
+            return f"{key}_{region}", {
                 'success': success,
                 'response': response
             }
         except Exception as exc:
-            results[f"{key}_{region}"] = {
+            logger.error(f"❌ トレンド取得エラー ({key}_{region}): {exc}", exc_info=True)
+            return f"{key}_{region}", {
                 'success': False,
                 'error': str(exc)
             }
-    
-    # 日本のデータを更新
-    logger.info("🇯🇵 日本のデータを更新中...")
-    call_manager('google', lambda m: m.get_trends('JP', force_refresh=force_refresh), 'JP')
-    call_manager('youtube', lambda m: m.get_trends('JP', force_refresh=force_refresh), 'JP')
-    call_manager('music', lambda m: m.get_trends('spotify', 'JP', force_refresh=force_refresh), 'JP')
-    call_manager('worldnews', lambda m: m.get_trends(country='jp', category=None, force_refresh=force_refresh), 'JP')
-    call_manager('podcast', lambda m: m.get_trends('best_podcasts', region='jp', force_refresh=force_refresh), 'JP')
-    call_manager('rakuten', lambda m: m.get_trends(force_refresh=force_refresh), 'JP')
-    call_manager('hatena', lambda m: m.get_trends(category='all', limit=25, force_refresh=force_refresh, fetch_all_categories=True), 'JP')
-    # Twitch: 全カテゴリーを取得してキャッシュに保存
-    call_manager('twitch', lambda m: m._fetch_and_cache_all_categories(), 'JP')
-    call_manager('qiita', lambda m: m.get_trends(limit=25, sort='likes_count', force_refresh=force_refresh), 'JP')
-    call_manager('nhk', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP')
-    call_manager('stock', lambda m: m.get_trends(market='JP', limit=25, force_refresh=force_refresh), 'JP')
-    call_manager('crypto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP')
-    call_manager('movie', lambda m: m.get_trends(country='JP', time_window='day', limit=25, force_refresh=force_refresh), 'JP')
-    call_manager('book', lambda m: m.get_trends(country='JP', limit=25, force_refresh=force_refresh), 'JP')
-    call_manager('github', lambda m: m.get_trends(language='all', limit=25, force_refresh=force_refresh), 'JP')
-    call_manager('appstore', lambda m: m.get_trends(country='JP', category='all', limit=25, force_refresh=force_refresh), 'JP')
-    call_manager('ipa', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP')
-    call_manager('jpcert', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP')
-    call_manager('zenn', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP')
-    call_manager('note', lambda m: m.get_trends(category='all', limit=25, force_refresh=force_refresh, fetch_all_categories=True), 'JP')
-    
-    # USのデータを更新
-    logger.info("🇺🇸 USのデータを更新中...")
-    call_manager('google', lambda m: m.get_trends('US', force_refresh=force_refresh), 'US')
-    call_manager('youtube', lambda m: m.get_trends('US', force_refresh=force_refresh), 'US')
-    call_manager('music', lambda m: m.get_trends('spotify', 'US', force_refresh=force_refresh), 'US')
-    call_manager('worldnews', lambda m: m.get_trends(country='us', category=None, force_refresh=force_refresh), 'US')
-    call_manager('podcast', lambda m: m.get_trends('best_podcasts', region='us', force_refresh=force_refresh), 'US')
-    # Twitch: 全カテゴリーを取得してキャッシュに保存
-    call_manager('twitch', lambda m: m._fetch_and_cache_all_categories(), 'US')
+
+    # タスクリストを作成
+    tasks = []
+
+    # 日本のデータを更新するタスク
+    logger.info("🇯🇵 日本のデータを更新中（並列実行）...")
+    tasks.append(('google', lambda m: m.get_trends('JP', force_refresh=force_refresh), 'JP'))
+    tasks.append(('youtube', lambda m: m.get_trends('JP', force_refresh=force_refresh), 'JP'))
+    tasks.append(('music', lambda m: m.get_trends('spotify', 'JP', force_refresh=force_refresh), 'JP'))
+    tasks.append(('worldnews', lambda m: m.get_trends(country='jp', category=None, force_refresh=force_refresh), 'JP'))
+    tasks.append(('podcast', lambda m: m.get_trends('best_podcasts', region='jp', force_refresh=force_refresh), 'JP'))
+    tasks.append(('rakuten', lambda m: m.get_trends(force_refresh=force_refresh), 'JP'))
+    tasks.append(('hatena', lambda m: m.get_trends(category='all', limit=25, force_refresh=force_refresh, fetch_all_categories=True), 'JP'))
+    tasks.append(('twitch', lambda m: m._fetch_and_cache_all_categories(), 'JP'))
+    tasks.append(('qiita', lambda m: m.get_trends(limit=25, sort='likes_count', force_refresh=force_refresh), 'JP'))
+    tasks.append(('nhk', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('stock', lambda m: m.get_trends(market='JP', limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('crypto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('movie', lambda m: m.get_trends(country='JP', time_window='day', limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('book', lambda m: m.get_trends(country='JP', limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('github', lambda m: m.get_trends(language='all', limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('appstore', lambda m: m.get_trends(country='JP', category='all', limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('ipa', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('jpcert', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('zenn', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('note', lambda m: m.get_trends(category='all', limit=25, force_refresh=force_refresh, fetch_all_categories=True), 'JP'))
+
+    # USのデータを更新するタスク
+    logger.info("🇺🇸 USのデータを更新中（並列実行）...")
+    tasks.append(('google', lambda m: m.get_trends('US', force_refresh=force_refresh), 'US'))
+    tasks.append(('youtube', lambda m: m.get_trends('US', force_refresh=force_refresh), 'US'))
+    tasks.append(('music', lambda m: m.get_trends('spotify', 'US', force_refresh=force_refresh), 'US'))
+    tasks.append(('worldnews', lambda m: m.get_trends(country='us', category=None, force_refresh=force_refresh), 'US'))
+    tasks.append(('podcast', lambda m: m.get_trends('best_podcasts', region='us', force_refresh=force_refresh), 'US'))
+    tasks.append(('twitch', lambda m: m._fetch_and_cache_all_categories(), 'US'))
     # eBay: 全カテゴリーを取得してキャッシュに保存
     ebay_manager = managers.get('ebay')
     if ebay_manager:
@@ -209,25 +214,56 @@ def refresh_all_trends(managers, force_refresh=True):
         for category in categories:
             def ebay_handler(m, cat=category):
                 return m.get_trends(category=cat, limit=25, force_refresh=force_refresh)
-            call_manager('ebay', ebay_handler, 'US')
+            tasks.append(('ebay', ebay_handler, 'US'))
     # Redditは使用していないため無効化
-    # call_manager('reddit', lambda m: m.get_trends('all', limit=25, time_filter='day', force_refresh=force_refresh), 'US')
-    call_manager('hackernews', lambda m: m.get_trends('top', limit=25, force_refresh=force_refresh), 'US')
-    call_manager('producthunt', lambda m: m.get_trends(limit=25, sort='votes', force_refresh=force_refresh), 'US')
-    call_manager('cnn', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
-    call_manager('stock', lambda m: m.get_trends(market='US', limit=25, force_refresh=force_refresh), 'US')
-    call_manager('crypto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
-    call_manager('movie', lambda m: m.get_trends(country='US', time_window='day', limit=25, force_refresh=force_refresh), 'US')
-    call_manager('book', lambda m: m.get_trends(country='US', limit=25, force_refresh=force_refresh), 'US')
-    call_manager('github', lambda m: m.get_trends(language='all', limit=25, force_refresh=force_refresh), 'US')
-    call_manager('appstore', lambda m: m.get_trends(country='US', category='all', limit=25, force_refresh=force_refresh), 'US')
-    call_manager('cisa_kev', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
-    call_manager('thehackernews', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
-    call_manager('medium', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
-    call_manager('devto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US')
-    
+    # tasks.append(('reddit', lambda m: m.get_trends('all', limit=25, time_filter='day', force_refresh=force_refresh), 'US'))
+    tasks.append(('hackernews', lambda m: m.get_trends('top', limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('producthunt', lambda m: m.get_trends(limit=25, sort='votes', force_refresh=force_refresh), 'US'))
+    tasks.append(('cnn', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('stock', lambda m: m.get_trends(market='US', limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('crypto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('movie', lambda m: m.get_trends(country='US', time_window='day', limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('book', lambda m: m.get_trends(country='US', limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('github', lambda m: m.get_trends(language='all', limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('appstore', lambda m: m.get_trends(country='US', category='all', limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('cisa_kev', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('thehackernews', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('medium', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('devto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
+
+    # 並列実行（最大20スレッド）
+    max_workers = min(20, len(tasks))
+    logger.info(f"🚀 {len(tasks)}件のタスクを{max_workers}スレッドで並列実行します")
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # すべてのタスクを実行
+        future_to_task = {
+            executor.submit(call_manager, key, handler, region): (key, region)
+            for key, handler, region in tasks
+        }
+
+        # 完了したタスクから結果を収集
+        completed_count = 0
+        for future in as_completed(future_to_task):
+            key, region = future_to_task[future]
+            completed_count += 1
+            try:
+                result_key, result_data = future.result()
+                with results_lock:
+                    results[result_key] = result_data
+                logger.debug(f"✅ [{completed_count}/{len(tasks)}] {result_key} 完了")
+            except Exception as exc:
+                logger.error(f"❌ タスク実行エラー ({key}_{region}): {exc}", exc_info=True)
+                with results_lock:
+                    results[f"{key}_{region}"] = {
+                        'success': False,
+                        'error': str(exc)
+                    }
+
+    logger.info(f"✅ 並列実行完了: {len(results)}件の結果を取得しました")
+
     overall_success = all(result.get('success') for result in results.values())
-    
+
     return {
         'success': overall_success,
         'results': results

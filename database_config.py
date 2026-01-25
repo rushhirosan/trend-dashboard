@@ -45,7 +45,7 @@ def _get_connection_pool():
             if database_url:
                 # 接続パラメータを構築
                 min_conn = 2  # 最小接続数
-                max_conn = 10  # 最大接続数（同時リクエストに対応）
+                max_conn = 25  # 最大接続数（並列実行に対応：20スレッド + バッファ）
                 
                 # 接続パラメータを抽出
                 _connection_pool = pool.ThreadedConnectionPool(
@@ -63,7 +63,7 @@ def _get_connection_pool():
             else:
                 # 個別の環境変数を使用
                 min_conn = 2
-                max_conn = 10
+                max_conn = 25  # 最大接続数（並列実行に対応：20スレッド + バッファ）
                 
                 _connection_pool = pool.ThreadedConnectionPool(
                     minconn=min_conn,

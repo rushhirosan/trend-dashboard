@@ -251,16 +251,20 @@ def get_statistics():
 def refresh_all_trends_endpoint():
     """すべてのトレンドデータを強制更新"""
     try:
+        logger.info("🔄 /api/cache/refresh-all エンドポイントにリクエストが到達しました")
         managers = current_app.config.get('TREND_MANAGERS')
         if not managers:
+            logger.error("❌ トレンドマネージャーが初期化されていません")
             return jsonify({
                 'success': False,
                 'error': 'トレンドマネージャーが初期化されていません'
             }), 500
         
         force_refresh = request.args.get('force_refresh', 'true').lower() == 'true'
+        logger.info(f"🔄 refresh_all_trends実行開始 (force_refresh={force_refresh})")
         from managers.trend_managers import refresh_all_trends
         result = refresh_all_trends(managers, force_refresh=force_refresh)
+        logger.info(f"✅ refresh_all_trends実行完了: success={result.get('success')}")
         
         # データ更新完了後、メール自動送信を実行
         # ただし、環境変数SKIP_EMAIL_ON_UPDATE=trueの場合はスキップ（デプロイ時の不要なメール送信を防ぐ）

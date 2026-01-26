@@ -27,7 +27,7 @@ The source code is currently in a private repository. For Reddit's review purpos
 
 3. **Live Demo:**
    - Application URL: https://trends-dashboard.fly.dev
-   - You can test the Reddit API integration in real-time
+   - You can test the Reddit API integration
    - All API requests are logged and can be reviewed
 
 4. **Technical Documentation:**
@@ -70,7 +70,7 @@ We are committed to full transparency and will provide any code or documentation
    - Our use case requires an external web application, not a Reddit-integrated app
 
 4. **Data Aggregation:**
-   - We need to cache and compare trends across platforms in real-time
+   - We need to cache and compare trends across platforms regularly
    - Devvit's execution model doesn't support the continuous data aggregation we require
 ```
 

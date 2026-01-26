@@ -69,7 +69,7 @@ Multi-platform trends aggregator displaying trending content from Google Trends,
 ## Features
 
 - Aggregates trending content from 10+ platforms
-- Real-time data updates
+- Regular data updates (4 times daily)
 - 24-hour caching for performance
 - Responsive web dashboard
 

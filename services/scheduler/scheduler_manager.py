@@ -415,13 +415,16 @@ class TrendsScheduler:
                 
                 key, region = parts
                 
-                # 特殊なケース
+                # 特殊なケース（国別・地域別に分かれるもの）
                 if key == 'stock':
                     return f'stock_trends_{region}'
                 elif key == 'book':
                     return f'book_trends_{region}'
                 elif key == 'movie':
                     return f'movie_trends_{region}'
+                elif key == 'appstore':
+                    # App Storeは国別に分かれる
+                    return f'appstore_trends_{region}'
                 elif key == 'ebay':
                     # eBayは複数のカテゴリがあるが、cache_keyは統合されている
                     return 'ebay_trends'
@@ -444,6 +447,22 @@ class TrendsScheduler:
                             successful_cache_keys.extend(cache_key)
                         else:
                             successful_cache_keys.append(cache_key)
+                    else:
+                        # マッピングに失敗した場合のログ
+                        logger.warning(f"⚠️ cache_keyマッピング失敗: {result_key} → None")
+            
+            # デバッグ: 収集されたcache_keyをログ出力（Stock TrendsとApp Storeを確認）
+            stock_keys = [k for k in successful_cache_keys if 'stock' in k]
+            appstore_keys = [k for k in successful_cache_keys if 'appstore' in k]
+            if stock_keys:
+                logger.info(f"📊 Stock Trendsのcache_key: {', '.join(stock_keys)}")
+            else:
+                logger.warning(f"⚠️ Stock Trendsのcache_keyが収集されていません")
+            if appstore_keys:
+                logger.info(f"📊 App Storeのcache_key: {', '.join(appstore_keys)}")
+            else:
+                logger.warning(f"⚠️ App Storeのcache_keyが収集されていません")
+            logger.debug(f"📋 収集された全cache_key ({len(successful_cache_keys)}件): {', '.join(sorted(successful_cache_keys))}")
             
             # 成功したトレンドのみタイムスタンプを更新（更新完了時刻を使用）
             timestamp_updated = False

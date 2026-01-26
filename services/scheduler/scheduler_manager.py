@@ -357,8 +357,9 @@ class TrendsScheduler:
             total_count = len(results)
             failed_count = total_count - success_count
             
-            # 失敗したトレンドをログに詳細出力
+            # 失敗したトレンドをログに詳細出力し、エラー詳細を収集
             failed_trends = []
+            failed_trends_details = []  # エラー詳細情報を格納
             for key, result_data in results.items():
                 success = result_data.get('success', False)
                 if not success:
@@ -372,6 +373,14 @@ class TrendsScheduler:
                         status = 'unknown'
                         data_count = 0
                     logger.warning(f"❌ 失敗: {key} - error={error}, status={status}, data_count={data_count}")
+                    
+                    # エラー詳細情報を収集
+                    error_detail = {
+                        'source': key,  # ソース名（例: google_JP, youtube_US）
+                        'error': str(error),
+                        'status': str(status) if isinstance(response, dict) else 'unknown',
+                    }
+                    failed_trends_details.append(error_detail)
             
             if failed_trends:
                 logger.warning(f"⚠️ 失敗したトレンド ({len(failed_trends)}件): {', '.join(failed_trends)}")
@@ -505,15 +514,14 @@ class TrendsScheduler:
             # 異常検出 → Discord アラート
             has_anomaly = self._check_and_alert_anomalies(
                 execution_id, start_time, end_time,
-                total_count, success_count, failed_count, duration, failed_trends,
+                total_count, success_count, failed_count, duration, failed_trends, failed_trends_details,
             )
             
-            # 正常終了時（異常検出がない場合）にDiscord通知を送信
-            if not has_anomaly:
-                self._send_success_notification(
-                    execution_id, start_time, end_time,
-                    total_count, success_count, failed_count, duration,
-                )
+            # 常にDiscord通知を送信（成功時も失敗時も）
+            self._send_execution_notification(
+                execution_id, start_time, end_time,
+                total_count, success_count, failed_count, duration, failed_trends_details, has_anomaly,
+            )
 
             # データ保存完了後、メール自動送信を実行
             # スケジューラー実行時（深夜1時・朝7時・昼13時・夜19時）のみメール送信
@@ -532,11 +540,23 @@ class TrendsScheduler:
             
         except Exception as e:
             logger.error(f"❌ 自動トレンド取得エラー: {e}", exc_info=True)
+            import traceback
+            error_traceback = traceback.format_exc()
+            # トレースバックの最初の数行のみを取得（Discordの文字数制限を考慮）
+            traceback_lines = error_traceback.split('\n')[:10]
+            traceback_summary = '\n'.join(traceback_lines)
+            
             self._send_alert(
                 "critical",
                 "トレンド取得処理エラー",
                 f"自動トレンド取得中にエラーが発生しました: {str(e)}",
-                {"エラータイプ": type(e).__name__},
+                {
+                    "実行ID": execution_id if 'execution_id' in locals() else "unknown",
+                    "エラータイプ": type(e).__name__,
+                    "エラーメッセージ": str(e),
+                    "エラー発生箇所": traceback_summary,
+                    "実行時間": f"{(datetime.now(jst) - start_time).total_seconds():.2f}秒" if 'start_time' in locals() else "不明",
+                },
             )
             # エラーが発生してもメール送信を試みる（ただし、SKIP_EMAIL_ON_UPDATE=trueの場合はスキップ）
             skip_email = os.getenv('SKIP_EMAIL_ON_UPDATE', 'false').lower() == 'true'
@@ -602,6 +622,7 @@ class TrendsScheduler:
         failed_count: int,
         duration: float,
         failed_trends: list,
+        failed_trends_details: list,
     ) -> bool:
         """異常を検出して Discord アラート送信
         
@@ -614,55 +635,90 @@ class TrendsScheduler:
         failure_rate = (failed_count / total_count) * 100
         has_anomaly = False
 
+        # エラー詳細をフォーマット
+        error_details_text = self._format_error_details(failed_trends_details)
+
         # 全失敗
         if success_count == 0:
+            details = {
+                "実行ID": execution_id,
+                "総数": str(total_count),
+                "実行時間": f"{duration / 60:.1f}分 ({duration:.2f}秒)",
+                "開始時刻": start_time.strftime("%Y-%m-%d %H:%M:%S JST"),
+                "終了時刻": end_time.strftime("%Y-%m-%d %H:%M:%S JST"),
+            }
+            if error_details_text:
+                details["エラー詳細"] = error_details_text
             self._send_alert(
                 "critical",
                 "全トレンド取得失敗",
                 "全てのトレンド取得に失敗しました。",
-                {
-                    "実行ID": execution_id,
-                    "総数": str(total_count),
-                    "失敗トレンド": ", ".join(failed_trends) if failed_trends else "全て",
-                },
+                details,
             )
             return True
 
         # 失敗率 50% 以上
         if failure_rate >= 50:
+            details = {
+                "実行ID": execution_id,
+                "成功": str(success_count),
+                "失敗": str(failed_count),
+                "総数": str(total_count),
+                "失敗率": f"{failure_rate:.1f}%",
+                "実行時間": f"{duration / 60:.1f}分 ({duration:.2f}秒)",
+                "開始時刻": start_time.strftime("%Y-%m-%d %H:%M:%S JST"),
+                "終了時刻": end_time.strftime("%Y-%m-%d %H:%M:%S JST"),
+            }
+            if error_details_text:
+                details["エラー詳細"] = error_details_text
             self._send_alert(
                 "critical",
                 "高失敗率検出",
                 f"トレンド取得の失敗率が {failure_rate:.1f}% です（閾値: 50%）。",
-                {
-                    "実行ID": execution_id,
-                    "成功": str(success_count),
-                    "失敗": str(failed_count),
-                    "総数": str(total_count),
-                    "失敗率": f"{failure_rate:.1f}%",
-                    "失敗トレンド": ", ".join(failed_trends) if failed_trends else "なし",
-                },
+                details,
             )
             has_anomaly = True
 
         # 実行時間 30 分以上
         if duration >= 1800:
+            details = {
+                "実行ID": execution_id,
+                "実行時間": f"{duration / 60:.1f}分 ({duration:.2f}秒)",
+                "開始時刻": start_time.strftime("%Y-%m-%d %H:%M:%S JST"),
+                "終了時刻": end_time.strftime("%Y-%m-%d %H:%M:%S JST"),
+            }
+            if error_details_text:
+                details["エラー詳細"] = error_details_text
             self._send_alert(
                 "warning",
                 "実行時間が異常に長い",
                 f"トレンド取得の実行時間が {duration / 60:.1f} 分です（閾値: 30 分）。",
-                {
-                    "実行ID": execution_id,
-                    "実行時間（秒）": f"{duration:.2f}",
-                    "開始": start_time.strftime("%Y-%m-%d %H:%M:%S JST"),
-                    "終了": end_time.strftime("%Y-%m-%d %H:%M:%S JST"),
-                },
+                details,
             )
             has_anomaly = True
         
         return has_anomaly
     
-    def _send_success_notification(
+    def _format_error_details(self, failed_trends_details: list) -> str:
+        """エラー詳細をフォーマットして文字列として返す"""
+        if not failed_trends_details:
+            return ""
+        
+        # Discordのフィールド値の最大長（1024文字）を考慮して、最初の10件まで表示
+        max_items = 10
+        details_lines = []
+        for i, detail in enumerate(failed_trends_details[:max_items]):
+            source = detail.get('source', 'unknown')
+            error = detail.get('error', 'unknown')
+            status = detail.get('status', 'unknown')
+            details_lines.append(f"• {source}: {error} (status: {status})")
+        
+        if len(failed_trends_details) > max_items:
+            details_lines.append(f"... 他 {len(failed_trends_details) - max_items}件")
+        
+        return "\n".join(details_lines)
+    
+    def _send_execution_notification(
         self,
         execution_id: str,
         start_time: datetime,
@@ -671,36 +727,56 @@ class TrendsScheduler:
         success_count: int,
         failed_count: int,
         duration: float,
+        failed_trends_details: list,
+        has_anomaly: bool,
     ) -> None:
-        """正常終了時にDiscord通知を送信"""
+        """スケジューラ実行結果をDiscord通知（成功時も失敗時も）"""
         if not self.alert_service:
             return
         
-        jst = pytz.timezone('Asia/Tokyo')
         duration_min = duration / 60
         
         # 失敗率を計算
         failure_rate = (failed_count / total_count) * 100 if total_count > 0 else 0
         
-        # メッセージを構築
+        # アラートタイプを決定
+        if has_anomaly:
+            alert_type = "warning" if failed_count > 0 else "warning"
+        elif failed_count == 0:
+            alert_type = "success"
+        else:
+            alert_type = "warning"  # 一部失敗があるが異常ではない場合
+        
+        # タイトルとメッセージを構築
         if failed_count == 0:
+            title = "✅ トレンド取得正常終了"
             message = f"全てのトレンド取得が正常に完了しました。"
         else:
-            message = f"トレンド取得が完了しました（一部失敗あり）。"
+            title = "⚠️ トレンド取得完了（一部失敗）"
+            message = f"トレンド取得が完了しましたが、{failed_count}件の失敗があります。"
+        
+        # 詳細情報を構築
+        details = {
+            "実行ID": execution_id,
+            "成功": f"{success_count}/{total_count}",
+            "失敗": str(failed_count),
+            "失敗率": f"{failure_rate:.1f}%",
+            "実行時間": f"{duration_min:.1f}分 ({duration:.2f}秒)",
+            "開始時刻": start_time.strftime("%Y-%m-%d %H:%M:%S JST"),
+            "終了時刻": end_time.strftime("%Y-%m-%d %H:%M:%S JST"),
+        }
+        
+        # エラー詳細を追加
+        if failed_trends_details:
+            error_details_text = self._format_error_details(failed_trends_details)
+            if error_details_text:
+                details["エラー詳細"] = error_details_text
         
         self._send_alert(
-            "success",
-            "✅ トレンド取得正常終了",
+            alert_type,
+            title,
             message,
-            {
-                "実行ID": execution_id,
-                "成功": f"{success_count}/{total_count}",
-                "失敗": str(failed_count),
-                "失敗率": f"{failure_rate:.1f}%",
-                "実行時間": f"{duration_min:.1f}分 ({duration:.2f}秒)",
-                "開始時刻": start_time.strftime("%Y-%m-%d %H:%M:%S JST"),
-                "終了時刻": end_time.strftime("%Y-%m-%d %H:%M:%S JST"),
-            },
+            details,
         )
 
     def _save_to_trends_cache(self, platform: str, data: dict, data_count: int):

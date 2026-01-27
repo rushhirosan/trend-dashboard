@@ -11,7 +11,7 @@
         <div class="d-flex align-items-center justify-content-between py-1">
             <!-- 左側: ロゴとタイトル -->
             <a href="/" class="header-title" style="text-decoration: none; cursor: pointer;">
-                <i class="{{ page_icon|default('fas fa-chart-line') }} header-title-icon"></i>
+                <img src="{{ url_for('static', filename='images/favicon.png') }}" alt="Trends Dashboard" class="header-title-icon" style="width: 1.3rem; height: 1.3rem; object-fit: contain;">
                 <h1 class="h4 mb-0 header-title-text">{{ page_title }}</h1>
             </a>
             <!-- 右側: ナビゲーション -->

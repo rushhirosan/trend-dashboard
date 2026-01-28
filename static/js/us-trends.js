@@ -893,6 +893,8 @@ function displayGoogleResults(data) {
                 </a>
             </td>
         `;
+        // 行全体をクリック可能にする（アクセシビリティ対応）
+        makeTableRowClickable(row, googleSearchUrl, `Search ${keyword} on Google`);
         tableBody.appendChild(row);
     });
     
@@ -951,6 +953,8 @@ function displayYouTubeResults(data) {
             <td>${channel}</td>
             <td>${formatNumber(views)}</td>
         `;
+        // 行全体をクリック可能にする（アクセシビリティ対応）
+        makeTableRowClickable(row, youtubeUrl, `Open ${title} video`);
         tableBody.appendChild(row);
     });
     
@@ -1248,6 +1252,8 @@ function displayWorldNewsResults(data) {
             <td><a href="${url}" target="_blank" class="text-decoration-none"><strong>${title}</strong></a></td>
             <td>${published}</td>
         `;
+        // 行全体をクリック可能にする（アクセシビリティ対応）
+        makeTableRowClickable(row, url, `Open ${title} news article`);
         tableBody.appendChild(row);
     });
     
@@ -1297,6 +1303,8 @@ function displaySpotifyResults(data) {
             <td>${artist}</td>
             <td>${album}</td>
         `;
+        // 行全体をクリック可能にする（アクセシビリティ対応）
+        makeTableRowClickable(row, spotifyUrl, `Open ${title} by ${artist} on Spotify`);
         tableBody.appendChild(row);
     });
     
@@ -1452,13 +1460,16 @@ function displayRedditResults(data) {
         const comments = item.num_comments || 0;
         const permalink = item.permalink || '#';
         
+        const redditUrl = permalink.startsWith('http') ? permalink : `https://www.reddit.com${permalink}`;
         row.innerHTML = `
             <td><span class="badge bg-warning text-dark">${index + 1}</span></td>
-            <td><a href="${permalink}" target="_blank"><strong>${title}</strong></a></td>
+            <td><a href="${redditUrl}" target="_blank"><strong>${title}</strong></a></td>
             <td><span class="badge bg-secondary">r/${subreddit}</span></td>
             <td>${formatNumber(score)}</td>
             <td>${formatNumber(comments)}</td>
         `;
+        // 行全体をクリック可能にする（アクセシビリティ対応）
+        makeTableRowClickable(row, redditUrl, `Open ${title} on Reddit`);
         tableBody.appendChild(row);
     });
     
@@ -1592,6 +1603,8 @@ function displayPodcastResults(data) {
             <td><a href="${url}" target="_blank"><strong>${title}</strong></a></td>
             <td>${publisher}</td>
         `;
+        // 行全体をクリック可能にする（アクセシビリティ対応）
+        makeTableRowClickable(row, url, `Open ${title} podcast`);
         tableBody.appendChild(row);
     });
     
@@ -1689,6 +1702,8 @@ function displayTwitchResults(data, type = 'games') {
                 <td><a href="${url}" target="_blank" class="text-decoration-none"><strong>${gameName}</strong></a></td>
                 <td>${formatNumber(viewers)}</td>
             `;
+            // 行全体をクリック可能にする（アクセシビリティ対応）
+            makeTableRowClickable(row, url, `Open ${gameName} on Twitch`);
         } else if (type === 'streams') {
             const title = item.title || 'N/A';
             const userName = item.user_name || 'N/A';
@@ -1700,6 +1715,8 @@ function displayTwitchResults(data, type = 'games') {
                 <td><a href="${url}" target="_blank" class="text-decoration-none"><strong>${title}</strong><br><small>${userName}</small></a></td>
                 <td>${formatNumber(viewers)}</td>
             `;
+            // 行全体をクリック可能にする（アクセシビリティ対応）
+            makeTableRowClickable(row, url, `Open ${title} stream by ${userName} on Twitch`);
         } else if (type === 'clips') {
             const title = item.title || 'N/A';
             const creatorName = item.creator_name || 'N/A';
@@ -1711,6 +1728,8 @@ function displayTwitchResults(data, type = 'games') {
                 <td><a href="${url}" target="_blank" class="text-decoration-none"><strong>${title}</strong><br><small>${creatorName}</small></a></td>
                 <td>${formatNumber(viewCount)}</td>
             `;
+            // 行全体をクリック可能にする（アクセシビリティ対応）
+            makeTableRowClickable(row, url, `Open ${title} clip by ${creatorName} on Twitch`);
         }
         
         tableBody.appendChild(row);
@@ -1830,6 +1849,8 @@ function displayHackerNewsResults(data) {
             <td>${score}</td>
             <td>${comments}</td>
         `;
+        // 行全体をクリック可能にする（アクセシビリティ対応）
+        makeTableRowClickable(row, url, `Open ${title} on Hacker News`);
         tableBody.appendChild(row);
     });
     
@@ -2006,6 +2027,8 @@ function displayCNNResults(data) {
             <td><a href="${url}" target="_blank" class="text-decoration-none"><strong>${title}</strong></a></td>
             <td>${publishedDate}</td>
         `;
+        // 行全体をクリック可能にする（アクセシビリティ対応）
+        makeTableRowClickable(row, url, `Open ${title} CNN article`);
         tableBody.appendChild(row);
     });
     
@@ -2119,6 +2142,8 @@ function displayProductHuntResults(data) {
             <td>${tagline}</td>
             <td>${formatNumber(votes)}</td>
         `;
+        // 行全体をクリック可能にする（アクセシビリティ対応）
+        makeTableRowClickable(row, url, `Open ${name} on Product Hunt`);
         tableBody.appendChild(row);
     });
     
@@ -2581,6 +2606,8 @@ function displayDevToResults(data) {
             <td>${author}</td>
             <td>${formatNumber(reactions)}</td>
         `;
+        // 行全体をクリック可能にする（アクセシビリティ対応）
+        makeTableRowClickable(row, url, `Open ${title} on DEV.to`);
         tableBody.appendChild(row);
     });
     
@@ -2627,6 +2654,8 @@ function displayMediumResults(data) {
             <td>${author}</td>
             <td>${published}</td>
         `;
+        // 行全体をクリック可能にする（アクセシビリティ対応）
+        makeTableRowClickable(row, url, `Open ${title} on Medium`);
         tableBody.appendChild(row);
     });
     
@@ -2737,6 +2766,8 @@ function displayEbayResults(data) {
             <td><a href="${url}" target="_blank" class="text-decoration-none"><strong>${title}</strong></a></td>
             <td>${price}</td>
         `;
+        // 行全体をクリック可能にする（アクセシビリティ対応）
+        makeTableRowClickable(row, url, `Open ${title} on eBay`);
         tableBody.appendChild(row);
     });
     

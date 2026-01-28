@@ -33,15 +33,15 @@ function displayNoteResults(data) {
         console.error('noteTrendsTableBodyが見つかりません');
         return;
     }
-    
+
     tableBody.innerHTML = '';
-    
+
     if (data.data && data.data.length > 0) {
         data.data.forEach((item, index) => {
             const row = document.createElement('tr');
             row.className = 'trend-card';
             row.style.minHeight = '100px';
-            
+
             // 公開日をフォーマット
             let publishedDate = 'N/A';
             if (item.published_date) {
@@ -56,23 +56,28 @@ function displayNoteResults(data) {
                     publishedDate = item.published_date;
                 }
             }
-            
+
+            const articleUrl = item.url || '#';
+            const articleTitle = item.title || 'N/A';
+
             // リンクを追加
-            const articleLink = item.url ? 
-                `<br><a href="${item.url}" target="_blank" class="btn btn-sm btn-outline-secondary mt-1">
+            const articleLink = articleUrl !== '#' ?
+                `<br><a href="${articleUrl}" target="_blank" class="btn btn-sm btn-outline-secondary mt-1">
                     <i class="fas fa-external-link-alt"></i> 記事を読む
                 </a>` : '';
-            
+
             row.innerHTML = `
                 <td><span class="badge bg-secondary">${item.rank || index + 1}</span></td>
                 <td>
-                    <strong>${item.title || 'N/A'}</strong>${articleLink}
+                    <strong><a href="${articleUrl}" target="_blank">${articleTitle}</a></strong>${articleLink}
                 </td>
                 <td>${publishedDate}</td>
             `;
+            // 行全体をクリック可能にする（アクセシビリティ対応）
+            makeTableRowClickable(row, articleUrl, `${articleTitle}の記事を開く`);
             tableBody.appendChild(row);
         });
-        
+
         showNoteResults();
     } else {
         showNoteError('データが見つかりませんでした');

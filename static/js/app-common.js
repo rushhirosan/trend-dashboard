@@ -69,19 +69,19 @@ async function callAPI(endpoint, params = {}) {
     try {
         const queryString = new URLSearchParams(params).toString();
         const url = queryString ? `${endpoint}?${queryString}` : endpoint;
-        
+
         logDebug(`API呼び出し: ${url}`);
-        
+
         const response = await fetch(url);
         logDebug(`APIレスポンス: ${response.status} ${response.statusText}`);
-        
+
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
+
         const data = await response.json();
         logDebug(`APIデータ:`, data);
-        
+
         return data;
     } catch (error) {
         logError(`API呼び出しエラー: ${endpoint}`, error);
@@ -96,9 +96,9 @@ function updateTable(tableBodyId, data, rowRenderer) {
         logError(`テーブルボディが見つかりません: ${tableBodyId}`);
         return;
     }
-    
+
     tableBody.innerHTML = '';
-    
+
     if (data && data.length > 0) {
         data.forEach((item, index) => {
             const row = document.createElement('tr');
@@ -146,6 +146,69 @@ function formatDate(dateString, locale = 'ja-JP') {
 function truncateText(text, maxLength = 100) {
     if (!text) return '';
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+}
+
+// ============================================
+// アクセシビリティ対応: テーブル行をクリック可能にする
+// ============================================
+
+/**
+ * テーブル行をクリック可能にする（アクセシビリティ対応）
+ * @param {HTMLTableRowElement} row - テーブル行要素
+ * @param {string} linkUrl - クリック時に遷移するURL
+ * @param {string} ariaLabel - スクリーンリーダー用のラベル（オプション）
+ */
+function makeTableRowClickable(row, linkUrl, ariaLabel = null) {
+    if (!row || !linkUrl || linkUrl === '#') {
+        return;
+    }
+
+    // クリック可能な行としてマーク
+    row.setAttribute('data-clickable', 'true');
+    row.setAttribute('tabindex', '0');
+    row.setAttribute('role', 'button');
+
+    // aria-labelを設定（指定がない場合は行内のリンクテキストを使用）
+    if (ariaLabel) {
+        row.setAttribute('aria-label', ariaLabel);
+    } else {
+        // 行内の最初のリンクのテキストを取得
+        const firstLink = row.querySelector('a');
+        if (firstLink) {
+            const linkText = firstLink.textContent.trim();
+            row.setAttribute('aria-label', `${linkText}を開く`);
+        }
+    }
+
+    // クリックイベント: 行全体をクリックしたときにリンクを開く
+    row.addEventListener('click', function(e) {
+        // リンクやボタンがクリックされた場合は、その要素の動作を優先
+        if (e.target.tagName === 'A' || e.target.tagName === 'BUTTON' || e.target.closest('a') || e.target.closest('button')) {
+            return;
+        }
+
+        // 行全体がクリックされた場合は、最初のリンクを開く
+        const firstLink = row.querySelector('a[href]');
+        if (firstLink && firstLink.href && firstLink.href !== '#') {
+            window.open(firstLink.href, firstLink.target || '_blank');
+        }
+    });
+
+    // キーボードイベント: EnterキーまたはSpaceキーでリンクを開く
+    row.addEventListener('keydown', function(e) {
+        // リンクやボタンがフォーカスされている場合は、その要素の動作を優先
+        if (e.target.tagName === 'A' || e.target.tagName === 'BUTTON' || e.target.closest('a') || e.target.closest('button')) {
+            return;
+        }
+
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            const firstLink = row.querySelector('a[href]');
+            if (firstLink && firstLink.href && firstLink.href !== '#') {
+                window.open(firstLink.href, firstLink.target || '_blank');
+            }
+        }
+    });
 }
 
 // ============================================
@@ -220,21 +283,21 @@ function createDropdownTrendsManager(config) {
     const fetchTrends = () => {
         showLoading();
         hideResults();
-        
+
         const selectElement = document.getElementById(selectId);
         const selectedValue = selectElement ? selectElement.value : defaultValue;
-        
+
         console.log(`🔍 ${serviceName}: ${paramName} '${selectedValue}' のデータを取得中...`);
-        
+
         const params = {
             [paramName]: selectedValue,
             limit: 25,
             ...getParams(selectedValue)
         };
-        
+
         const queryString = new URLSearchParams(params).toString();
         const url = `${apiEndpoint}?${queryString}`;
-        
+
         fetch(url)
             .then(response => response.json())
             .then(data => {
@@ -314,7 +377,7 @@ function loadTrendsFromCache(config) {
     } = config;
 
     console.log(`📊 ${serviceName} Trends キャッシュデータ読み込み`);
-    
+
     // ローディング表示
     if (uiIds.loading) {
         const loadingElement = document.getElementById(uiIds.loading);
@@ -322,11 +385,11 @@ function loadTrendsFromCache(config) {
             loadingElement.style.display = 'block';
         }
     }
-    
+
     // AbortControllerを使用したタイムアウト処理
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
-    
+
     // パラメータにforce_refresh=falseを追加
     const queryParams = {
         ...params,
@@ -334,7 +397,7 @@ function loadTrendsFromCache(config) {
     };
     const queryString = new URLSearchParams(queryParams).toString();
     const url = `${apiEndpoint}?${queryString}`;
-    
+
     // キャッシュデータを取得して表示
     fetchWithRetry(url, { signal: controller.signal })
         .then(response => {
@@ -347,7 +410,7 @@ function loadTrendsFromCache(config) {
         })
         .then(data => {
             console.log(`${serviceName} Trends API データ:`, data);
-            
+
             // ローディング表示を非表示
             if (uiIds.loading) {
                 const loadingElement = document.getElementById(uiIds.loading);
@@ -355,7 +418,7 @@ function loadTrendsFromCache(config) {
                     loadingElement.style.display = 'none';
                 }
             }
-            
+
             if (data.data && data.data.length > 0) {
                 console.log(`${serviceName} Trends データ表示開始`);
                 if (typeof displayFunction === 'function') {
@@ -366,7 +429,7 @@ function loadTrendsFromCache(config) {
             } else {
                 console.log(`${serviceName} Trends データなしまたはエラー:`, data);
             }
-            
+
             // 結果エリアを表示
             if (uiIds.results) {
                 const resultsElement = document.getElementById(uiIds.results);
@@ -382,7 +445,7 @@ function loadTrendsFromCache(config) {
             } else {
                 console.error(`${serviceName} Trends キャッシュ読み込みエラー:`, error);
             }
-            
+
             // エラー時もローディング表示を非表示
             if (uiIds.loading) {
                 const loadingElement = document.getElementById(uiIds.loading);
@@ -390,7 +453,7 @@ function loadTrendsFromCache(config) {
                     loadingElement.style.display = 'none';
                 }
             }
-            
+
             // エラー時でも結果エリアを表示（空でも）
             if (uiIds.results) {
                 const resultsElement = document.getElementById(uiIds.results);

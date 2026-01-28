@@ -31,6 +31,26 @@
     transition: background-color 0.2s ease;
 }
 
+/* クリック可能な行のスタイル */
+.trend-table tbody tr[data-clickable="true"] {
+    cursor: pointer;
+}
+
+.trend-table tbody tr[data-clickable="true"]:hover {
+    background-color: #f1f3f5;
+}
+
+.trend-table tbody tr[data-clickable="true"]:focus {
+    outline: 2px solid #007bff;
+    outline-offset: -2px;
+    background-color: #e7f3ff;
+}
+
+.trend-table tbody tr[data-clickable="true"]:active {
+    background-color: #d1e7ff;
+}
+
+/* 従来のホバースタイル（後方互換性のため残す） */
 .trend-table tbody tr:hover {
     background-color: #f1f3f5;
 }

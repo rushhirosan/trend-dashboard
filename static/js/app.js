@@ -29,35 +29,35 @@ async function fetchWithRetry(url, options = {}, maxRetries = 2) {
 // Google Trendsデータを取得
 async function fetchGoogleTrends() {
     console.log('fetchGoogleTrends: 開始');
-    
+
     const country = 'JP'; // 日本固定
-    
+
     console.log('fetchGoogleTrends: パラメータ', { country });
-    
+
     // ローディング表示
     showGoogleLoading();
     console.log('fetchGoogleTrends: ローディング表示完了');
-    
+
     try {
         console.log(`Google API呼び出し: /api/google-trends?country=${country}`);
-        
+
         const response = await fetchWithRetry(`/api/google-trends?country=${country}`);
         console.log('Google API レスポンス受信:', response.status, response.ok);
-        
+
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
+
         const data = await response.json();
         console.log('Google APIレスポンス:', data);
-        
+
         if (data.error) {
             console.error('Google API エラー:', data.error);
             showGoogleError(data.error);
             hideGoogleLoading();
             return;
         }
-        
+
         // データの存在チェックを改善
         if (!data.data || !Array.isArray(data.data)) {
             console.error('Google API データ形式エラー:', data);
@@ -67,12 +67,12 @@ async function fetchGoogleTrends() {
             hideGoogleLoading();
             return;
         }
-        
+
         console.log('fetchGoogleTrends: データ表示開始');
         displayGoogleResults(data);
         hideGoogleLoading();
         console.log('fetchGoogleTrends: 完了');
-        
+
     } catch (error) {
         console.error('Google Trends取得エラー:', error);
         showGoogleError('Google Trendsの取得に失敗しました: ' + error.message);
@@ -88,38 +88,38 @@ async function fetchGoogleTrends() {
 // YouTube Trendsデータを取得
 async function fetchYouTubeTrends() {
     console.log('fetchYouTubeTrends: 開始');
-    
+
     const region = 'JP'; // 日本固定
     // Rising機能は削除されたため、常にtop25を使用
     const trendType = 'top25';
-    
+
     console.log('fetchYouTubeTrends: パラメータ', { region, trendType });
-    
+
     // ローディング表示
     showYouTubeLoading();
     console.log('fetchYouTubeTrends: ローディング表示完了');
-    
+
     try {
         const endpoint = '/api/youtube-trends';
         console.log(`YouTube API呼び出し: ${endpoint}?region=${region}`);
-        
+
         const response = await fetch(`${endpoint}?region=${region}`);
         console.log('YouTube API レスポンス受信:', response.status, response.ok);
-        
+
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
+
         const data = await response.json();
         console.log('YouTube APIレスポンス:', data);
-        
+
         if (data.error) {
             console.error('YouTube API エラー:', data.error);
             showYouTubeError(data.error);
             hideYouTubeLoading();
             return;
         }
-        
+
         // データの存在チェックを改善
         if (!data.data || !Array.isArray(data.data)) {
             console.error('YouTube API データ形式エラー:', data);
@@ -129,12 +129,12 @@ async function fetchYouTubeTrends() {
             hideYouTubeLoading();
             return;
         }
-        
+
         console.log('fetchYouTubeTrends: データ表示開始');
         displayYouTubeResults(data);
         hideYouTubeLoading();
         console.log('fetchYouTubeTrends: 完了');
-        
+
     } catch (error) {
         console.error('YouTube Trends取得エラー:', error);
         showYouTubeError('YouTube Trendsの取得に失敗しました: ' + error.message);
@@ -151,31 +151,31 @@ async function fetchYouTubeTrends() {
 async function fetchMusicTrends() {
     console.log('=== fetchMusicTrends関数が呼び出されました ===');
     console.log('fetchMusicTrends: 開始');
-    
+
     // Spotifyに固定
     const service = 'spotify';
-    
+
     console.log('fetchMusicTrends: パラメータ', { service });
-    
+
     try {
         console.log(`音楽API呼び出し: /api/music-trends?service=${service}`);
-        
+
         const response = await fetch(`/api/music-trends?service=${service}`);
         console.log('音楽API レスポンス受信:', response.status, response.ok);
-        
+
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
+
         const data = await response.json();
         console.log('音楽APIレスポンス:', data);
-        
+
         if (data.error) {
             console.error('音楽API エラー:', data.error);
             showMusicError(data.error);
             return;
         }
-        
+
         // データの存在チェックを改善
         if (!data.data || !Array.isArray(data.data)) {
             console.error('音楽API データ形式エラー:', data);
@@ -184,11 +184,11 @@ async function fetchMusicTrends() {
             showMusicError('データの形式が正しくありません');
             return;
         }
-        
+
         console.log('fetchMusicTrends: データ表示開始');
         displayMusicResults(data);
         console.log('fetchMusicTrends: 完了');
-        
+
     } catch (error) {
         console.error('音楽トレンド取得エラー:', error);
         showMusicError('音楽トレンドの取得に失敗しました: ' + error.message);
@@ -201,18 +201,18 @@ async function fetchMusicTrends() {
 // Google Trends結果を表示
 function displayGoogleResults(data) {
     console.log('displayGoogleResults: 開始', data);
-    
+
     const tableBody = document.getElementById('googleTrendsTableBody');
     const statusMessage = document.getElementById('googleStatusMessage');
     const country = 'JP'; // 日本固定
-    
+
     console.log('displayGoogleResults: 要素取得完了', {
         tableBody: !!tableBody,
         statusMessage: !!statusMessage,
         country: country
     });
-    
-    
+
+
     // ステータスメッセージは非表示のまま
     if (statusMessage) {
         statusMessage.style.display = 'none !important';
@@ -220,44 +220,48 @@ function displayGoogleResults(data) {
 
     // テーブルを更新
     console.log('displayGoogleResults: テーブル更新開始', { dataLength: data.data.length });
-    
+
     // Popularity（score）の降順でソート
     const sortedData = [...data.data].sort((a, b) => {
         const scoreA = a.score || a.popularity || 0;
         const scoreB = b.score || b.popularity || 0;
         return scoreB - scoreA; // 降順
     });
-    
+
     tableBody.innerHTML = '';
     sortedData.forEach((trend, index) => {
         const row = document.createElement('tr');
         row.className = 'trend-card';
         row.style.minHeight = '100px';
-        
+
         // Google検索リンクを追加
         console.log(`displayGoogleResults: 行${index + 1}の検索URL確認`, {
             keyword: trend.keyword,
             google_search_url: trend.google_search_url
         });
-        
-        const searchLink = trend.google_search_url ? 
+
+        const searchLink = trend.google_search_url ?
             `<a href="${trend.google_search_url}" target="_blank" class="btn btn-sm btn-outline-primary">
                 <i class="fab fa-google"></i> 検索
-            </a>` : 
+            </a>` :
             `<button class="btn btn-sm btn-outline-secondary" disabled>
                 <i class="fas fa-search"></i> 検索URLなし
             </button>`;
-        
+
         const popularity = trend.score || trend.popularity || 0;
-        
+        const keyword = trend.keyword || trend.term || 'N/A';
+        const googleSearchUrl = trend.google_search_url || '#';
+
         row.innerHTML = `
             <td><span class="badge bg-primary">${index + 1}</span></td>
-            <td><strong>${trend.keyword || trend.term || 'N/A'}</strong></td>
+            <td><strong><a href="${googleSearchUrl}" target="_blank">${keyword}</a></strong></td>
             <td><strong>${Math.round(popularity).toLocaleString()}</strong></td>
             <td>${searchLink}</td>
         `;
+        // 行全体をクリック可能にする（アクセシビリティ対応）
+        makeTableRowClickable(row, googleSearchUrl, `${keyword}をGoogleで検索`);
         tableBody.appendChild(row);
-        
+
         if (index < 3) { // 最初の3件のみログ出力
             console.log(`displayGoogleResults: 行${index + 1}追加完了`, {
                 rank: index + 1,
@@ -281,17 +285,17 @@ function displayGoogleResults(data) {
 // YouTube Trends結果を表示
 function displayYouTubeResults(data) {
     console.log('displayYouTubeResults: 開始', data);
-    
+
     const tableBody = document.getElementById('youtubeTrendsTableBody');
     const statusMessage = document.getElementById('youtubeStatusMessage');
     const region = 'JP'; // 日本固定
-    
+
     console.log('displayYouTubeResults: 要素取得完了', {
         tableBody: !!tableBody,
         statusMessage: !!statusMessage,
         region: region
     });
-    
+
     // ステータスメッセージは非表示のまま
     if (statusMessage) {
         statusMessage.style.display = 'none !important';
@@ -300,37 +304,40 @@ function displayYouTubeResults(data) {
     // テーブルを更新
     console.log('displayYouTubeResults: テーブル更新開始', { dataLength: data.data.length });
     tableBody.innerHTML = '';
-    
+
     // 視聴回数でソート（降順）
     const sortedData = [...data.data].sort((a, b) => {
         const viewCountA = a.view_count || 0;
         const viewCountB = b.view_count || 0;
         return viewCountB - viewCountA; // 降順ソート
     });
-    
+
     sortedData.forEach((video, index) => {
         const row = document.createElement('tr');
         row.className = 'trend-card';
         row.style.minHeight = '100px';
-        
+
         // 追加情報を表示
         let additionalInfo = '';
         if (video.days_since_published !== undefined && video.days_since_published !== null) {
             const daysText = video.days_since_published === 1 ? '1日前' : `${video.days_since_published}日前`;
             additionalInfo = `<br><small class="text-muted">投稿: ${daysText}</small>`;
         }
-        
+
         // YouTubeリンクを作成
         const youtubeUrl = `https://www.youtube.com/watch?v=${video.video_id}`;
-        
+        const videoTitle = video.title || 'N/A';
+
         row.innerHTML = `
             <td><span class="badge bg-danger">${index + 1}</span></td>
-            <td><a href="${youtubeUrl}" target="_blank" class="text-decoration-none"><strong>${video.title}</strong></a>${additionalInfo}</td>
+            <td><a href="${youtubeUrl}" target="_blank" class="text-decoration-none"><strong>${videoTitle}</strong></a>${additionalInfo}</td>
             <td>${video.channel_title}</td>
             <td><strong>${formatViewCount(video.view_count)}</strong></td>
         `;
+        // 行全体をクリック可能にする（アクセシビリティ対応）
+        makeTableRowClickable(row, youtubeUrl, `${videoTitle}の動画を開く`);
         tableBody.appendChild(row);
-        
+
         if (index < 3) { // 最初の3件のみログ出力
             console.log(`displayYouTubeResults: 行${index + 1}追加完了`, {
                 rank: index + 1,
@@ -354,28 +361,28 @@ function displayYouTubeResults(data) {
 // 音楽トレンド結果を表示
 function displayMusicResults(data) {
     console.log('🎵 displayMusicResults: 開始', data);
-    
+
     const tableBody = document.getElementById('musicTrendsTableBody');
     const statusMessage = document.getElementById('musicStatusMessage');
     const resultsElement = document.getElementById('musicResults');
-    
+
     console.log('🎵 displayMusicResults: 要素取得完了', {
         tableBody: !!tableBody,
         statusMessage: !!statusMessage,
         resultsElement: !!resultsElement,
         dataLength: data.data ? data.data.length : 0
     });
-    
+
     if (!tableBody) {
         console.error('❌ musicTrendsTableBody要素が見つかりません');
         return;
     }
-    
+
     if (!resultsElement) {
         console.error('❌ musicResults要素が見つかりません');
         return;
     }
-    
+
     // ステータスメッセージは非表示のまま
     if (statusMessage) {
         statusMessage.style.display = 'none !important';
@@ -388,28 +395,31 @@ function displayMusicResults(data) {
         const row = document.createElement('tr');
         row.className = 'trend-card';
         row.style.minHeight = '100px';
-        
+
         // 人気度を表示（Spotifyではplay_countの代わりにpopularityを使用）
         const popularity = item.popularity || 0;
-        
+
         // 追加情報を表示
         let additionalInfo = '';
         if (item.days_since_published !== undefined) {
             const daysText = item.days_since_published === 1 ? '1日前' : `${item.days_since_published}日前`;
             additionalInfo = `<br><small class="text-muted">投稿: ${daysText}</small>`;
         }
-        
+
         // Spotifyリンクを作成
         const spotifyUrl = item.spotify_url || `https://open.spotify.com/search/${encodeURIComponent(item.title + ' ' + item.artist)}`;
-        
+        const musicTitle = item.title || 'N/A';
+
         row.innerHTML = `
             <td><span class="badge bg-success">${item.rank}</span></td>
-            <td><a href="${spotifyUrl}" target="_blank" class="text-decoration-none"><strong>${item.title}</strong></a>${additionalInfo}</td>
+            <td><a href="${spotifyUrl}" target="_blank" class="text-decoration-none"><strong>${musicTitle}</strong></a>${additionalInfo}</td>
             <td>${item.artist}</td>
             <td><strong>${popularity}</strong></td>
         `;
+        // 行全体をクリック可能にする（アクセシビリティ対応）
+        makeTableRowClickable(row, spotifyUrl, `${musicTitle}の楽曲を開く`);
         tableBody.appendChild(row);
-        
+
         if (index < 3) { // 最初の3件のみログ出力
             console.log(`displayMusicResults: 行${index + 1}追加完了`, {
                 rank: item.rank,
@@ -454,15 +464,15 @@ function formatPlayCount(count) {
 // Google Trendsグラフを更新
 function updateGoogleChart(data) {
     const chartElement = document.getElementById('googleTrendsChart');
-    
+
     // グラフ要素が存在しない場合はスキップ
     if (!chartElement) {
         console.log('Google Trends グラフ要素が見つかりません。テーブル表示のみを使用します。');
         return;
     }
-    
+
     const ctx = chartElement.getContext('2d');
-    
+
     // 既存のグラフを破棄
     if (currentGoogleChart) {
         currentGoogleChart.destroy();
@@ -510,15 +520,15 @@ function updateGoogleChart(data) {
 // YouTube Trendsグラフを更新
 function updateYouTubeChart(data) {
     const chartElement = document.getElementById('youtubeTrendsChart');
-    
+
     // グラフ要素が存在しない場合はスキップ
     if (!chartElement) {
         console.log('YouTube Trends グラフ要素が見つかりません。テーブル表示のみを使用します。');
         return;
     }
-    
+
     const ctx = chartElement.getContext('2d');
-    
+
     // 既存のグラフを破棄
     if (currentYouTubeChart) {
         currentYouTubeChart.destroy();
@@ -566,15 +576,15 @@ function updateYouTubeChart(data) {
 // 音楽トレンドグラフを更新
 function updateMusicChart(data) {
     const chartElement = document.getElementById('musicTrendsChart');
-    
+
     // グラフ要素が存在しない場合はスキップ
     if (!chartElement) {
         console.log('Music Trends グラフ要素が見つかりません。テーブル表示のみを使用します。');
         return;
     }
-    
+
     const ctx = chartElement.getContext('2d');
-    
+
     // 既存のグラフを破棄
     if (currentMusicChart) {
         currentMusicChart.destroy();
@@ -624,7 +634,7 @@ function showGoogleLoading() {
     const loadingElement = document.getElementById('googleLoading');
     const resultsElement = document.getElementById('googleResults');
     const errorElement = document.getElementById('googleErrorMessage');
-    
+
     if (!loadingElement || !resultsElement || !errorElement) {
         console.error('必要なDOM要素が見つかりません:', {
             loading: !!loadingElement,
@@ -633,7 +643,7 @@ function showGoogleLoading() {
         });
         return;
     }
-    
+
     loadingElement.style.display = 'block';
     resultsElement.style.display = 'none';
     errorElement.style.display = 'none';
@@ -642,12 +652,12 @@ function showGoogleLoading() {
 // Google Trendsローディング非表示
 function hideGoogleLoading() {
     const loadingElement = document.getElementById('googleLoading');
-    
+
     if (!loadingElement) {
         console.error('googleLoading要素が見つかりません');
         return;
     }
-    
+
     loadingElement.style.display = 'none';
 }
 
@@ -655,7 +665,7 @@ function hideGoogleLoading() {
 function showGoogleResults() {
     const resultsElement = document.getElementById('googleResults');
     const errorElement = document.getElementById('googleErrorMessage');
-    
+
     if (!resultsElement || !errorElement) {
         console.error('必要なDOM要素が見つかりません:', {
             results: !!resultsElement,
@@ -663,7 +673,7 @@ function showGoogleResults() {
         });
         return;
     }
-    
+
     resultsElement.style.display = 'block';
     errorElement.style.display = 'none';
 }
@@ -672,7 +682,7 @@ function showGoogleResults() {
 function showGoogleError(message) {
     const errorElement = document.getElementById('googleErrorMessage');
     const resultsElement = document.getElementById('googleResults');
-    
+
     if (!errorElement || !resultsElement) {
         console.error('必要なDOM要素が見つかりません:', {
             error: !!errorElement,
@@ -680,7 +690,7 @@ function showGoogleError(message) {
         });
         return;
     }
-    
+
     errorElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
     errorElement.style.display = 'block';
     resultsElement.style.display = 'none';
@@ -691,7 +701,7 @@ function showYouTubeLoading() {
     const loadingElement = document.getElementById('youtubeLoading');
     const resultsElement = document.getElementById('youtubeResults');
     const errorElement = document.getElementById('youtubeErrorMessage');
-    
+
     if (!loadingElement || !resultsElement || !errorElement) {
         console.error('必要なDOM要素が見つかりません:', {
             loading: !!loadingElement,
@@ -700,7 +710,7 @@ function showYouTubeLoading() {
         });
         return;
     }
-    
+
     loadingElement.style.display = 'block';
     resultsElement.style.display = 'none';
     errorElement.style.display = 'none';
@@ -709,12 +719,12 @@ function showYouTubeLoading() {
 // YouTube Trendsローディング非表示
 function hideYouTubeLoading() {
     const loadingElement = document.getElementById('youtubeLoading');
-    
+
     if (!loadingElement) {
         console.error('youtubeLoading要素が見つかりません');
         return;
     }
-    
+
     loadingElement.style.display = 'none';
 }
 
@@ -722,7 +732,7 @@ function hideYouTubeLoading() {
 function showYouTubeResults() {
     const resultsElement = document.getElementById('youtubeResults');
     const errorElement = document.getElementById('youtubeErrorMessage');
-    
+
     if (!resultsElement || !errorElement) {
         console.error('必要なDOM要素が見つかりません:', {
             results: !!resultsElement,
@@ -730,7 +740,7 @@ function showYouTubeResults() {
         });
         return;
     }
-    
+
     resultsElement.style.display = 'block';
     errorElement.style.display = 'none';
 }
@@ -739,7 +749,7 @@ function showYouTubeResults() {
 function showYouTubeError(message) {
     const errorElement = document.getElementById('youtubeErrorMessage');
     const resultsElement = document.getElementById('youtubeResults');
-    
+
     if (!errorElement || !resultsElement) {
         console.error('必要なDOM要素が見つかりません:', {
             error: !!errorElement,
@@ -747,7 +757,7 @@ function showYouTubeError(message) {
         });
         return;
     }
-    
+
     errorElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
     errorElement.style.display = 'block';
     resultsElement.style.display = 'none';
@@ -758,12 +768,12 @@ function showMusicResults() {
     console.log('🎵 showMusicResults: 開始');
     const resultsElement = document.getElementById('musicResults');
     const errorElement = document.getElementById('musicErrorMessage');
-    
+
     console.log('🎵 showMusicResults: 要素確認', {
         results: !!resultsElement,
         error: !!errorElement
     });
-    
+
     if (!resultsElement || !errorElement) {
         console.error('❌ 必要なDOM要素が見つかりません:', {
             results: !!resultsElement,
@@ -771,7 +781,7 @@ function showMusicResults() {
         });
         return;
     }
-    
+
     // インラインスタイルを上書き
     resultsElement.style.setProperty('display', 'block', 'important');
     errorElement.style.setProperty('display', 'none', 'important');
@@ -783,7 +793,7 @@ function showMusicResults() {
 function showMusicError(message) {
     const errorElement = document.getElementById('musicErrorMessage');
     const resultsElement = document.getElementById('musicResults');
-    
+
     if (!errorElement || !resultsElement) {
         console.error('必要なDOM要素が見つかりません:', {
             error: !!errorElement,
@@ -791,7 +801,7 @@ function showMusicError(message) {
         });
         return;
     }
-    
+
     errorElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
     errorElement.style.display = 'block';
     resultsElement.style.display = 'none';
@@ -818,7 +828,7 @@ function hideError() {
 // ページ読み込み時の初期化
 document.addEventListener('DOMContentLoaded', function() {
     console.log('=== DOMContentLoaded: 初期化開始 ===');
-    
+
     // 要素の存在確認
     const elements = {
         googleLoading: document.getElementById('googleLoading'),
@@ -827,9 +837,9 @@ document.addEventListener('DOMContentLoaded', function() {
         youtubeResults: document.getElementById('youtubeResults'),
         musicResults: document.getElementById('musicResults')
     };
-    
+
     console.log('要素の存在確認:', elements);
-    
+
     // キャッシュデータを自動読み込み
     console.log('loadCachedDataExternal関数の存在確認:', typeof loadCachedDataExternal);
     if (typeof loadCachedDataExternal === 'function') {
@@ -843,23 +853,23 @@ document.addEventListener('DOMContentLoaded', function() {
         console.warn('⚠️ loadCachedDataExternal関数が見つかりません');
         console.warn('利用可能な関数:', Object.keys(window).filter(k => k.includes('load') || k.includes('Load')));
     }
-    
+
     // YouTube急上昇機能は削除されたため、ラジオボタンの監視は不要
-    
+
     // YouTube地域選択は削除済み（日本固定）
-    
+
     console.log('=== 初期化完了 ===');
 });
 
 // World News API トレンド取得
 async function fetchWorldNewsTrends() {
     console.log('=== World News API トレンド取得開始 ===');
-    
+
     const resultsElement = document.getElementById('newsResults');
     const statusMessage = document.getElementById('newsStatusMessage');
     const errorElement = document.getElementById('newsErrorMessage');
     const tableBody = document.getElementById('newsTrendsTableBody');
-    
+
     if (!resultsElement || !statusMessage || !errorElement || !tableBody) {
         console.error('必要なDOM要素が見つかりません:', {
             results: !!resultsElement,
@@ -869,32 +879,32 @@ async function fetchWorldNewsTrends() {
         });
         return;
     }
-    
+
     try {
         // 結果表示エリアを表示
         resultsElement.style.display = 'block';
         errorElement.style.display = 'none';
-        
+
         // ステータスメッセージを更新
         statusMessage.innerHTML = '<i class="fas fa-spinner fa-spin"></i> World News APIからニューストレンドデータを取得中...';
-        
+
         // API呼び出し（日本固定）
         const response = await fetchWithRetry('/api/worldnews-trends?country=jp&category=general');
         const data = await response.json();
-        
+
         if (!response.ok) {
             throw new Error(data.error || `HTTP ${response.status}`);
         }
-        
+
         if (!data.success) {
             throw new Error(data.error || '不明なエラーが発生しました');
         }
-        
+
         console.log('World News API 成功:', data);
-        
+
         // 結果を表示
         displayWorldNewsResults(data);
-        
+
     } catch (error) {
         console.error('World News API エラー:', error);
         showNewsError(error.message);
@@ -904,36 +914,36 @@ async function fetchWorldNewsTrends() {
 // World News API トレンド結果を表示
 function displayWorldNewsResults(data) {
     console.log('displayWorldNewsResults: 開始', data);
-    
+
     const tableBody = document.getElementById('newsTrendsTableBody');
     const statusMessage = document.getElementById('newsStatusMessage');
-    
+
     if (!tableBody || !statusMessage) {
         console.error('必要なDOM要素が見つかりません');
         return;
     }
-    
+
     // ステータスメッセージは非表示のまま
     if (statusMessage) {
         statusMessage.style.display = 'none !important';
     }
-    
+
     // テーブルを更新
     tableBody.innerHTML = '';
     data.data.forEach((news, index) => {
         const row = document.createElement('tr');
         row.className = 'trend-card';
         row.style.minHeight = '100px';
-        
+
         // ニュースリンクを追加（他のセクションと同じ形式）
-        const newsLink = news.url ? 
+        const newsLink = news.url ?
             `<br><a href="${news.url}" target="_blank" class="btn btn-sm btn-outline-info mt-1">
                 <i class="fas fa-external-link-alt"></i> 記事を読む
             </a>` : '';
-        
+
         // 公開日時をフォーマット
         const publishedDate = news.published_date || news.source || '';
-        
+
         row.innerHTML = `
             <td><span class="badge bg-info">${news.rank || index + 1}</span></td>
             <td>
@@ -943,10 +953,10 @@ function displayWorldNewsResults(data) {
         `;
         tableBody.appendChild(row);
     });
-    
+
     // グラフを更新
     updateNewsChart(data.data);
-    
+
     // 結果を表示
     showNewsResults();
 }
@@ -988,7 +998,7 @@ function displayPodcastResults(data, trendType) {
     data.data.forEach(item => {
         const row = document.createElement('tr');
         row.className = 'trend-card';
-        
+
             if (trendType === 'program') {
             row.innerHTML = `
                 <td><span class="badge bg-warning">${index + 1}</span></td>
@@ -1029,7 +1039,7 @@ function hidePodcastResults(trendType) {
 // シンプルなポッドキャスト表示関数（HTMLテンプレート用）
 async function fetchPodcastTrends() {
     console.log('fetchPodcastTrends: 開始');
-    
+
     // ローディング表示
     showPodcastLoading();
     hidePodcastResults();
@@ -1037,24 +1047,24 @@ async function fetchPodcastTrends() {
 
     try {
         console.log('Podcast API呼び出し: /api/podcast-trends?trend_type=best_podcasts&force_refresh=false');
-        
+
         const response = await fetchWithRetry('/api/podcast-trends?trend_type=best_podcasts&force_refresh=false');
         console.log('Podcast API レスポンス受信:', response.status, response.ok);
-        
+
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
+
         const data = await response.json();
         console.log('Podcast APIレスポンス:', data);
-        
+
         if (data.error) {
             console.error('Podcast API エラー:', data.error);
             showPodcastError(data.error);
             hidePodcastLoading();
             return;
         }
-        
+
         // データの存在チェック
         if (!data.data || !Array.isArray(data.data)) {
             console.error('Podcast API データ形式エラー:', data);
@@ -1062,12 +1072,12 @@ async function fetchPodcastTrends() {
             hidePodcastLoading();
             return;
         }
-        
+
         console.log('fetchPodcastTrends: データ表示開始');
         displayPodcastResults(data);
         hidePodcastLoading();
         console.log('fetchPodcastTrends: 完了');
-        
+
     } catch (error) {
         console.error('Podcast Trends取得エラー:', error);
         showPodcastError('Podcast Trendsの取得に失敗しました: ' + error.message);
@@ -1091,7 +1101,7 @@ function displayPodcastResults(data) {
 
     // テーブルを更新
     tableBody.innerHTML = '';
-    
+
     // エピソード数でソート（降順）、同じ場合はスコアでソート
     const sortedData = [...data.data].sort((a, b) => {
         const episodesA = a.total_episodes || 0;
@@ -1103,11 +1113,11 @@ function displayPodcastResults(data) {
         }
         return scoreB - scoreA; // 同じ場合はスコアで降順ソート
     });
-    
+
     sortedData.forEach((item, index) => {
         const row = document.createElement('tr');
         row.className = 'trend-card';
-        
+
         row.innerHTML = `
             <td><span class="badge bg-warning">${index + 1}</span></td>
             <td><strong>${item.title}</strong></td>
@@ -1125,12 +1135,12 @@ function displayPodcastResults(data) {
 function showPodcastLoading() {
     const loadingElement = document.getElementById('podcastLoading');
     const resultsElement = document.getElementById('podcastResults');
-    
+
     if (!loadingElement || !resultsElement) {
         console.error('必要なDOM要素が見つかりません');
         return;
     }
-    
+
     loadingElement.style.display = 'block';
     resultsElement.style.display = 'none';
 }
@@ -1138,48 +1148,48 @@ function showPodcastLoading() {
 // ポッドキャストローディング非表示
 function hidePodcastLoading() {
     const loadingElement = document.getElementById('podcastLoading');
-    
+
     if (!loadingElement) {
         console.error('podcastLoading要素が見つかりません');
         return;
     }
-    
+
     loadingElement.style.display = 'none';
 }
 
 // ポッドキャスト結果表示
 function showPodcastResults() {
     const resultsElement = document.getElementById('podcastResults');
-    
+
     if (!resultsElement) {
         console.error('podcastResults要素が見つかりません');
         return;
     }
-    
+
     resultsElement.style.display = 'block';
 }
 
 // ポッドキャスト結果非表示
 function hidePodcastResults() {
     const resultsElement = document.getElementById('podcastResults');
-    
+
     if (!resultsElement) {
         console.error('podcastResults要素が見つかりません');
         return;
     }
-    
+
     resultsElement.style.display = 'none';
 }
 
 // ポッドキャストエラー表示
 function showPodcastError(message) {
     const errorElement = document.getElementById('errorMessage');
-    
+
     if (!errorElement) {
         console.error('errorMessage要素が見つかりません');
         return;
     }
-    
+
     errorElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
     errorElement.style.display = 'block';
 }
@@ -1187,7 +1197,7 @@ function showPodcastError(message) {
 // 楽天トレンドデータを取得
 async function fetchRakutenTrends() {
     console.log('fetchRakutenTrends: 開始');
-    
+
     // ローディング表示
     showRakutenLoading();
     hideRakutenResults();
@@ -1195,24 +1205,24 @@ async function fetchRakutenTrends() {
 
     try {
         console.log('Rakuten API呼び出し: /api/rakuten-trends');
-        
+
         const response = await fetchWithRetry('/api/rakuten-trends');
         console.log('Rakuten API レスポンス受信:', response.status, response.ok);
-        
+
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
+
         const data = await response.json();
         console.log('Rakuten APIレスポンス:', data);
-        
+
         if (data.error) {
             console.error('Rakuten API エラー:', data.error);
             showRakutenError(data.error);
             hideRakutenLoading();
             return;
         }
-        
+
         // データの存在チェック
         if (!data.data || !Array.isArray(data.data)) {
             console.error('Rakuten API データ形式エラー:', data);
@@ -1220,12 +1230,12 @@ async function fetchRakutenTrends() {
             hideRakutenLoading();
             return;
         }
-        
+
         console.log('fetchRakutenTrends: データ表示開始');
         displayRakutenResults(data);
         hideRakutenLoading();
         console.log('fetchRakutenTrends: 完了');
-        
+
     } catch (error) {
         console.error('Rakuten Trends取得エラー:', error);
         showRakutenError('楽天商品トレンドの取得に失敗しました: ' + error.message);
@@ -1249,7 +1259,7 @@ function displayRakutenResults(data) {
 
     // テーブルを更新
     tableBody.innerHTML = '';
-    
+
     // 売上数でソート（降順）、同じ場合はレビュー数でソート
     const sortedData = [...data.data].sort((a, b) => {
         // sales_countを数値に変換
@@ -1257,42 +1267,47 @@ function displayRakutenResults(data) {
         const salesCountB = typeof b.sales_count === 'number' ? b.sales_count : (typeof b.sales_count === 'string' && b.sales_count !== 'N/A' ? parseInt(b.sales_count) || 0 : 0);
         const reviewCountA = a.review_count || 0;
         const reviewCountB = b.review_count || 0;
-        
+
         if (salesCountA !== salesCountB) {
             return salesCountB - salesCountA; // 売上数で降順ソート
         }
         return reviewCountB - reviewCountA; // 同じ場合はレビュー数で降順ソート
     });
-    
+
     sortedData.forEach((item, index) => {
         const row = document.createElement('tr');
         row.className = 'trend-card';
-        
+
         // 価格をフォーマット
         const price = item.price ? `¥${item.price.toLocaleString()}` : '価格不明';
-        
+
         // レビュー情報をフォーマット
-        const reviewInfo = item.review_count > 0 
+        const reviewInfo = item.review_count > 0
             ? `${item.review_average || 0}/5.0 (${item.review_count}件)`
             : 'レビューなし';
-        
+
         // 売上情報をフォーマット
-        const salesInfo = item.sales_rank && item.sales_rank !== 'N/A' 
+        const salesInfo = item.sales_rank && item.sales_rank !== 'N/A'
             ? `ランク: ${item.sales_rank}`
             : item.sales_count && item.sales_count !== 'N/A'
             ? `売上: ${item.sales_count}`
             : '売上情報なし';
-        
+
+        const rakutenUrl = item.url || item.item_url || '#';
+        const productTitle = item.title || 'N/A';
+
         row.innerHTML = `
             <td><span class="badge bg-danger">${index + 1}</span></td>
             <td>
-                <strong>${item.title}</strong>
+                <strong><a href="${rakutenUrl}" target="_blank">${productTitle}</a></strong>
             </td>
             <td>${price}</td>
             <td>${reviewInfo}</td>
             <td>${salesInfo}</td>
             <td>${item.shop_name || '不明'}</td>
         `;
+        // 行全体をクリック可能にする（アクセシビリティ対応）
+        makeTableRowClickable(row, rakutenUrl, `${productTitle}の商品を開く`);
         tableBody.appendChild(row);
     });
 
@@ -1304,12 +1319,12 @@ function displayRakutenResults(data) {
 function showRakutenLoading() {
     const loadingElement = document.getElementById('rakutenLoading');
     const resultsElement = document.getElementById('rakutenResults');
-    
+
     if (!loadingElement || !resultsElement) {
         console.error('必要なDOM要素が見つかりません');
         return;
     }
-    
+
     loadingElement.style.display = 'block';
     resultsElement.style.display = 'none';
 }
@@ -1317,48 +1332,48 @@ function showRakutenLoading() {
 // 楽天ローディング非表示
 function hideRakutenLoading() {
     const loadingElement = document.getElementById('rakutenLoading');
-    
+
     if (!loadingElement) {
         console.error('rakutenLoading要素が見つかりません');
         return;
     }
-    
+
     loadingElement.style.display = 'none';
 }
 
 // 楽天結果表示
 function showRakutenResults() {
     const resultsElement = document.getElementById('rakutenResults');
-    
+
     if (!resultsElement) {
         console.error('rakutenResults要素が見つかりません');
         return;
     }
-    
+
     resultsElement.style.display = 'block';
 }
 
 // 楽天結果非表示
 function hideRakutenResults() {
     const resultsElement = document.getElementById('rakutenResults');
-    
+
     if (!resultsElement) {
         console.error('rakutenResults要素が見つかりません');
         return;
     }
-    
+
     resultsElement.style.display = 'none';
 }
 
 // 楽天エラー表示
 function showRakutenError(message) {
     const errorElement = document.getElementById('errorMessage');
-    
+
     if (!errorElement) {
         console.error('errorMessage要素が見つかりません');
         return;
     }
-    
+
     errorElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
     errorElement.style.display = 'block';
 }
@@ -1367,7 +1382,7 @@ function showRakutenError(message) {
 function fetchHatenaTrends() {
     showHatenaLoading();
     hideHatenaResults();
-    
+
     fetchWithRetry('/api/hatena-trends?category=all&limit=25&type=hot')
         .then(response => response.json())
         .then(data => {
@@ -1390,9 +1405,9 @@ function displayHatenaResults(data) {
         console.error('hatenaTrendsTableBodyが見つかりません');
         return;
     }
-    
+
     tableBody.innerHTML = '';
-    
+
     if (data.data && data.data.length > 0) {
         // ブックマーク数でソート（降順）
         const sortedData = [...data.data].sort((a, b) => {
@@ -1400,32 +1415,37 @@ function displayHatenaResults(data) {
             const bookmarkCountB = b.bookmark_count || 0;
             return bookmarkCountB - bookmarkCountA; // 降順ソート
         });
-        
+
         sortedData.forEach((item, index) => {
             const row = document.createElement('tr');
             row.className = 'trend-card';
             row.style.minHeight = '100px';
-            
+
             // ブックマーク数をフォーマット
             const bookmarkCount = item.bookmark_count || 0;
             const bookmarkInfo = bookmarkCount > 0 ? `${bookmarkCount.toLocaleString()}件` : '0件';
-            
+
+            const articleUrl = item.url || '#';
+            const articleTitle = item.title || 'N/A';
+
             // リンクを追加（他のセクションと同じ形式）
-            const articleLink = item.url ? 
-                `<br><a href="${item.url}" target="_blank" class="btn btn-sm btn-outline-warning mt-1">
+            const articleLink = articleUrl !== '#' ?
+                `<br><a href="${articleUrl}" target="_blank" class="btn btn-sm btn-outline-warning mt-1">
                     <i class="fas fa-external-link-alt"></i> 記事を読む
                 </a>` : '';
-            
+
             row.innerHTML = `
                 <td><span class="badge bg-warning">${item.rank || index + 1}</span></td>
                 <td>
-                    <strong>${item.title || 'N/A'}</strong>${articleLink}
+                    <strong><a href="${articleUrl}" target="_blank">${articleTitle}</a></strong>${articleLink}
                 </td>
                 <td><strong>${bookmarkInfo}</strong></td>
             `;
+            // 行全体をクリック可能にする（アクセシビリティ対応）
+            makeTableRowClickable(row, articleUrl, `${articleTitle}の記事を開く`);
             tableBody.appendChild(row);
         });
-        
+
         showHatenaResults();
         showHatenaStatusMessage(`✅ ${data.source} - ${data.total_count || data.data.length}件のエントリーを取得しました`, 'success');
     } else {
@@ -1464,18 +1484,18 @@ function showHatenaError(message) {
 // NHK ニュース トレンド取得
 async function fetchNHKTrends() {
     console.log('=== NHK ニュース トレンド取得開始 ===');
-    
+
     const resultsElement = document.getElementById('nhkResults');
     const statusMessage = document.getElementById('nhkStatusMessage');
     const errorElement = document.getElementById('nhkErrorMessage');
     const tableBody = document.getElementById('nhkTrendsTableBody');
     const loadingElement = document.getElementById('nhkLoading');
-    
+
     if (!resultsElement || !statusMessage || !errorElement || !tableBody) {
         console.error('必要なDOM要素が見つかりません');
         return;
     }
-    
+
     try {
         // ローディング表示
         if (loadingElement) {
@@ -1483,29 +1503,29 @@ async function fetchNHKTrends() {
         }
         resultsElement.style.display = 'none';
         errorElement.style.display = 'none';
-        
+
         // API呼び出し
         const response = await fetchWithRetry('/api/nhk-trends');
         const data = await response.json();
-        
+
         if (!response.ok) {
             throw new Error(data.error || `HTTP ${response.status}`);
         }
-        
+
         if (!data.success) {
             throw new Error(data.error || '不明なエラーが発生しました');
         }
-        
+
         console.log('NHK ニュース API 成功:', data);
-        
+
         // ローディング非表示
         if (loadingElement) {
             loadingElement.style.display = 'none';
         }
-        
+
         // 結果を表示
         displayNHKResults(data);
-        
+
     } catch (error) {
         console.error('NHK ニュース API エラー:', error);
         if (loadingElement) {
@@ -1520,34 +1540,38 @@ function displayNHKResults(data) {
     const resultsElement = document.getElementById('nhkResults');
     const tableBody = document.getElementById('nhkTrendsTableBody');
     const statusMessage = document.getElementById('nhkStatusMessage');
-    
+
     if (!resultsElement || !tableBody) {
         console.error('必要なDOM要素が見つかりません');
         return;
     }
-    
+
     // テーブルをクリア
     tableBody.innerHTML = '';
-    
+
     if (!data.data || data.data.length === 0) {
         showNHKError('データがありません');
         return;
     }
-    
+
     // データを表示
     data.data.forEach((item, index) => {
         const row = document.createElement('tr');
+        const articleUrl = item.url || '#';
+        const articleTitle = item.title || 'タイトルなし';
         row.innerHTML = `
             <td>${index + 1}</td>
-            <td><a href="${item.url || '#'}" target="_blank" rel="noopener noreferrer">${item.title || 'タイトルなし'}</a></td>
+            <td><a href="${articleUrl}" target="_blank" rel="noopener noreferrer">${articleTitle}</a></td>
             <td>${item.published_date ? new Date(item.published_date).toLocaleDateString('ja-JP') : '-'}</td>
         `;
+        // 行全体をクリック可能にする（アクセシビリティ対応）
+        makeTableRowClickable(row, articleUrl, `${articleTitle}の記事を開く`);
         tableBody.appendChild(row);
     });
-    
+
     // 結果を表示
     resultsElement.style.display = 'block';
-    
+
     // ステータスメッセージは非表示（他のトレンドと統一）
     if (statusMessage) {
         statusMessage.style.display = 'none';
@@ -1557,12 +1581,12 @@ function displayNHKResults(data) {
 function showNHKError(message) {
     const errorElement = document.getElementById('nhkErrorMessage');
     const resultsElement = document.getElementById('nhkResults');
-    
+
     if (errorElement) {
         errorElement.textContent = message;
         errorElement.style.display = 'block';
     }
-    
+
     if (resultsElement) {
         resultsElement.style.display = 'block';
     }
@@ -1571,18 +1595,18 @@ function showNHKError(message) {
 // Qiita トレンド取得
 async function fetchQiitaTrends() {
     console.log('=== Qiita トレンド取得開始 ===');
-    
+
     const resultsElement = document.getElementById('qiitaResults');
     const statusMessage = document.getElementById('qiitaStatusMessage');
     const errorElement = document.getElementById('qiitaErrorMessage');
     const tableBody = document.getElementById('qiitaTrendsTableBody');
     const loadingElement = document.getElementById('qiitaLoading');
-    
+
     if (!resultsElement || !statusMessage || !errorElement || !tableBody) {
         console.error('必要なDOM要素が見つかりません');
         return;
     }
-    
+
     try {
         // ローディング表示
         if (loadingElement) {
@@ -1590,29 +1614,29 @@ async function fetchQiitaTrends() {
         }
         resultsElement.style.display = 'none';
         errorElement.style.display = 'none';
-        
+
         // API呼び出し
         const response = await fetchWithRetry('/api/qiita-trends?limit=25&sort=likes_count');
         const data = await response.json();
-        
+
         if (!response.ok) {
             throw new Error(data.error || `HTTP ${response.status}`);
         }
-        
+
         if (!data.success) {
             throw new Error(data.error || '不明なエラーが発生しました');
         }
-        
+
         console.log('Qiita トレンド API 成功:', data);
-        
+
         // ローディング非表示
         if (loadingElement) {
             loadingElement.style.display = 'none';
         }
-        
+
         // 結果を表示
         displayQiitaResults(data);
-        
+
     } catch (error) {
         console.error('Qiita トレンド API エラー:', error);
         if (loadingElement) {
@@ -1627,35 +1651,39 @@ function displayQiitaResults(data) {
     const resultsElement = document.getElementById('qiitaResults');
     const tableBody = document.getElementById('qiitaTrendsTableBody');
     const statusMessage = document.getElementById('qiitaStatusMessage');
-    
+
     if (!resultsElement || !tableBody) {
         console.error('必要なDOM要素が見つかりません');
         return;
     }
-    
+
     // テーブルをクリア
     tableBody.innerHTML = '';
-    
+
     if (!data.data || data.data.length === 0) {
         showQiitaError('データがありません');
         return;
     }
-    
+
     // データを表示
     data.data.forEach((item, index) => {
         const row = document.createElement('tr');
+        const articleUrl = item.url || '#';
+        const articleTitle = item.title || 'タイトルなし';
         row.innerHTML = `
             <td>${item.rank || index + 1}</td>
-            <td><a href="${item.url || '#'}" target="_blank" rel="noopener noreferrer">${item.title || 'タイトルなし'}</a></td>
+            <td><a href="${articleUrl}" target="_blank" rel="noopener noreferrer">${articleTitle}</a></td>
             <td>${item.user_name || item.user_id || '-'}</td>
             <td>${item.likes_count || 0}</td>
         `;
+        // 行全体をクリック可能にする（アクセシビリティ対応）
+        makeTableRowClickable(row, articleUrl, `${articleTitle}の記事を開く`);
         tableBody.appendChild(row);
     });
-    
+
     // 結果を表示（重要度付きでインラインスタイルを設定）
     resultsElement.style.setProperty('display', 'block', 'important');
-    
+
     // ステータスメッセージは非表示（他のトレンドと統一）
     if (statusMessage) {
         statusMessage.style.display = 'none';
@@ -1665,12 +1693,12 @@ function displayQiitaResults(data) {
 function showQiitaError(message) {
     const errorElement = document.getElementById('qiitaErrorMessage');
     const resultsElement = document.getElementById('qiitaResults');
-    
+
     if (errorElement) {
         errorElement.textContent = message;
         errorElement.style.display = 'block';
     }
-    
+
     if (resultsElement) {
         resultsElement.style.display = 'block';
     }
@@ -1679,17 +1707,17 @@ function showQiitaError(message) {
 // 株価トレンド取得（日本）
 async function fetchStockTrends() {
     console.log('=== 株価トレンド取得開始 ===');
-    
+
     const loadingElement = document.getElementById('stockLoading');
     const resultsElement = document.getElementById('stockResults');
     const errorElement = document.getElementById('stockErrorMessage');
     const tableBody = document.getElementById('stockTrendsTableBody');
-    
+
     if (!resultsElement || !errorElement || !tableBody) {
         console.error('必要なDOM要素が見つかりません');
         return;
     }
-    
+
     try {
         // ローディング表示
         if (loadingElement) {
@@ -1697,31 +1725,31 @@ async function fetchStockTrends() {
         }
         resultsElement.style.display = 'none';
         errorElement.style.display = 'none';
-        
+
         // API呼び出し（日本株）
         const response = await fetchWithRetry('/api/stock-trends?market=JP&limit=25');
         const data = await response.json();
-        
+
         if (!response.ok) {
             throw new Error(data.error || `HTTP ${response.status}`);
         }
-        
+
         if (data.error) {
             throw new Error(data.error);
         }
-        
+
         if (!data.data || !Array.isArray(data.data)) {
             throw new Error('データの形式が正しくありません');
         }
-        
+
         // ローディング非表示
         if (loadingElement) {
             loadingElement.style.display = 'none';
         }
-        
+
         // データ表示
         displayStockResults(data);
-        
+
     } catch (error) {
         console.error('株価トレンド取得エラー:', error);
         if (loadingElement) {
@@ -1737,15 +1765,15 @@ function displayStockResults(data) {
     const tableBody = document.getElementById('stockTrendsTableBody');
     const resultsElement = document.getElementById('stockResults');
     const errorElement = document.getElementById('stockErrorMessage');
-    
+
     if (!tableBody || !resultsElement) {
         console.error('❌ 株価 DOM要素が見つかりません');
         return;
     }
-    
+
     // テーブルをクリア
     tableBody.innerHTML = '';
-    
+
     // データが空の場合の処理
     if (!data.data || data.data.length === 0 || data.status === 'cache_not_found') {
         if (errorElement) {
@@ -1760,19 +1788,19 @@ function displayStockResults(data) {
         console.log('✅ 株価結果表示完了（データなし）');
         return;
     }
-    
+
     // エラーメッセージを非表示
     if (errorElement) {
         errorElement.style.display = 'none';
     }
-    
+
     // 変動率の絶対値でソート（降順）
     const sortedData = [...data.data].sort((a, b) => {
         const changeA = Math.abs(a.change_percent || 0);
         const changeB = Math.abs(b.change_percent || 0);
         return changeB - changeA;
     });
-    
+
     sortedData.forEach((item, index) => {
         const row = document.createElement('tr');
         row.className = 'trend-card';
@@ -1781,23 +1809,26 @@ function displayStockResults(data) {
         const changeClass = changePercent >= 0 ? 'text-danger' : 'text-primary';
         const changeSymbol = changePercent >= 0 ? '↑' : '↓';
         const price = parseFloat(item.current_price || 0);
-        
+
         // 株価のリンクを生成（日本株はYahoo Finance JP、米国株はYahoo Finance US）
         const market = data.market || 'JP';
         const symbol = item.symbol || '';
-        const stockUrl = market === 'JP' 
+        const stockUrl = market === 'JP'
             ? `https://finance.yahoo.co.jp/quote/${symbol}.T`
             : `https://finance.yahoo.com/quote/${symbol}`;
-        
+
+        const stockName = item.name || 'N/A';
         row.innerHTML = `
             <td>${index + 1}</td>
-            <td><a href="${stockUrl}" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>${item.name || 'N/A'}</strong><br><small class="text-muted">${item.symbol || 'N/A'}</small></a></td>
+            <td><a href="${stockUrl}" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>${stockName}</strong><br><small class="text-muted">${item.symbol || 'N/A'}</small></a></td>
             <td>¥${price.toLocaleString()}</td>
             <td class="${changeClass}"><strong>${changeSymbol} ${Math.abs(changePercent).toFixed(2)}%</strong></td>
         `;
+        // 行全体をクリック可能にする（アクセシビリティ対応）
+        makeTableRowClickable(row, stockUrl, `${stockName}の株価情報を開く`);
         tableBody.appendChild(row);
     });
-    
+
     // 結果を表示
     resultsElement.style.setProperty('display', 'block', 'important');
     console.log('✅ 株価結果表示完了');
@@ -1806,12 +1837,12 @@ function displayStockResults(data) {
 function showStockError(message) {
     const errorElement = document.getElementById('stockErrorMessage');
     const resultsElement = document.getElementById('stockResults');
-    
+
     if (errorElement) {
         errorElement.textContent = message;
         errorElement.style.display = 'block';
     }
-    
+
     if (resultsElement) {
         resultsElement.style.display = 'block';
     }
@@ -1820,17 +1851,17 @@ function showStockError(message) {
 // 仮想通貨トレンド取得
 async function fetchCryptoTrends() {
     console.log('=== 仮想通貨トレンド取得開始 ===');
-    
+
     const loadingElement = document.getElementById('cryptoLoading');
     const resultsElement = document.getElementById('cryptoResults');
     const errorElement = document.getElementById('cryptoErrorMessage');
     const tableBody = document.getElementById('cryptoTrendsTableBody');
-    
+
     if (!resultsElement || !errorElement || !tableBody) {
         console.error('必要なDOM要素が見つかりません');
         return;
     }
-    
+
     try {
         // ローディング表示
         if (loadingElement) {
@@ -1838,31 +1869,31 @@ async function fetchCryptoTrends() {
         }
         resultsElement.style.display = 'none';
         errorElement.style.display = 'none';
-        
+
         // API呼び出し
         const response = await fetchWithRetry('/api/crypto-trends?limit=25');
         const data = await response.json();
-        
+
         if (!response.ok) {
             throw new Error(data.error || `HTTP ${response.status}`);
         }
-        
+
         if (data.error) {
             throw new Error(data.error);
         }
-        
+
         if (!data.data || !Array.isArray(data.data)) {
             throw new Error('データの形式が正しくありません');
         }
-        
+
         // ローディング非表示
         if (loadingElement) {
             loadingElement.style.display = 'none';
         }
-        
+
         // データ表示
         displayCryptoResults(data);
-        
+
     } catch (error) {
         console.error('仮想通貨トレンド取得エラー:', error);
         if (loadingElement) {
@@ -1878,7 +1909,7 @@ function displayCryptoResults(data) {
     console.log('📊 仮想通貨: 受信データ件数:', data.data ? data.data.length : 0);
     const tableBody = document.getElementById('cryptoTrendsTableBody');
     const resultsElement = document.getElementById('cryptoResults');
-    
+
     if (!tableBody || !resultsElement) {
         console.error('❌ 仮想通貨 DOM要素が見つかりません', {
             tableBody: !!tableBody,
@@ -1886,25 +1917,25 @@ function displayCryptoResults(data) {
         });
         return;
     }
-    
+
     // テーブルをクリア
     tableBody.innerHTML = '';
-    
+
     // データの存在確認
     if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
         console.warn('⚠️ 仮想通貨: 表示するデータがありません');
         return;
     }
-    
+
     // 時価総額順でソート（market_cap_rankの昇順）
     const sortedData = [...data.data].sort((a, b) => {
         const rankA = a.market_cap_rank || 999999;
         const rankB = b.market_cap_rank || 999999;
         return rankA - rankB;
     });
-    
+
     console.log('📊 仮想通貨: ソート後のデータ件数:', sortedData.length);
-    
+
     sortedData.forEach((item, index) => {
         try {
             const row = document.createElement('tr');
@@ -1915,25 +1946,29 @@ function displayCryptoResults(data) {
             const changeSymbol = changePercent >= 0 ? '↑' : '↓';
             const price = parseFloat(item.current_price || 0);
             const priceFormatted = price < 0.01 ? price.toFixed(6) : price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            
+
             // 仮想通貨のリンクを生成（CoinGecko）
             const coinId = item.coin_id || item.id || '';
             const cryptoUrl = coinId ? `https://www.coingecko.com/ja/coins/${coinId}` : '#';
-            
+
+            const cryptoName = item.name || 'N/A';
+            const cryptoSymbol = item.symbol || 'N/A';
             row.innerHTML = `
                 <td>${index + 1}</td>
-                <td><a href="${cryptoUrl}" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>${item.symbol || 'N/A'}</strong><br><small>${item.name || 'N/A'}</small></a></td>
+                <td><a href="${cryptoUrl}" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>${cryptoSymbol}</strong><br><small>${cryptoName}</small></a></td>
                 <td>$${priceFormatted}</td>
                 <td class="${changeClass}"><strong>${changeSymbol} ${Math.abs(changePercent).toFixed(2)}%</strong></td>
             `;
+            // 行全体をクリック可能にする（アクセシビリティ対応）
+            makeTableRowClickable(row, cryptoUrl, `${cryptoName}の仮想通貨情報を開く`);
             tableBody.appendChild(row);
         } catch (error) {
             console.error(`仮想通貨行 ${index + 1} の処理エラー:`, error, item);
         }
     });
-    
+
     console.log('📊 仮想通貨: テーブルに追加された行数:', tableBody.children.length);
-    
+
     // 結果を表示
     resultsElement.style.setProperty('display', 'block', 'important');
     console.log('✅ 仮想通貨結果表示完了');
@@ -1942,12 +1977,12 @@ function displayCryptoResults(data) {
 function showCryptoError(message) {
     const errorElement = document.getElementById('cryptoErrorMessage');
     const resultsElement = document.getElementById('cryptoResults');
-    
+
     if (errorElement) {
         errorElement.textContent = message;
         errorElement.style.display = 'block';
     }
-    
+
     if (resultsElement) {
         resultsElement.style.display = 'block';
     }

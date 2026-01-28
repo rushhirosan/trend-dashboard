@@ -34,35 +34,40 @@ function displayHatenaResults(data) {
         console.error('hatenaTrendsTableBodyが見つかりません');
         return;
     }
-    
+
     tableBody.innerHTML = '';
-    
+
     if (data.data && data.data.length > 0) {
         data.data.forEach((item, index) => {
             const row = document.createElement('tr');
             row.className = 'trend-card';
             row.style.minHeight = '100px';
-            
+
             // ブックマーク数をフォーマット
             const bookmarkCount = item.bookmark_count || 0;
             const bookmarkInfo = bookmarkCount > 0 ? `${bookmarkCount.toLocaleString()}件` : '0件';
-            
+
+            const articleUrl = item.url || '#';
+            const articleTitle = item.title || 'N/A';
+
             // リンクを追加（他のセクションと同じ形式）
-            const articleLink = item.url ? 
-                `<br><a href="${item.url}" target="_blank" class="btn btn-sm btn-outline-warning mt-1">
+            const articleLink = articleUrl !== '#' ?
+                `<br><a href="${articleUrl}" target="_blank" class="btn btn-sm btn-outline-warning mt-1">
                     <i class="fas fa-external-link-alt"></i> 記事を読む
                 </a>` : '';
-            
+
             row.innerHTML = `
                 <td><span class="badge bg-warning">${item.rank || index + 1}</span></td>
                 <td>
-                    <strong>${item.title || 'N/A'}</strong>${articleLink}
+                    <strong><a href="${articleUrl}" target="_blank">${articleTitle}</a></strong>${articleLink}
                 </td>
                 <td><strong>${bookmarkInfo}</strong></td>
             `;
+            // 行全体をクリック可能にする（アクセシビリティ対応）
+            makeTableRowClickable(row, articleUrl, `${articleTitle}の記事を開く`);
             tableBody.appendChild(row);
         });
-        
+
         showHatenaResults();
     } else {
         showHatenaError('データが見つかりませんでした');

@@ -35,15 +35,18 @@ function displayTwitchResults(data) {
         data.data.forEach(item => {
             const row = document.createElement('tr');
             
-            // シンプルな3カラム表示
-            const titleCell = `<strong>${item.name || item.title}</strong>`;
+            // Twitchリンクを作成
+            const twitchUrl = `https://www.twitch.tv/${item.user_name || item.name || ''}`;
+            const streamName = item.name || item.title || 'N/A';
             const countCell = item.viewer_count ? `${item.viewer_count.toLocaleString()}人` : 'N/A';
             
             row.innerHTML = `
                 <td><span class="badge bg-secondary">${item.rank}</span></td>
-                <td>${titleCell}</td>
+                <td><strong><a href="${twitchUrl}" target="_blank">${streamName}</a></strong></td>
                 <td>${countCell}</td>
             `;
+            // 行全体をクリック可能にする（アクセシビリティ対応）
+            makeTableRowClickable(row, twitchUrl, `${streamName}のTwitch配信を開く`);
             tableBody.appendChild(row);
         });
         

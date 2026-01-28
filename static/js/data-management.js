@@ -364,9 +364,10 @@ function loadHatenaTrendsFromCache() {
         loadingElement.style.display = 'block';
     }
     
-    // AbortControllerを使用したタイムアウト処理（30秒）
+    // AbortControllerを使用したタイムアウト処理（60秒・サーバ応答遅延対策）
+    const hatenaTimeoutMs = 60000;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), hatenaTimeoutMs);
     
     // キャッシュデータを取得して表示（force_refresh=falseで明示的にキャッシュのみを使用）
     fetchWithRetry(`/api/hatena-trends?category=${selectedCategory}&limit=25&type=hot&force_refresh=false`, { signal: controller.signal })
@@ -401,7 +402,7 @@ function loadHatenaTrendsFromCache() {
         .catch(error => {
             clearTimeout(timeoutId);
             if (error.name === 'AbortError') {
-                console.error('Hatena Trends キャッシュ読み込みエラー: タイムアウト（30秒）');
+                console.error(`Hatena Trends キャッシュ読み込みエラー: タイムアウト（${hatenaTimeoutMs / 1000}秒）`);
             } else {
                 console.error('Hatena Trends キャッシュ読み込みエラー:', error);
             }

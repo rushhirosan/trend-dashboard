@@ -98,6 +98,8 @@ function displayRakutenResults(data) {
             <td>${reviewCount}</td>
             <td>${item.shop_name || '不明'}</td>
         `;
+        // 行全体をクリック可能にする（アクセシビリティ対応）
+        makeTableRowClickable(row, rakutenUrl, `${item.title}の商品を開く`);
         tableBody.appendChild(row);
     });
 

@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from database_config import TrendsCache
 from utils.logger_config import get_logger
+from utils.dummy_data_generator import generate_dummy_rakuten_data
 from services.trends.base_trends_manager import BaseTrendsManager
 
 # 環境変数を明示的に読み込み
@@ -112,6 +113,51 @@ class RakutenTrendsManager(BaseTrendsManager):
     def get_popular_items(self, genre_id=None, limit=25, force_refresh=False):
         """楽天人気商品を取得（キャッシュデータが存在しない場合のみ外部APIを呼び出し）"""
         try:
+            # USE_DUMMY_DATA 時はダミーのみ返却（「データなし」解消）
+            if self._is_dummy_mode():
+                cache_scope = genre_id or 'all'
+                logger.info(f"🎭 Rakuten: ダミーモードが有効です。ダミーデータのみ返却します (scope: {cache_scope})")
+                if force_refresh:
+                    try:
+                        self._clear_cache(genre_id=genre_id)
+                    except Exception as e:
+                        logger.warning(f"⚠️ Rakuten: ダミーモード キャッシュクリア中にエラー: {e}")
+                # キャッシュにあればそれを使用（更新しない）
+                cached_data = self.get_from_cache(cache_scope)
+                if cached_data and len(cached_data) > 0:
+                    for item in cached_data:
+                        sc = item.get('sales_count', 'N/A')
+                        if isinstance(sc, str) and sc != 'N/A':
+                            try:
+                                item['sales_count'] = int(sc)
+                            except Exception:
+                                item['sales_count'] = 0
+                        elif sc == 'N/A' or sc is None:
+                            item['sales_count'] = 0
+                    cached_data.sort(key=lambda x: (x.get('sales_count', 0), x.get('review_count', 0)), reverse=True)
+                    for i, item in enumerate(cached_data, 1):
+                        item['rank'] = i
+                    logger.info(f"✅ Rakuten: ダミーキャッシュから {len(cached_data)} 件取得")
+                    return {
+                        'data': cached_data,
+                        'status': 'dummy_cached',
+                        'genre_id': genre_id,
+                        'source': 'dummy_database_cache',
+                    }
+                # キャッシュが空のときだけ生成・保存
+                dummy_data = generate_dummy_rakuten_data(limit=limit, genre_id=cache_scope)
+                try:
+                    if self._save_to_cache(dummy_data, genre_id=genre_id):
+                        self._update_cache_status(self._get_cache_key(genre_id=genre_id), len(dummy_data))
+                        logger.info(f"✅ Rakuten: ダミーデータ {len(dummy_data)} 件をキャッシュに保存しました")
+                except Exception as e:
+                    logger.warning(f"⚠️ Rakuten: ダミーデータキャッシュ保存中にエラー: {e}")
+                return {
+                    'data': dummy_data,
+                    'status': 'dummy_generated',
+                    'genre_id': genre_id,
+                    'source': 'dummy_database_cache',
+                }
             cache_scope = genre_id or 'all'
             cached_data = None
             

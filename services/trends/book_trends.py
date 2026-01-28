@@ -8,6 +8,7 @@ import requests
 from datetime import datetime
 from database_config import TrendsCache
 from utils.logger_config import get_logger
+from utils.dummy_data_generator import generate_dummy_book_data
 from services.trends.base_trends_manager import BaseTrendsManager
 
 # ロガーの初期化
@@ -175,6 +176,44 @@ class BookTrendsManager(BaseTrendsManager):
             dict: トレンドデータ
         """
         try:
+            # USE_DUMMY_DATA 時はダミーのみ返却（API/DB 呼び出しなしで 500 回避）
+            if self._is_dummy_mode():
+                logger.info(f"🎭 Book: ダミーモードが有効です。ダミーデータのみ返却します (country: {country})")
+                if force_refresh:
+                    try:
+                        self._clear_cache(country=country)
+                    except Exception as e:
+                        logger.warning(f"⚠️ Book: ダミーモード キャッシュクリア中にエラー: {e}")
+                # キャッシュにあればそれを使用（更新しない）
+                cached_data = self._get_from_cache(country=country)
+                if cached_data and len(cached_data) > 0:
+                    cached_data.sort(key=lambda x: x.get('rank', 999999))
+                    logger.info(f"✅ Book: ダミーキャッシュから {len(cached_data)} 件取得 (country: {country})")
+                    return {
+                        'success': True,
+                        'data': cached_data[:limit],
+                        'status': 'dummy_cached',
+                        'source': 'dummy_database_cache',
+                        'country': country,
+                        'total_count': len(cached_data),
+                    }
+                # キャッシュが空のときだけ生成・保存
+                dummy_data = generate_dummy_book_data(country=country, limit=limit)
+                try:
+                    if self._save_to_cache(dummy_data, country=country):
+                        cache_key = self._get_cache_key(country=country)
+                        self._update_cache_status(cache_key, len(dummy_data))
+                        logger.info(f"✅ Book: ダミーデータ {len(dummy_data)} 件をキャッシュに保存しました (country: {country})")
+                except Exception as e:
+                    logger.warning(f"⚠️ Book: ダミーデータキャッシュ保存中にエラー: {e}")
+                return {
+                    'success': True,
+                    'data': dummy_data[:limit],
+                    'status': 'dummy_generated',
+                    'source': 'dummy_database_cache',
+                    'country': country,
+                    'total_count': len(dummy_data),
+                }
             if country == 'JP':
                 return self._get_rakuten_books_trends(limit, force_refresh)
             elif country == 'US':

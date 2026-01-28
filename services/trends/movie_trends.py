@@ -8,6 +8,7 @@ import requests
 from datetime import datetime
 from database_config import TrendsCache
 from utils.logger_config import get_logger
+from utils.dummy_data_generator import generate_dummy_movie_data
 from services.trends.base_trends_manager import BaseTrendsManager
 
 # ロガーの初期化
@@ -98,6 +99,11 @@ class MovieTrendsManager(BaseTrendsManager):
             logger.warning(f"⚠️ Movie: cache_status更新エラー: {e}")
             return False
 
+    def _generate_dummy_data(self, limit: int = 25, *args, **kwargs):
+        """映画用ダミーデータを生成（USE_DUMMY_DATA 時・movie_trends_cache スキーマ互換）"""
+        country = kwargs.get("country", "JP")
+        return generate_dummy_movie_data(country=country, limit=limit)
+
     def _generate_amazon_link(self, title, country='JP'):
         """映画タイトルからAmazon Prime Video/DVDリンクを生成
         
@@ -135,8 +141,8 @@ class MovieTrendsManager(BaseTrendsManager):
         Returns:
             dict: トレンドデータ
         """
-        # APIキーのチェック
-        if not self.api_key:
+        # ダミーモード時はAPIキー不要（ベースでダミー処理）
+        if not self._is_dummy_mode() and not self.api_key:
             return {
                 'success': False,
                 'error': 'TMDB_API_KEYが設定されていません',

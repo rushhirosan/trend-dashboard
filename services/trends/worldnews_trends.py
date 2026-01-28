@@ -3,6 +3,7 @@ import requests
 from datetime import datetime, timedelta
 from database_config import TrendsCache
 from utils.logger_config import get_logger
+from utils.dummy_data_generator import generate_dummy_worldnews_data
 from services.trends.base_trends_manager import BaseTrendsManager
 
 # ロガーの初期化
@@ -117,6 +118,39 @@ class WorldNewsTrendsManager(BaseTrendsManager):
     def get_trends(self, country='jp', category=None, page_size=25, force_refresh=False):
         """World Newsトレンドを取得（キャッシュデータが存在しない場合のみ外部APIを呼び出し）"""
         try:
+            # USE_DUMMY_DATA 時はダミーのみ返却（「データなし」解消）
+            if self._is_dummy_mode():
+                logger.info(f"🎭 World News: ダミーモードが有効です。ダミーデータのみ返却します (country: {country})")
+                if force_refresh:
+                    try:
+                        self.db.clear_worldnews_trends_cache('general', country.lower())
+                    except Exception as e:
+                        logger.warning(f"⚠️ World News: ダミーモード キャッシュクリア中にエラー: {e}")
+                # キャッシュにあればそれを使用（更新しない）
+                cached_data = self.get_from_cache('worldnews_trends', country)
+                if cached_data and len(cached_data) > 0:
+                    logger.info(f"✅ World News: ダミーキャッシュから {len(cached_data)} 件取得")
+                    return {
+                        'data': cached_data,
+                        'status': 'dummy_cached',
+                        'country': (country or 'jp').upper(),
+                        'category': category or 'general',
+                        'source': 'dummy_database_cache',
+                    }
+                # キャッシュが空のときだけ生成・保存
+                dummy_data = generate_dummy_worldnews_data(country=country.lower(), limit=page_size or 25)
+                try:
+                    self.save_to_cache(dummy_data, 'worldnews_trends', country.lower())
+                    logger.info(f"✅ World News: ダミーデータ {len(dummy_data)} 件をキャッシュに保存しました")
+                except Exception as e:
+                    logger.warning(f"⚠️ World News: ダミーデータキャッシュ保存中にエラー: {e}")
+                return {
+                    'data': dummy_data,
+                    'status': 'dummy_generated',
+                    'country': (country or 'jp').upper(),
+                    'category': category or 'general',
+                    'source': 'dummy_database_cache',
+                }
             cache_key = 'worldnews_trends'
             cached_data = None
             

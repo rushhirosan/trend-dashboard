@@ -58,11 +58,6 @@
         "@type": "Offer",
         "price": "0",
         "priceCurrency": "JPY"
-      },
-      "aggregateRating": {
-        "@type": "AggregateRating",
-        "ratingValue": "4.5",
-        "ratingCount": "100"
       }
     }
     </script>
@@ -1608,6 +1603,27 @@
                             </div>
                         </div>
                     </article>
+                </div>
+            </section>
+
+            <!-- SEO: 詳細説明セクション -->
+            <section id="about-trends-dashboard" class="mt-5 mb-4" aria-label="トレンドダッシュボードについて">
+                <div class="card">
+                    <div class="card-header bg-dark text-white">
+                        <h2 class="h5 mb-0"><i class="fas fa-info-circle" aria-hidden="true"></i> トレンドダッシュボードについて</h2>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-3">トレンドダッシュボードは、日本の最新トレンド情報を一括で確認できる無料のWebアプリです。複数のサービスで話題になっているキーワードやコンテンツを1つの画面で把握できます。</p>
+                        <h3 class="h6 fw-bold mt-4 mb-2">主な機能</h3>
+                        <ul class="mb-3">
+                            <li>Google Trends・YouTube・Spotify・はてなブックマーク・楽天・Twitch・Podcastなど、複数ソースのトレンドを同時表示</li>
+                            <li>Zenn・Note・Qiitaなどの技術・創作系プラットフォームのトレンド表示</li>
+                            <li>株価・仮想通貨（暗号資産）の市場動向の確認</li>
+                            <li>NHK・海外ニュースなどニュース系トレンドの表示</li>
+                        </ul>
+                        <h3 class="h6 fw-bold mt-4 mb-2">データの更新</h3>
+                        <p class="mb-0">データは毎日1時、7時、13時、19時（JST）に更新処理を開始します。更新完了まで10〜20分かかる場合があります。最新の状態は<a href="{{ url_for('data_status') }}">データ更新状況</a>ページで確認できます。</p>
+                    </div>
                 </div>
             </section>
         </div>

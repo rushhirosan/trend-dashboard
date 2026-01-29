@@ -284,6 +284,12 @@ Sitemap: https://trends-dashboard.fly.dev/sitemap.xml
     <priority>0.9</priority>
   </url>
   <url>
+    <loc>https://trends-dashboard.fly.dev/about</loc>
+    <lastmod>{now_str}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://trends-dashboard.fly.dev/data-status</loc>
     <lastmod>{now_str}</lastmod>
     <changefreq>daily</changefreq>

@@ -3,6 +3,10 @@ import logging
 import time
 import signal
 from datetime import datetime
+try:
+    import fcntl
+except ImportError:
+    fcntl = None  # Windows等では未使用（複数ワーカー時は二重実行の可能性あり）
 import pytz
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -12,6 +16,11 @@ from services.subscription.subscription_manager import SubscriptionManager
 # ログ設定
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# 複数ワーカー時、1プロセスのみジョブ実行するためのロックファイル。
+# gunicorn で worker が複数あると各ワーカーでスケジューラが start し、同一時刻に同じジョブが複数回走る。
+# その結果、同一実行IDで「40/40 成功」と「38/40 一部失敗」など二重の Discord 通知が届くため、ファイルロックで1プロセスのみ実行する。
+SCHEDULER_LOCK_PATH = os.environ.get("TRENDS_SCHEDULER_LOCK_PATH", "/tmp/trends_scheduler.lock")
 
 class TrendsScheduler:
     """トレンド自動取得スケジューラークラス"""
@@ -54,7 +63,31 @@ class TrendsScheduler:
         except Exception as e:
             logger.error(f"関数実行エラー: {e}")
             raise e
-    
+
+    def _try_acquire_scheduler_lock(self):
+        """プロセス間ロックを取得（非ブロッキング）。取得できた場合はFDを返し、できなければ None。fcntl未対応環境では -1 を返してロックなしで実行。"""
+        if fcntl is None:
+            return -1  # Windows等: ロックなしで実行（単一ワーカー推奨）
+        try:
+            fd = os.open(SCHEDULER_LOCK_PATH, os.O_CREAT | os.O_RDWR, 0o644)
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return fd
+        except (BlockingIOError, OSError):
+            return None
+        except Exception as e:
+            logger.warning("⚠️ スケジューラロック取得エラー（実行続行）: %s", e)
+            return None
+
+    def _release_scheduler_lock(self, fd):
+        """プロセス間ロックを解放。"""
+        if fd is None or fd < 0 or fcntl is None:
+            return
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            os.close(fd)
+        except Exception as e:
+            logger.warning("⚠️ スケジューラロック解放エラー: %s", e)
+
     def start(self):
         """スケジューラーを開始"""
         if not self.is_running:
@@ -285,17 +318,23 @@ class TrendsScheduler:
                    Falseの場合、スケジューラー実行時（通常の定期実行）
             trigger_source: 呼び出し元の識別子。'scheduler'=定期実行、'api'=API（手動/外部）
         """
-        # 同時実行防止: 既に実行中の場合はスキップ
+        # 同時実行防止: 既に実行中の場合はスキップ（同一プロセス内）
         if self._fetching_in_progress:
             logger.warning("⚠️ データ取得処理が既に実行中です。重複実行をスキップします")
             return
-        
+
+        # 複数ワーカー時は1プロセスのみ実行（gunicorn等で同一実行ID・二重Discord通知を防ぐ）
+        lock_fd = self._try_acquire_scheduler_lock()
+        if lock_fd is None:
+            logger.info("⏭️ 他プロセスがスケジューラを実行中のため、このプロセスではスキップします")
+            return
+
         self._fetching_in_progress = True
         try:
             jst = pytz.timezone('Asia/Tokyo')
             now_jst = datetime.now(jst)
             today = now_jst.date()
-            
+
             # 既に当日実行済みかチェック（重複実行を防ぐ）
             # force=Trueの場合はスキップしない
             if not force:
@@ -304,26 +343,22 @@ class TrendsScheduler:
                     time_diff = (now_jst - self.last_night_execution_time).total_seconds()
                     if time_diff < 3600:  # 1時間以内
                         logger.info(f"⏰ 当日の1時のジョブは既に実行済みです（{time_diff:.0f}秒前）。重複実行をスキップします。")
-                        self._fetching_in_progress = False
                         return
                 # 7時前後（6:00-8:00）の実行の場合、当日の7時ジョブが既に実行済みかチェック
                 if 6 <= now_jst.hour < 8 and self.last_daily_execution_date == today:
                     logger.info(f"⏰ 当日の7時のジョブは既に実行済みです（{today}）。重複実行をスキップします。")
-                    self._fetching_in_progress = False
                     return
                 # 13時前後（12:00-14:00）の実行の場合、1時間以内に13時ジョブが実行済みかチェック
                 if 12 <= now_jst.hour < 14 and self.last_afternoon_execution_time:
                     time_diff = (now_jst - self.last_afternoon_execution_time).total_seconds()
                     if time_diff < 3600:  # 1時間以内
                         logger.info(f"⏰ 当日の13時のジョブは既に実行済みです（{time_diff:.0f}秒前）。重複実行をスキップします。")
-                        self._fetching_in_progress = False
                         return
                 # 19時前後（18:00-20:00）の実行の場合、1時間以内に19時ジョブが実行済みかチェック
                 if 18 <= now_jst.hour < 20 and self.last_evening_execution_time:
                     time_diff = (now_jst - self.last_evening_execution_time).total_seconds()
                     if time_diff < 3600:  # 1時間以内
                         logger.info(f"⏰ 当日の19時のジョブは既に実行済みです（{time_diff:.0f}秒前）。重複実行をスキップします。")
-                        self._fetching_in_progress = False
                         return
             
             logger.info("🔄 自動トレンド取得開始 [trigger=%s]", trigger_source)
@@ -590,7 +625,8 @@ class TrendsScheduler:
             else:
                 logger.info("⏭️ メール自動送信をスキップします（SKIP_EMAIL_ON_UPDATE=true）")
         finally:
-            # 実行完了後にフラグをリセット
+            # プロセス間ロックを解放し、フラグをリセット
+            self._release_scheduler_lock(lock_fd)
             self._fetching_in_progress = False
     
     

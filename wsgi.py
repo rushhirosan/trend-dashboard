@@ -81,7 +81,7 @@ if app is None:
     logger.error("❌ アプリケーションがNoneです。フォールバックアプリを使用します")
     app = fallback_app
 
-# スケジューラーを開始（gunicornのworkerプロセスで実行、エラーが発生しても続行）
+# スケジューラーを開始（各workerでstartするが、ジョブ実行はファイルロックで1プロセスのみ）
 # 詳細なログはscheduler_manager.pyで出力されるため、ここでは簡潔に記録
 if scheduler:
     try:

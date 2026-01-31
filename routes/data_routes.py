@@ -302,7 +302,8 @@ def execute_scheduler():
         
         # スケジューラーの_fetch_all_trendsを実行（手動実行のためforce=True）
         # force=Trueの場合、メール送信はスキップされる（明示的な手動実行のため）
-        scheduler._fetch_all_trends(force=True)
+        # trigger_source='api' でDiscord通知に「API（手動/外部）」と表示される
+        scheduler._fetch_all_trends(force=True, trigger_source='api')
         
         return jsonify({
             'success': True,

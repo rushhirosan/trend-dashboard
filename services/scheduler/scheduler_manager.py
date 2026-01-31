@@ -277,12 +277,13 @@ class TrendsScheduler:
             except Exception as e:
                 logger.error(f"❌ スケジューラー停止エラー: {e}")
     
-    def _fetch_all_trends(self, force=False):
+    def _fetch_all_trends(self, force=False, trigger_source='scheduler'):
         """全プラットフォームのトレンドを取得（既存のrefresh_all_trends()を使用）
         
         Args:
             force: Trueの場合、既に実行済みでも強制的に実行する
                    Falseの場合、スケジューラー実行時（通常の定期実行）
+            trigger_source: 呼び出し元の識別子。'scheduler'=定期実行、'api'=API（手動/外部）
         """
         # 同時実行防止: 既に実行中の場合はスキップ
         if self._fetching_in_progress:
@@ -325,7 +326,7 @@ class TrendsScheduler:
                         self._fetching_in_progress = False
                         return
             
-            logger.info("🔄 自動トレンド取得開始")
+            logger.info("🔄 自動トレンド取得開始 [trigger=%s]", trigger_source)
             start_time = datetime.now(jst)
             execution_id = f"scheduler_{start_time.strftime('%Y%m%d_%H%M%S')}"
             
@@ -496,6 +497,7 @@ class TrendsScheduler:
                     f"成功トレンドの更新時刻更新に失敗しました（{max_retries}回試行後）。",
                     {
                         "実行ID": execution_id,
+                        "トリガー": self._trigger_label(trigger_source),
                         "成功数": str(success_count),
                         "総数": str(total_count),
                         "失敗数": str(failed_count),
@@ -540,6 +542,7 @@ class TrendsScheduler:
             self._send_execution_notification(
                 execution_id, start_time, end_time,
                 total_count, success_count, failed_count, duration, failed_trends_details, has_anomaly,
+                trigger_source=trigger_source,
             )
 
             # データ保存完了後、メール自動送信を実行
@@ -718,6 +721,14 @@ class TrendsScheduler:
         
         return has_anomaly
     
+    def _trigger_label(self, trigger_source: str) -> str:
+        """トリガー元をDiscord表示用のラベルに変換"""
+        labels = {
+            'scheduler': 'スケジューラ(定期)',
+            'api': 'API（手動/外部）',
+        }
+        return labels.get(trigger_source, trigger_source or '不明')
+    
     def _format_error_details(self, failed_trends_details: list) -> str:
         """エラー詳細をフォーマットして文字列として返す"""
         if not failed_trends_details:
@@ -748,6 +759,7 @@ class TrendsScheduler:
         duration: float,
         failed_trends_details: list,
         has_anomaly: bool,
+        trigger_source: str = 'scheduler',
     ) -> None:
         """スケジューラ実行結果をDiscord通知（成功時も失敗時も）"""
         if not self.alert_service:
@@ -774,9 +786,10 @@ class TrendsScheduler:
             title = "⚠️ トレンド取得完了（一部失敗）"
             message = f"トレンド取得が完了しましたが、{failed_count}件の失敗があります。"
         
-        # 詳細情報を構築
+        # 詳細情報を構築（トリガー元を先頭付近に表示）
         details = {
             "実行ID": execution_id,
+            "トリガー": self._trigger_label(trigger_source),
             "成功": f"{success_count}/{total_count}",
             "失敗": str(failed_count),
             "失敗率": f"{failure_rate:.1f}%",

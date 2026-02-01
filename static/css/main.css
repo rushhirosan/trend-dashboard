@@ -278,6 +278,66 @@ body {
     }
 }
 
+/* 全部入り（All）タブのみ: ヘッダー・テーブル行を1行に収める（カテゴリータブには影響しない） */
+#pane-all .card-header {
+    flex-wrap: nowrap;
+    white-space: nowrap;
+}
+#pane-all .card-header h3,
+#pane-all .card-header .h6 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+#pane-all .card-header .all-more-link {
+    flex-shrink: 0;
+}
+#pane-all .card-body .table-responsive table th,
+#pane-all .card-body .table-responsive table td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* 全部入り: タイトル下のサブテキストを非表示（1行表示にするため） */
+#pane-all .card-body .table-responsive td br,
+#pane-all .card-body .table-responsive td small.text-muted,
+#pane-all .card-body .table-responsive td div.text-muted {
+    display: none !important;
+}
+/* 全部入り: 行全体がリンクなので「記事を読む」ボタンは不要 */
+#pane-all .card-body .table-responsive td .btn-outline-warning {
+    display: none !important;
+}
+/* 全部入り: 映画ポスター・本の表紙・アプリアイコンは不要（1行表示のため） */
+#pane-all .card-body .table-responsive td img {
+    display: none !important;
+}
+/* 全部入り: 映画の「Amazonで見る」ボタンはアフィリエイトのため表示（1行内に） */
+#pane-all [data-all-card="movie"] .table-responsive td:nth-child(2) {
+    display: flex !important;
+    align-items: center;
+    gap: 0.25rem;
+    white-space: nowrap;
+}
+#pane-all [data-all-card="movie"] .table-responsive td:nth-child(2) strong {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#pane-all [data-all-card="movie"] .table-responsive td:nth-child(2) .btn-warning {
+    flex-shrink: 0;
+    margin-top: 0 !important;
+    font-size: 0.7rem !important;
+    padding: 0.15rem 0.35rem !important;
+}
+/* 全部入り: G検索ボタンは不要（行にリンク付きのため） */
+#pane-all [data-all-card="google"] .table-responsive th:last-child,
+#pane-all [data-all-card="google"] .table-responsive td:last-child {
+    display: none !important;
+}
+
 #rakutenResults .trend-table-container {
     max-height: 500px;
     overflow-y: auto;

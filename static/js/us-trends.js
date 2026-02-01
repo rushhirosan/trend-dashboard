@@ -148,7 +148,7 @@ function displayStockResultsUS(data) {
     // Display results
     resultsElement.style.setProperty('display', 'block', 'important');
     if (typeof syncToAllPane === 'function') {
-        setTimeout(() => syncToAllPane('stockTrendsTableBody', 'all-stockTrendsTableBody', 10), 0);
+        setTimeout(() => syncToAllPane('stockTrendsTableBody', 'all-stockTrendsTableBody', 5), 0);
     }
     console.log('✅ Stock Results display completed');
 }
@@ -278,7 +278,7 @@ function displayCryptoResultsUS(data) {
     // Display results
     resultsElement.style.setProperty('display', 'block', 'important');
     if (typeof syncToAllPane === 'function') {
-        setTimeout(() => syncToAllPane('cryptoTrendsTableBody', 'all-cryptoTrendsTableBody', 10), 0);
+        setTimeout(() => syncToAllPane('cryptoTrendsTableBody', 'all-cryptoTrendsTableBody', 5), 0);
     }
 }
 
@@ -397,7 +397,7 @@ function displayMovieResultsUS(data) {
     // Display results
     resultsElement.style.setProperty('display', 'block', 'important');
     if (typeof syncToAllPane === 'function') {
-        setTimeout(() => syncToAllPane('movieTrendsTableBody', 'all-movieTrendsTableBody', 10), 0);
+        setTimeout(() => syncToAllPane('movieTrendsTableBody', 'all-movieTrendsTableBody', 5), 0);
     }
 }
 
@@ -451,7 +451,7 @@ async function fetchBookTrendsUS() {
                 statusMessage.textContent = 'ℹ️ データがありません。しばらく待ってから再度お試しください。';
                 statusMessage.style.display = 'block';
             }
-            tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">データがありません</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">データがありません</td></tr>';
             resultsElement.style.display = 'block';
             return;
         }
@@ -471,7 +471,7 @@ async function fetchBookTrendsUS() {
             statusMessage.style.display = 'block';
         }
         if (tableBody) {
-            tableBody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">エラー: ${error.message || 'データの取得に失敗しました'}</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">エラー: ${error.message || 'データの取得に失敗しました'}</td></tr>`;
         }
         resultsElement.style.display = 'block';
     }
@@ -502,7 +502,6 @@ function displayBookResultsUS(data) {
             
             const author = item.author || (item.authors && item.authors.length > 0 ? item.authors.join(', ') : 'N/A') || 'N/A';
             const price = item.price ? `$${parseFloat(item.price).toFixed(2)}` : 'N/A';
-            const ratingsCount = item.ratings_count ? parseInt(item.ratings_count).toLocaleString() : 'N/A';
             // リンクの優先順位: amazon_link > buy_link > info_link > preview_link
             const bookLink = item.amazon_link || item.buy_link || item.info_link || item.preview_link || '#';
             // 画像URLの優先順位: image_url > thumbnail > small_thumbnail
@@ -516,19 +515,18 @@ function displayBookResultsUS(data) {
                 </td>
                 <td>${author}</td>
                 <td>${price}</td>
-                <td>${ratingsCount}</td>
             `;
             tableBody.appendChild(row);
         });
     } else {
         console.warn('📊 No book data to display', { bookData, isArray: Array.isArray(bookData), length: Array.isArray(bookData) ? bookData.length : 'N/A' });
-        tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">データがありません</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">データがありません</td></tr>';
     }
     
     // Display results
     resultsElement.style.setProperty('display', 'block', 'important');
     if (typeof syncToAllPane === 'function') {
-        setTimeout(() => syncToAllPane('bookTrendsTableBody', 'all-bookTrendsTableBody', 10), 0);
+        setTimeout(() => syncToAllPane('bookTrendsTableBody', 'all-bookTrendsTableBody', 5), 0);
     }
 }
 
@@ -631,7 +629,7 @@ function loadBookTrendsFromCacheUS() {
                     statusMessage.style.display = 'block';
                 }
                 if (tableBody) {
-                    tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">データが取得できませんでした</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">データが取得できませんでした</td></tr>';
                 }
                 if (resultsElement) {
                     resultsElement.style.display = 'block';
@@ -674,7 +672,7 @@ function loadBookTrendsFromCacheUS() {
                     statusMessage.style.display = 'block';
                 }
                 if (tableBody) {
-                    tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">データがありません</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">データがありません</td></tr>';
                 }
                 if (resultsElement) {
                     resultsElement.style.display = 'block';
@@ -702,7 +700,7 @@ function loadBookTrendsFromCacheUS() {
                 statusMessage.style.display = 'block';
             }
             if (tableBody) {
-                tableBody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">${errorMessage}</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">${errorMessage}</td></tr>`;
             }
             if (resultsElement) {
                 resultsElement.style.display = 'block';
@@ -911,7 +909,7 @@ function displayGoogleResults(data) {
     });
     
     if (typeof syncToAllPane === 'function') {
-        setTimeout(() => syncToAllPane('googleTrendsTableBody', 'all-googleTrendsTableBody', 10), 0);
+        setTimeout(() => syncToAllPane('googleTrendsTableBody', 'all-googleTrendsTableBody', 5), 0);
     }
     console.log('displayGoogleResults: Completed');
 }
@@ -974,7 +972,7 @@ function displayYouTubeResults(data) {
     });
     
     if (typeof syncToAllPane === 'function') {
-        setTimeout(() => syncToAllPane('youtubeTrendsTableBody', 'all-youtubeTrendsTableBody', 10), 0);
+        setTimeout(() => syncToAllPane('youtubeTrendsTableBody', 'all-youtubeTrendsTableBody', 5), 0);
     }
     console.log('displayYouTubeResults: Completed');
 }
@@ -1276,7 +1274,7 @@ function displayWorldNewsResults(data) {
     });
     
     if (typeof syncToAllPane === 'function') {
-        setTimeout(() => syncToAllPane('worldnewsTrendsTableBody', 'all-worldnewsTrendsTableBody', 10), 0);
+        setTimeout(() => syncToAllPane('worldnewsTrendsTableBody', 'all-worldnewsTrendsTableBody', 5), 0);
     }
     console.log('displayWorldNewsResults: Completed');
 }
@@ -1330,7 +1328,7 @@ function displaySpotifyResults(data) {
     });
     
     if (typeof syncToAllPane === 'function') {
-        setTimeout(() => syncToAllPane('spotifyTrendsTableBody', 'all-spotifyTrendsTableBody', 10), 0);
+        setTimeout(() => syncToAllPane('spotifyTrendsTableBody', 'all-spotifyTrendsTableBody', 5), 0);
     }
     console.log('displaySpotifyResults: Completed');
 }
@@ -1635,7 +1633,7 @@ function displayPodcastResults(data) {
     // 結果セクションを表示 - 日本版と同じシンプルな方法
     document.getElementById('podcastResults').style.setProperty('display', 'block', 'important');
     if (typeof syncToAllPane === 'function') {
-        setTimeout(() => syncToAllPane('podcastTrendsTableBody', 'all-podcastTrendsTableBody', 10), 0);
+        setTimeout(() => syncToAllPane('podcastTrendsTableBody', 'all-podcastTrendsTableBody', 5), 0);
     }
     console.log('displayPodcastResults: Completed -', tableBody.children.length, 'rows added');
 }
@@ -1763,7 +1761,7 @@ function displayTwitchResults(data, type = 'games') {
     });
     
     if (typeof syncToAllPane === 'function') {
-        setTimeout(() => syncToAllPane('twitchTrendsTableBody', 'all-twitchTrendsTableBody', 10), 0);
+        setTimeout(() => syncToAllPane('twitchTrendsTableBody', 'all-twitchTrendsTableBody', 5), 0);
     }
     console.log('displayTwitchResults: Completed');
 }
@@ -1885,7 +1883,7 @@ function displayHackerNewsResults(data) {
     });
     
     if (typeof syncToAllPane === 'function') {
-        setTimeout(() => syncToAllPane('hackernewsTrendsTableBody', 'all-hackernewsTrendsTableBody', 10), 0);
+        setTimeout(() => syncToAllPane('hackernewsTrendsTableBody', 'all-hackernewsTrendsTableBody', 5), 0);
     }
     console.log('displayHackerNewsResults: Completed');
 }
@@ -2066,7 +2064,7 @@ function displayCNNResults(data) {
     });
     
     if (typeof syncToAllPane === 'function') {
-        setTimeout(() => syncToAllPane('cnnTrendsTableBody', 'all-cnnTrendsTableBody', 10), 0);
+        setTimeout(() => syncToAllPane('cnnTrendsTableBody', 'all-cnnTrendsTableBody', 5), 0);
     }
     console.log('displayCNNResults: Completed');
 }
@@ -2184,7 +2182,7 @@ function displayProductHuntResults(data) {
     });
     
     if (typeof syncToAllPane === 'function') {
-        setTimeout(() => syncToAllPane('producthuntTrendsTableBody', 'all-producthuntTrendsTableBody', 10), 0);
+        setTimeout(() => syncToAllPane('producthuntTrendsTableBody', 'all-producthuntTrendsTableBody', 5), 0);
     }
     console.log('displayProductHuntResults: Completed');
 }
@@ -2812,7 +2810,7 @@ function displayEbayResults(data) {
     
     resultsElement.style.setProperty('display', 'block', 'important');
     if (typeof syncToAllPane === 'function') {
-        setTimeout(() => syncToAllPane('ebayTrendsTableBody', 'all-ebayTrendsTableBody', 10), 0);
+        setTimeout(() => syncToAllPane('ebayTrendsTableBody', 'all-ebayTrendsTableBody', 5), 0);
     }
 }
 

@@ -829,9 +829,9 @@ function hideError() {
  * 全部入り（All）タブ用: メインのテーブル先頭N行をAll用tbodyへコピーする
  * @param {string} mainTableBodyId - メインペインのtbody要素ID（例: 'googleTrendsTableBody'）
  * @param {string} allTableBodyId - Allペインのtbody要素ID（例: 'all-googleTrendsTableBody'）
- * @param {number} limit - コピーする最大行数（デフォルト10）
+ * @param {number} limit - コピーする最大行数（デフォルト5）
  */
-function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 10) {
+function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 5) {
     const mainTbody = document.getElementById(mainTableBodyId);
     const allTbody = document.getElementById(allTableBodyId);
     if (!mainTbody || !allTbody) return;

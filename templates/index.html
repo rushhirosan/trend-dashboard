@@ -129,9 +129,9 @@
                     </ul>
                 </div>
                 <div class="tab-content" id="trendCategoryTabContent">
-                <!-- 全部入り（All）: 各ジャンルのトップ10のみ表示、もっと見るでジャンルタブへ -->
+                <!-- 全部入り（All）: 各ジャンルのトップ5のみ表示、もっと見るでジャンルタブへ -->
                 <div class="tab-pane fade show active" id="pane-all" role="tabpanel" aria-labelledby="tab-all">
-                    <p class="text-muted small mb-3">各ジャンルのトップ10件を表示しています。詳しく見る場合は「もっと見る」またはタブでジャンルを選んでください。</p>
+                    <p class="text-muted small mb-3">各ジャンルのトップ5件を表示しています。詳しく見る場合は「もっと見る」またはタブでジャンルを選んでください。</p>
                     <div id="all-trends-container" class="row g-3">
                         <!-- 各ソースのカードはJSで同期される。ここにはプレースホルダー用のカードを並べる -->
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="nhk">
@@ -363,7 +363,7 @@
                                 </div>
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
-                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>著者</th><th>価格</th><th>売上数</th></tr></thead><tbody id="all-bookTrendsTableBody"></tbody></table>
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>著者</th><th>価格</th></tr></thead><tbody id="all-bookTrendsTableBody"></tbody></table>
                                     </div>
                                 </div>
                             </div>
@@ -1547,7 +1547,6 @@
                                                                 <th>タイトル</th>
                                                                 <th>著者</th>
                                                                 <th>価格</th>
-                                                                <th>売上数</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody id="bookTrendsTableBody">
@@ -1557,6 +1556,11 @@
                                                                 <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
                                                                 <td><div class="skeleton skeleton-text"></div></td>
                                                                 <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                                            </tr>
+                                                            <tr class="skeleton-row">
+                                                                <td><div class="skeleton skeleton-badge"></div></td>
+                                                                <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
+                                                                <td><div class="skeleton skeleton-text"></div></td>
                                                                 <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
                                                             </tr>
                                                             <tr class="skeleton-row">
@@ -1564,27 +1568,17 @@
                                                                 <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
                                                                 <td><div class="skeleton skeleton-text"></div></td>
                                                                 <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
-                                                                <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
                                                             </tr>
                                                             <tr class="skeleton-row">
                                                                 <td><div class="skeleton skeleton-badge"></div></td>
                                                                 <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
                                                                 <td><div class="skeleton skeleton-text"></div></td>
                                                                 <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
-                                                                <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
                                                             </tr>
                                                             <tr class="skeleton-row">
                                                                 <td><div class="skeleton skeleton-badge"></div></td>
                                                                 <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
                                                                 <td><div class="skeleton skeleton-text"></div></td>
-                                                                <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
-                                                                <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
-                                                            </tr>
-                                                            <tr class="skeleton-row">
-                                                                <td><div class="skeleton skeleton-badge"></div></td>
-                                                                <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
-                                                                <td><div class="skeleton skeleton-text"></div></td>
-                                                                <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
                                                                 <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
                                                             </tr>
                                                         </tbody>

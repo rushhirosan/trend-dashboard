@@ -400,7 +400,7 @@ function loadHatenaTrendsFromCache() {
                     console.error('displayHatenaResults関数が見つかりません');
                 }
                 if (typeof syncToAllPane === 'function') {
-                    setTimeout(() => syncToAllPane('hatenaTrendsTableBody', 'all-hatenaTrendsTableBody', 10), 0);
+                    setTimeout(() => syncToAllPane('hatenaTrendsTableBody', 'all-hatenaTrendsTableBody', 5), 0);
                 }
             } else {
                 console.log('📊 Hatena データが見つかりません:', data);
@@ -464,7 +464,7 @@ function loadTwitchTrendsFromCache() {
                     console.error('displayTwitchResults関数が見つかりません');
                 }
                 if (typeof syncToAllPane === 'function') {
-                    setTimeout(() => syncToAllPane('twitchTrendsTableBody', 'all-twitchTrendsTableBody', 10), 0);
+                    setTimeout(() => syncToAllPane('twitchTrendsTableBody', 'all-twitchTrendsTableBody', 5), 0);
                 }
             } else {
                 console.log('📊 Twitch データが見つかりません:', data);
@@ -1155,7 +1155,7 @@ function loadNoteTrendsFromCache() {
                     console.error('displayNoteResults関数が見つかりません');
                 }
                 if (typeof syncToAllPane === 'function') {
-                    setTimeout(() => syncToAllPane('noteTrendsTableBody', 'all-noteTrendsTableBody', 10), 0);
+                    setTimeout(() => syncToAllPane('noteTrendsTableBody', 'all-noteTrendsTableBody', 5), 0);
                 }
             } else {
                 console.log('Note Trends データなしまたはエラー:', data);

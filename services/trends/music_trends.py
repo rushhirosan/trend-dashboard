@@ -46,7 +46,7 @@ class MusicTrendsManager(BaseTrendsManager):
         except Exception as e:
             logger.error(f"Spotify API初期化エラー: {e}", exc_info=True)
     
-    def _get_cache_key(self):
+    def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
         return 'music_trends'
 

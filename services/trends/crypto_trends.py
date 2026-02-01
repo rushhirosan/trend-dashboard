@@ -26,7 +26,7 @@ class CryptoTrendsManager(BaseTrendsManager):
         logger.info("Crypto Trends Manager初期化完了")
         logger.info(f"  Base URL: {self.base_url}")
     
-    def _get_cache_key(self):
+    def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
         return 'crypto_trends'
 

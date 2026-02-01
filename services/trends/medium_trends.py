@@ -43,7 +43,7 @@ class MediumTrendsManager(BaseTrendsManager):
             logger.error(f"❌ Medium キャッシュクリアエラー: {e}", exc_info=True)
             return False
 
-    def _get_cache_key(self):
+    def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
         return 'medium_trends'
 

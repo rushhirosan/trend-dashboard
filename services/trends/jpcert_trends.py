@@ -23,7 +23,7 @@ class JPCERTTrendsManager(BaseTrendsManager):
         logger.info("JPCERT/CC Trends Manager初期化:")
         logger.info(f"  RSS URL: {self.rss_url}")
     
-    def _get_cache_key(self):
+    def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
         return 'jpcert_trends'
 

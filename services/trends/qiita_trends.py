@@ -21,7 +21,7 @@ class QiitaTrendsManager(BaseTrendsManager):
         logger.info("Qiita Trends Manager初期化:")
         logger.info(f"  API URL: {self.api_url}")
 
-    def _get_cache_key(self):
+    def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
         return 'qiita_trends'
 

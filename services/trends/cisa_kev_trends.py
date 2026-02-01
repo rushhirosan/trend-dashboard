@@ -23,7 +23,7 @@ class CISAKEVTrendsManager(BaseTrendsManager):
         logger.info("CISA KEV Trends Manager初期化:")
         logger.info(f"  KEV JSON URL: {self.kev_json_url}")
     
-    def _get_cache_key(self):
+    def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
         return 'cisa_kev_trends'
 

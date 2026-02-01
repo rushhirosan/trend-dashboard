@@ -30,7 +30,7 @@ class TwitchTrendsManager(BaseTrendsManager):
         logger.info(f"  Client Secret: {'設定済み' if self.client_secret else '未設定'}")
         logger.info(f"  Base URL: {self.base_url}")
     
-    def _get_cache_key(self):
+    def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
         return 'twitch_trends'
 

@@ -22,7 +22,7 @@ class YouTubeTrendsManager(BaseTrendsManager):
         super().__init__(service_name='youtube', max_requests=10, window_seconds=60)
         self.youtube_api_key = os.getenv('YOUTUBE_API_KEY')
     
-    def _get_cache_key(self):
+    def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
         return 'youtube_trends'
     

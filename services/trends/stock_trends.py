@@ -518,8 +518,8 @@ class StockTrendsManager(BaseTrendsManager):
                             try:
                                 ticker_data = hist.xs(ticker_symbol, level='symbol')
                             except KeyError:
-                                # 銘柄がデータに含まれていない場合
-                                logger.warning(f"銘柄 {ticker_symbol}: データが見つかりません")
+                                # 銘柄がyahooqueryの結果に含まれていない場合（休場・銘柄コード差などで発生しうる）
+                                logger.debug(f"銘柄 {ticker_symbol}: データが見つかりません")
                                 error_count += 1
                                 continue
                         else:

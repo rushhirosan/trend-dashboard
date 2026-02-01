@@ -25,7 +25,7 @@ class CNNTrendsManager(BaseTrendsManager):
         else:
             logger.info("✅ CNN Trends Manager初期化: NewsAPIを使用して最新のCNN記事を取得します")
     
-    def _get_cache_key(self):
+    def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
         return 'cnn_trends'
 

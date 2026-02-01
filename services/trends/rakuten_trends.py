@@ -166,8 +166,9 @@ class RakutenTrendsManager(BaseTrendsManager):
             if self.rakuten_affiliate_id:
                 params['affiliateId'] = self.rakuten_affiliate_id
             
-            if genre_id:
-                params['genreId'] = genre_id
+            # 楽天APIのgenreIdは数値形式のみ。'all'や空は渡さない（全ジャンルランキングになる）
+            if genre_id and str(genre_id).strip() != 'all' and str(genre_id).isdigit():
+                params['genreId'] = str(genre_id).strip()
             
             logger.debug(f"楽天ランキングAPIリクエストURL: {url}")
             logger.debug(f"楽天ランキングAPIリクエストパラメータ: {params}")
@@ -249,10 +250,10 @@ class RakutenTrendsManager(BaseTrendsManager):
             if self.rakuten_affiliate_id:
                 params['affiliateId'] = self.rakuten_affiliate_id
             
-            if genre_id:
-                params['genreId'] = genre_id
+            # genreIdは数値形式のみ。'all'や空は渡さず、keywordで検索
+            if genre_id and str(genre_id).strip() != 'all' and str(genre_id).isdigit():
+                params['genreId'] = str(genre_id).strip()
             else:
-                # デフォルトで人気のキーワード検索（より一般的な商品を取得）
                 params['keyword'] = '人気'
             
             logger.debug(f"楽天APIリクエストURL: {url}")

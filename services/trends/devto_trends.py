@@ -21,7 +21,7 @@ class DevToTrendsManager(BaseTrendsManager):
         logger.info("DEV.to Trends Manager初期化:")
         logger.info(f"  API URL: {self.api_url}")
 
-    def _get_cache_key(self):
+    def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
         return 'devto_trends'
 

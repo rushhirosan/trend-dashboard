@@ -42,8 +42,8 @@ class PodcastTrendsManager(BaseTrendsManager):
         except Exception as e:
             logger.error(f"Listen Notes API接続テストエラー: {e}", exc_info=True)
     
-    def _get_cache_key(self):
-        """キャッシュキーを返す"""
+    def _get_cache_key(self, *args, **kwargs):
+        """キャッシュキーを返す（ベースクラスが *args, **kwargs で呼ぶため受け取る）"""
         return 'podcast_trends'
 
     def _get_from_cache(self, *args, **kwargs):

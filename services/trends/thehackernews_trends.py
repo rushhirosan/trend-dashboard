@@ -21,7 +21,7 @@ class TheHackerNewsTrendsManager(BaseTrendsManager):
         logger.info("The Hacker News Trends Manager初期化:")
         logger.info(f"  RSS URL: {self.rss_url}")
     
-    def _get_cache_key(self):
+    def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
         return 'thehackernews_trends'
 

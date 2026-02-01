@@ -23,7 +23,7 @@ class HackerNoonTrendsManager(BaseTrendsManager):
         logger.info("Hacker Noon Trends Manager初期化:")
         logger.info(f"  RSS URL: {self.rss_url}")
     
-    def _get_cache_key(self):
+    def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
         return 'hackernoon_trends'
 

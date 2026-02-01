@@ -28,7 +28,7 @@ class HatenaTrendsManager(BaseTrendsManager):
         logger.info(f"  Count API: {self.count_api_url}")
         logger.info(f"  Entry API: {self.entry_api_url}")
     
-    def _get_cache_key(self):
+    def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
         return 'hatena_trends'
 

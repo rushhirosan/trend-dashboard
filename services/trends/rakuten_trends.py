@@ -102,12 +102,13 @@ class RakutenTrendsManager(BaseTrendsManager):
                 'genre_id': genre_id,
                 'source': '楽天商品ランキングAPI'
             }
-        else:
-            return {
-                'success': False,
-                'error': 'データが取得できませんでした',
-                'data': []
-            }
+        # 失敗時: _get_rakuten_ranking が返した error を使い、Discord/ログで原因が分かるようにする
+        error_msg = (result.get('error') if isinstance(result, dict) else None) or 'データが取得できませんでした'
+        return {
+            'success': False,
+            'error': error_msg,
+            'data': []
+        }
 
     def _generate_dummy_data(self, limit=25, *args, **kwargs):
         """楽天用ダミーデータを生成（USE_DUMMY_DATA 時）"""
@@ -150,6 +151,9 @@ class RakutenTrendsManager(BaseTrendsManager):
     
     def _get_rakuten_ranking(self, genre_id=None, limit=25):
         """楽天商品ランキングAPIを使用"""
+        if not self.rakuten_app_id:
+            logger.warning("楽天ランキングAPI: RAKUTEN_APP_ID が未設定です")
+            return {'data': [], 'error': 'RAKUTEN_APP_ID が未設定です'}
         try:
             url = "https://app.rakuten.co.jp/services/api/IchibaItem/Ranking/20170628"
             params = {
@@ -219,12 +223,13 @@ class RakutenTrendsManager(BaseTrendsManager):
                     'total_count': len(trends_data)
                 }
             else:
-                logger.error(f"楽天ランキングAPIエラー: {response.text}")
-                return None
+                err_text = (response.text or '')[:500]
+                logger.error(f"楽天ランキングAPIエラー: {err_text}")
+                return {'data': [], 'error': f'楽天API HTTP {response.status_code}: {err_text}'}
                 
         except Exception as e:
             logger.error(f"楽天ランキングAPIエラー: {str(e)}", exc_info=True)
-            return None
+            return {'data': [], 'error': f'楽天API 例外: {str(e)}'}
     
     def _get_rakuten_search(self, genre_id=None, limit=25):
         """楽天商品検索APIを使用"""

@@ -401,7 +401,8 @@ class TrendsScheduler:
                 if not success:
                     failed_trends.append(key)
                     response = result_data.get('response', {})
-                    error = result_data.get('error', 'unknown')
+                    # マネージャーが response 内に error を返す場合があるため、両方参照する
+                    error = (response.get('error') if isinstance(response, dict) else None) or result_data.get('error', 'unknown')
                     if isinstance(response, dict):
                         status = response.get('status', 'unknown')
                         data_count = len(response.get('data', []))

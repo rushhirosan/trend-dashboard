@@ -825,9 +825,42 @@ function hideError() {
     }
 }
 
+/**
+ * 全部入り（All）タブ用: メインのテーブル先頭N行をAll用tbodyへコピーする
+ * @param {string} mainTableBodyId - メインペインのtbody要素ID（例: 'googleTrendsTableBody'）
+ * @param {string} allTableBodyId - Allペインのtbody要素ID（例: 'all-googleTrendsTableBody'）
+ * @param {number} limit - コピーする最大行数（デフォルト10）
+ */
+function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 10) {
+    const mainTbody = document.getElementById(mainTableBodyId);
+    const allTbody = document.getElementById(allTableBodyId);
+    if (!mainTbody || !allTbody) return;
+    const dataRows = Array.from(mainTbody.querySelectorAll('tr:not(.skeleton-row)'));
+    const toCopy = dataRows.slice(0, limit);
+    allTbody.innerHTML = '';
+    toCopy.forEach(tr => {
+        allTbody.appendChild(tr.cloneNode(true));
+    });
+}
+
 // ページ読み込み時の初期化
 document.addEventListener('DOMContentLoaded', function() {
     console.log('=== DOMContentLoaded: 初期化開始 ===');
+
+    // 全部入り「もっと見る」: クリックで該当ジャンルタブへ切り替え
+    document.querySelectorAll('.all-more-link').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const targetTabId = this.getAttribute('data-target-tab');
+            if (!targetTabId) return;
+            const tabEl = document.getElementById(targetTabId);
+            if (tabEl && typeof bootstrap !== 'undefined') {
+                const tab = new bootstrap.Tab(tabEl);
+                tab.show();
+                document.querySelector('#trends')?.scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+    });
 
     // 要素の存在確認
     const elements = {
@@ -857,6 +890,22 @@ document.addEventListener('DOMContentLoaded', function() {
     // YouTube急上昇機能は削除されたため、ラジオボタンの監視は不要
 
     // YouTube地域選択は削除済み（日本固定）
+
+    // トレンドカテゴリタブ切り替え時: グラフリサイズ
+    const trendTabsEl = document.getElementById('trendCategoryTabs');
+    if (trendTabsEl) {
+        trendTabsEl.addEventListener('shown.bs.tab', function() {
+            if (typeof currentGoogleChart !== 'undefined' && currentGoogleChart) {
+                try { currentGoogleChart.resize(); } catch (e) { /* ignore */ }
+            }
+            if (typeof currentYouTubeChart !== 'undefined' && currentYouTubeChart) {
+                try { currentYouTubeChart.resize(); } catch (e) { /* ignore */ }
+            }
+            if (typeof currentMusicChart !== 'undefined' && currentMusicChart) {
+                try { currentMusicChart.resize(); } catch (e) { /* ignore */ }
+            }
+        });
+    }
 
     console.log('=== 初期化完了 ===');
 });

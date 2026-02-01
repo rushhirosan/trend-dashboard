@@ -73,22 +73,19 @@
     </script>
     {% endif %}
     
-    <!-- External CSS (non-blocking) -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet" media="print" onload="this.media='all'">
-    <noscript><link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet"></noscript>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" media="print" onload="this.media='all'">
-    <noscript><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"></noscript>
-    
-    <!-- Critical CSS (inline or preloaded) -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/trends.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/data-status.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/subscription.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/us-trends.css') }}" rel="stylesheet">
     
-    <!-- JavaScript (defer for non-critical scripts) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/app-common.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/display-functions.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='js/us-trends.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/display-functions.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/us-trends.js') }}"></script>
 </head>
 <body class="bg-light">
     <!-- ヘッダー -->
@@ -98,16 +95,229 @@
     {% set lang = 'en' %}
     {% include 'partials/header.html' with context %}
 
-    <div class="container-fluid py-4">
-
-        <!-- Main Content -->
+    <main class="container-fluid py-4">
         <div id="mainContent">
             <header class="mb-3">
-                <h1 class="h3 fw-bold mb-2">US Trends Dashboard - Latest Trends in America</h1>
+                <h1 class="h3 fw-bold mb-2">US Trends - Latest Trends in America</h1>
                 <p class="text-muted small">Displaying latest trend data from Google Trends, YouTube, Stock markets, Spotify, Reddit, Hacker News, Twitch, and Podcasts. Track cryptocurrency and stock market movements. Data update processing starts daily at 1 AM, 7 AM, 1 PM, and 7 PM (JST) (may take 10-20 minutes to complete).</p>
             </header>
-        <div id="trends">
-        <!-- Row 1: CNN News + World News -->
+            <section id="trends" aria-label="Trend information">
+                <!-- Category tabs (horizontal scroll on mobile) -->
+                <div class="trend-tabs-wrapper mb-3">
+                    <ul class="nav nav-tabs trend-category-tabs flex-nowrap" id="trendCategoryTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="tab-all" data-bs-toggle="tab" data-bs-target="#pane-all" type="button" role="tab" aria-controls="pane-all" aria-selected="true">All</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-news" data-bs-toggle="tab" data-bs-target="#pane-news" type="button" role="tab" aria-controls="pane-news" aria-selected="false">News</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-search" data-bs-toggle="tab" data-bs-target="#pane-search" type="button" role="tab" aria-controls="pane-search" aria-selected="false">Search & Video</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-tech" data-bs-toggle="tab" data-bs-target="#pane-tech" type="button" role="tab" aria-controls="pane-tech" aria-selected="false">Tech</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-market" data-bs-toggle="tab" data-bs-target="#pane-market" type="button" role="tab" aria-controls="pane-market" aria-selected="false">Market</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-entertainment" data-bs-toggle="tab" data-bs-target="#pane-entertainment" type="button" role="tab" aria-controls="pane-entertainment" aria-selected="false">Entertainment</button>
+                        </li>
+                    </ul>
+                </div>
+                <div class="tab-content" id="trendCategoryTabContent">
+                    <!-- All tab: top 10 from each genre -->
+                    <div class="tab-pane fade show active" id="pane-all" role="tabpanel" aria-labelledby="tab-all">
+                        <p class="text-muted small mb-3">Displaying top 10 from each genre. Click "More" or switch tabs to see full details.</p>
+                        <div id="all-trends-container" class="row g-3">
+                            <div class="col-12 col-md-6 col-lg-4" data-all-card="cnn">
+                                <div class="card h-100">
+                                    <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center py-2">
+                                        <h3 class="h6 mb-0"><i class="fas fa-newspaper"></i> CNN News</h3>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-news" aria-label="Go to News tab">More</a>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Title</th><th>Published</th></tr></thead><tbody id="all-cnnTrendsTableBody"></tbody></table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4" data-all-card="worldnews">
+                                <div class="card h-100">
+                                    <div class="card-header bg-info text-white d-flex justify-content-between align-items-center py-2">
+                                        <h3 class="h6 mb-0"><i class="fas fa-globe-americas"></i> World News</h3>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-news" aria-label="Go to News tab">More</a>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Title</th><th>Published</th></tr></thead><tbody id="all-worldnewsTrendsTableBody"></tbody></table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4" data-all-card="google">
+                                <div class="card h-100">
+                                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
+                                        <h3 class="h6 mb-0"><i class="fab fa-google"></i> Google Trends</h3>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" aria-label="Go to Search tab">More</a>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Keyword</th><th>Popularity</th><th>Search</th></tr></thead><tbody id="all-googleTrendsTableBody"></tbody></table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4" data-all-card="youtube">
+                                <div class="card h-100">
+                                    <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center py-2">
+                                        <h3 class="h6 mb-0"><i class="fab fa-youtube"></i> YouTube</h3>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" aria-label="Go to Search tab">More</a>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Title</th><th>Channel</th><th>Views</th></tr></thead><tbody id="all-youtubeTrendsTableBody"></tbody></table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4" data-all-card="hackernews">
+                                <div class="card h-100">
+                                    <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#ff6600;color:#fff;">
+                                        <h3 class="h6 mb-0"><i class="fab fa-hacker-news"></i> Hacker News</h3>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" aria-label="Go to Tech tab">More</a>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Title</th><th>Score</th><th>Comments</th></tr></thead><tbody id="all-hackernewsTrendsTableBody"></tbody></table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4" data-all-card="producthunt">
+                                <div class="card h-100">
+                                    <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#da552f;color:#fff;">
+                                        <h3 class="h6 mb-0"><i class="fab fa-product-hunt"></i> Product Hunt</h3>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" aria-label="Go to Tech tab">More</a>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Product</th><th>Tagline</th><th>Votes</th></tr></thead><tbody id="all-producthuntTrendsTableBody"></tbody></table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4" data-all-card="stock">
+                                <div class="card h-100">
+                                    <div class="card-header bg-info text-white d-flex justify-content-between align-items-center py-2">
+                                        <h3 class="h6 mb-0"><i class="fas fa-chart-line"></i> Stock (US)</h3>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-market" aria-label="Go to Market tab">More</a>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Symbol</th><th>Price</th><th>Change %</th></tr></thead><tbody id="all-stockTrendsTableBody"></tbody></table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4" data-all-card="crypto">
+                                <div class="card h-100">
+                                    <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center py-2">
+                                        <h3 class="h6 mb-0"><i class="fab fa-bitcoin"></i> Cryptocurrency</h3>
+                                        <a href="#" class="btn btn-sm btn-dark all-more-link" data-target-tab="tab-market" aria-label="Go to Market tab">More</a>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Coin</th><th>Price</th><th>24h</th></tr></thead><tbody id="all-cryptoTrendsTableBody"></tbody></table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4" data-all-card="spotify">
+                                <div class="card h-100">
+                                    <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#1DB954;color:#fff;">
+                                        <h3 class="h6 mb-0"><i class="fab fa-spotify"></i> Spotify</h3>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" aria-label="Go to Entertainment tab">More</a>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Track</th><th>Artist</th><th>Album</th></tr></thead><tbody id="all-spotifyTrendsTableBody"></tbody></table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4" data-all-card="podcast">
+                                <div class="card h-100">
+                                    <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#8b5cf6;color:#fff;">
+                                        <h3 class="h6 mb-0"><i class="fas fa-podcast"></i> Podcast</h3>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" aria-label="Go to Entertainment tab">More</a>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Podcast</th><th>Publisher</th></tr></thead><tbody id="all-podcastTrendsTableBody"></tbody></table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4" data-all-card="movie">
+                                <div class="card h-100">
+                                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
+                                        <h3 class="h6 mb-0"><i class="fas fa-film"></i> Movies</h3>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" aria-label="Go to Entertainment tab">More</a>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Title</th><th>Rating</th><th>Release</th></tr></thead><tbody id="all-movieTrendsTableBody"></tbody></table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4" data-all-card="book">
+                                <div class="card h-100">
+                                    <div class="card-header bg-info text-white d-flex justify-content-between align-items-center py-2">
+                                        <h3 class="h6 mb-0"><i class="fas fa-book"></i> Books</h3>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" aria-label="Go to Entertainment tab">More</a>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Title</th><th>Author</th><th>Price</th></tr></thead><tbody id="all-bookTrendsTableBody"></tbody></table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4" data-all-card="ebay">
+                                <div class="card h-100">
+                                    <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#0064D2;color:#fff;">
+                                        <h3 class="h6 mb-0"><i class="fab fa-ebay"></i> eBay</h3>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" aria-label="Go to Entertainment tab">More</a>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Title</th><th>Price</th></tr></thead><tbody id="all-ebayTrendsTableBody"></tbody></table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4" data-all-card="twitch">
+                                <div class="card h-100">
+                                    <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#9146FF;color:#fff;">
+                                        <h3 class="h6 mb-0"><i class="fab fa-twitch"></i> Twitch</h3>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" aria-label="Go to Entertainment tab">More</a>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Game</th><th>Viewers</th></tr></thead><tbody id="all-twitchTrendsTableBody"></tbody></table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div><!-- /.tab-pane#pane-all -->
+
+                    <!-- News tab -->
+                    <div class="tab-pane fade" id="pane-news" role="tabpanel" aria-labelledby="tab-news">
+                    <div class="row g-3 mb-3">
         <div class="row g-3 mb-3">
             <!-- Left: CNN News -->
             <div class="col-12 col-md-6">
@@ -205,7 +415,7 @@
                         </div>
 
                         <!-- World News Results Display Area -->
-                        <div id="worldnewsResults" style="display: none;">
+                        <div id="worldnewsResults">
                             <!-- Status Display -->
                             <div class="alert alert-success status-message" id="worldnewsStatusMessage" style="display: none;">
                                 <!-- Status messages will be displayed here -->
@@ -267,8 +477,12 @@
                 </div>
             </div>
         </div>
+                </div>
+                </div><!-- /.tab-pane#pane-news -->
 
-        <!-- Row 2: Google Trends + YouTube Trends -->
+                    <!-- Search & Video tab -->
+                    <div class="tab-pane fade" id="pane-search" role="tabpanel" aria-labelledby="tab-search">
+        <div class="row g-3 mb-3">
         <div class="row g-3 mb-3">
             <!-- Left: Google Trends -->
             <div class="col-12 col-md-6">
@@ -442,8 +656,12 @@
                 </div>
             </div>
         </div>
+                </div>
+                </div><!-- /.tab-pane#pane-search -->
 
-        <!-- Row 3: Hacker News + Product Hunt -->
+                    <!-- Tech tab -->
+                    <div class="tab-pane fade" id="pane-tech" role="tabpanel" aria-labelledby="tab-tech">
+        <div class="row g-3 mb-3">
         <div class="row g-3 mb-3">
             <!-- Left: Hacker News -->
             <div class="col-12 col-md-6">
@@ -1078,8 +1296,12 @@
                 </div>
             </div>
         </div>
+                </div>
+                </div><!-- /.tab-pane#pane-tech -->
 
-        <!-- Row 7: Stock Trends + Crypto Trends -->
+                    <!-- Market tab -->
+                    <div class="tab-pane fade" id="pane-market" role="tabpanel" aria-labelledby="tab-market">
+        <div class="row g-3 mb-3">
         <div class="row g-3 mb-3">
             <!-- Left: Stock Trends (US) -->
             <div class="col-12 col-md-6" id="stockTrends">
@@ -1249,8 +1471,12 @@
                 </div>
             </div>
         </div>
+                </div>
+                </div><!-- /.tab-pane#pane-market -->
 
-        <!-- Row 8: Movie Trends + Book Trends -->
+                    <!-- Entertainment tab -->
+                    <div class="tab-pane fade" id="pane-entertainment" role="tabpanel" aria-labelledby="tab-entertainment">
+        <div class="row g-3 mb-3">
         <div class="row g-3 mb-3">
             <!-- Left: Movie Trends -->
             <div class="col-12 col-md-6">
@@ -1761,9 +1987,33 @@
                 </div>
             </div>
         </div>
-        </div> <!-- #trends -->
-        </div> <!-- #mainContent -->
-    </div>
+                </div>
+                </div><!-- /.tab-pane#pane-entertainment -->
+                </div><!-- #trendCategoryTabContent -->
+            </section>
+
+            <!-- About section -->
+            <section class="mt-4" aria-label="About Trends Dashboard">
+                <div class="card">
+                    <div class="card-header bg-dark text-white">
+                        <h2 class="h5 mb-0"><i class="fas fa-info-circle" aria-hidden="true"></i> About Trends Dashboard</h2>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-3">Trends Dashboard is a free web app that displays the latest trend information from the US in one place. You can see keywords and content that are trending across multiple services on a single screen.</p>
+                        <h3 class="h6 fw-bold mt-4 mb-2">Features</h3>
+                        <ul class="mb-3">
+                            <li>Display trends from Google Trends, YouTube, Spotify, Hacker News, Twitch, Podcasts and more</li>
+                            <li>Tech platform trends: Product Hunt, DEV.to, Medium, GitHub</li>
+                            <li>Stock and cryptocurrency market trends</li>
+                            <li>News trends from CNN, World News, The Hacker News</li>
+                        </ul>
+                        <h3 class="h6 fw-bold mt-4 mb-2">Data Update</h3>
+                        <p class="mb-0">Data update processing starts daily at 1 AM, 7 AM, 1 PM, and 7 PM (JST). It may take 10-20 minutes to complete. Check the <a href="{{ url_for('data_status') }}">Data Freshness</a> page for the latest status.</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
 
     <style>
         /* すべてのローディング表示を確実に非表示 */
@@ -1780,21 +2030,27 @@
             position: absolute !important;
             left: -9999px !important;
         }
-        /* すべての結果エリアを表示 */
-        #googleResults,
-        #youtubeResults,
-        #cnnResults,
-        #worldnewsResults,
-        #hackernewsResults,
-        #producthuntResults,
-        #spotifyResults,
-        #podcastResults,
-        #movieResults,
-        #bookResults,
-        #devtoResults,
-        #mediumResults,
-        #ebayResults,
-        #twitchResults {
+        /* アクティブなタブ内の結果エリアのみ表示（日本ページと同様のタブ切り替え） */
+        #trendCategoryTabContent > .tab-pane.active.show #googleResults,
+        #trendCategoryTabContent > .tab-pane.active.show #youtubeResults,
+        #trendCategoryTabContent > .tab-pane.active.show #cnnResults,
+        #trendCategoryTabContent > .tab-pane.active.show #worldnewsResults,
+        #trendCategoryTabContent > .tab-pane.active.show #hackernewsResults,
+        #trendCategoryTabContent > .tab-pane.active.show #producthuntResults,
+        #trendCategoryTabContent > .tab-pane.active.show #spotifyResults,
+        #trendCategoryTabContent > .tab-pane.active.show #podcastResults,
+        #trendCategoryTabContent > .tab-pane.active.show #movieResults,
+        #trendCategoryTabContent > .tab-pane.active.show #bookResults,
+        #trendCategoryTabContent > .tab-pane.active.show #devtoResults,
+        #trendCategoryTabContent > .tab-pane.active.show #mediumResults,
+        #trendCategoryTabContent > .tab-pane.active.show #ebayResults,
+        #trendCategoryTabContent > .tab-pane.active.show #twitchResults,
+        #trendCategoryTabContent > .tab-pane.active.show #stockResults,
+        #trendCategoryTabContent > .tab-pane.active.show #cryptoResults,
+        #trendCategoryTabContent > .tab-pane.active.show #cisaKevResults,
+        #trendCategoryTabContent > .tab-pane.active.show #thehackernewsResults,
+        #trendCategoryTabContent > .tab-pane.active.show #githubResults,
+        #trendCategoryTabContent > .tab-pane.active.show #appstoreResults {
             display: block !important;
             visibility: visible !important;
             opacity: 1 !important;

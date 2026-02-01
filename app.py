@@ -7,8 +7,10 @@ import os
 from dotenv import load_dotenv
 from flask import Flask, render_template
 
-# .envファイルを読み込み
-load_dotenv()
+# .env をアプリルートから明示的に読み込み（cwd に依存しない）
+_env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+load_dotenv(dotenv_path=_env_path)
+load_dotenv()  # cwd の .env も併用
 from config.app_config import AppConfig
 from database_config import TrendsCache
 from managers.trend_managers import initialize_managers
@@ -38,6 +40,12 @@ def create_app():
         config = AppConfig.get_config_dict()
         app.config.update(config)
         logger.info("✅ アプリケーション設定適用完了")
+        # USE_DUMMY_DATA を os.environ に同期（全マネージャーの _is_dummy_mode() で確実に参照されるようにする）
+        if app.config.get('USE_DUMMY_DATA'):
+            os.environ['USE_DUMMY_DATA'] = 'true'
+            logger.info("🎭 USE_DUMMY_DATA が有効です。トレンドAPIはダミーデータを返します（ローカル用）。")
+        else:
+            os.environ['USE_DUMMY_DATA'] = 'false'
     except Exception as e:
         logger.error(f"❌ 設定適用エラー: {e}", exc_info=True)
         # 設定が失敗してもデフォルト設定で続行

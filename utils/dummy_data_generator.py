@@ -187,6 +187,30 @@ def generate_dummy_worldnews_data(country: str = "jp", limit: int = 25) -> List[
     return dummy_data
 
 
+def generate_dummy_ebay_data(category: str = "fashion", limit: int = 25) -> List[Dict[str, Any]]:
+    """eBay Popular/Trending用のダミーデータを生成（ebay_trends_cache スキーマ互換）"""
+    dummy_data: List[Dict[str, Any]] = []
+    now = datetime.now().isoformat()
+    for i in range(1, limit + 1):
+        item: Dict[str, Any] = {
+            "rank": i,
+            "title": generate_lorem_text(2, 8).rstrip("."),
+            "url": f"https://www.ebay.com/itm/dummy_{i}",
+            "item_id": f"dummy_ebay_{i}",
+            "price": round(random.uniform(9.99, 299.99), 2),
+            "currency": "USD",
+            "image_url": "",
+            "condition": "New",
+            "seller": "Example Seller",
+            "shipping": "0",
+            "category": category,
+            "published_date": now,
+            "source": "eBay Popular/Trending",
+        }
+        dummy_data.append(item)
+    return dummy_data
+
+
 def generate_dummy_rakuten_data(limit: int = 25, genre_id: str = "all") -> List[Dict[str, Any]]:
     """楽天トレンド用のダミーデータを生成（rakuten_trends_cache スキーマ互換）"""
     dummy_data: List[Dict[str, Any]] = []
@@ -204,7 +228,7 @@ def generate_dummy_rakuten_data(limit: int = 25, genre_id: str = "all") -> List[
             "url": f"https://example.com/rakuten/{i}",
             "shop_name": "Example Shop",
             "sales_rank": "",
-            "sales_count": str(random.randint(0, 500)),
+            "sales_count": random.randint(0, 500),
             "rank": i,
             "region": "JP",
         }

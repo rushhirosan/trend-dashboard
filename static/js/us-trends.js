@@ -147,6 +147,9 @@ function displayStockResultsUS(data) {
     
     // Display results
     resultsElement.style.setProperty('display', 'block', 'important');
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('stockTrendsTableBody', 'all-stockTrendsTableBody', 10), 0);
+    }
     console.log('✅ Stock Results display completed');
 }
 
@@ -274,6 +277,9 @@ function displayCryptoResultsUS(data) {
     
     // Display results
     resultsElement.style.setProperty('display', 'block', 'important');
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('cryptoTrendsTableBody', 'all-cryptoTrendsTableBody', 10), 0);
+    }
 }
 
 // Movie Trends data fetch for US
@@ -390,6 +396,9 @@ function displayMovieResultsUS(data) {
     
     // Display results
     resultsElement.style.setProperty('display', 'block', 'important');
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('movieTrendsTableBody', 'all-movieTrendsTableBody', 10), 0);
+    }
 }
 
 // Book Trends data fetch for US
@@ -518,6 +527,9 @@ function displayBookResultsUS(data) {
     
     // Display results
     resultsElement.style.setProperty('display', 'block', 'important');
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('bookTrendsTableBody', 'all-bookTrendsTableBody', 10), 0);
+    }
 }
 
 // Load Movie Trends from Cache (US)
@@ -898,6 +910,9 @@ function displayGoogleResults(data) {
         tableBody.appendChild(row);
     });
     
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('googleTrendsTableBody', 'all-googleTrendsTableBody', 10), 0);
+    }
     console.log('displayGoogleResults: Completed');
 }
 
@@ -958,6 +973,9 @@ function displayYouTubeResults(data) {
         tableBody.appendChild(row);
     });
     
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('youtubeTrendsTableBody', 'all-youtubeTrendsTableBody', 10), 0);
+    }
     console.log('displayYouTubeResults: Completed');
 }
 
@@ -1257,6 +1275,9 @@ function displayWorldNewsResults(data) {
         tableBody.appendChild(row);
     });
     
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('worldnewsTrendsTableBody', 'all-worldnewsTrendsTableBody', 10), 0);
+    }
     console.log('displayWorldNewsResults: Completed');
 }
 
@@ -1308,6 +1329,9 @@ function displaySpotifyResults(data) {
         tableBody.appendChild(row);
     });
     
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('spotifyTrendsTableBody', 'all-spotifyTrendsTableBody', 10), 0);
+    }
     console.log('displaySpotifyResults: Completed');
 }
 
@@ -1610,6 +1634,9 @@ function displayPodcastResults(data) {
     
     // 結果セクションを表示 - 日本版と同じシンプルな方法
     document.getElementById('podcastResults').style.setProperty('display', 'block', 'important');
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('podcastTrendsTableBody', 'all-podcastTrendsTableBody', 10), 0);
+    }
     console.log('displayPodcastResults: Completed -', tableBody.children.length, 'rows added');
 }
 
@@ -1735,6 +1762,9 @@ function displayTwitchResults(data, type = 'games') {
         tableBody.appendChild(row);
     });
     
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('twitchTrendsTableBody', 'all-twitchTrendsTableBody', 10), 0);
+    }
     console.log('displayTwitchResults: Completed');
 }
 
@@ -1854,6 +1884,9 @@ function displayHackerNewsResults(data) {
         tableBody.appendChild(row);
     });
     
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('hackernewsTrendsTableBody', 'all-hackernewsTrendsTableBody', 10), 0);
+    }
     console.log('displayHackerNewsResults: Completed');
 }
 
@@ -2032,6 +2065,9 @@ function displayCNNResults(data) {
         tableBody.appendChild(row);
     });
     
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('cnnTrendsTableBody', 'all-cnnTrendsTableBody', 10), 0);
+    }
     console.log('displayCNNResults: Completed');
 }
 
@@ -2147,6 +2183,9 @@ function displayProductHuntResults(data) {
         tableBody.appendChild(row);
     });
     
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('producthuntTrendsTableBody', 'all-producthuntTrendsTableBody', 10), 0);
+    }
     console.log('displayProductHuntResults: Completed');
 }
 
@@ -2772,6 +2811,9 @@ function displayEbayResults(data) {
     });
     
     resultsElement.style.setProperty('display', 'block', 'important');
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('ebayTrendsTableBody', 'all-ebayTrendsTableBody', 10), 0);
+    }
 }
 
 // Error display functions
@@ -2840,6 +2882,34 @@ function showEbayError(message, status = null) {
 // Page initialization
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🇺🇸 US Trends page initialization');
+    
+    // All tab "More" link: switch to category tab on click
+    document.querySelectorAll('.all-more-link').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const targetTabId = this.getAttribute('data-target-tab');
+            if (!targetTabId) return;
+            const tabEl = document.getElementById(targetTabId);
+            if (tabEl && typeof bootstrap !== 'undefined') {
+                const tab = new bootstrap.Tab(tabEl);
+                tab.show();
+                document.querySelector('#trends')?.scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+    });
+
+    // トレンドカテゴリタブ切り替え時: グラフリサイズ
+    const trendTabsEl = document.getElementById('trendCategoryTabs');
+    if (trendTabsEl) {
+        trendTabsEl.addEventListener('shown.bs.tab', function() {
+            if (typeof currentGoogleChart !== 'undefined' && currentGoogleChart) {
+                try { currentGoogleChart.resize(); } catch (e) { /* ignore */ }
+            }
+            if (typeof currentYouTubeChart !== 'undefined' && currentYouTubeChart) {
+                try { currentYouTubeChart.resize(); } catch (e) { /* ignore */ }
+            }
+        });
+    }
     
     // Load cached data first (like Japan version)
     loadCachedDataUS();

@@ -105,8 +105,301 @@
                 <p class="text-muted small">Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Twitch、Podcast、Zenn、Note、Qiitaなどの人気トレンドを一括表示。株価や仮想通貨のトレンドも確認できます。データは毎日1時、7時、13時、19時（JST）に更新処理を開始します（更新完了まで10〜20分かかる場合があります）。</p>
             </header>
             <section id="trends" aria-label="トレンド情報">
-                <!-- 1行目: NHK + World News -->
-                <div class="row g-3 mb-3">
+                <!-- カテゴリ別タブナビ（モバイルは横スクロール） -->
+                <div class="trend-tabs-wrapper mb-3">
+                    <ul class="nav nav-tabs trend-category-tabs flex-nowrap" id="trendCategoryTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="tab-all" data-bs-toggle="tab" data-bs-target="#pane-all" type="button" role="tab" aria-controls="pane-all" aria-selected="true">全部入り（All）</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-news" data-bs-toggle="tab" data-bs-target="#pane-news" type="button" role="tab" aria-controls="pane-news" aria-selected="false">ニュース</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-search" data-bs-toggle="tab" data-bs-target="#pane-search" type="button" role="tab" aria-controls="pane-search" aria-selected="false">検索・動画</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-tech" data-bs-toggle="tab" data-bs-target="#pane-tech" type="button" role="tab" aria-controls="pane-tech" aria-selected="false">テック・開発</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-market" data-bs-toggle="tab" data-bs-target="#pane-market" type="button" role="tab" aria-controls="pane-market" aria-selected="false">マーケット</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-entertainment" data-bs-toggle="tab" data-bs-target="#pane-entertainment" type="button" role="tab" aria-controls="pane-entertainment" aria-selected="false">エンタメ</button>
+                        </li>
+                    </ul>
+                </div>
+                <div class="tab-content" id="trendCategoryTabContent">
+                <!-- 全部入り（All）: 各ジャンルのトップ10のみ表示、もっと見るでジャンルタブへ -->
+                <div class="tab-pane fade show active" id="pane-all" role="tabpanel" aria-labelledby="tab-all">
+                    <p class="text-muted small mb-3">各ジャンルのトップ10件を表示しています。詳しく見る場合は「もっと見る」またはタブでジャンルを選んでください。</p>
+                    <div id="all-trends-container" class="row g-3">
+                        <!-- 各ソースのカードはJSで同期される。ここにはプレースホルダー用のカードを並べる -->
+                        <div class="col-12 col-md-6 col-lg-4" data-all-card="nhk">
+                            <div class="card h-100">
+                                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-2">
+                                    <h3 class="h6 mb-0"><i class="fas fa-newspaper"></i> NHK ニュース</h3>
+                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-news" aria-label="ニュースタブへ">もっと見る</a>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>公開日</th></tr></thead><tbody id="all-nhkTrendsTableBody"></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4" data-all-card="news">
+                            <div class="card h-100">
+                                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center py-2">
+                                    <h3 class="h6 mb-0"><i class="fas fa-globe"></i> World News</h3>
+                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-news" aria-label="ニュースタブへ">もっと見る</a>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>ソース</th></tr></thead><tbody id="all-newsTrendsTableBody"></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4" data-all-card="google">
+                            <div class="card h-100">
+                                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
+                                    <h3 class="h6 mb-0"><i class="fab fa-google"></i> Google Trends</h3>
+                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" aria-label="検索・動画タブへ">もっと見る</a>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>キーワード</th><th>人気度</th><th>検索</th></tr></thead><tbody id="all-googleTrendsTableBody"></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4" data-all-card="youtube">
+                            <div class="card h-100">
+                                <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center py-2">
+                                    <h3 class="h6 mb-0"><i class="fab fa-youtube"></i> YouTube</h3>
+                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" aria-label="検索・動画タブへ">もっと見る</a>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>チャンネル</th><th>視聴回数</th></tr></thead><tbody id="all-youtubeTrendsTableBody"></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4" data-all-card="qiita">
+                            <div class="card h-100">
+                                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center py-2">
+                                    <h3 class="h6 mb-0"><i class="fab fa-qiita"></i> Qiita</h3>
+                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" aria-label="テック・開発タブへ">もっと見る</a>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>ユーザー</th><th>いいね</th></tr></thead><tbody id="all-qiitaTrendsTableBody"></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4" data-all-card="hatena">
+                            <div class="card h-100">
+                                <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center py-2">
+                                    <h3 class="h6 mb-0"><i class="fas fa-bookmark"></i> はてなブックマーク</h3>
+                                    <a href="#" class="btn btn-sm btn-dark all-more-link" data-target-tab="tab-tech" aria-label="テック・開発タブへ">もっと見る</a>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>BM数</th></tr></thead><tbody id="all-hatenaTrendsTableBody"></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4" data-all-card="zenn">
+                            <div class="card h-100">
+                                <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#3EA8FF;color:#fff;">
+                                    <h3 class="h6 mb-0">Zenn</h3>
+                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" aria-label="テック・開発タブへ">もっと見る</a>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>いいね</th></tr></thead><tbody id="all-zennTrendsTableBody"></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4" data-all-card="note">
+                            <div class="card h-100">
+                                <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#41C9B4;color:#fff;">
+                                    <h3 class="h6 mb-0">Note</h3>
+                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" aria-label="テック・開発タブへ">もっと見る</a>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>いいね</th></tr></thead><tbody id="all-noteTrendsTableBody"></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4" data-all-card="github">
+                            <div class="card h-100">
+                                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-2">
+                                    <h3 class="h6 mb-0"><i class="fab fa-github"></i> GitHub</h3>
+                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" aria-label="テック・開発タブへ">もっと見る</a>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>リポジトリ</th><th>言語</th><th>スター数</th></tr></thead><tbody id="all-githubTrendsTableBody"></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4" data-all-card="stock">
+                            <div class="card h-100">
+                                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center py-2">
+                                    <h3 class="h6 mb-0"><i class="fas fa-chart-line"></i> 株価（日本）</h3>
+                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-market" aria-label="マーケットタブへ">もっと見る</a>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>銘柄</th><th>現在値</th><th>変動率</th></tr></thead><tbody id="all-stockTrendsTableBody"></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4" data-all-card="crypto">
+                            <div class="card h-100">
+                                <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center py-2">
+                                    <h3 class="h6 mb-0"><i class="fab fa-bitcoin"></i> 仮想通貨</h3>
+                                    <a href="#" class="btn btn-sm btn-dark all-more-link" data-target-tab="tab-market" aria-label="マーケットタブへ">もっと見る</a>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>通貨</th><th>価格</th><th>24h</th></tr></thead><tbody id="all-cryptoTrendsTableBody"></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4" data-all-card="appstore">
+                            <div class="card h-100">
+                                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center py-2">
+                                    <h3 class="h6 mb-0"><i class="fab fa-apple"></i> App Store</h3>
+                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" aria-label="テック・開発タブへ">もっと見る</a>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>アプリ名</th><th>開発者</th><th>評価</th></tr></thead><tbody id="all-appstoreTrendsTableBody"></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4" data-all-card="ipa">
+                            <div class="card h-100">
+                                <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center py-2">
+                                    <h3 class="h6 mb-0"><i class="fas fa-shield-alt"></i> IPA注意喚起</h3>
+                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" aria-label="テック・開発タブへ">もっと見る</a>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>公開日</th></tr></thead><tbody id="all-ipaTrendsTableBody"></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4" data-all-card="jpcert">
+                            <div class="card h-100">
+                                <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center py-2">
+                                    <h3 class="h6 mb-0"><i class="fas fa-exclamation-triangle"></i> JPCERT/CC</h3>
+                                    <a href="#" class="btn btn-sm btn-dark all-more-link" data-target-tab="tab-tech" aria-label="テック・開発タブへ">もっと見る</a>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>公開日</th></tr></thead><tbody id="all-jpcertTrendsTableBody"></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4" data-all-card="music">
+                            <div class="card h-100">
+                                <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#1DB954;color:#fff;">
+                                    <h3 class="h6 mb-0"><i class="fab fa-spotify"></i> Spotify</h3>
+                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" aria-label="検索・動画タブへ">もっと見る</a>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>曲名</th><th>アーティスト</th><th>再生回数</th></tr></thead><tbody id="all-musicTrendsTableBody"></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4" data-all-card="podcast">
+                            <div class="card h-100">
+                                <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#E14B32;color:#fff;">
+                                    <h3 class="h6 mb-0"><i class="fas fa-podcast"></i> Podcast</h3>
+                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" aria-label="エンタメタブへ">もっと見る</a>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>配信者</th><th>スコア</th></tr></thead><tbody id="all-podcastTrendsTableBody"></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4" data-all-card="movie">
+                            <div class="card h-100">
+                                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
+                                    <h3 class="h6 mb-0"><i class="fas fa-film"></i> 映画</h3>
+                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" aria-label="エンタメタブへ">もっと見る</a>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>評価</th><th>公開日</th></tr></thead><tbody id="all-movieTrendsTableBody"></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4" data-all-card="book">
+                            <div class="card h-100">
+                                <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#2E7D32;color:#fff;">
+                                    <h3 class="h6 mb-0"><i class="fas fa-book"></i> 本</h3>
+                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" aria-label="エンタメタブへ">もっと見る</a>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>著者</th><th>価格</th><th>売上数</th></tr></thead><tbody id="all-bookTrendsTableBody"></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4" data-all-card="rakuten">
+                            <div class="card h-100">
+                                <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#BF0000;color:#fff;">
+                                    <h3 class="h6 mb-0">楽天トレンド</h3>
+                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" aria-label="エンタメタブへ">もっと見る</a>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>商品名</th><th>価格</th><th>レビュー</th><th>レビュー数</th><th>ショップ</th></tr></thead><tbody id="all-rakutenTrendsTableBody"></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4" data-all-card="twitch">
+                            <div class="card h-100">
+                                <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#9146FF;color:#fff;">
+                                    <h3 class="h6 mb-0"><i class="fab fa-twitch"></i> Twitch</h3>
+                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" aria-label="エンタメタブへ">もっと見る</a>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>ゲーム</th><th>視聴者</th></tr></thead><tbody id="all-twitchTrendsTableBody"></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div><!-- /.tab-pane#pane-all -->
+
+                <div class="tab-pane fade" id="pane-news" role="tabpanel" aria-labelledby="tab-news">
+                    <!-- 1行目: NHK + World News -->
+                    <div class="row g-3 mb-3">
                     <!-- 左側: NHK ニュース -->
                     <article class="col-12 col-md-6">
                         <div class="card h-100">
@@ -240,8 +533,10 @@
                         </div>
                     </article>
                 </div>
+                </div><!-- /.tab-pane#pane-news -->
 
-                <!-- 2行目: Google Trends + YouTube Trends -->
+                <div class="tab-pane fade" id="pane-search" role="tabpanel" aria-labelledby="tab-search">
+                    <!-- 2行目: Google Trends + YouTube Trends -->
                 <div class="row g-3 mb-3">
                     <!-- 左側: Google Trends -->
                     <article class="col-12 col-md-6">
@@ -398,9 +693,11 @@
                             </div>
                         </div>
                     </article>
-                </div>
+                    </div>
+                </div><!-- /.tab-pane#pane-search -->
 
-                <!-- 3行目: はてなブックマーク + Qiita -->
+                <div class="tab-pane fade" id="pane-tech" role="tabpanel" aria-labelledby="tab-tech">
+                    <!-- 3行目: はてなブックマーク + Qiita -->
                 <div class="row g-3 mb-3">
                     <!-- 左側: はてなブックマークトレンド -->
                     <article class="col-12 col-md-6">
@@ -842,7 +1139,7 @@
                     </article>
                 </div>
 
-                <!-- 6行目: GitHub + App Store -->
+                    <!-- 6行目: GitHub + App Store -->
                 <div class="row g-3 mb-3">
                     <!-- 左側: GitHub Trends -->
                     <article class="col-12 col-md-6">
@@ -988,9 +1285,11 @@
                             </div>
                         </div>
                     </article>
-                </div>
+                    </div>
+                </div><!-- /.tab-pane#pane-tech -->
 
-                <!-- 7行目: 株価 + 仮想通貨 -->
+                <div class="tab-pane fade" id="pane-market" role="tabpanel" aria-labelledby="tab-market">
+                    <!-- 7行目: 株価 + 仮想通貨 -->
                 <div class="row g-3 mb-3">
                     <!-- 左側: 株価トレンド（日本） -->
                     <article class="col-12 col-md-6" id="stockTrends">
@@ -1143,8 +1442,10 @@
                         </div>
                     </article>
                 </div>
+                </div><!-- /.tab-pane#pane-market -->
 
-                <!-- 8行目: 映画 + 本 -->
+                <div class="tab-pane fade" id="pane-entertainment" role="tabpanel" aria-labelledby="tab-entertainment">
+                    <!-- 8行目: 映画 + 本 -->
                 <div class="row g-3 mb-3">
                     <!-- 左側: 映画トレンド -->
                     <article class="col-12 col-md-6">
@@ -1603,7 +1904,9 @@
                             </div>
                         </div>
                     </article>
-                </div>
+                    </div>
+                </div><!-- /.tab-pane#pane-entertainment -->
+                </div><!-- /.tab-content -->
             </section>
 
             <!-- SEO: 詳細説明セクション -->

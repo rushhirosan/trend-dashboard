@@ -6,7 +6,9 @@ Flaskアプリケーションの設定を管理
 import os
 from dotenv import load_dotenv
 
-# .envファイルを読み込み
+# .env を読み込み（このパッケージの親ディレクトリ = プロジェクトルート）
+_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(dotenv_path=os.path.join(_root, '.env'))
 load_dotenv()
 
 
@@ -37,6 +39,9 @@ class AppConfig:
     # 今後使う可能性があるため、コードは残すがUIからは非表示
     ENABLE_SUBSCRIPTION_UI = os.getenv('ENABLE_SUBSCRIPTION_UI', 'false').lower() == 'true'
     
+    # ローカル開発用: トレンドAPIをダミーデータで上書き（true のとき全トレンドがダミーを返す）
+    USE_DUMMY_DATA = os.getenv('USE_DUMMY_DATA', 'false').lower() in ('true', '1', 'yes')
+    
     # Buy Me a Coffee設定
     BUY_ME_A_COFFEE_USERNAME = os.getenv('BUY_ME_A_COFFEE_USERNAME', '')
     
@@ -55,6 +60,7 @@ class AppConfig:
             'MAX_RESULTS': cls.MAX_RESULTS,
             'ENABLE_SCHEDULER': cls.ENABLE_SCHEDULER,
             'ENABLE_SUBSCRIPTION_UI': cls.ENABLE_SUBSCRIPTION_UI,
+            'USE_DUMMY_DATA': cls.USE_DUMMY_DATA,
             'BUY_ME_A_COFFEE_USERNAME': cls.BUY_ME_A_COFFEE_USERNAME
         }
 

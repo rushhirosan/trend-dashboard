@@ -58,7 +58,7 @@ class BaseTrendsManager(ABC):
 
         環境変数 USE_DUMMY_DATA が true/1/yes のときに有効。
         """
-        use_dummy = os.getenv("USE_DUMMY_DATA", "").lower()
+        use_dummy = os.getenv("USE_DUMMY_DATA", "").strip().lower()
         return use_dummy in ("true", "1", "yes")
 
     def _generate_dummy_data(self, limit: int = 25, *args, **kwargs) -> List[Dict[str, Any]]:

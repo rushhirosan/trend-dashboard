@@ -55,7 +55,10 @@ class RakutenTrendsManager(BaseTrendsManager):
         try:
             genre_id = kwargs.get('genre_id', None)
             cache_scope = genre_id or 'all'
-            return self.db.get_rakuten_trends_from_cache(cache_scope)
+            data = self.db.get_rakuten_trends_from_cache(cache_scope)
+            if data:
+                self._normalize_sales_count(data)
+            return data
         except Exception as e:
             logger.error(f"❌ Rakuten: キャッシュ取得エラー: {e}", exc_info=True)
             return None
@@ -80,7 +83,7 @@ class RakutenTrendsManager(BaseTrendsManager):
             logger.error(f"❌ Rakuten キャッシュクリアエラー: {e}", exc_info=True)
             return False
 
-    def _update_cache_status(self, cache_key, data_count):
+    def _update_cache_status(self, cache_key, data_count, *args, **kwargs):
         """cache_statusテーブルを更新"""
         try:
             return self.db.update_cache_status(cache_key, data_count)
@@ -106,131 +109,44 @@ class RakutenTrendsManager(BaseTrendsManager):
                 'data': []
             }
 
-    def get_trends(self, genre_id=None, limit=25, force_refresh=False):
-        """楽天トレンドを取得（get_popular_itemsのエイリアス）"""
-        return self.get_popular_items(genre_id, limit, force_refresh)
-    
-    def get_popular_items(self, genre_id=None, limit=25, force_refresh=False):
-        """楽天人気商品を取得（キャッシュデータが存在しない場合のみ外部APIを呼び出し）"""
-        try:
-            # USE_DUMMY_DATA 時はダミーのみ返却（「データなし」解消）
-            if self._is_dummy_mode():
-                cache_scope = genre_id or 'all'
-                logger.info(f"🎭 Rakuten: ダミーモードが有効です。ダミーデータのみ返却します (scope: {cache_scope})")
-                if force_refresh:
-                    try:
-                        self._clear_cache(genre_id=genre_id)
-                    except Exception as e:
-                        logger.warning(f"⚠️ Rakuten: ダミーモード キャッシュクリア中にエラー: {e}")
-                # キャッシュにあればそれを使用（更新しない）
-                cached_data = self.get_from_cache(cache_scope)
-                if cached_data and len(cached_data) > 0:
-                    for item in cached_data:
-                        sc = item.get('sales_count', 'N/A')
-                        if isinstance(sc, str) and sc != 'N/A':
-                            try:
-                                item['sales_count'] = int(sc)
-                            except Exception:
-                                item['sales_count'] = 0
-                        elif sc == 'N/A' or sc is None:
-                            item['sales_count'] = 0
-                    cached_data.sort(key=lambda x: (x.get('sales_count', 0), x.get('review_count', 0)), reverse=True)
-                    for i, item in enumerate(cached_data, 1):
-                        item['rank'] = i
-                    logger.info(f"✅ Rakuten: ダミーキャッシュから {len(cached_data)} 件取得")
-                    return {
-                        'data': cached_data,
-                        'status': 'dummy_cached',
-                        'genre_id': genre_id,
-                        'source': 'dummy_database_cache',
-                    }
-                # キャッシュが空のときだけ生成・保存
-                dummy_data = generate_dummy_rakuten_data(limit=limit, genre_id=cache_scope)
+    def _generate_dummy_data(self, limit=25, *args, **kwargs):
+        """楽天用ダミーデータを生成（USE_DUMMY_DATA 時）"""
+        genre_id = kwargs.get('genre_id')
+        cache_scope = genre_id or 'all'
+        return generate_dummy_rakuten_data(limit=limit, genre_id=cache_scope)
+
+    def _normalize_sales_count(self, data):
+        """sales_countを数値に正規化（ソート・表示用）"""
+        if not data:
+            return
+        for item in data:
+            sc = item.get('sales_count', 'N/A')
+            if isinstance(sc, str) and sc != 'N/A':
                 try:
-                    if self._save_to_cache(dummy_data, genre_id=genre_id):
-                        self._update_cache_status(self._get_cache_key(genre_id=genre_id), len(dummy_data))
-                        logger.info(f"✅ Rakuten: ダミーデータ {len(dummy_data)} 件をキャッシュに保存しました")
-                except Exception as e:
-                    logger.warning(f"⚠️ Rakuten: ダミーデータキャッシュ保存中にエラー: {e}")
-                return {
-                    'data': dummy_data,
-                    'status': 'dummy_generated',
-                    'genre_id': genre_id,
-                    'source': 'dummy_database_cache',
-                }
-            cache_scope = genre_id or 'all'
-            cached_data = None
-            
-            if force_refresh:
-                logger.info(f"🔄 楽天: force_refresh指定のためキャッシュをスキップします (scope: {cache_scope})")
-            else:
-                logger.debug(f"🔍 楽天: キャッシュデータ取得開始 (genre_id: {genre_id})")
-                cached_data = self.get_from_cache(cache_scope)
-                logger.debug(f"🔍 楽天: キャッシュデータ取得結果: {type(cached_data)}, 長さ: {len(cached_data) if cached_data else 0}")
-            
-            if cached_data:
-                # sales_countを数値に変換（'N/A'の場合は0）
-                for item in cached_data:
-                    sales_count = item.get('sales_count', 'N/A')
-                    if isinstance(sales_count, str) and sales_count != 'N/A':
-                        try:
-                            item['sales_count'] = int(sales_count)
-                        except:
-                            item['sales_count'] = 0
-                    elif sales_count == 'N/A' or sales_count is None:
-                        item['sales_count'] = 0
-                
-                # 売上数でソート（降順）、同じ場合はレビュー数でソート
-                cached_data.sort(key=lambda x: (x.get('sales_count', 0), x.get('review_count', 0)), reverse=True)
-                
-                # ランキングを再設定
-                for i, item in enumerate(cached_data, 1):
-                    item['rank'] = i
-                
-                logger.info(f"✅ 楽天: キャッシュデータを使用し、売上数でソートしました ({len(cached_data)}件)")
-                cache_info = self._get_cache_info(cache_scope)
-                return {
-                    'data': cached_data,
-                    'status': 'cached',
-                    'genre_id': genre_id,
-                    'cache_info': cache_info
-                }
-            
-            # force_refresh=Falseの場合は、キャッシュがない場合でも外部APIを呼び出さない
-            if not force_refresh:
-                logger.warning(f"⚠️ 楽天: キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません (genre_id: {genre_id})")
-                return {
-                    'data': [],
-                    'status': 'cache_not_found',
-                    'genre_id': genre_id,
-                    'success': False,
-                    'error': 'キャッシュにデータがありません'
-                }
-            # force_refresh=trueの場合のみ外部APIを呼び出す
-            logger.warning(f"⚠️ 楽天: キャッシュ未使用のため外部APIを呼び出します")
-            api_result = self._get_rakuten_ranking(genre_id, limit)
-            if api_result and api_result.get('data'):
-                trends_data = api_result['data']
-                # キャッシュに保存
-                self.save_to_cache(trends_data, cache_scope)
-                self._update_refresh_time(cache_scope)
-                logger.info(f"✅ 楽天: 外部APIから{len(trends_data)}件のデータを取得し、キャッシュに保存しました")
-                return {
-                    'data': trends_data,
-                    'status': 'api_fetched',
-                    'genre_id': genre_id,
-                    'source': '楽天商品ランキングAPI'
-                }
-            else:
-                logger.error(f"❌ 楽天: 外部APIからデータを取得できませんでした")
-                return {
-                    'data': [],
-                    'status': 'api_error',
-                    'genre_id': genre_id
-                }
-        
-        except Exception as e:
-            return {'error': f'楽天トレンド取得エラー: {str(e)}'}
+                    item['sales_count'] = int(sc)
+                except Exception:
+                    item['sales_count'] = 0
+            elif sc == 'N/A' or sc is None:
+                item['sales_count'] = 0
+
+    def get_trends(self, genre_id=None, limit=25, force_refresh=False):
+        """楽天トレンドを取得（ベースクラスの共通処理を使用）"""
+        cache_scope = genre_id or 'all'
+        result = super().get_trends(
+            limit=limit,
+            force_refresh=force_refresh,
+            auto_fetch_on_cache_miss=False,  # 楽天はキャッシュ未ヒット時はAPI呼び出さない（force_refresh時のみ）
+            sort_key='sales_count',
+            sort_reverse=True,
+            genre_id=cache_scope
+        )
+        if result and isinstance(result, dict):
+            result['genre_id'] = genre_id
+        return result
+
+    def get_popular_items(self, genre_id=None, limit=25, force_refresh=False):
+        """楽天人気商品を取得（get_trendsのエイリアス）"""
+        return self.get_trends(genre_id=genre_id, limit=limit, force_refresh=force_refresh)
     
     def _get_rakuten_ranking(self, genre_id=None, limit=25):
         """楽天商品ランキングAPIを使用"""

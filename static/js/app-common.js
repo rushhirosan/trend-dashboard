@@ -426,6 +426,13 @@ function loadTrendsFromCache(config) {
                 } else {
                     console.error(`display${serviceName.charAt(0).toUpperCase() + serviceName.slice(1)}Results関数が見つかりません`);
                 }
+                // 全部入り（All）タブ用: メイン表の先頭10行をAll用tbodyへ同期
+                const allPaneSync = config.allPaneSync;
+                if (allPaneSync && typeof syncToAllPane === 'function') {
+                    setTimeout(function() {
+                        syncToAllPane(allPaneSync.mainTableBodyId, allPaneSync.allTableBodyId, allPaneSync.limit || 10);
+                    }, 0);
+                }
             } else {
                 console.log(`${serviceName} Trends データなしまたはエラー:`, data);
             }
@@ -462,4 +469,22 @@ function loadTrendsFromCache(config) {
                 }
             }
         });
+}
+
+/**
+ * 全部入り（All）タブ用: メインのテーブル先頭N行をAll用tbodyへコピーする
+ * @param {string} mainTableBodyId - メインペインのtbody要素ID（例: 'googleTrendsTableBody'）
+ * @param {string} allTableBodyId - Allペインのtbody要素ID（例: 'all-googleTrendsTableBody'）
+ * @param {number} limit - コピーする最大行数（デフォルト10）
+ */
+function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 10) {
+    const mainTbody = document.getElementById(mainTableBodyId);
+    const allTbody = document.getElementById(allTableBodyId);
+    if (!mainTbody || !allTbody) return;
+    const dataRows = Array.from(mainTbody.querySelectorAll('tr:not(.skeleton-row)'));
+    const toCopy = dataRows.slice(0, limit);
+    allTbody.innerHTML = '';
+    toCopy.forEach(tr => {
+        allTbody.appendChild(tr.cloneNode(true));
+    });
 }

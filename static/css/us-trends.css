@@ -1,0 +1,29 @@
+/**
+ * USトレンドページ専用スタイル
+ * 日本ページ(index.html)と同じタブ切り替え挙動にする
+ */
+
+/* タブペイン: 日本トレンドと同一の表示制御（非アクティブは完全非表示） */
+#trends #trendCategoryTabContent > .tab-pane {
+    display: none !important;
+}
+#trends #trendCategoryTabContent > .tab-pane.active.show {
+    display: block !important;
+}
+/* 非アクティブなペインとその子孫を強制非表示（日本 main.css と同じルール） */
+#trends #trendCategoryTabContent > .tab-pane:not(.active.show),
+#trends #trendCategoryTabContent > .tab-pane:not(.active.show) * {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+}
+#trends #trendCategoryTabContent > .tab-pane.active.show {
+    display: block !important;
+    visibility: visible !important;
+    height: auto !important;
+    overflow: visible !important;
+}

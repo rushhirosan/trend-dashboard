@@ -105,7 +105,8 @@ function loadGoogleTrendsFromCache() {
                 loading: 'googleTrendsLoading',
                 results: 'googleResults'
             },
-            displayFunction: displayGoogleResults
+            displayFunction: displayGoogleResults,
+            allPaneSync: { mainTableBodyId: 'googleTrendsTableBody', allTableBodyId: 'all-googleTrendsTableBody', targetTabId: 'tab-search' }
         });
     } else {
         // フォールバック（共通関数が利用できない場合）
@@ -160,7 +161,8 @@ function loadYouTubeTrendsFromCache() {
             uiIds: {
                 results: 'youtubeResults'
             },
-            displayFunction: displayYouTubeResults
+            displayFunction: displayYouTubeResults,
+            allPaneSync: { mainTableBodyId: 'youtubeTrendsTableBody', allTableBodyId: 'all-youtubeTrendsTableBody', targetTabId: 'tab-search' }
         });
     } else {
         // フォールバック（共通関数が利用できない場合）
@@ -200,7 +202,8 @@ function loadMusicTrendsFromCache() {
             uiIds: {
                 results: 'musicResults'
             },
-            displayFunction: displayMusicResults
+            displayFunction: displayMusicResults,
+            allPaneSync: { mainTableBodyId: 'musicTrendsTableBody', allTableBodyId: 'all-musicTrendsTableBody', targetTabId: 'tab-search' }
         });
     } else {
         // フォールバック（共通関数が利用できない場合）
@@ -242,7 +245,8 @@ function loadNewsTrendsFromCache() {
             uiIds: {
                 results: 'newsResults'
             },
-            displayFunction: displayWorldNewsResults
+            displayFunction: displayWorldNewsResults,
+            allPaneSync: { mainTableBodyId: 'newsTrendsTableBody', allTableBodyId: 'all-newsTrendsTableBody', targetTabId: 'tab-news' }
         });
     } else {
         // フォールバック（共通関数が利用できない場合）
@@ -281,7 +285,8 @@ function loadPodcastTrendsFromCache() {
             uiIds: {
                 results: 'podcastResults'
             },
-            displayFunction: displayPodcastResults
+            displayFunction: displayPodcastResults,
+            allPaneSync: { mainTableBodyId: 'podcastTrendsTableBody', allTableBodyId: 'all-podcastTrendsTableBody', targetTabId: 'tab-entertainment' }
         });
     } else {
         // フォールバック（共通関数が利用できない場合）
@@ -320,7 +325,8 @@ function loadRakutenTrendsFromCache() {
             uiIds: {
                 results: 'rakutenResults'
             },
-            displayFunction: displayRakutenResults
+            displayFunction: displayRakutenResults,
+            allPaneSync: { mainTableBodyId: 'rakutenTrendsTableBody', allTableBodyId: 'all-rakutenTrendsTableBody', targetTabId: 'tab-entertainment' }
         });
     } else {
         // フォールバック（共通関数が利用できない場合）
@@ -393,6 +399,9 @@ function loadHatenaTrendsFromCache() {
                 } else {
                     console.error('displayHatenaResults関数が見つかりません');
                 }
+                if (typeof syncToAllPane === 'function') {
+                    setTimeout(() => syncToAllPane('hatenaTrendsTableBody', 'all-hatenaTrendsTableBody', 10), 0);
+                }
             } else {
                 console.log('📊 Hatena データが見つかりません:', data);
                 // キャッシュにデータがない場合は、ローディングを非表示にして終了
@@ -453,6 +462,9 @@ function loadTwitchTrendsFromCache() {
                     displayTwitchResults(data);
                 } else {
                     console.error('displayTwitchResults関数が見つかりません');
+                }
+                if (typeof syncToAllPane === 'function') {
+                    setTimeout(() => syncToAllPane('twitchTrendsTableBody', 'all-twitchTrendsTableBody', 10), 0);
                 }
             } else {
                 console.log('📊 Twitch データが見つかりません:', data);
@@ -653,7 +665,8 @@ function loadNHKTrendsFromCache() {
             uiIds: {
                 loading: 'nhkLoading'
             },
-            displayFunction: displayNHKResults
+            displayFunction: displayNHKResults,
+            allPaneSync: { mainTableBodyId: 'nhkTrendsTableBody', allTableBodyId: 'all-nhkTrendsTableBody', targetTabId: 'tab-news' }
         });
     } else {
         // フォールバック（共通関数が利用できない場合）
@@ -692,7 +705,8 @@ function loadQiitaTrendsFromCache() {
             uiIds: {
                 loading: 'qiitaLoading'
             },
-            displayFunction: displayQiitaResults
+            displayFunction: displayQiitaResults,
+            allPaneSync: { mainTableBodyId: 'qiitaTrendsTableBody', allTableBodyId: 'all-qiitaTrendsTableBody', targetTabId: 'tab-tech' }
         });
     } else {
         // フォールバック（共通関数が利用できない場合）
@@ -732,7 +746,8 @@ function loadStockTrendsFromCache() {
                 results: 'stockResults'
             },
             displayFunction: displayStockResults,
-            alwaysCallDisplay: true // データが空でも表示関数を呼び出す（「本日取引はありません」を表示するため）
+            alwaysCallDisplay: true, // データが空でも表示関数を呼び出す（「本日取引はありません」を表示するため）
+            allPaneSync: { mainTableBodyId: 'stockTrendsTableBody', allTableBodyId: 'all-stockTrendsTableBody', targetTabId: 'tab-market' }
         });
     } else {
         // フォールバック（共通関数が利用できない場合）
@@ -771,7 +786,8 @@ function loadCryptoTrendsFromCache() {
             uiIds: {
                 results: 'cryptoResults'
             },
-            displayFunction: displayCryptoResults
+            displayFunction: displayCryptoResults,
+            allPaneSync: { mainTableBodyId: 'cryptoTrendsTableBody', allTableBodyId: 'all-cryptoTrendsTableBody', targetTabId: 'tab-market' }
         });
     } else {
         // フォールバック（共通関数が利用できない場合）
@@ -811,7 +827,8 @@ function loadMovieTrendsFromCache() {
                 loading: 'movieLoading',
                 results: 'movieResults'
             },
-            displayFunction: displayMovieResults
+            displayFunction: displayMovieResults,
+            allPaneSync: { mainTableBodyId: 'movieTrendsTableBody', allTableBodyId: 'all-movieTrendsTableBody', targetTabId: 'tab-entertainment' }
         });
     } else {
         // フォールバック（共通関数が利用できない場合）
@@ -855,7 +872,8 @@ function loadBookTrendsFromCache() {
                 loading: 'bookLoading',
                 results: 'bookResults'
             },
-            displayFunction: displayBookResults
+            displayFunction: displayBookResults,
+            allPaneSync: { mainTableBodyId: 'bookTrendsTableBody', allTableBodyId: 'all-bookTrendsTableBody', targetTabId: 'tab-entertainment' }
         });
     } else {
         // フォールバック（共通関数が利用できない場合）
@@ -898,7 +916,8 @@ function loadGitHubTrendsFromCache() {
             uiIds: {
                 results: 'githubResults'
             },
-            displayFunction: displayGitHubResults
+            displayFunction: displayGitHubResults,
+            allPaneSync: { mainTableBodyId: 'githubTrendsTableBody', allTableBodyId: 'all-githubTrendsTableBody', targetTabId: 'tab-tech' }
         });
     } else {
         // フォールバック（共通関数が利用できない場合）
@@ -937,7 +956,8 @@ function loadAppStoreTrendsFromCache() {
             uiIds: {
                 results: 'appstoreResults'
             },
-            displayFunction: displayAppStoreResults
+            displayFunction: displayAppStoreResults,
+            allPaneSync: { mainTableBodyId: 'appstoreTrendsTableBody', allTableBodyId: 'all-appstoreTrendsTableBody', targetTabId: 'tab-tech' }
         });
     } else {
         // フォールバック（共通関数が利用できない場合）
@@ -977,7 +997,8 @@ function loadIPATrendsFromCache() {
                 loading: 'ipaLoading',
                 results: 'ipaResults'
             },
-            displayFunction: displayIPAResults
+            displayFunction: displayIPAResults,
+            allPaneSync: { mainTableBodyId: 'ipaTrendsTableBody', allTableBodyId: 'all-ipaTrendsTableBody', targetTabId: 'tab-tech' }
         });
     } else {
         // フォールバック（共通関数が利用できない場合）
@@ -1021,7 +1042,8 @@ function loadJPCERTTrendsFromCache() {
                 loading: 'jpcertLoading',
                 results: 'jpcertResults'
             },
-            displayFunction: displayJPCERTResults
+            displayFunction: displayJPCERTResults,
+            allPaneSync: { mainTableBodyId: 'jpcertTrendsTableBody', allTableBodyId: 'all-jpcertTrendsTableBody', targetTabId: 'tab-tech' }
         });
     } else {
         // フォールバック（共通関数が利用できない場合）
@@ -1065,7 +1087,8 @@ function loadZennTrendsFromCache() {
                 loading: 'zennLoading',
                 results: 'zennResults'
             },
-            displayFunction: displayZennResults
+            displayFunction: displayZennResults,
+            allPaneSync: { mainTableBodyId: 'zennTrendsTableBody', allTableBodyId: 'all-zennTrendsTableBody', targetTabId: 'tab-tech' }
         });
     } else {
         // フォールバック（共通関数が利用できない場合）
@@ -1130,6 +1153,9 @@ function loadNoteTrendsFromCache() {
                     displayNoteResults(data);
                 } else {
                     console.error('displayNoteResults関数が見つかりません');
+                }
+                if (typeof syncToAllPane === 'function') {
+                    setTimeout(() => syncToAllPane('noteTrendsTableBody', 'all-noteTrendsTableBody', 10), 0);
                 }
             } else {
                 console.log('Note Trends データなしまたはエラー:', data);

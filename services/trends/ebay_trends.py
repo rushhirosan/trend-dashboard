@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from database_config import TrendsCache
 from utils.logger_config import get_logger
 from services.trends.base_trends_manager import BaseTrendsManager
+from utils.dummy_data_generator import generate_dummy_ebay_data
 
 logger = get_logger(__name__)
 
@@ -116,68 +117,92 @@ class eBayTrendsManager(BaseTrendsManager):
     def get_available_categories(self):
         """利用可能なカテゴリ一覧を取得"""
         return list(self.categories.keys())
+
+    def _get_cache_key(self, *args, **kwargs):
+        """キャッシュキーを返す"""
+        return 'ebay_trends'
+
+    def _get_from_cache(self, *args, **kwargs):
+        """キャッシュからデータを取得"""
+        try:
+            category = kwargs.get('category', 'fashion')
+            if category not in self.categories:
+                category = 'fashion'
+            return self.db.get_ebay_trends_from_cache(category)
+        except Exception as e:
+            logger.error(f"❌ eBay: キャッシュ取得エラー: {e}", exc_info=True)
+            return None
+
+    def _save_to_cache(self, data, *args, **kwargs):
+        """キャッシュにデータを保存"""
+        try:
+            category = kwargs.get('category', 'fashion')
+            if category not in self.categories:
+                category = 'fashion'
+            return self.db.save_ebay_trends_to_cache(data, category)
+        except Exception as e:
+            logger.error(f"❌ eBay: キャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def _clear_cache(self, *args, **kwargs):
+        """キャッシュをクリア"""
+        try:
+            category = kwargs.get('category')
+            return self.db.clear_ebay_trends_cache(category)
+        except Exception as e:
+            logger.error(f"❌ eBay: キャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
+    def _update_cache_status(self, cache_key, data_count, *args, **kwargs):
+        """cache_statusテーブルを更新"""
+        try:
+            return self.db.update_cache_status(cache_key, data_count)
+        except Exception as e:
+            logger.warning(f"⚠️ eBay: cache_status更新エラー: {e}")
+            return False
+
+    def _generate_dummy_data(self, limit=25, *args, **kwargs):
+        """eBay用ダミーデータを生成（USE_DUMMY_DATA 時）"""
+        category = kwargs.get('category', 'fashion')
+        if category not in self.categories:
+            category = 'fashion'
+        return generate_dummy_ebay_data(category=category, limit=limit)
         
     def get_trends(self, category='fashion', limit=25, force_refresh=False):
-        """eBay Popular/Trendingトレンドを取得（キャッシュ優先）
+        """eBay Popular/Trendingトレンドを取得（ベースクラスの共通処理を使用）"""
+        # カテゴリの検証
+        if category not in self.categories:
+            logger.warning(f"⚠️ eBay: 無効なカテゴリ '{category}'、デフォルト 'fashion' を使用します")
+            category = 'fashion'
         
-        Args:
-            category (str): カテゴリ名（デフォルト: 'fashion'）
-            limit (int): 取得件数
-            force_refresh (bool): キャッシュを無視して取得するかどうか
-        """
-        try:
-            if not self.client_id or not self.client_secret:
-                logger.warning("⚠️ eBay: 認証情報が設定されていません")
-                missing = []
-                if not self.client_id:
-                    missing.append('EBAY_CLIENT_ID')
-                if not self.client_secret:
-                    missing.append('EBAY_CLIENT_SECRET')
-                return {
-                    'success': False,
-                    'data': [],
-                    'status': 'api_key_not_configured',
-                    'error': f'eBay認証情報が設定されていません。環境変数{", ".join(missing)}を設定してください。',
-                    'source': 'ebay_api'
-                }
-            
-            # カテゴリの検証
-            if category not in self.categories:
-                logger.warning(f"⚠️ eBay: 無効なカテゴリ '{category}'、デフォルト 'fashion' を使用します")
-                category = 'fashion'
-            
-            if force_refresh:
-                logger.info(f"🔄 eBay force_refresh: カテゴリ '{category}' のキャッシュをクリアします")
-                self.db.clear_ebay_trends_cache(category)
-
-            cached_data = self._get_from_cache(category=category)
-            if cached_data:
-                # ランキングでソート（昇順）
-                cached_data.sort(key=lambda x: x.get('rank', 999), reverse=False)
-                logger.info(f"✅ eBay: カテゴリ '{category}' のキャッシュから{len(cached_data)}件のデータを取得しました")
-                return {
-                    'success': True,
-                    'data': cached_data[:limit],
-                    'status': 'cached',
-                    'category': category,
-                    'source': 'database_cache'
-                }
-            
-            # force_refresh=Falseの場合でも、キャッシュがない場合は外部APIを呼び出す
-            # （ユーザーがカテゴリを選択したときにデータを表示できるようにするため）
-            if not force_refresh:
-                logger.warning(f"⚠️ eBay: カテゴリ '{category}' のキャッシュにデータがありません。外部APIを呼び出してデータを取得します")
-            
-            logger.warning(f"⚠️ eBay: カテゴリ '{category}' のキャッシュデータが見つかりません。外部APIを呼び出します")
-            result = self._fetch_trends(category, limit)
-            # categoryパラメータを結果に追加
-            if result and isinstance(result, dict):
-                result['category'] = category
-            return result
-
-        except Exception as e:
-            logger.error(f"❌ eBay トレンド取得エラー: {e}", exc_info=True)
-            return {'error': f'eBayトレンドの取得に失敗しました: {str(e)}', 'success': False}
+        # 認証未設定時はダミーモード以外で早期リターン（ベースの_fetch_trends前にエラー返却）
+        if not self._is_dummy_mode() and (not self.client_id or not self.client_secret):
+            logger.warning("⚠️ eBay: 認証情報が設定されていません")
+            missing = []
+            if not self.client_id:
+                missing.append('EBAY_CLIENT_ID')
+            if not self.client_secret:
+                missing.append('EBAY_CLIENT_SECRET')
+            return {
+                'success': False,
+                'data': [],
+                'status': 'api_key_not_configured',
+                'error': f'eBay認証情報が設定されていません。環境変数{", ".join(missing)}を設定してください。',
+                'source': 'ebay_api',
+                'category': category
+            }
+        
+        result = super().get_trends(
+            limit=limit,
+            force_refresh=force_refresh,
+            auto_fetch_on_cache_miss=True,
+            sort_key='rank',
+            sort_reverse=False,
+            category=category
+        )
+        if result and isinstance(result, dict):
+            result['category'] = category
+        return result
     
     def _add_affiliate_params(self, url):
         """eBay URLにアフィリエイトパラメータを追加
@@ -313,10 +338,7 @@ class eBayTrendsManager(BaseTrendsManager):
                     continue
             
             final_data = formatted_data[:limit]
-
-            if final_data:
-                self.db.save_ebay_trends_to_cache(final_data, category)
-                self.db.update_cache_status('ebay_trends', len(final_data))
+            # キャッシュ保存はベースクラスのget_trendsが_save_to_cacheを呼ぶ
 
             logger.info(f"✅ eBay: カテゴリ '{category}' から{len(final_data)}件の人気商品を取得しました")
             return {

@@ -219,7 +219,8 @@ var TREND_PREF_PREFIX = 'trend_pref_';
 
 /**
  * 指定ソースの前回選択値を取得する
- * @param {string} serviceName - サービス名（例: 'hatena', 'rakuten'）
+ * @param {string} serviceName - サービス名（例: 'hatena', 'rakuten', 'page'）
+ *   - 'page': 最後に開いたページ（'jp' | 'us'）。ルート(/)訪問時のリダイレクトに使用。
  * @returns {string|object|null} 保存値（文字列またはJSONオブジェクト）。無い場合は null
  */
 function getTrendPreference(serviceName) {

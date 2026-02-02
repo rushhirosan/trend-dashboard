@@ -2880,7 +2880,12 @@ function showEbayError(message, status = null) {
 // Page initialization
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🇺🇸 US Trends page initialization');
-    
+
+    // USページを開いたことを記憶（次回のルート訪問時のリダイレクト用）
+    if (typeof setTrendPreference === 'function') {
+        setTrendPreference('page', 'us');
+    }
+
     // All tab "More" link: switch to category tab on click
     document.querySelectorAll('.all-more-link').forEach(link => {
         link.addEventListener('click', function(e) {

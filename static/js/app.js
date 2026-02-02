@@ -860,6 +860,11 @@ var TREND_TAB_IDS = ['tab-all', 'tab-news', 'tab-search', 'tab-tech', 'tab-marke
 document.addEventListener('DOMContentLoaded', function() {
     console.log('=== DOMContentLoaded: 初期化開始 ===');
 
+    // 日本ページを開いたことを記憶（次回のルート訪問時のリダイレクト用）
+    if (typeof setTrendPreference === 'function') {
+        setTrendPreference('page', 'jp');
+    }
+
     // 前回開いていたタブを復元（loadCachedDataExternal の前に実行）
     var trendTabsEl = document.getElementById('trendCategoryTabs');
     if (trendTabsEl && typeof getTrendPreference === 'function' && typeof bootstrap !== 'undefined') {

@@ -92,6 +92,17 @@
     <script src="{{ url_for('static', filename='js/display-functions.js') }}"></script>
 </head>
 <body class="bg-light">
+    <!-- 前回USページを開いていた場合、外部からのルート(/)訪問時のみ /us へリダイレクト（サイト内の「日本トレンド」クリックではリダイレクトしない） -->
+    <script>
+    (function(){
+      try {
+        var ref = document.referrer;
+        var sameOrigin = !ref || (new URL(ref).origin === location.origin);
+        if (sameOrigin) return;
+        if (localStorage.getItem('trend_pref_page') === 'us') location.replace('/us');
+      } catch (e) {}
+    })();
+    </script>
     <!-- ヘッダー -->
     {% set page_title = 'トレンド一覧' %}
     {% set page_icon = 'fas fa-chart-line' %}

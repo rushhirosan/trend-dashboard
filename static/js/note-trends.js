@@ -16,7 +16,8 @@ if (typeof createDropdownTrendsManager === 'function') {
             statusMessage: 'noteStatusMessage',
             errorMessage: 'noteErrorMessage'
         },
-        displayFunction: displayNoteResults
+        displayFunction: displayNoteResults,
+        allPaneSync: { mainTableBodyId: 'noteTrendsTableBody', allTableBodyId: 'all-noteTrendsTableBody', limit: 5 }
     });
 }
 

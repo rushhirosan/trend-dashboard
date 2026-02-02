@@ -2933,7 +2933,36 @@ document.addEventListener('DOMContentLoaded', function() {
             loadEbayFromCacheUS(selectedCategory);
         });
     }
-    
+
+    // All tab category dropdown change handlers
+    document.querySelectorAll('.all-category-select').forEach(select => {
+        select.addEventListener('change', function() {
+            const mainSelectId = this.dataset.mainSelect;
+            const service = this.dataset.service;
+            const mainSelect = document.getElementById(mainSelectId);
+            if (mainSelect) {
+                mainSelect.value = this.value;
+                if (service === 'ebay') {
+                    loadEbayFromCacheUS(this.value);
+                } else if (service === 'twitch') {
+                    loadTwitchFromCacheUS(this.value);
+                }
+            }
+        });
+    });
+    // Sync main select -> All dropdown (bidirectional)
+    const usSyncPairs = [
+        { main: 'ebayCategorySelectUS', all: 'all-ebayCategorySelectUS' },
+        { main: 'twitchTypeSelectUS', all: 'all-twitchTypeSelectUS' }
+    ];
+    usSyncPairs.forEach(({ main, all }) => {
+        const mainEl = document.getElementById(main);
+        const allEl = document.getElementById(all);
+        if (mainEl && allEl) {
+            allEl.value = mainEl.value;
+            mainEl.addEventListener('change', () => { allEl.value = mainEl.value; });
+        }
+    });
     
     console.log('=== US Trends initialization completed ===');
 });

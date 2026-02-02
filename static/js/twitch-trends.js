@@ -16,7 +16,8 @@ if (typeof createDropdownTrendsManager === 'function') {
             statusMessage: 'twitchStatusMessage',
             errorMessage: 'twitchErrorMessage'
         },
-        displayFunction: displayTwitchResults
+        displayFunction: displayTwitchResults,
+        allPaneSync: { mainTableBodyId: 'twitchTrendsTableBody', allTableBodyId: 'all-twitchTrendsTableBody', limit: 5 }
     });
 }
 

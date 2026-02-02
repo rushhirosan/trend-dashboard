@@ -130,13 +130,20 @@ def main():
                             fail_count += 1
                         continue
                     
+                    # movie, book は country=JP を明示（日本版で表示するため）
+                    if key in ("movie", "book"):
+                        extra_kwargs = {"country": "JP"}
+                    else:
+                        extra_kwargs = {}
+                    
                     logger.info(f"📝 [{key}] ダミーデータ生成中...")
                     
-                    # デフォルトの引数を準備
+                    # デフォルトの引数を準備（movie/bookはcountry=JPを追加）
                     default_kwargs = {
                         "limit": 25,
                         "force_refresh": True,
                         "auto_fetch_on_cache_miss": True,
+                        **extra_kwargs,
                     }
                     
                     # マネージャーのシグネチャに合わせて有効な引数だけを取得

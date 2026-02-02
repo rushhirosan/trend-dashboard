@@ -839,7 +839,17 @@ function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 5) {
     const toCopy = dataRows.slice(0, limit);
     allTbody.innerHTML = '';
     toCopy.forEach(tr => {
-        allTbody.appendChild(tr.cloneNode(true));
+        const cloned = tr.cloneNode(true);
+        // Safari対応: td内にラッパーを入れ、overflowをdivに適用（td直接ではSafariで効かないため）
+        cloned.querySelectorAll('td').forEach(td => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'all-td-inner';
+            while (td.firstChild) {
+                wrapper.appendChild(td.firstChild);
+            }
+            td.appendChild(wrapper);
+        });
+        allTbody.appendChild(cloned);
     });
 }
 
@@ -860,6 +870,39 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.querySelector('#trends')?.scrollIntoView({ behavior: 'smooth' });
             }
         });
+    });
+
+    // 全部入りタブ: カテゴリ選択ドロップダウン変更時
+    document.querySelectorAll('.all-category-select').forEach(select => {
+        select.addEventListener('change', function() {
+            const mainSelectId = this.dataset.mainSelect;
+            const service = this.dataset.service;
+            const mainSelect = document.getElementById(mainSelectId);
+            if (mainSelect) {
+                mainSelect.value = this.value;
+                if (service === 'hatena' && typeof hatenaManager !== 'undefined' && hatenaManager) {
+                    hatenaManager.fetchTrends();
+                } else if (service === 'note' && typeof noteManager !== 'undefined' && noteManager) {
+                    noteManager.fetchTrends();
+                } else if (service === 'twitch' && typeof twitchManager !== 'undefined' && twitchManager) {
+                    twitchManager.fetchTrends();
+                }
+            }
+        });
+    });
+    // メインのカテゴリ選択変更時 → Allタブのドロップダウンを同期（双方向）
+    const syncPairs = [
+        { main: 'hatenaCategorySelect', all: 'all-hatenaCategorySelect' },
+        { main: 'noteCategorySelect', all: 'all-noteCategorySelect' },
+        { main: 'twitchTypeSelect', all: 'all-twitchTypeSelect' }
+    ];
+    syncPairs.forEach(({ main, all }) => {
+        const mainEl = document.getElementById(main);
+        const allEl = document.getElementById(all);
+        if (mainEl && allEl) {
+            allEl.value = mainEl.value; // 初期値同期
+            mainEl.addEventListener('change', () => { allEl.value = mainEl.value; });
+        }
     });
 
     // 要素の存在確認

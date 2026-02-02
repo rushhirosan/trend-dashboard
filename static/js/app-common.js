@@ -241,7 +241,8 @@ function createDropdownTrendsManager(config) {
         paramName = 'category',
         uiIds,
         displayFunction,
-        getParams = () => ({})
+        getParams = () => ({}),
+        allPaneSync
     } = config;
 
     // ヘルパー関数
@@ -306,6 +307,10 @@ function createDropdownTrendsManager(config) {
                 if (data.success) {
                     if (typeof displayFunction === 'function') {
                         displayFunction(data);
+                        // 全部入りタブへ同期
+                        if (allPaneSync && typeof syncToAllPane === 'function') {
+                            setTimeout(() => syncToAllPane(allPaneSync.mainTableBodyId, allPaneSync.allTableBodyId, allPaneSync.limit || 5), 0);
+                        }
                         // displayFunction内でshowResults/showErrorが呼ばれるので、ここでは呼ばない
                     } else {
                         console.error(`display${serviceName.charAt(0).toUpperCase() + serviceName.slice(1)}Results関数が見つかりません`);
@@ -485,6 +490,16 @@ function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 5) {
     const toCopy = dataRows.slice(0, limit);
     allTbody.innerHTML = '';
     toCopy.forEach(tr => {
-        allTbody.appendChild(tr.cloneNode(true));
+        const cloned = tr.cloneNode(true);
+        // Safari対応: td内にラッパーを入れ、overflowをdivに適用（td直接ではSafariで効かないため）
+        cloned.querySelectorAll('td').forEach(td => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'all-td-inner';
+            while (td.firstChild) {
+                wrapper.appendChild(td.firstChild);
+            }
+            td.appendChild(wrapper);
+        });
+        allTbody.appendChild(cloned);
     });
 }

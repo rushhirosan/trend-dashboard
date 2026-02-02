@@ -17,7 +17,8 @@ if (typeof createDropdownTrendsManager === 'function') {
             errorMessage: 'hatenaErrorMessage'
         },
         displayFunction: displayHatenaResults,
-        getParams: (category) => ({ type: 'hot' })
+        getParams: (category) => ({ type: 'hot' }),
+        allPaneSync: { mainTableBodyId: 'hatenaTrendsTableBody', allTableBodyId: 'all-hatenaTrendsTableBody', limit: 5 }
     });
 }
 

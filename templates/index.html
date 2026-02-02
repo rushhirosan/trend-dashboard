@@ -201,9 +201,19 @@
                         </div>
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="hatena">
                             <div class="card h-100">
-                                <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center py-2">
-                                    <h3 class="h6 mb-0"><i class="fas fa-bookmark"></i> はてなブックマーク</h3>
-                                    <a href="#" class="btn btn-sm btn-dark all-more-link" data-target-tab="tab-tech" aria-label="テック・開発タブへ">もっと見る</a>
+                                <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center py-2 flex-wrap gap-1">
+                                    <div class="d-flex align-items-center gap-2 flex-grow-1 min-width-0">
+                                        <h3 class="h6 mb-0"><i class="fas fa-bookmark"></i> はてな</h3>
+                                        <select class="form-select form-select-sm all-category-select" id="all-hatenaCategorySelect" data-main-select="hatenaCategorySelect" data-service="hatena" style="max-width: 8rem;">
+                                            <option value="all">総合</option>
+                                            <option value="it">テクノロジー</option>
+                                            <option value="social">ニュース・社会</option>
+                                            <option value="entertainment">エンタメ</option>
+                                            <option value="life">暮らし</option>
+                                            <option value="knowledge">学び</option>
+                                        </select>
+                                    </div>
+                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" aria-label="テック・開発タブへ">もっと見る</a>
                                 </div>
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
@@ -227,8 +237,17 @@
                         </div>
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="note">
                             <div class="card h-100">
-                                <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#41C9B4;color:#fff;">
-                                    <h3 class="h6 mb-0">Note</h3>
+                                <div class="card-header d-flex justify-content-between align-items-center py-2 flex-wrap gap-1" style="background:#41C9B4;color:#fff;">
+                                    <div class="d-flex align-items-center gap-2 flex-grow-1 min-width-0">
+                                        <h3 class="h6 mb-0">Note</h3>
+                                        <select class="form-select form-select-sm all-category-select" id="all-noteCategorySelect" data-main-select="noteCategorySelect" data-service="note" style="max-width: 8rem;">
+                                            <option value="all">総合</option>
+                                            <option value="tech">テクノロジー</option>
+                                            <option value="business">ビジネス</option>
+                                            <option value="lifestyle">ライフスタイル</option>
+                                            <option value="entertainment">エンタメ</option>
+                                        </select>
+                                    </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" aria-label="テック・開発タブへ">もっと見る</a>
                                 </div>
                                 <div class="card-body p-2">
@@ -268,7 +287,7 @@
                             <div class="card h-100">
                                 <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center py-2">
                                     <h3 class="h6 mb-0"><i class="fab fa-bitcoin"></i> 仮想通貨</h3>
-                                    <a href="#" class="btn btn-sm btn-dark all-more-link" data-target-tab="tab-market" aria-label="マーケットタブへ">もっと見る</a>
+                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-market" aria-label="マーケットタブへ">もっと見る</a>
                                 </div>
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
@@ -307,7 +326,7 @@
                             <div class="card h-100">
                                 <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center py-2">
                                     <h3 class="h6 mb-0"><i class="fas fa-exclamation-triangle"></i> JPCERT/CC</h3>
-                                    <a href="#" class="btn btn-sm btn-dark all-more-link" data-target-tab="tab-tech" aria-label="テック・開発タブへ">もっと見る</a>
+                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" aria-label="テック・開発タブへ">もっと見る</a>
                                 </div>
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
@@ -383,8 +402,15 @@
                         </div>
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="twitch">
                             <div class="card h-100">
-                                <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#9146FF;color:#fff;">
-                                    <h3 class="h6 mb-0"><i class="fab fa-twitch"></i> Twitch</h3>
+                                <div class="card-header d-flex justify-content-between align-items-center py-2 flex-wrap gap-1" style="background:#9146FF;color:#fff;">
+                                    <div class="d-flex align-items-center gap-2 flex-grow-1 min-width-0">
+                                        <h3 class="h6 mb-0"><i class="fab fa-twitch"></i> Twitch</h3>
+                                        <select class="form-select form-select-sm all-category-select" id="all-twitchTypeSelect" data-main-select="twitchTypeSelect" data-service="twitch" style="max-width: 8rem;">
+                                            <option value="games">ゲーム</option>
+                                            <option value="streams">ストリーム</option>
+                                            <option value="clips">クリップ</option>
+                                        </select>
+                                    </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" aria-label="エンタメタブへ">もっと見る</a>
                                 </div>
                                 <div class="card-body p-2">

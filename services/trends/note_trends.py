@@ -82,6 +82,17 @@ class NoteTrendsManager(BaseTrendsManager):
 
     def get_trends(self, category='all', limit=25, force_refresh=False, fetch_all_categories=False):
         """Noteトレンドを取得（キャッシュ優先）"""
+        # ダミーモード時は fetch_all_categories でもベースクラスのダミー処理を使用（実API呼び出しを回避）
+        if fetch_all_categories and self._is_dummy_mode():
+            return super().get_trends(
+                limit=limit,
+                force_refresh=force_refresh,
+                auto_fetch_on_cache_miss=True,
+                sort_key='published_date',
+                sort_reverse=True,
+                category=category
+            )
+        
         # 全カテゴリを取得する場合
         if fetch_all_categories:
             logger.info("🔄 Note: 全カテゴリのデータを取得します")

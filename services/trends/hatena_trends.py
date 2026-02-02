@@ -103,6 +103,17 @@ class HatenaTrendsManager(BaseTrendsManager):
         """はてなブックマークトレンドを取得（BaseTrendsManagerの共通処理を使用）"""
         logger.debug(f"🔍 はてなブックマーク: get_trends呼び出し (category: {category}, fetch_all_categories: {fetch_all_categories})")
         
+        # ダミーモード時は fetch_all_categories でもベースクラスのダミー処理を使用（実API呼び出しを回避）
+        if fetch_all_categories and self._is_dummy_mode():
+            return super().get_trends(
+                limit=limit,
+                force_refresh=force_refresh,
+                auto_fetch_on_cache_miss=True,
+                sort_key='bookmark_count',
+                sort_reverse=True,
+                category=category
+            )
+        
         # 全カテゴリを取得する場合（スケジューラー用の特殊ケース）
         if fetch_all_categories:
             logger.info("🔄 はてなブックマーク: 全カテゴリのデータを取得します")

@@ -283,6 +283,13 @@ body {
     flex-wrap: nowrap;
     white-space: nowrap;
 }
+/* カテゴリ選択ありのヘッダーは折り返し許可（ドロップダウン収納） */
+#pane-all .card-header:has(.all-category-select) {
+    flex-wrap: wrap;
+}
+#pane-all .all-category-select {
+    flex-shrink: 0;
+}
 #pane-all .card-header h3,
 #pane-all .card-header .h6 {
     overflow: hidden;
@@ -299,14 +306,24 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+/* 全部入り: Safari対応 - td直接のoverflowが効かないため、ラッパーdivで適用 */
+#pane-all .card-body .table-responsive td .all-td-inner {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
 /* 全部入り: タイトル下のサブテキストを非表示（1行表示にするため） */
 #pane-all .card-body .table-responsive td br,
 #pane-all .card-body .table-responsive td small.text-muted,
-#pane-all .card-body .table-responsive td div.text-muted {
+#pane-all .card-body .table-responsive td div.text-muted,
+#pane-all .card-body .table-responsive td span.text-muted {
     display: none !important;
 }
-/* 全部入り: 行全体がリンクなので「記事を読む」ボタンは不要 */
-#pane-all .card-body .table-responsive td .btn-outline-warning {
+/* 全部入り: 行全体がリンクなので「記事を読む」ボタンは不要（Note: btn-outline-secondary, ニュース: btn-outline-info 含む） */
+#pane-all .card-body .table-responsive td .btn-outline-warning,
+#pane-all .card-body .table-responsive td .btn-outline-secondary,
+#pane-all .card-body .table-responsive td .btn-outline-info {
     display: none !important;
 }
 /* 全部入り: 映画ポスター・本の表紙・アプリアイコンは不要（1行表示のため） */
@@ -319,6 +336,12 @@ body {
     align-items: center;
     gap: 0.25rem;
     white-space: nowrap;
+}
+#pane-all [data-all-card="movie"] .table-responsive td:nth-child(2) .all-td-inner {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    overflow: hidden;
 }
 #pane-all [data-all-card="movie"] .table-responsive td:nth-child(2) strong {
     flex: 1;

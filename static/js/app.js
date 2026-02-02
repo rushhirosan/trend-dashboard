@@ -853,9 +853,25 @@ function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 5) {
     });
 }
 
+// 前回開いていたタブを復元するための有効なタブID一覧
+var TREND_TAB_IDS = ['tab-all', 'tab-news', 'tab-search', 'tab-tech', 'tab-market', 'tab-entertainment'];
+
 // ページ読み込み時の初期化
 document.addEventListener('DOMContentLoaded', function() {
     console.log('=== DOMContentLoaded: 初期化開始 ===');
+
+    // 前回開いていたタブを復元（loadCachedDataExternal の前に実行）
+    var trendTabsEl = document.getElementById('trendCategoryTabs');
+    if (trendTabsEl && typeof getTrendPreference === 'function' && typeof bootstrap !== 'undefined') {
+        var savedTabId = getTrendPreference('active_tab');
+        if (savedTabId && TREND_TAB_IDS.indexOf(savedTabId) !== -1) {
+            var tabBtn = document.getElementById(savedTabId);
+            if (tabBtn) {
+                var tab = new bootstrap.Tab(tabBtn);
+                tab.show();
+            }
+        }
+    }
 
     // 全部入り「もっと見る」: クリックで該当ジャンルタブへ切り替え
     document.querySelectorAll('.all-more-link').forEach(link => {
@@ -934,18 +950,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // YouTube地域選択は削除済み（日本固定）
 
-    // トレンドカテゴリタブ切り替え時: グラフリサイズ
-    const trendTabsEl = document.getElementById('trendCategoryTabs');
+    // トレンドカテゴリタブ切り替え時: 前回タブを保存 ＋ グラフリサイズ
     if (trendTabsEl) {
-        trendTabsEl.addEventListener('shown.bs.tab', function() {
+        trendTabsEl.addEventListener('shown.bs.tab', function(e) {
+            var tabId = e.target && e.target.id;
+            if (tabId && typeof setTrendPreference === 'function') {
+                setTrendPreference('active_tab', tabId);
+            }
             if (typeof currentGoogleChart !== 'undefined' && currentGoogleChart) {
-                try { currentGoogleChart.resize(); } catch (e) { /* ignore */ }
+                try { currentGoogleChart.resize(); } catch (err) { /* ignore */ }
             }
             if (typeof currentYouTubeChart !== 'undefined' && currentYouTubeChart) {
-                try { currentYouTubeChart.resize(); } catch (e) { /* ignore */ }
+                try { currentYouTubeChart.resize(); } catch (err) { /* ignore */ }
             }
             if (typeof currentMusicChart !== 'undefined' && currentMusicChart) {
-                try { currentMusicChart.resize(); } catch (e) { /* ignore */ }
+                try { currentMusicChart.resize(); } catch (err) { /* ignore */ }
             }
         });
     }

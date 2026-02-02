@@ -1,6 +1,9 @@
 // 楽天トレンドデータを取得
 async function fetchRakutenTrends() {
     console.log('fetchRakutenTrends: 開始');
+
+    // 前回選択ジャンルを復元（無ければデフォルト 101070）
+    var genreId = (typeof getTrendPreference === 'function' ? (getTrendPreference('rakuten') || '101070') : '101070');
     
     // ローディング表示
     showRakutenLoading();
@@ -8,9 +11,10 @@ async function fetchRakutenTrends() {
     hideError();
 
     try {
-        console.log('Rakuten API呼び出し: /api/rakuten-trends');
+        var url = '/api/rakuten-trends?genre_id=' + encodeURIComponent(genreId);
+        console.log('Rakuten API呼び出し:', url);
         
-        const response = await fetch('/api/rakuten-trends');
+        const response = await fetch(url);
         console.log('Rakuten API レスポンス受信:', response.status, response.ok);
         
         if (!response.ok) {
@@ -33,6 +37,11 @@ async function fetchRakutenTrends() {
             showRakutenError('データの形式が正しくありません');
             hideRakutenLoading();
             return;
+        }
+
+        // 取得成功時は今回の genre_id を保存（次回復元用）
+        if (typeof setTrendPreference === 'function') {
+            setTrendPreference('rakuten', genreId);
         }
         
         console.log('fetchRakutenTrends: データ表示開始');

@@ -96,11 +96,12 @@ function loadCachedDataExternal() {
 
 // Google Trendsキャッシュデータの読み込み（共通化）
 function loadGoogleTrendsFromCache() {
+    var country = (typeof getTrendPreference === 'function' ? (getTrendPreference('google') || 'JP') : 'JP');
     if (typeof loadTrendsFromCache === 'function') {
         loadTrendsFromCache({
             serviceName: 'Google',
             apiEndpoint: '/api/google-trends',
-            params: { country: 'JP' },
+            params: { country: country },
             uiIds: {
                 loading: 'googleTrendsLoading',
                 results: 'googleResults'
@@ -117,7 +118,7 @@ function loadGoogleTrendsFromCache() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
         
-        fetchWithRetry('/api/google-trends?country=JP&force_refresh=false', { signal: controller.signal })
+        fetchWithRetry('/api/google-trends?country=' + encodeURIComponent(country) + '&force_refresh=false', { signal: controller.signal })
             .then(response => {
                 clearTimeout(timeoutId);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -151,13 +152,14 @@ function showGoogleResults() {
 
 // YouTube Trendsキャッシュデータの読み込み（共通化）
 function loadYouTubeTrendsFromCache() {
+    var region = (typeof getTrendPreference === 'function' ? (getTrendPreference('youtube') || 'JP') : 'JP');
     if (typeof loadTrendsFromCache === 'function') {
         // Rising機能は削除されたため、常にtrendingを使用
         const endpoint = '/api/youtube-trends';
         loadTrendsFromCache({
             serviceName: 'YouTube',
             apiEndpoint: endpoint,
-            params: { region: 'JP' },
+            params: { region: region },
             uiIds: {
                 results: 'youtubeResults'
             },
@@ -169,7 +171,7 @@ function loadYouTubeTrendsFromCache() {
         console.log('📊 YouTube Trends キャッシュデータ読み込み');
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
-        fetchWithRetry('/api/youtube-trends?region=JP&force_refresh=false', { signal: controller.signal })
+        fetchWithRetry('/api/youtube-trends?region=' + encodeURIComponent(region) + '&force_refresh=false', { signal: controller.signal })
             .then(response => {
                 clearTimeout(timeoutId);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -194,11 +196,14 @@ function loadYouTubeTrendsFromCache() {
 // 音楽トレンドキャッシュデータの読み込み（共通化）
 // Spotify音楽トレンドキャッシュデータの読み込み
 function loadMusicTrendsFromCache() {
+    var musicPref = (typeof getTrendPreference === 'function' ? getTrendPreference('music') : null);
+    var service = (musicPref && typeof musicPref === 'object' ? musicPref.service : null) || (typeof musicPref === 'string' ? musicPref : null) || 'spotify';
+    var region = (musicPref && typeof musicPref === 'object' && musicPref.region) ? musicPref.region : 'JP';
     if (typeof loadTrendsFromCache === 'function') {
         loadTrendsFromCache({
             serviceName: 'Music',
             apiEndpoint: '/api/music-trends',
-            params: { service: 'spotify' },
+            params: { service: service, region: region },
             uiIds: {
                 results: 'musicResults'
             },
@@ -211,7 +216,7 @@ function loadMusicTrendsFromCache() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
         
-        fetchWithRetry('/api/music-trends?service=spotify&force_refresh=false', { signal: controller.signal })
+        fetchWithRetry('/api/music-trends?service=' + encodeURIComponent(service) + '&region=' + encodeURIComponent(region) + '&force_refresh=false', { signal: controller.signal })
             .then(response => {
                 clearTimeout(timeoutId);
                 if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -277,11 +282,16 @@ function loadNewsTrendsFromCache() {
 
 // Podcastトレンドキャッシュデータの読み込み（共通化）
 function loadPodcastTrendsFromCache() {
+    var podcastPref = (typeof getTrendPreference === 'function' ? getTrendPreference('podcast') : null) || {};
+    var podcastParams = Object.assign(
+        { trend_type: 'best_podcasts', region: 'jp' },
+        typeof podcastPref === 'object' && podcastPref !== null ? podcastPref : {}
+    );
     if (typeof loadTrendsFromCache === 'function') {
         loadTrendsFromCache({
             serviceName: 'Podcast',
             apiEndpoint: '/api/podcast-trends',
-            params: { trend_type: 'best_podcasts' },
+            params: podcastParams,
             uiIds: {
                 results: 'podcastResults'
             },
@@ -293,7 +303,9 @@ function loadPodcastTrendsFromCache() {
         console.log('📊 Podcast Trends キャッシュデータ読み込み');
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
-        fetchWithRetry('/api/podcast-trends?trend_type=best_podcasts&force_refresh=false', { signal: controller.signal })
+        var podcastQs = new URLSearchParams(podcastParams);
+        podcastQs.set('force_refresh', 'false');
+        fetchWithRetry('/api/podcast-trends?' + podcastQs.toString(), { signal: controller.signal })
             .then(response => {
                 clearTimeout(timeoutId);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -317,11 +329,12 @@ function loadPodcastTrendsFromCache() {
 
 // 楽天トレンドキャッシュデータの読み込み（共通化）
 function loadRakutenTrendsFromCache() {
+    var genreId = (typeof getTrendPreference === 'function' ? (getTrendPreference('rakuten') || '101070') : '101070');
     if (typeof loadTrendsFromCache === 'function') {
         loadTrendsFromCache({
             serviceName: 'Rakuten',
             apiEndpoint: '/api/rakuten-trends',
-            params: {},
+            params: { genre_id: genreId },
             uiIds: {
                 results: 'rakutenResults'
             },
@@ -333,7 +346,7 @@ function loadRakutenTrendsFromCache() {
         console.log('📊 Rakuten Trends キャッシュデータ読み込み');
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
-        fetchWithRetry('/api/rakuten-trends?force_refresh=false', { signal: controller.signal })
+        fetchWithRetry('/api/rakuten-trends?genre_id=' + encodeURIComponent(genreId) + '&force_refresh=false', { signal: controller.signal })
             .then(response => {
                 clearTimeout(timeoutId);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -359,10 +372,11 @@ function loadRakutenTrendsFromCache() {
 function loadHatenaTrendsFromCache() {
     console.log('📊 Hatena Trends キャッシュデータ読み込み');
     
-    // 初期読み込み時は常に'all'カテゴリを使用
-    const selectedCategory = 'all';
+    // 前回選択を復元済みのselectから取得（無ければ'all'）
+    const categorySelect = document.getElementById('hatenaCategorySelect');
+    const selectedCategory = categorySelect ? categorySelect.value : (typeof getTrendPreference === 'function' ? (getTrendPreference('hatena') || 'all') : 'all');
     
-    console.log(`🔍 はてなブックマーク: 初期読み込み時のカテゴリ '${selectedCategory}' のデータを取得中...`);
+    console.log(`🔍 はてなブックマーク: カテゴリ '${selectedCategory}' のデータを取得中...`);
     
     // ローディング表示
     const loadingElement = document.getElementById('hatenaTrendsLoading');
@@ -426,10 +440,11 @@ function loadHatenaTrendsFromCache() {
 function loadTwitchTrendsFromCache() {
     console.log('📊 Twitch Trends キャッシュデータ読み込み');
     
-    // 初期読み込み時は常に'games'カテゴリを使用
-    const selectedType = 'games';
+    // 前回選択を復元済みのselectから取得（無ければ'games'）
+    const typeSelect = document.getElementById('twitchTypeSelect');
+    const selectedType = typeSelect ? typeSelect.value : (typeof getTrendPreference === 'function' ? (getTrendPreference('twitch') || 'games') : 'games');
     
-    console.log(`🔍 Twitch: 初期読み込み時のカテゴリ '${selectedType}' のデータを取得中...`);
+    console.log(`🔍 Twitch: タイプ '${selectedType}' のデータを取得中...`);
     
     // ローディング表示
     const loadingElement = document.getElementById('twitchTrendsLoading');

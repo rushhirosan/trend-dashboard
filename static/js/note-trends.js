@@ -9,6 +9,7 @@ if (typeof createDropdownTrendsManager === 'function') {
         apiEndpoint: '/api/note-trends',
         defaultValue: 'all',
         paramName: 'category',
+        storageKey: 'note',
         uiIds: {
             loading: 'noteLoading',
             results: 'noteResults',

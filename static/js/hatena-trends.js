@@ -9,6 +9,7 @@ if (typeof createDropdownTrendsManager === 'function') {
         apiEndpoint: '/api/hatena-trends',
         defaultValue: 'all',
         paramName: 'category',
+        storageKey: 'hatena',
         uiIds: {
             loading: 'hatenaTrendsLoading',
             results: 'hatenaResults',

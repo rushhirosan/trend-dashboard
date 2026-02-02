@@ -212,6 +212,44 @@ function makeTableRowClickable(row, linkUrl, ariaLabel = null) {
 }
 
 // ============================================
+// トレンド選択の保存・復元（localStorage）
+// ============================================
+
+var TREND_PREF_PREFIX = 'trend_pref_';
+
+/**
+ * 指定ソースの前回選択値を取得する
+ * @param {string} serviceName - サービス名（例: 'hatena', 'rakuten'）
+ * @returns {string|object|null} 保存値（文字列またはJSONオブジェクト）。無い場合は null
+ */
+function getTrendPreference(serviceName) {
+    try {
+        var raw = localStorage.getItem(TREND_PREF_PREFIX + serviceName);
+        if (raw == null || raw === '') return null;
+        if (raw.startsWith('{')) {
+            return JSON.parse(raw);
+        }
+        return raw;
+    } catch (e) {
+        return null;
+    }
+}
+
+/**
+ * 指定ソースの選択値を保存する
+ * @param {string} serviceName - サービス名
+ * @param {string|object} value - 保存する値（オブジェクトの場合はJSONで保存）
+ */
+function setTrendPreference(serviceName, value) {
+    try {
+        var toSave = typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value);
+        localStorage.setItem(TREND_PREF_PREFIX + serviceName, toSave);
+    } catch (e) {
+        console.warn('setTrendPreference failed:', e);
+    }
+}
+
+// ============================================
 // ドロップダウンパターン用の共通関数
 // ============================================
 
@@ -223,6 +261,7 @@ function makeTableRowClickable(row, linkUrl, ariaLabel = null) {
  * @param {string} config.apiEndpoint - APIエンドポイント（例: '/api/hatena-trends'）
  * @param {string} config.defaultValue - デフォルト値（例: 'all', 'games'）
  * @param {string} config.paramName - パラメータ名（例: 'category', 'type'）
+ * @param {string} config.storageKey - 保存キー（省略時は serviceName）。指定時のみ保存・復元する
  * @param {Object} config.uiIds - UI要素のID
  * @param {string} config.uiIds.loading - ローディング要素のID
  * @param {string} config.uiIds.results - 結果要素のID
@@ -239,11 +278,14 @@ function createDropdownTrendsManager(config) {
         apiEndpoint,
         defaultValue,
         paramName = 'category',
+        storageKey = null,
         uiIds,
         displayFunction,
         getParams = () => ({}),
         allPaneSync
     } = config;
+
+    const prefKey = storageKey != null ? storageKey : serviceName;
 
     // ヘルパー関数
     const showLoading = () => {
@@ -327,11 +369,32 @@ function createDropdownTrendsManager(config) {
             });
     };
 
-    // イベントリスナーの設定
+    // 保存値の復元（select に反映）
+    const restorePreference = () => {
+        const selectElement = document.getElementById(selectId);
+        if (!selectElement || typeof getTrendPreference !== 'function') return;
+        const saved = getTrendPreference(prefKey);
+        if (saved == null) return;
+        const value = typeof saved === 'object' ? (saved.value != null ? saved.value : null) : String(saved);
+        if (!value) return;
+        const options = selectElement.querySelectorAll('option');
+        for (var i = 0; i < options.length; i++) {
+            if (options[i].value === value) {
+                selectElement.value = value;
+                return;
+            }
+        }
+    };
+
+    // イベントリスナーの設定（復元 → changeで保存＋取得）
     const setupEventListener = () => {
         const selectElement = document.getElementById(selectId);
         if (selectElement) {
+            restorePreference();
             selectElement.addEventListener('change', function() {
+                if (typeof setTrendPreference === 'function') {
+                    setTrendPreference(prefKey, selectElement.value);
+                }
                 fetchTrends();
             });
         }

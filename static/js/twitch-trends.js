@@ -9,6 +9,7 @@ if (typeof createDropdownTrendsManager === 'function') {
         apiEndpoint: '/api/twitch-trends',
         defaultValue: 'games',
         paramName: 'type',
+        storageKey: 'twitch',
         uiIds: {
             loading: 'twitchTrendsLoading',
             results: 'twitchResults',

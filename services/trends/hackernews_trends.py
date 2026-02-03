@@ -47,8 +47,8 @@ class HackerNewsTrendsManager(BaseTrendsManager):
             logger.error(f"❌ Hacker News キャッシュクリアエラー: {e}", exc_info=True)
             return False
 
-    def _update_cache_status(self, cache_key, data_count):
-        """cache_statusテーブルを更新"""
+    def _update_cache_status(self, cache_key, data_count, *args, **kwargs):
+        """cache_statusテーブルを更新（*args,**kwargsはベースクラスからstory_type等が渡される）"""
         try:
             return self.db.update_cache_status(cache_key, data_count)
         except Exception as e:

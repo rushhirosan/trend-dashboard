@@ -655,6 +655,16 @@ class TrendsCache:
                     END IF;
                 END $$;
                 
+                -- スケジューラー分散ロック用テーブル（複数マシン・複数プロセス間で二重実行を防ぐ）
+                CREATE TABLE IF NOT EXISTS scheduler_lock (
+                    id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+                    holder_id VARCHAR(255),
+                    locked_at TIMESTAMP,
+                    lock_until TIMESTAMP
+                );
+                INSERT INTO scheduler_lock (id, holder_id, locked_at, lock_until) VALUES (1, NULL, NULL, NULL)
+                ON CONFLICT (id) DO NOTHING;
+                
                 CREATE TABLE IF NOT EXISTS subscriptions (
                     id SERIAL PRIMARY KEY,
                     email VARCHAR(255) NOT NULL UNIQUE,
@@ -737,6 +747,26 @@ class TrendsCache:
                     logger.info("✅ ipa_trends_cacheテーブルのスキーマ更新完了")
                 except Exception as e:
                     logger.warning(f"⚠️ ipa_trends_cacheのスキーマ更新に失敗しました: {e}", exc_info=True)
+                
+                # scheduler_lockテーブル（分散ロック用）の作成（既存DBへのマイグレーション）
+                try:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS scheduler_lock (
+                            id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+                            holder_id VARCHAR(255),
+                            locked_at TIMESTAMP,
+                            lock_until TIMESTAMP
+                        )
+                    """)
+                    cursor.execute("""
+                        INSERT INTO scheduler_lock (id, holder_id, locked_at, lock_until)
+                        VALUES (1, NULL, NULL, NULL) ON CONFLICT (id) DO NOTHING
+                    """)
+                    conn.commit()
+                    logger.info("✅ scheduler_lockテーブル作成/確認完了")
+                except Exception as e:
+                    logger.warning(f"⚠️ scheduler_lockテーブル作成スキップ: {e}", exc_info=True)
+                    conn.rollback()
                 
                 # movie_trends_cacheテーブルのスキーマ更新（既存テーブルにカラムを追加）
                 try:
@@ -1986,6 +2016,46 @@ class TrendsCache:
             return result
         except Exception as e:
             logger.error(f"❌ cache_status更新エラー: {e}", exc_info=True)
+            return False
+    
+    def try_acquire_scheduler_lock_db(self, holder_id: str, lock_minutes: int = 30) -> bool:
+        """スケジューラー分散ロックを取得（DBベース、複数マシン・プロセス間で共有）
+        
+        Args:
+            holder_id: ロック取得者の識別子（例: hostname-pid）
+            lock_minutes: ロックの有効期限（分）。クラッシュ時の自動解放用。
+        
+        Returns:
+            True=取得成功、False=他プロセスが保持中
+        """
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        UPDATE scheduler_lock
+                        SET holder_id = %s, locked_at = NOW(), lock_until = NOW() + %s * INTERVAL '1 minute'
+                        WHERE id = 1 AND (holder_id IS NULL OR lock_until < NOW())
+                    """, (holder_id, lock_minutes))
+                    conn.commit()
+                    return cursor.rowcount == 1
+        except Exception as e:
+            logger.warning(f"⚠️ スケジューラーDBロック取得エラー: {e}", exc_info=True)
+            return False
+    
+    def release_scheduler_lock_db(self, holder_id: str) -> bool:
+        """スケジューラー分散ロックを解放"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        UPDATE scheduler_lock
+                        SET holder_id = NULL, locked_at = NULL, lock_until = NULL
+                        WHERE id = 1 AND holder_id = %s
+                    """, (holder_id,))
+                    conn.commit()
+                    return cursor.rowcount == 1
+        except Exception as e:
+            logger.warning(f"⚠️ スケジューラーDBロック解放エラー: {e}", exc_info=True)
             return False
     
     def clear_all_cache(self):

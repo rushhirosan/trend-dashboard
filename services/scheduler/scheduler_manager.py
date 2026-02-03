@@ -17,10 +17,11 @@ from services.subscription.subscription_manager import SubscriptionManager
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# 複数ワーカー時、1プロセスのみジョブ実行するためのロックファイル。
-# gunicorn で worker が複数あると各ワーカーでスケジューラが start し、同一時刻に同じジョブが複数回走る。
-# その結果、同一実行IDで「40/40 成功」と「38/40 一部失敗」など二重の Discord 通知が届くため、ファイルロックで1プロセスのみ実行する。
+# 複数ワーカー時、1プロセスのみジョブ実行するためのロック。
+# 1) DB分散ロック（scheduler_lockテーブル）: 複数マシン・複数プロセス間で共有、Fly.io等で二重実行を防止
+# 2) ファイルロック（フォールバック）: 同一マシン内の複数ワーカー用（DB利用不可時）
 SCHEDULER_LOCK_PATH = os.environ.get("TRENDS_SCHEDULER_LOCK_PATH", "/tmp/trends_scheduler.lock")
+SCHEDULER_LOCK_MINUTES = int(os.environ.get("TRENDS_SCHEDULER_LOCK_MINUTES", "30"))
 
 class TrendsScheduler:
     """トレンド自動取得スケジューラークラス"""
@@ -65,28 +66,62 @@ class TrendsScheduler:
             raise e
 
     def _try_acquire_scheduler_lock(self):
-        """プロセス間ロックを取得（非ブロッキング）。取得できた場合はFDを返し、できなければ None。fcntl未対応環境では -1 を返してロックなしで実行。"""
+        """分散ロックを取得（非ブロッキング）。
+        
+        1) DB分散ロックを優先: 複数マシン間で二重実行を防止
+        2) DB失敗時はファイルロックにフォールバック: 同一マシン内の複数ワーカー用
+        
+        Returns:
+            ('db', holder_id) or ('file', fd): 取得成功時
+            None: 取得失敗（他プロセスが実行中）
+        """
+        import socket
+        holder_id = f"{socket.gethostname()}-{os.getpid()}-{int(time.time())}"
+        
+        # 1) DB分散ロックを優先（複数マシン・Fly.ioの複数インスタンスで共有）
+        try:
+            if self.db and hasattr(self.db, 'try_acquire_scheduler_lock_db'):
+                if self.db.try_acquire_scheduler_lock_db(holder_id, SCHEDULER_LOCK_MINUTES):
+                    logger.debug("🔒 スケジューラーDB分散ロックを取得しました")
+                    return ('db', holder_id)
+        except Exception as e:
+            logger.warning("⚠️ スケジューラーDBロック取得スキップ（フォールバック）: %s", e)
+        
+        # 2) ファイルロックにフォールバック（同一マシン内のgunicorn複数ワーカー用）
         if fcntl is None:
-            return -1  # Windows等: ロックなしで実行（単一ワーカー推奨）
+            # Windows等: ロックなしで実行（単一ワーカー推奨）
+            return ('none', -1)
         try:
             fd = os.open(SCHEDULER_LOCK_PATH, os.O_CREAT | os.O_RDWR, 0o644)
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            return fd
+            logger.debug("🔒 スケジューラーファイルロックを取得しました（DBロック未使用）")
+            return ('file', fd)
         except (BlockingIOError, OSError):
             return None
         except Exception as e:
-            logger.warning("⚠️ スケジューラロック取得エラー（実行続行）: %s", e)
+            logger.warning("⚠️ スケジューラロック取得エラー: %s", e)
             return None
 
-    def _release_scheduler_lock(self, fd):
-        """プロセス間ロックを解放。"""
-        if fd is None or fd < 0 or fcntl is None:
+    def _release_scheduler_lock(self, lock_handle):
+        """分散ロックを解放。"""
+        if lock_handle is None:
             return
-        try:
-            fcntl.flock(fd, fcntl.LOCK_UN)
-            os.close(fd)
-        except Exception as e:
-            logger.warning("⚠️ スケジューラロック解放エラー: %s", e)
+        lock_type, value = lock_handle[0], lock_handle[1]
+        if lock_type == 'none':
+            return
+        if lock_type == 'db' and value:
+            try:
+                if self.db and hasattr(self.db, 'release_scheduler_lock_db'):
+                    self.db.release_scheduler_lock_db(value)
+                    logger.debug("🔓 スケジューラーDB分散ロックを解放しました")
+            except Exception as e:
+                logger.warning("⚠️ スケジューラーDBロック解放エラー: %s", e)
+        elif lock_type == 'file' and value is not None and value >= 0 and fcntl:
+            try:
+                fcntl.flock(value, fcntl.LOCK_UN)
+                os.close(value)
+            except Exception as e:
+                logger.warning("⚠️ スケジューラーファイルロック解放エラー: %s", e)
 
     def start(self):
         """スケジューラーを開始"""
@@ -323,10 +358,10 @@ class TrendsScheduler:
             logger.warning("⚠️ データ取得処理が既に実行中です。重複実行をスキップします")
             return
 
-        # 複数ワーカー時は1プロセスのみ実行（gunicorn等で同一実行ID・二重Discord通知を防ぐ）
-        lock_fd = self._try_acquire_scheduler_lock()
-        if lock_fd is None:
-            logger.info("⏭️ 他プロセスがスケジューラを実行中のため、このプロセスではスキップします")
+        # 分散ロック取得（DB優先→ファイルロック、複数マシン・二重Discord通知を防ぐ）
+        lock_handle = self._try_acquire_scheduler_lock()
+        if lock_handle is None:
+            logger.info("⏭️ 他プロセス/他マシンがスケジューラを実行中のため、このプロセスではスキップします")
             return
 
         self._fetching_in_progress = True
@@ -626,8 +661,8 @@ class TrendsScheduler:
             else:
                 logger.info("⏭️ メール自動送信をスキップします（SKIP_EMAIL_ON_UPDATE=true）")
         finally:
-            # プロセス間ロックを解放し、フラグをリセット
-            self._release_scheduler_lock(lock_fd)
+            # 分散ロックを解放し、フラグをリセット
+            self._release_scheduler_lock(lock_handle)
             self._fetching_in_progress = False
     
     

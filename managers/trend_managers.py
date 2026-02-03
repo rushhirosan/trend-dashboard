@@ -4,6 +4,7 @@
 """
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import os
 import threading
 from services.trends.google_trends import GoogleTrendsManager
 from services.trends.youtube_trends import YouTubeTrendsManager
@@ -185,7 +186,10 @@ def refresh_all_trends(managers, force_refresh=True):
     tasks.append(('podcast', lambda m: m.get_trends('best_podcasts', region='jp', force_refresh=force_refresh), 'JP'))
     tasks.append(('rakuten', lambda m: m.get_trends(force_refresh=force_refresh), 'JP'))
     tasks.append(('hatena', lambda m: m.get_trends(category='all', limit=25, force_refresh=force_refresh, fetch_all_categories=True), 'JP'))
-    tasks.append(('twitch', lambda m: m._fetch_and_cache_all_categories(), 'JP'))
+    if os.getenv('TWITCH_CLIENT_ID') and os.getenv('TWITCH_CLIENT_SECRET'):
+        tasks.append(('twitch', lambda m: m._fetch_and_cache_all_categories(), 'JP'))
+    else:
+        logger.info("⚠️ Twitch: 認証情報未設定のためスキップ (TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET)")
     tasks.append(('qiita', lambda m: m.get_trends(limit=25, sort='likes_count', force_refresh=force_refresh), 'JP'))
     tasks.append(('nhk', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
     tasks.append(('stock', lambda m: m.get_trends(market='JP', limit=25, force_refresh=force_refresh), 'JP'))
@@ -206,7 +210,8 @@ def refresh_all_trends(managers, force_refresh=True):
     tasks.append(('music', lambda m: m.get_trends('spotify', 'US', force_refresh=force_refresh), 'US'))
     tasks.append(('worldnews', lambda m: m.get_trends(country='us', category=None, force_refresh=force_refresh), 'US'))
     tasks.append(('podcast', lambda m: m.get_trends('best_podcasts', region='us', force_refresh=force_refresh), 'US'))
-    tasks.append(('twitch', lambda m: m._fetch_and_cache_all_categories(), 'US'))
+    if os.getenv('TWITCH_CLIENT_ID') and os.getenv('TWITCH_CLIENT_SECRET'):
+        tasks.append(('twitch', lambda m: m._fetch_and_cache_all_categories(), 'US'))
     # eBay: 全カテゴリーを取得してキャッシュに保存
     ebay_manager = managers.get('ebay')
     if ebay_manager:

@@ -2886,25 +2886,34 @@ document.addEventListener('DOMContentLoaded', function() {
         setTrendPreference('page', 'us');
     }
 
-    // All tab "More" link: switch to category tab on click
+    // All tab "More" link: タブ切り替え後に対象ソースのアンカーへスクロール
+    var pendingMoreLinkAnchor = null;
     document.querySelectorAll('.all-more-link').forEach(link => {
         link.addEventListener('click', function(e) {
             e.preventDefault();
             const targetTabId = this.getAttribute('data-target-tab');
+            const targetAnchorId = this.getAttribute('data-target-anchor');
             if (!targetTabId) return;
             const tabEl = document.getElementById(targetTabId);
             if (tabEl && typeof bootstrap !== 'undefined') {
+                pendingMoreLinkAnchor = targetAnchorId || null;
                 const tab = new bootstrap.Tab(tabEl);
                 tab.show();
-                document.querySelector('#trends')?.scrollIntoView({ behavior: 'smooth' });
             }
         });
     });
 
-    // トレンドカテゴリタブ切り替え時: グラフリサイズ
+    // トレンドカテゴリタブ切り替え時: グラフリサイズ ＋ もっと見るからのアンカースクロール
     const trendTabsEl = document.getElementById('trendCategoryTabs');
     if (trendTabsEl) {
         trendTabsEl.addEventListener('shown.bs.tab', function() {
+            if (pendingMoreLinkAnchor) {
+                var anchor = document.getElementById(pendingMoreLinkAnchor);
+                if (anchor) {
+                    anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+                pendingMoreLinkAnchor = null;
+            }
             if (typeof currentGoogleChart !== 'undefined' && currentGoogleChart) {
                 try { currentGoogleChart.resize(); } catch (e) { /* ignore */ }
             }

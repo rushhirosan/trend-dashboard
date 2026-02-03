@@ -878,17 +878,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // 全部入り「もっと見る」: クリックで該当ジャンルタブへ切り替え
+    // 全部入り「もっと見る」: タブ切り替え後に対象ソースのアンカーへスクロール
+    var pendingMoreLinkAnchor = null;
     document.querySelectorAll('.all-more-link').forEach(link => {
         link.addEventListener('click', function(e) {
             e.preventDefault();
             const targetTabId = this.getAttribute('data-target-tab');
+            const targetAnchorId = this.getAttribute('data-target-anchor');
             if (!targetTabId) return;
             const tabEl = document.getElementById(targetTabId);
             if (tabEl && typeof bootstrap !== 'undefined') {
+                pendingMoreLinkAnchor = targetAnchorId || null;
                 const tab = new bootstrap.Tab(tabEl);
                 tab.show();
-                document.querySelector('#trends')?.scrollIntoView({ behavior: 'smooth' });
             }
         });
     });
@@ -955,12 +957,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // YouTube地域選択は削除済み（日本固定）
 
-    // トレンドカテゴリタブ切り替え時: 前回タブを保存 ＋ グラフリサイズ
+    // トレンドカテゴリタブ切り替え時: 前回タブを保存 ＋ グラフリサイズ ＋ もっと見るからのアンカースクロール
     if (trendTabsEl) {
         trendTabsEl.addEventListener('shown.bs.tab', function(e) {
             var tabId = e.target && e.target.id;
             if (tabId && typeof setTrendPreference === 'function') {
                 setTrendPreference('active_tab', tabId);
+            }
+            if (pendingMoreLinkAnchor) {
+                var anchor = document.getElementById(pendingMoreLinkAnchor);
+                if (anchor) {
+                    anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+                pendingMoreLinkAnchor = null;
             }
             if (typeof currentGoogleChart !== 'undefined' && currentGoogleChart) {
                 try { currentGoogleChart.resize(); } catch (err) { /* ignore */ }

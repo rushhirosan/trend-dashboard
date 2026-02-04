@@ -2648,6 +2648,9 @@ function displayDevToResults(data) {
         tableBody.appendChild(row);
     });
     
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('devtoTrendsTableBody', 'all-devtoTrendsTableBody', 5), 0);
+    }
     resultsElement.style.setProperty('display', 'block', 'important');
 }
 
@@ -2696,6 +2699,9 @@ function displayMediumResults(data) {
         tableBody.appendChild(row);
     });
     
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('mediumTrendsTableBody', 'all-mediumTrendsTableBody', 5), 0);
+    }
     resultsElement.style.setProperty('display', 'block', 'important');
 }
 

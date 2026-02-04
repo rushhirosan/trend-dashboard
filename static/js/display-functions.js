@@ -302,6 +302,9 @@ function displayGitHubResults(data) {
     if (resultsElement) {
         resultsElement.style.display = 'block';
     }
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('githubTrendsTableBody', 'all-githubTrendsTableBody', 5), 0);
+    }
     console.log('✅ GitHub Results表示完了');
 }
 
@@ -361,6 +364,9 @@ function displayAppStoreResults(data) {
     const resultsElement = document.getElementById('appstoreResults');
     if (resultsElement) {
         resultsElement.style.display = 'block';
+    }
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('appstoreTrendsTableBody', 'all-appstoreTrendsTableBody', 5), 0);
     }
     console.log('✅ App Store Results表示完了');
 }
@@ -591,6 +597,9 @@ function displayCISAKEVResults(data) {
     if (resultsElement) {
         resultsElement.style.display = 'block';
     }
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('cisaKevTrendsTableBody', 'all-cisaKevTrendsTableBody', 5), 0);
+    }
     console.log('✅ CISA KEV Results表示完了');
 }
 
@@ -636,6 +645,9 @@ function displayTheHackerNewsResults(data) {
     const resultsElement = document.getElementById('thehackernewsResults');
     if (resultsElement) {
         resultsElement.style.display = 'block';
+    }
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('thehackernewsTrendsTableBody', 'all-thehackernewsTrendsTableBody', 5), 0);
     }
     console.log('✅ The Hacker News Results表示完了');
 }

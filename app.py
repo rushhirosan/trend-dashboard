@@ -255,6 +255,7 @@ def create_app():
 Allow: /
 Disallow: /api/
 Disallow: /health
+Disallow: /subscription
 Sitemap: https://trends-dashboard.fly.dev/sitemap.xml
 """
                 return Response(robots_content, mimetype='text/plain')
@@ -302,12 +303,6 @@ Sitemap: https://trends-dashboard.fly.dev/sitemap.xml
     <lastmod>{now_str}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://trends-dashboard.fly.dev/subscription</loc>
-    <lastmod>{now_str}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
   </url>
 </urlset>
 """

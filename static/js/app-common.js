@@ -541,6 +541,42 @@ function loadTrendsFromCache(config) {
 }
 
 /**
+ * バッチ読み込みの共通実行（日本・US で統一）
+ * @param {Function[]} loadFunctions - 読み込み関数の配列
+ * @param {Object} options - { batchSize: number, delayMs: number }
+ */
+function runBatchLoad(loadFunctions, options) {
+    const batchSize = (options && options.batchSize) || 4;
+    const delayMs = (options && options.delayMs) != null ? options.delayMs : 200;
+    if (!Array.isArray(loadFunctions) || loadFunctions.length === 0) return;
+
+    function executeBatch(batchIndex) {
+        if (batchIndex >= loadFunctions.length) {
+            console.log('✅ 全バッチの実行完了');
+            return;
+        }
+        const batchEnd = Math.min(batchIndex + batchSize, loadFunctions.length);
+        const batch = loadFunctions.slice(batchIndex, batchEnd);
+        const batchNumber = Math.floor(batchIndex / batchSize) + 1;
+        console.log('📦 バッチ ' + batchNumber + ' 実行中 (' + batch.map(function(f) { return f.name; }).join(', ') + ')');
+        batch.forEach(function(loadFn) {
+            try {
+                console.log('🚀 実行中: ' + loadFn.name);
+                loadFn();
+            } catch (err) {
+                console.error('❌ ' + loadFn.name + ' 実行エラー:', err);
+            }
+        });
+        if (batchEnd < loadFunctions.length) {
+            setTimeout(function() { executeBatch(batchEnd); }, delayMs);
+        } else {
+            console.log('✅ 全バッチの実行完了');
+        }
+    }
+    executeBatch(0);
+}
+
+/**
  * 全部入り（All）タブ用: メインのテーブル先頭N行をAll用tbodyへコピーする
  * @param {string} mainTableBodyId - メインペインのtbody要素ID（例: 'googleTrendsTableBody'）
  * @param {string} allTableBodyId - Allペインのtbody要素ID（例: 'all-googleTrendsTableBody'）

@@ -1039,74 +1039,44 @@ function formatNumber(num) {
     return num.toString();
 }
 
-// Load cached data for US trends
+// eBay用: セレクトの現在値で loadEbayFromCacheUS を呼ぶラッパー（バッチ配列用）
+function loadEbayFromCacheUSWrapper() {
+    var ebayCategorySelect = document.getElementById('ebayCategorySelectUS');
+    var initialCategory = ebayCategorySelect ? ebayCategorySelect.value : 'cell_phones';
+    loadEbayFromCacheUS(initialCategory);
+}
+
+// Load cached data for US trends（日本と同一のバッチ方式で統一・Allタブの表示順に合わせる）
 function loadCachedDataUS() {
     console.log('📦 Loading cached data for US trends');
-    
-    // Load Google Trends from cache
-    loadGoogleTrendsFromCacheUS();
-    
-    // Load YouTube Trends from cache
-    loadYouTubeTrendsFromCacheUS();
-    
-    // Load World News from cache
-    loadWorldNewsFromCacheUS();
-    
-    // Load Stock Trends from cache
-    loadStockTrendsFromCacheUS();
-    
-    // Load Crypto Trends from cache
-    loadCryptoTrendsFromCacheUS();
-    
-    // Load Spotify from cache
-    loadSpotifyFromCacheUS();
-    
-    // Load Movie Trends from cache
-    loadMovieTrendsFromCacheUS();
-    
-    // Load Book Trends from cache
-    loadBookTrendsFromCacheUS();
-    
-    // Load CISA KEV from cache
-    loadCISAKEVTrendsFromCacheUS();
-    
-    // Load The Hacker News from cache
-    loadTheHackerNewsTrendsFromCacheUS();
-    
-    // Load GitHub Trends from cache
-    loadGitHubTrendsFromCacheUS();
-    
-    // Load App Store Trends from cache
-    loadAppStoreTrendsFromCacheUS();
-    
-    // Load Podcast from cache (Redditと独立して表示)
-    loadPodcastFromCacheUS();
-    
-    // Load DEV.to from cache
-    loadDevToFromCacheUS();
-    
-    // Load Medium from cache
-    loadMediumFromCacheUS();
-    
-    // Load eBay from cache (default: cell_phones to match initial select option)
-    const ebayCategorySelect = document.getElementById('ebayCategorySelectUS');
-    const initialCategory = ebayCategorySelect ? ebayCategorySelect.value : 'cell_phones';
-    loadEbayFromCacheUS(initialCategory);
-    
-    // Load Twitch from cache
-    loadTwitchFromCacheUS();
-    
-    // Load Hacker News from cache
-    loadHackerNewsFromCacheUS();
-    
-    // Load CNN News from cache
-    loadCNNFromCacheUS();
-    
-    // Load Wikipedia Most Read (en) from cache
-    loadWikipediaFromCacheUS();
-    
-    // Load Product Hunt from cache
-    loadProductHuntFromCacheUS();
+    var allCategoriesUS = [
+        loadCNNFromCacheUS,
+        loadWorldNewsFromCacheUS,
+        loadWikipediaFromCacheUS,
+        loadGoogleTrendsFromCacheUS,
+        loadYouTubeTrendsFromCacheUS,
+        loadHackerNewsFromCacheUS,
+        loadProductHuntFromCacheUS,
+        loadDevToFromCacheUS,
+        loadMediumFromCacheUS,
+        loadCISAKEVTrendsFromCacheUS,
+        loadTheHackerNewsTrendsFromCacheUS,
+        loadGitHubTrendsFromCacheUS,
+        loadAppStoreTrendsFromCacheUS,
+        loadStockTrendsFromCacheUS,
+        loadCryptoTrendsFromCacheUS,
+        loadSpotifyFromCacheUS,
+        loadPodcastFromCacheUS,
+        loadMovieTrendsFromCacheUS,
+        loadBookTrendsFromCacheUS,
+        loadEbayFromCacheUSWrapper,
+        loadTwitchFromCacheUS
+    ];
+    if (typeof runBatchLoad === 'function') {
+        runBatchLoad(allCategoriesUS, { batchSize: 4, delayMs: 200 });
+    } else {
+        allCategoriesUS.forEach(function(fn) { fn(); });
+    }
 }
 
 // Google Trends cache data loading for US

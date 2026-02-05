@@ -35,16 +35,11 @@ class NHKTrendsManager(BaseTrendsManager):
         return 'nhk_trends'
 
     def _get_from_cache(self, *args, **kwargs):
-        """キャッシュからデータを取得"""
+        """キャッシュからデータを取得（保存時に重複排除済みのためそのまま返す）"""
         try:
-            cached_data = self.db.get_nhk_trends_from_cache()
-            # 重複排除を適用
-            if cached_data:
-                cached_data = self._remove_duplicates(cached_data)
-            return cached_data
+            return self.db.get_nhk_trends_from_cache() or []
         except Exception as e:
             logger.error(f"❌ NHK: キャッシュ取得エラー: {e}", exc_info=True)
-            # エラー時は空のリストとして扱う（500エラーを防ぐ）
             return []
 
     def _save_to_cache(self, data, *args, **kwargs):

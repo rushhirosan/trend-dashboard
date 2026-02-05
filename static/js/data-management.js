@@ -24,74 +24,39 @@ async function fetchWithRetry(url, options = {}, maxRetries = 2) {
 }
 
 // キャッシュデータを自動読み込み（外部から呼び出し用）
+// 並び順: 全部入り（All）タブの表示順に合わせる（上からバッチで読み込み）
 function loadCachedDataExternal() {
     console.log('📦 キャッシュデータの読み込み処理開始');
-    
-    // 全カテゴリを定義
-    const allCategories = [
+    var allCategories = [
+        loadNHKTrendsFromCache,
+        loadNewsTrendsFromCache,
+        loadWikipediaTrendsFromCache,
         loadGoogleTrendsFromCache,
         loadYouTubeTrendsFromCache,
-        loadMusicTrendsFromCache,
-        loadNewsTrendsFromCache,
-        loadStockTrendsFromCache,
-        loadCryptoTrendsFromCache,
-        loadPodcastTrendsFromCache,
-        loadMovieTrendsFromCache,
-        loadBookTrendsFromCache,
-        loadIPATrendsFromCache,
-        loadJPCERTTrendsFromCache,
+        loadQiitaTrendsFromCache,
+        loadHatenaTrendsFromCache,
         loadZennTrendsFromCache,
         loadNoteTrendsFromCache,
         loadGitHubTrendsFromCache,
+        loadStockTrendsFromCache,
+        loadCryptoTrendsFromCache,
         loadAppStoreTrendsFromCache,
+        loadIPATrendsFromCache,
+        loadJPCERTTrendsFromCache,
+        loadMusicTrendsFromCache,
+        loadPodcastTrendsFromCache,
+        loadMovieTrendsFromCache,
+        loadBookTrendsFromCache,
         loadRakutenTrendsFromCache,
-        loadHatenaTrendsFromCache,
-        loadTwitchTrendsFromCache,
-        loadNHKTrendsFromCache,
-        loadWikipediaTrendsFromCache,
-        loadQiitaTrendsFromCache
+        loadTwitchTrendsFromCache
     ];
-    
-    // バッチ処理: 一度に4つずつ実行（データベース接続の競合を防ぐ）
-    const BATCH_SIZE = 4;
-    console.log('🚀 全カテゴリのバッチ読み込み開始（並列数: ' + BATCH_SIZE + '）');
-    console.log('🚀 実行する関数:', allCategories.map(f => f.name));
-    
-    // バッチごとに順次実行（データベース接続の競合を防ぐ）
-    function executeBatch(batchIndex) {
-        if (batchIndex >= allCategories.length) {
-            console.log('✅ 全バッチの実行完了');
-            return;
-        }
-        
-        const batchEnd = Math.min(batchIndex + BATCH_SIZE, allCategories.length);
-        const batch = allCategories.slice(batchIndex, batchEnd);
-        const batchNumber = Math.floor(batchIndex / BATCH_SIZE) + 1;
-        console.log(`📦 バッチ ${batchNumber} 実行中 (${batch.map(f => f.name).join(', ')})`);
-        
-        // バッチ内の関数を並列実行
-        batch.forEach(loadFunction => {
-            try {
-                console.log(`🚀 実行中: ${loadFunction.name}`);
-                loadFunction();
-            } catch (error) {
-                console.error(`❌ ${loadFunction.name} 実行エラー:`, error);
-            }
-        });
-        
-        // 次のバッチを200ms後に実行（データベース接続の競合を防ぐ）
-        if (batchEnd < allCategories.length) {
-            setTimeout(() => {
-                executeBatch(batchEnd);
-            }, 200);
-        } else {
-            console.log('✅ 全バッチの実行完了');
-        }
+    console.log('🚀 全カテゴリのバッチ読み込み開始（並列数: 4）');
+    console.log('🚀 実行する関数:', allCategories.map(function(f) { return f.name; }));
+    if (typeof runBatchLoad === 'function') {
+        runBatchLoad(allCategories, { batchSize: 4, delayMs: 200 });
+    } else {
+        allCategories.forEach(function(fn) { fn(); });
     }
-    
-    // 最初のバッチを実行
-    executeBatch(0);
-    
     console.log('✅ キャッシュデータの読み込み処理完了');
 }
 

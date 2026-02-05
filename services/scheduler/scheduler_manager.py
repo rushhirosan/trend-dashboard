@@ -84,10 +84,14 @@ class TrendsScheduler:
                 if self.db.try_acquire_scheduler_lock_db(holder_id, SCHEDULER_LOCK_MINUTES):
                     logger.debug("🔒 スケジューラーDB分散ロックを取得しました")
                     return ('db', holder_id)
+                # DBロックが「他が保持中」の場合はここで終了。ファイルロックにフォールバックしない
+                # （別マシンでは /tmp が共有されないため、フォールバックすると二重実行になる）
+                logger.debug("🔒 スケジューラーDB分散ロックは他プロセスが保持中のためスキップ")
+                return None
         except Exception as e:
             logger.warning("⚠️ スケジューラーDBロック取得スキップ（フォールバック）: %s", e)
         
-        # 2) ファイルロックにフォールバック（同一マシン内のgunicorn複数ワーカー用）
+        # 2) ファイルロックにフォールバック（同一マシン内のgunicorn複数ワーカー用・DB障害時のみ）
         if fcntl is None:
             # Windows等: ロックなしで実行（単一ワーカー推奨）
             return ('none', -1)

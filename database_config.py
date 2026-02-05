@@ -1211,11 +1211,12 @@ class TrendsCache:
                         raise verify_error
                 
                 # 接続を返す（コンテキストマネージャーとして）
-                # 呼び出し元で発生した例外は再送出し、generator didn't stop after throw() を防ぐ
+                # 呼び出し元で発生した例外は必ず再送出（finally 後に raise で generator didn't stop を防ぐ）
+                pending_exc = None
                 try:
                     yield conn
-                except BaseException:
-                    raise
+                except BaseException as e:
+                    pending_exc = e
                 finally:
                     # 使用後に接続を返却
                     if conn:
@@ -1256,6 +1257,8 @@ class TrendsCache:
                                 self.pool.putconn(conn, close=True)
                             except Exception:
                                 pass
+                if pending_exc is not None:
+                    raise pending_exc
                 return
                 
             except pool.PoolError as pool_error:
@@ -2872,50 +2875,38 @@ class TrendsCache:
             return False
     
     # Wikipedia Trends キャッシュメソッド
+    def _ensure_wikipedia_trends_cache_table(self):
+        """wikipedia_trends_cache が無い場合に作成（初回利用時のマイグレーション）"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS wikipedia_trends_cache (
+                            id SERIAL PRIMARY KEY,
+                            title TEXT NOT NULL,
+                            url TEXT,
+                            description TEXT,
+                            rank INTEGER DEFAULT 0,
+                            views INTEGER DEFAULT 0,
+                            lang VARCHAR(10) NOT NULL,
+                            cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    """)
+                    conn.commit()
+                    logger.info("✅ wikipedia_trends_cache テーブルを確認/作成しました")
+        except Exception as e:
+            logger.warning(f"⚠️ wikipedia_trends_cache テーブル作成スキップ: {e}")
+
     def save_wikipedia_trends_to_cache(self, data, lang='ja'):
         """Wikipedia 人気記事をキャッシュに保存（言語別）"""
         if not data:
             return False
         try:
-            with self.get_connection() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("DELETE FROM wikipedia_trends_cache WHERE lang = %s", (lang,))
-                    for item in data:
-                        # NOT NULL / 型エラー防止: 安全に正規化
-                        title = item.get('title') or ''
-                        if not isinstance(title, str):
-                            title = str(title)
-                        title = (title or 'Untitled')[:10000]
-                        url = item.get('url') or ''
-                        if not isinstance(url, str):
-                            url = str(url)
-                        desc = (item.get('description') or '')[:2000]
-                        if not isinstance(desc, str):
-                            desc = str(desc)[:2000]
-                        try:
-                            rank = int(item.get('rank', 0))
-                        except (TypeError, ValueError):
-                            rank = 0
-                        try:
-                            views = int(item.get('views', 0))
-                        except (TypeError, ValueError):
-                            views = 0
-                        cursor.execute("""
-                            INSERT INTO wikipedia_trends_cache
-                            (title, url, description, rank, views, lang)
-                            VALUES (%s, %s, %s, %s, %s, %s)
-                        """, (title, url, desc, rank, views, str(lang)[:10]))
-                    import pytz
-                    jst = pytz.timezone('Asia/Tokyo')
-                    now_jst = datetime.now(jst)
-                    cache_key = f'wikipedia_trends_{lang}'
-                    cursor.execute(
-                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                        (cache_key, now_jst, len(data), now_jst, len(data))
-                    )
-                    conn.commit()
-                    logger.info(f"✅ wikipedia_trends ({lang}) キャッシュを保存しました ({len(data)}件)")
-                    return True
+            self._ensure_wikipedia_trends_cache_table()
+        except Exception as ensure_e:
+            logger.debug("wikipedia_trends_cache テーブル確認スキップ: %s", ensure_e)
+        try:
+            return self._save_wikipedia_trends_to_cache_impl(data, lang)
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ wikipedia_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
@@ -2924,8 +2915,54 @@ class TrendsCache:
             logger.error(f"❌ wikipedia_trendsキャッシュ保存エラー: {e}", exc_info=True)
             return False
 
+    def _save_wikipedia_trends_to_cache_impl(self, data, lang):
+        """Wikipedia キャッシュ保存の実処理（save_wikipedia_trends_to_cache から呼ぶ）"""
+        with self.get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM wikipedia_trends_cache WHERE lang = %s", (lang,))
+                for item in data:
+                    # NOT NULL / 型エラー防止: 安全に正規化
+                    title = item.get('title') or ''
+                    if not isinstance(title, str):
+                        title = str(title)
+                    title = (title or 'Untitled')[:10000]
+                    url = item.get('url') or ''
+                    if not isinstance(url, str):
+                        url = str(url)
+                    desc = (item.get('description') or '')[:2000]
+                    if not isinstance(desc, str):
+                        desc = str(desc)[:2000]
+                    try:
+                        rank = int(item.get('rank', 0))
+                    except (TypeError, ValueError):
+                        rank = 0
+                    try:
+                        views = int(item.get('views', 0))
+                    except (TypeError, ValueError):
+                        views = 0
+                    cursor.execute("""
+                        INSERT INTO wikipedia_trends_cache
+                        (title, url, description, rank, views, lang)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (title, url, desc, rank, views, str(lang)[:10]))
+                import pytz
+                jst = pytz.timezone('Asia/Tokyo')
+                now_jst = datetime.now(jst)
+                cache_key = f'wikipedia_trends_{lang}'
+                cursor.execute(
+                    "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                    (cache_key, now_jst, len(data), now_jst, len(data))
+                )
+                conn.commit()
+                logger.info(f"✅ wikipedia_trends ({lang}) キャッシュを保存しました ({len(data)}件)")
+                return True
+
     def get_wikipedia_trends_from_cache(self, lang='ja'):
         """Wikipedia 人気記事をキャッシュから取得（言語別）"""
+        try:
+            self._ensure_wikipedia_trends_cache_table()
+        except Exception as ensure_e:
+            logger.debug("wikipedia_trends_cache テーブル確認スキップ: %s", ensure_e)
         def query_func(conn):
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute("""

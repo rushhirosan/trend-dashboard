@@ -779,6 +779,26 @@ class TrendsCache:
                     logger.warning(f"⚠️ scheduler_lockテーブル作成スキップ: {e}", exc_info=True)
                     conn.rollback()
                 
+                # wikipedia_trends_cache の作成（既存DBへのマイグレーション／psycopg2は1executeで1文のため確実に作成）
+                try:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS wikipedia_trends_cache (
+                            id SERIAL PRIMARY KEY,
+                            title TEXT NOT NULL,
+                            url TEXT,
+                            description TEXT,
+                            rank INTEGER DEFAULT 0,
+                            views INTEGER DEFAULT 0,
+                            lang VARCHAR(10) NOT NULL,
+                            cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    """)
+                    conn.commit()
+                    logger.info("✅ wikipedia_trends_cache テーブル作成/確認完了")
+                except Exception as e:
+                    logger.warning(f"⚠️ wikipedia_trends_cacheテーブル作成スキップ: {e}", exc_info=True)
+                    conn.rollback()
+                
                 # movie_trends_cacheテーブルのスキーマ更新（既存テーブルにカラムを追加）
                 try:
                     cursor.execute("ALTER TABLE movie_trends_cache ADD COLUMN IF NOT EXISTS item_url TEXT")
@@ -1191,8 +1211,11 @@ class TrendsCache:
                         raise verify_error
                 
                 # 接続を返す（コンテキストマネージャーとして）
+                # 呼び出し元で発生した例外は再送出し、generator didn't stop after throw() を防ぐ
                 try:
                     yield conn
+                except BaseException:
+                    raise
                 finally:
                     # 使用後に接続を返却
                     if conn:
@@ -2858,18 +2881,30 @@ class TrendsCache:
                 with conn.cursor() as cursor:
                     cursor.execute("DELETE FROM wikipedia_trends_cache WHERE lang = %s", (lang,))
                     for item in data:
+                        # NOT NULL / 型エラー防止: 安全に正規化
+                        title = item.get('title') or ''
+                        if not isinstance(title, str):
+                            title = str(title)
+                        title = (title or 'Untitled')[:10000]
+                        url = item.get('url') or ''
+                        if not isinstance(url, str):
+                            url = str(url)
+                        desc = (item.get('description') or '')[:2000]
+                        if not isinstance(desc, str):
+                            desc = str(desc)[:2000]
+                        try:
+                            rank = int(item.get('rank', 0))
+                        except (TypeError, ValueError):
+                            rank = 0
+                        try:
+                            views = int(item.get('views', 0))
+                        except (TypeError, ValueError):
+                            views = 0
                         cursor.execute("""
                             INSERT INTO wikipedia_trends_cache
                             (title, url, description, rank, views, lang)
                             VALUES (%s, %s, %s, %s, %s, %s)
-                        """, (
-                            item.get('title', ''),
-                            item.get('url', ''),
-                            (item.get('description') or '')[:2000],
-                            item.get('rank', 0),
-                            item.get('views', 0),
-                            lang
-                        ))
+                        """, (title, url, desc, rank, views, str(lang)[:10]))
                     import pytz
                     jst = pytz.timezone('Asia/Tokyo')
                     now_jst = datetime.now(jst)

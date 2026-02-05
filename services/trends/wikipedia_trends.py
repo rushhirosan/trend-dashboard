@@ -53,7 +53,8 @@ class WikipediaTrendsManager(BaseTrendsManager):
             return self.db.save_wikipedia_trends_to_cache(data, lang=lang)
         except Exception as e:
             logger.error(f"Wikipedia キャッシュ保存エラー: {e}", exc_info=True)
-            return False
+            # ベースのアラートでエラー詳細を送れるよう再送出
+            raise
 
     def _clear_cache(self, lang: str = "ja", **kwargs) -> bool:
         try:

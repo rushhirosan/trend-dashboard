@@ -368,6 +368,17 @@ class TrendsCache:
                     cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
+                CREATE TABLE IF NOT EXISTS wikipedia_trends_cache (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    url TEXT,
+                    description TEXT,
+                    rank INTEGER DEFAULT 0,
+                    views INTEGER DEFAULT 0,
+                    lang VARCHAR(10) NOT NULL,
+                    cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                
                 CREATE TABLE IF NOT EXISTS producthunt_trends_cache (
                     id SERIAL PRIMARY KEY,
                     product_id VARCHAR(255) NOT NULL,
@@ -2073,7 +2084,8 @@ class TrendsCache:
                         'worldnews_trends_cache',
                         'rakuten_trends_cache',
                         'hatena_trends_cache',
-                        'twitch_trends_cache'
+                        'twitch_trends_cache',
+                        'wikipedia_trends_cache',
                     ]
                     
                     for table in tables:
@@ -2124,6 +2136,7 @@ class TrendsCache:
                     'qiita_trends_cache',
                     'nhk_trends_cache',
                     'cnn_trends_cache',
+                    'wikipedia_trends_cache',
                     'producthunt_trends_cache'
                 ]
                 
@@ -2833,6 +2846,82 @@ class TrendsCache:
             return False
         except Exception as e:
             logger.error(f"❌ nhk_trendsキャッシュクリアエラー: {e}", exc_info=True)
+            return False
+    
+    # Wikipedia Trends キャッシュメソッド
+    def save_wikipedia_trends_to_cache(self, data, lang='ja'):
+        """Wikipedia 人気記事をキャッシュに保存（言語別）"""
+        if not data:
+            return False
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM wikipedia_trends_cache WHERE lang = %s", (lang,))
+                    for item in data:
+                        cursor.execute("""
+                            INSERT INTO wikipedia_trends_cache
+                            (title, url, description, rank, views, lang)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                        """, (
+                            item.get('title', ''),
+                            item.get('url', ''),
+                            (item.get('description') or '')[:2000],
+                            item.get('rank', 0),
+                            item.get('views', 0),
+                            lang
+                        ))
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cache_key = f'wikipedia_trends_{lang}'
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        (cache_key, now_jst, len(data), now_jst, len(data))
+                    )
+                    conn.commit()
+                    logger.info(f"✅ wikipedia_trends ({lang}) キャッシュを保存しました ({len(data)}件)")
+                    return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ wikipedia_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ wikipedia_trendsキャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def get_wikipedia_trends_from_cache(self, lang='ja'):
+        """Wikipedia 人気記事をキャッシュから取得（言語別）"""
+        def query_func(conn):
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT title, url, description, rank, views, lang, cached_at
+                    FROM wikipedia_trends_cache
+                    WHERE lang = %s
+                    ORDER BY rank
+                    LIMIT 50
+                """, (lang,))
+                return [dict(row) for row in cursor.fetchall()]
+        try:
+            return self._execute_with_retry(query_func)
+        except Exception as e:
+            logger.error(f"❌ Wikipedia Trends キャッシュ取得エラー: {e}", exc_info=True)
+            return None
+
+    def clear_wikipedia_trends_cache(self, lang='ja'):
+        """Wikipedia 人気記事キャッシュをクリア（言語別）"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM wikipedia_trends_cache WHERE lang = %s", (lang,))
+                    conn.commit()
+                    logger.info(f"✅ wikipedia_trends ({lang}) のキャッシュをクリアしました")
+                    return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ wikipedia_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ wikipedia_trendsキャッシュクリアエラー: {e}", exc_info=True)
             return False
     
     # CNN Trends キャッシュメソッド

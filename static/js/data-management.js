@@ -48,6 +48,7 @@ function loadCachedDataExternal() {
         loadHatenaTrendsFromCache,
         loadTwitchTrendsFromCache,
         loadNHKTrendsFromCache,
+        loadWikipediaTrendsFromCache,
         loadQiitaTrendsFromCache
     ];
     
@@ -705,6 +706,47 @@ function loadNHKTrendsFromCache() {
             .catch(error => {
                 clearTimeout(timeoutId);
                 console.error('NHK ニュース キャッシュ読み込みエラー:', error);
+                if (loadingElement) loadingElement.style.display = 'none';
+            });
+    }
+}
+
+// Wikipedia 人気記事 キャッシュデータ読み込み（日本語）
+function loadWikipediaTrendsFromCache() {
+    if (typeof loadTrendsFromCache === 'function') {
+        loadTrendsFromCache({
+            serviceName: 'Wikipedia',
+            apiEndpoint: '/api/wikipedia-trends',
+            params: { lang: 'ja' },
+            uiIds: {
+                loading: 'wikipediaLoading'
+            },
+            displayFunction: displayWikipediaResults,
+            allPaneSync: { mainTableBodyId: 'wikipediaTrendsTableBody', allTableBodyId: 'all-wikipediaTrendsTableBody', targetTabId: 'tab-search' }
+        });
+    } else {
+        console.log('📊 Wikipedia 人気記事 キャッシュデータ読み込み');
+        const loadingElement = document.getElementById('wikipediaLoading');
+        if (loadingElement) loadingElement.style.display = 'block';
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        fetchWithRetry('/api/wikipedia-trends?lang=ja&limit=25&force_refresh=false', { signal: controller.signal })
+            .then(response => {
+                clearTimeout(timeoutId);
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
+            })
+            .then(data => {
+                if (loadingElement) loadingElement.style.display = 'none';
+                if (data.success && data.data && data.data.length > 0 && typeof displayWikipediaResults === 'function') {
+                    displayWikipediaResults(data);
+                }
+                const resultsElement = document.getElementById('wikipediaResults');
+                if (resultsElement) resultsElement.style.display = 'block';
+            })
+            .catch(error => {
+                clearTimeout(timeoutId);
+                console.error('Wikipedia キャッシュ読み込みエラー:', error);
                 if (loadingElement) loadingElement.style.display = 'none';
             });
     }

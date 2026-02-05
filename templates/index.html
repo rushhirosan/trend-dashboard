@@ -171,6 +171,19 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="col-12 col-md-6 col-lg-4" data-all-card="wikipedia">
+                            <div class="card h-100">
+                                <div class="card-header text-white d-flex justify-content-between align-items-center py-2" style="background:#636466;">
+                                    <h3 class="h6 mb-0"><i class="fab fa-wikipedia-w"></i> Wikipedia 人気記事</h3>
+                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" data-target-anchor="source-wikipedia" aria-label="検索・動画タブへ">もっと見る</a>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>閲覧数</th></tr></thead><tbody id="all-wikipediaTrendsTableBody"></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="google">
                             <div class="card h-100">
                                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
@@ -514,52 +527,15 @@
                             </div>
                             <div class="card-body">
                                 <div id="newsResults">
-                                    <div class="alert alert-info status-message" id="newsStatusMessage" style="display: none !important;">
-                                        <!-- ステータスメッセージがここに表示されます -->
-                                    </div>
-                                    <div class="alert alert-danger" id="newsErrorMessage" style="display: none;">
-                                        <!-- ニューストレンドエラーメッセージがここに表示されます -->
-                                    </div>
+                                    <div class="alert alert-info status-message" id="newsStatusMessage" style="display: none !important;"></div>
+                                    <div class="alert alert-danger" id="newsErrorMessage" style="display: none;"></div>
                                     <div class="card trend-table category-card">
                                         <div class="card-body">
                                             <div class="trend-table-container">
                                                 <div class="table-responsive">
                                                     <table class="table table-hover trend-table" id="newsTrendsTable">
-                                                        <thead class="table-dark">
-                                                            <tr>
-                                                                <th>順位</th>
-                                                                <th>タイトル</th>
-                                                                <th>公開日 / ソース</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody id="newsTrendsTableBody">
-                                                            <!-- スケルトンUI: データ読み込み前のプレースホルダー -->
-                                                            <tr class="skeleton-row">
-                                                                <td><div class="skeleton skeleton-badge"></div></td>
-                                                                <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
-                                                                <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
-                                                            </tr>
-                                                            <tr class="skeleton-row">
-                                                                <td><div class="skeleton skeleton-badge"></div></td>
-                                                                <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
-                                                                <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
-                                                            </tr>
-                                                            <tr class="skeleton-row">
-                                                                <td><div class="skeleton skeleton-badge"></div></td>
-                                                                <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
-                                                                <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
-                                                            </tr>
-                                                            <tr class="skeleton-row">
-                                                                <td><div class="skeleton skeleton-badge"></div></td>
-                                                                <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
-                                                                <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
-                                                            </tr>
-                                                            <tr class="skeleton-row">
-                                                                <td><div class="skeleton skeleton-badge"></div></td>
-                                                                <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
-                                                                <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
-                                                            </tr>
-                                                        </tbody>
+                                                        <thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>公開日 / ソース</th></tr></thead>
+                                                        <tbody id="newsTrendsTableBody"></tbody>
                                                     </table>
                                                 </div>
                                             </div>
@@ -573,7 +549,7 @@
                 </div><!-- /.tab-pane#pane-news -->
 
                 <div class="tab-pane fade" id="pane-search" role="tabpanel" aria-labelledby="tab-search">
-                    <!-- 2行目: Google Trends + YouTube Trends -->
+                    <!-- 1行目: Google Trends + YouTube Trends -->
                 <div class="row g-3 mb-3">
                     <!-- 左側: Google Trends -->
                     <article class="col-12 col-md-6" id="source-google">
@@ -721,6 +697,38 @@
                                                                 <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
                                                             </tr>
                                                         </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                    </div>
+                    <!-- 2行目: Wikipedia 人気記事 -->
+                    <div class="row g-3 mb-3">
+                    <article class="col-12 col-md-6" id="source-wikipedia">
+                        <div class="card h-100">
+                            <div class="card-header text-white d-flex justify-content-between align-items-center" style="background:#636466;">
+                                <h2 class="h5 mb-0"><i class="fab fa-wikipedia-w" aria-hidden="true"></i> Wikipedia 人気記事</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="loading text-center py-5" id="wikipediaLoading" style="display: none;">
+                                    <div class="spinner-border text-secondary" role="status"><span class="visually-hidden">Loading...</span></div>
+                                    <p class="mt-3">Wikipedia 人気記事を取得中...</p>
+                                </div>
+                                <div id="wikipediaResults">
+                                    <div class="alert alert-secondary status-message" id="wikipediaStatusMessage" style="display: none !important;"></div>
+                                    <div class="alert alert-danger" id="wikipediaErrorMessage" style="display: none;"></div>
+                                    <div class="card trend-table category-card">
+                                        <div class="card-body">
+                                            <div class="trend-table-container">
+                                                <div class="table-responsive">
+                                                    <table class="table table-hover trend-table" id="wikipediaTrendsTable">
+                                                        <thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>閲覧数</th></tr></thead>
+                                                        <tbody id="wikipediaTrendsTableBody"></tbody>
                                                     </table>
                                                 </div>
                                             </div>

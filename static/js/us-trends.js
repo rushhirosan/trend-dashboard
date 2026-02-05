@@ -1102,6 +1102,9 @@ function loadCachedDataUS() {
     // Load CNN News from cache
     loadCNNFromCacheUS();
     
+    // Load Wikipedia Most Read (en) from cache
+    loadWikipediaFromCacheUS();
+    
     // Load Product Hunt from cache
     loadProductHuntFromCacheUS();
 }
@@ -2067,6 +2070,76 @@ function displayCNNResults(data) {
         setTimeout(() => syncToAllPane('cnnTrendsTableBody', 'all-cnnTrendsTableBody', 5), 0);
     }
     console.log('displayCNNResults: Completed');
+}
+
+// Wikipedia Most Read (en) cache data loading for US
+function loadWikipediaFromCacheUS() {
+    console.log('📊 Wikipedia Most Read cache data loading for US');
+    const loadingElement = document.getElementById('wikipediaLoading');
+    const resultsElement = document.getElementById('wikipediaResults');
+    if (loadingElement) loadingElement.style.display = 'block';
+    if (resultsElement) resultsElement.style.display = 'none';
+
+    fetchWithRetry('/api/wikipedia-trends?lang=en&limit=25&force_refresh=false')
+        .then(response => {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        })
+        .then(data => {
+            if (loadingElement) loadingElement.style.display = 'none';
+            if (data.success && data.data && data.data.length > 0) {
+                displayWikipediaResultsUS(data);
+            } else {
+                showWikipediaErrorUS(data.error || 'No data available');
+            }
+            if (resultsElement) resultsElement.style.display = 'block';
+        })
+        .catch(error => {
+            console.error('Wikipedia cache loading error:', error);
+            if (loadingElement) loadingElement.style.display = 'none';
+            showWikipediaErrorUS('Failed to load Wikipedia most read: ' + error.message);
+            if (resultsElement) resultsElement.style.display = 'block';
+        });
+}
+
+function displayWikipediaResultsUS(data) {
+    const resultsElement = document.getElementById('wikipediaResults');
+    const errorElement = document.getElementById('wikipediaErrorMessage');
+    const tableBody = document.getElementById('wikipediaTrendsTableBody');
+    if (!resultsElement || !tableBody) return;
+
+    if (errorElement) errorElement.style.display = 'none';
+    tableBody.innerHTML = '';
+
+    data.data.forEach((item, index) => {
+        const row = document.createElement('tr');
+        const url = item.url || '#';
+        const title = item.title || 'N/A';
+        const views = item.views != null ? item.views.toLocaleString() : '-';
+        row.innerHTML = `
+            <td><span class="badge bg-secondary">${index + 1}</span></td>
+            <td><a href="${url}" target="_blank" class="text-decoration-none"><strong>${title}</strong></a></td>
+            <td>${views}</td>
+        `;
+        if (typeof makeTableRowClickable === 'function') {
+            makeTableRowClickable(row, url, `Open ${title} on Wikipedia`);
+        }
+        tableBody.appendChild(row);
+    });
+
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('wikipediaTrendsTableBody', 'all-wikipediaTrendsTableBody', 5), 0);
+    }
+}
+
+function showWikipediaErrorUS(message) {
+    const errorElement = document.getElementById('wikipediaErrorMessage');
+    const resultsElement = document.getElementById('wikipediaResults');
+    if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+    }
+    if (resultsElement) resultsElement.style.display = 'block';
 }
 
 // Error display function for CNN

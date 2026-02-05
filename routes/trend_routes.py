@@ -124,7 +124,7 @@ def handle_trend_response(result, error_message, default_source=None, **extra_fi
         
         # 結果から追加フィールドをコピー
         for key in ['country', 'region', 'region_code', 'category', 'trend_type', 
-                   'subreddit', 'story_type', 'sort', 'service', 'genre_id']:
+                   'subreddit', 'story_type', 'sort', 'service', 'genre_id', 'lang']:
             if key in result:
                 response[key] = result[key]
         
@@ -438,6 +438,23 @@ def get_nhk_trends(manager):
         
     except Exception as e:
         return handle_api_error('NHKニュース', e)
+
+
+@trend_bp.route('/wikipedia-trends')
+@require_manager('wikipedia')
+def get_wikipedia_trends(manager):
+    """Wikipedia 人気記事（Most read）APIエンドポイント。lang=ja（日本）/ en（英語）"""
+    try:
+        lang = request.args.get('lang', 'ja').lower()
+        limit = int(request.args.get('limit', 25))
+        force_refresh = get_force_refresh()
+        
+        result = manager.get_trends(lang=lang, limit=limit, force_refresh=force_refresh)
+        return handle_trend_response(result, 'Wikipedia 人気記事', 'Wikipedia Featured API', lang=lang)
+        
+    except Exception as e:
+        return handle_api_error('Wikipedia 人気記事', e)
+
 
 @trend_bp.route('/producthunt-trends')
 @require_manager('producthunt')

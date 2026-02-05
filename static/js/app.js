@@ -1717,6 +1717,76 @@ function showNHKError(message) {
     }
 }
 
+// Wikipedia 人気記事 トレンド取得（日本語）
+async function fetchWikipediaTrends() {
+    const resultsElement = document.getElementById('wikipediaResults');
+    const errorElement = document.getElementById('wikipediaErrorMessage');
+    const tableBody = document.getElementById('wikipediaTrendsTableBody');
+    const loadingElement = document.getElementById('wikipediaLoading');
+
+    if (!resultsElement || !tableBody) return;
+
+    try {
+        if (loadingElement) loadingElement.style.display = 'block';
+        resultsElement.style.display = 'none';
+        if (errorElement) errorElement.style.display = 'none';
+
+        const response = await fetchWithRetry('/api/wikipedia-trends?lang=ja&limit=25');
+        const data = await response.json();
+
+        if (!response.ok) throw new Error(data.error || 'HTTP ' + response.status);
+        if (!data.success) throw new Error(data.error || '取得に失敗しました');
+
+        if (loadingElement) loadingElement.style.display = 'none';
+        displayWikipediaResults(data);
+    } catch (error) {
+        console.error('Wikipedia 人気記事 API エラー:', error);
+        if (loadingElement) loadingElement.style.display = 'none';
+        showWikipediaError(error.message);
+    }
+}
+
+function displayWikipediaResults(data) {
+    const resultsElement = document.getElementById('wikipediaResults');
+    const tableBody = document.getElementById('wikipediaTrendsTableBody');
+    if (!resultsElement || !tableBody) return;
+
+    tableBody.innerHTML = '';
+    if (!data.data || data.data.length === 0) {
+        showWikipediaError('データがありません');
+        return;
+    }
+
+    data.data.forEach((item, index) => {
+        const row = document.createElement('tr');
+        const url = item.url || '#';
+        const title = item.title || 'タイトルなし';
+        const views = item.views != null ? item.views.toLocaleString() : '-';
+        row.innerHTML = `
+            <td>${index + 1}</td>
+            <td><a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a></td>
+            <td>${views}</td>
+        `;
+        makeTableRowClickable(row, url, title + 'の記事を開く');
+        tableBody.appendChild(row);
+    });
+
+    resultsElement.style.display = 'block';
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('wikipediaTrendsTableBody', 'all-wikipediaTrendsTableBody', 5), 0);
+    }
+}
+
+function showWikipediaError(message) {
+    const errorElement = document.getElementById('wikipediaErrorMessage');
+    const resultsElement = document.getElementById('wikipediaResults');
+    if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+    }
+    if (resultsElement) resultsElement.style.display = 'block';
+}
+
 // Qiita トレンド取得
 async function fetchQiitaTrends() {
     console.log('=== Qiita トレンド取得開始 ===');

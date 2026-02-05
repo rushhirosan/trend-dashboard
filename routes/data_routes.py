@@ -101,6 +101,8 @@ def get_data_freshness():
             'ebay_trends': 'eBay Popular/Trending',
             'devto_trends': 'DEV.to',
             'medium_trends': 'Medium',
+            'wikipedia_trends_ja': 'Wikipedia 人気記事 (日本語)',
+            'wikipedia_trends_en': 'Wikipedia 人気記事 (英語)',
         }
         
         freshness_info = {}

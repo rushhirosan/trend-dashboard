@@ -37,6 +37,7 @@ from services.trends.note_trends import NoteTrendsManager
 from services.trends.ebay_trends import eBayTrendsManager
 from services.trends.medium_trends import MediumTrendsManager
 from services.trends.devto_trends import DevToTrendsManager
+from services.trends.wikipedia_trends import WikipediaTrendsManager
 from utils.logger_config import get_logger
 
 # ロガーの初期化
@@ -75,6 +76,7 @@ MANAGER_CONFIGS = [
     ('ebay', eBayTrendsManager, 'eBay Popular/Trending'),
     ('medium', MediumTrendsManager, 'Medium'),
     ('devto', DevToTrendsManager, 'DEV.to'),
+    ('wikipedia', WikipediaTrendsManager, 'Wikipedia'),
 ]
 
 
@@ -202,6 +204,7 @@ def refresh_all_trends(managers, force_refresh=True):
     tasks.append(('jpcert', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
     tasks.append(('zenn', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
     tasks.append(('note', lambda m: m.get_trends(category='all', limit=25, force_refresh=force_refresh, fetch_all_categories=True), 'JP'))
+    tasks.append(('wikipedia', lambda m: m.get_trends(lang='ja', limit=25, force_refresh=force_refresh), 'JP'))
 
     # USのデータを更新するタスク
     logger.info("🇺🇸 USのデータを更新中（並列実行）...")
@@ -235,6 +238,7 @@ def refresh_all_trends(managers, force_refresh=True):
     tasks.append(('thehackernews', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
     tasks.append(('medium', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
     tasks.append(('devto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('wikipedia', lambda m: m.get_trends(lang='en', limit=25, force_refresh=force_refresh), 'US'))
 
     # 並列実行（最大20スレッド）
     max_workers = min(20, len(tasks))

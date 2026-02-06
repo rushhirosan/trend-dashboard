@@ -315,6 +315,19 @@ def execute_scheduler():
         return handle_data_error('スケジューラー実行', e)
 
 
+@data_bp.route('/scheduler/lock-status')
+def scheduler_lock_status():
+    """スケジューラー分散ロックの現在状態（デバッグ用）。Discordが来ない原因切り分けに利用。"""
+    try:
+        cache = get_cache()
+        if not cache or not hasattr(cache, 'get_scheduler_lock_status'):
+            return jsonify({'success': False, 'error': 'キャッシュ/ロック状態を取得できません'}), 500
+        status = cache.get_scheduler_lock_status()
+        return jsonify({'success': True, 'lock': status})
+    except Exception as e:
+        return handle_data_error('ロック状態取得', e)
+
+
 @data_bp.route('/alert/test', methods=['POST'])
 def test_alert():
     """Discord アラートのテスト送信（Webhook 動作確認用）"""

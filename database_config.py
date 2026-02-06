@@ -368,6 +368,30 @@ class TrendsCache:
                     cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
+                CREATE TABLE IF NOT EXISTS prtimes_trends_cache (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    url TEXT,
+                    published_date TIMESTAMP WITH TIME ZONE,
+                    description TEXT,
+                    rank INTEGER DEFAULT 0,
+                    tags TEXT,
+                    cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                ALTER TABLE prtimes_trends_cache ADD COLUMN IF NOT EXISTS tags TEXT;
+                
+                CREATE TABLE IF NOT EXISTS globenewswire_trends_cache (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    url TEXT,
+                    published_date TIMESTAMP WITH TIME ZONE,
+                    description TEXT,
+                    rank INTEGER DEFAULT 0,
+                    tags TEXT,
+                    cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                ALTER TABLE globenewswire_trends_cache ADD COLUMN IF NOT EXISTS tags TEXT;
+                
                 CREATE TABLE IF NOT EXISTS wikipedia_trends_cache (
                     id SERIAL PRIMARY KEY,
                     title TEXT NOT NULL,
@@ -731,6 +755,8 @@ class TrendsCache:
                 CREATE INDEX IF NOT EXISTS idx_appstore_trends_cache_rank ON appstore_trends_cache(rank);
                 CREATE INDEX IF NOT EXISTS idx_nhk_trends_cache_rank ON nhk_trends_cache(rank);
                 CREATE INDEX IF NOT EXISTS idx_cnn_trends_cache_rank ON cnn_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_prtimes_trends_cache_rank ON prtimes_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_globenewswire_trends_cache_rank ON globenewswire_trends_cache(rank);
                 CREATE INDEX IF NOT EXISTS idx_producthunt_trends_cache_rank ON producthunt_trends_cache(rank);
                 CREATE INDEX IF NOT EXISTS idx_stock_trends_cache_rank ON stock_trends_cache(rank);
                 CREATE INDEX IF NOT EXISTS idx_crypto_trends_cache_rank ON crypto_trends_cache(rank);
@@ -854,6 +880,10 @@ class TrendsCache:
                     elif cache_key == 'qiita_trends':
                         cursor.execute(f"DELETE FROM {table_name}")
                     elif cache_key == 'nhk_trends':
+                        cursor.execute(f"DELETE FROM {table_name}")
+                    elif cache_key == 'prtimes_trends':
+                        cursor.execute(f"DELETE FROM {table_name}")
+                    elif cache_key == 'globenewswire_trends':
                         cursor.execute(f"DELETE FROM {table_name}")
                     elif cache_key == 'producthunt_trends':
                         cursor.execute(f"DELETE FROM {table_name}")
@@ -2055,6 +2085,22 @@ class TrendsCache:
             logger.error(f"❌ cache_status更新エラー: {e}", exc_info=True)
             return False
     
+    def _ensure_scheduler_lock_table_and_row(self, conn):
+        """scheduler_lock テーブルと id=1 の行が存在することを保証する。呼び出し元で conn の commit を行う。"""
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS scheduler_lock (
+                    id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+                    holder_id VARCHAR(255),
+                    locked_at TIMESTAMP,
+                    lock_until TIMESTAMP
+                )
+            """)
+            cursor.execute("""
+                INSERT INTO scheduler_lock (id, holder_id, locked_at, lock_until)
+                VALUES (1, NULL, NULL, NULL) ON CONFLICT (id) DO NOTHING
+            """)
+
     def try_acquire_scheduler_lock_db(self, holder_id: str, lock_minutes: int = 30) -> bool:
         """スケジューラー分散ロックを取得（DBベース、複数マシン・プロセス間で共有）
         
@@ -2068,13 +2114,52 @@ class TrendsCache:
         try:
             with self.get_connection() as conn:
                 with conn.cursor() as cursor:
-                    cursor.execute("""
-                        UPDATE scheduler_lock
-                        SET holder_id = %s, locked_at = NOW(), lock_until = NOW() + %s * INTERVAL '1 minute'
-                        WHERE id = 1 AND (holder_id IS NULL OR lock_until < NOW())
-                    """, (holder_id, lock_minutes))
-                    conn.commit()
-                    return cursor.rowcount == 1
+                    try:
+                        cursor.execute("""
+                            UPDATE scheduler_lock
+                            SET holder_id = %s, locked_at = NOW(), lock_until = NOW() + %s * INTERVAL '1 minute'
+                            WHERE id = 1 AND (holder_id IS NULL OR lock_until < NOW())
+                        """, (holder_id, lock_minutes))
+                        conn.commit()
+                        if cursor.rowcount == 1:
+                            return True
+                    except Exception as table_err:
+                        # テーブル未作成などで UPDATE が失敗した場合のみテーブル/行を自動作成
+                        conn.rollback()
+                        logger.info("scheduler_lock の UPDATE が失敗したためテーブル/行を自動作成します: %s", table_err)
+                        self._ensure_scheduler_lock_table_and_row(conn)
+                        conn.commit()
+                        with conn.cursor() as c2:
+                            c2.execute("""
+                                UPDATE scheduler_lock
+                                SET holder_id = %s, locked_at = NOW(), lock_until = NOW() + %s * INTERVAL '1 minute'
+                                WHERE id = 1 AND (holder_id IS NULL OR lock_until < NOW())
+                            """, (holder_id, lock_minutes))
+                            conn.commit()
+                            if c2.rowcount == 1:
+                                logger.info("✅ scheduler_lock を自動作成してロックを取得しました")
+                                return True
+                        return False
+                    # 0件 = 他が保持中 または 行が存在しない。行が無い場合のみ作成して1回だけ再試行
+                    cursor.execute("SELECT 1 FROM scheduler_lock WHERE id = 1")
+                    if cursor.fetchone() is not None:
+                        return False
+                    try:
+                        self._ensure_scheduler_lock_table_and_row(conn)
+                        conn.commit()
+                        cursor.execute("""
+                            UPDATE scheduler_lock
+                            SET holder_id = %s, locked_at = NOW(), lock_until = NOW() + %s * INTERVAL '1 minute'
+                            WHERE id = 1 AND (holder_id IS NULL OR lock_until < NOW())
+                        """, (holder_id, lock_minutes))
+                        conn.commit()
+                        if cursor.rowcount == 1:
+                            logger.info("✅ scheduler_lock 行を自動作成してロックを取得しました")
+                            return True
+                    except Exception as ensure_e:
+                        logger.warning("⚠️ scheduler_lock 行の自動作成に失敗: %s", ensure_e)
+                        conn.rollback()
+                    return False
         except Exception as e:
             logger.warning(f"⚠️ スケジューラーDBロック取得エラー: {e}", exc_info=True)
             return False
@@ -2094,7 +2179,28 @@ class TrendsCache:
         except Exception as e:
             logger.warning(f"⚠️ スケジューラーDBロック解放エラー: {e}", exc_info=True)
             return False
-    
+
+    def get_scheduler_lock_status(self):
+        """スケジューラー分散ロックの現在状態を返す（デバッグ用）。取得失敗時は None。"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT holder_id, locked_at, lock_until
+                        FROM scheduler_lock WHERE id = 1
+                    """)
+                    row = cursor.fetchone()
+                    if not row:
+                        return None
+                    return {
+                        "holder_id": row[0],
+                        "locked_at": row[1].isoformat() if row[1] else None,
+                        "lock_until": row[2].isoformat() if row[2] else None,
+                    }
+        except Exception as e:
+            logger.warning("⚠️ スケジューラーDBロック状態取得エラー: %s", e)
+            return None
+
     def clear_all_cache(self):
         """全キャッシュをクリア"""
         try:
@@ -2162,6 +2268,8 @@ class TrendsCache:
                     'qiita_trends_cache',
                     'nhk_trends_cache',
                     'cnn_trends_cache',
+                    'prtimes_trends_cache',
+                    'globenewswire_trends_cache',
                     'wikipedia_trends_cache',
                     'producthunt_trends_cache'
                 ]
@@ -2872,6 +2980,180 @@ class TrendsCache:
             return False
         except Exception as e:
             logger.error(f"❌ nhk_trendsキャッシュクリアエラー: {e}", exc_info=True)
+            return False
+    
+    # PR TIMES Trends キャッシュメソッド
+    def save_prtimes_trends_to_cache(self, data):
+        """PR TIMES Trendsデータをキャッシュに保存"""
+        if not data:
+            return False
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM prtimes_trends_cache")
+                    for item in data:
+                        tags_json = json.dumps(item.get('tags') or [], ensure_ascii=False) if (item.get('tags') is not None) else None
+                        cursor.execute("""
+                            INSERT INTO prtimes_trends_cache
+                            (title, url, published_date, description, rank, tags)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                        """, (
+                            item.get('title', ''),
+                            item.get('url', ''),
+                            item.get('published_date'),
+                            item.get('description', ''),
+                            item.get('rank', 0),
+                            tags_json
+                        ))
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        ('prtimes_trends', now_jst, len(data), now_jst, len(data))
+                    )
+                    conn.commit()
+                    logger.info(f"✅ prtimes_trendsキャッシュを保存しました ({len(data)}件)")
+                    return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ prtimes_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ prtimes_trendsキャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def get_prtimes_trends_from_cache(self):
+        """PR TIMES Trendsデータをキャッシュから取得"""
+        def query_func(conn):
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT title, url, published_date, description, rank, tags, cached_at
+                    FROM prtimes_trends_cache ORDER BY rank LIMIT 50
+                """)
+                data = cursor.fetchall()
+                result = []
+                for row in data:
+                    row_dict = dict(row)
+                    if row_dict.get('published_date') and isinstance(row_dict['published_date'], datetime):
+                        row_dict['published_date'] = row_dict['published_date'].isoformat()
+                    if row_dict.get('tags') and isinstance(row_dict['tags'], str):
+                        try:
+                            row_dict['tags'] = json.loads(row_dict['tags'])
+                        except (TypeError, ValueError):
+                            row_dict['tags'] = []
+                    elif row_dict.get('tags') is None:
+                        row_dict['tags'] = []
+                    result.append(row_dict)
+                return result
+        try:
+            return self._execute_with_retry(query_func)
+        except Exception as e:
+            logger.error(f"❌ PR TIMES Trendsキャッシュ取得エラー: {e}", exc_info=True)
+            return None
+
+    def clear_prtimes_trends_cache(self):
+        """PR TIMES Trendsキャッシュをクリア"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM prtimes_trends_cache")
+                    conn.commit()
+                    logger.info("✅ prtimes_trendsのキャッシュをクリアしました")
+                    return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ prtimes_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ prtimes_trendsキャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
+    # GlobeNewswire Trends キャッシュメソッド
+    def save_globenewswire_trends_to_cache(self, data):
+        """GlobeNewswire Trendsデータをキャッシュに保存"""
+        if not data:
+            return False
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM globenewswire_trends_cache")
+                    for item in data:
+                        tags_json = json.dumps(item.get('tags') or [], ensure_ascii=False) if (item.get('tags') is not None) else None
+                        cursor.execute("""
+                            INSERT INTO globenewswire_trends_cache
+                            (title, url, published_date, description, rank, tags)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                        """, (
+                            item.get('title', ''),
+                            item.get('url', ''),
+                            item.get('published_date'),
+                            item.get('description', ''),
+                            item.get('rank', 0),
+                            tags_json
+                        ))
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        ('globenewswire_trends', now_jst, len(data), now_jst, len(data))
+                    )
+                    conn.commit()
+                    logger.info(f"✅ globenewswire_trendsキャッシュを保存しました ({len(data)}件)")
+                    return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ globenewswire_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ globenewswire_trendsキャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def get_globenewswire_trends_from_cache(self):
+        """GlobeNewswire Trendsデータをキャッシュから取得"""
+        def query_func(conn):
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT title, url, published_date, description, rank, tags, cached_at
+                    FROM globenewswire_trends_cache ORDER BY rank LIMIT 50
+                """)
+                data = cursor.fetchall()
+                result = []
+                for row in data:
+                    row_dict = dict(row)
+                    if row_dict.get('published_date') and isinstance(row_dict['published_date'], datetime):
+                        row_dict['published_date'] = row_dict['published_date'].isoformat()
+                    if row_dict.get('tags') and isinstance(row_dict['tags'], str):
+                        try:
+                            row_dict['tags'] = json.loads(row_dict['tags'])
+                        except (TypeError, ValueError):
+                            row_dict['tags'] = []
+                    elif row_dict.get('tags') is None:
+                        row_dict['tags'] = []
+                    result.append(row_dict)
+                return result
+        try:
+            return self._execute_with_retry(query_func)
+        except Exception as e:
+            logger.error(f"❌ GlobeNewswire Trendsキャッシュ取得エラー: {e}", exc_info=True)
+            return None
+
+    def clear_globenewswire_trends_cache(self):
+        """GlobeNewswire Trendsキャッシュをクリア"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM globenewswire_trends_cache")
+                    conn.commit()
+                    logger.info("✅ globenewswire_trendsのキャッシュをクリアしました")
+                    return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ globenewswire_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ globenewswire_trendsキャッシュクリアエラー: {e}", exc_info=True)
             return False
     
     # Wikipedia Trends キャッシュメソッド

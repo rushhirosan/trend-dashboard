@@ -86,7 +86,16 @@ class TrendsScheduler:
                     return ('db', holder_id)
                 # DBロックが「他が保持中」の場合はここで終了。ファイルロックにフォールバックしない
                 # （別マシンでは /tmp が共有されないため、フォールバックすると二重実行になる）
-                logger.debug("🔒 スケジューラーDB分散ロックは他プロセスが保持中のためスキップ")
+                lock_status = None
+                if hasattr(self.db, 'get_scheduler_lock_status'):
+                    try:
+                        lock_status = self.db.get_scheduler_lock_status()
+                    except Exception:
+                        pass
+                logger.info(
+                    "⏭️ スケジューラーDB分散ロックは他プロセスが保持中のためスキップ（このプロセスでは実行しません） lock_status=%s",
+                    lock_status,
+                )
                 return None
         except Exception as e:
             logger.warning("⚠️ スケジューラーDBロック取得スキップ（フォールバック）: %s", e)

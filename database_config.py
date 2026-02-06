@@ -4,6 +4,7 @@ PostgreSQLデータベースの接続とキャッシュ機能を提供
 """
 
 import os
+import re
 import json
 import threading
 import psycopg2
@@ -774,8 +775,27 @@ class TrendsCache:
                 CREATE INDEX IF NOT EXISTS idx_note_trends_cache_rank ON note_trends_cache(rank);
                 """
                 
-                cursor.execute(create_tables_sql)
-                conn.commit()
+                # DDLは1文ずつ実行（複数文一括実行でcursor already closedが発生する場合があるため）
+                # autocommitで各文を独立トランザクションとして実行
+                old_isolation = conn.isolation_level
+                conn.set_isolation_level(extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+                try:
+                    # DO $$...$$ ブロックを保護して分割（DOブロック内の;で分割しない）
+                    parts = re.split(r'(DO \$\$.*?END \$\$;)', create_tables_sql, flags=re.DOTALL)
+                    for part in parts:
+                        part = part.strip()
+                        if not part or part.startswith('--'):
+                            continue
+                        if part.startswith('DO $$'):
+                            cursor.execute(part)
+                            continue
+                        # 通常の文は ; で分割
+                        for stmt in part.split(';'):
+                            stmt = stmt.strip()
+                            if stmt and not stmt.startswith('--'):
+                                cursor.execute(stmt + ';')
+                finally:
+                    conn.set_isolation_level(old_isolation)
                 
                 # ipa_trends_cacheテーブルのスキーマ更新（既存テーブルにカラムを追加）
                 try:
@@ -1209,6 +1229,7 @@ class TrendsCache:
         max_retries = 3
         base_retry_delay = 0.5
         
+        # 接続取得のリトライループ（取得・検証時のエラーのみリトライ、yield後の例外はリトライしない）
         for attempt in range(max_retries):
             try:
                 # 接続プールから接続を取得
@@ -1240,59 +1261,17 @@ class TrendsCache:
                     else:
                         raise verify_error
                 
-                # 接続を返す（コンテキストマネージャーとして）
-                # 呼び出し元で発生した例外は必ず再送出（finally 後に raise で generator didn't stop を防ぐ）
-                pending_exc = None
-                try:
-                    yield conn
-                except BaseException as e:
-                    pending_exc = e
-                finally:
-                    # 使用後に接続を返却
-                    if conn:
-                        try:
-                            # 接続が有効か確認
-                            try:
-                                # トランザクション状態を確認してクリーンアップ
-                                transaction_status = conn.get_transaction_status()
-                                if transaction_status == extensions.TRANSACTION_STATUS_INTRANS:
-                                    # トランザクションが開いている場合はロールバック
-                                    try:
-                                        conn.rollback()
-                                    except Exception:
-                                        pass
-                                elif transaction_status == extensions.TRANSACTION_STATUS_INERROR:
-                                    # エラー状態の場合はロールバック
-                                    try:
-                                        conn.rollback()
-                                    except Exception:
-                                        pass
-                            except (psycopg2.InterfaceError, psycopg2.OperationalError, AttributeError):
-                                # 接続が無効な場合は、そのまま接続を閉じて返却
-                                pass
-                            
-                            # 接続を返却
-                            try:
-                                self.pool.putconn(conn)
-                            except (psycopg2.InterfaceError, psycopg2.OperationalError):
-                                # 接続が無効な場合は閉じて返却
-                                try:
-                                    self.pool.putconn(conn, close=True)
-                                except Exception:
-                                    pass
-                        except Exception as put_error:
-                            logger.warning(f"⚠️ 接続の返却中にエラーが発生しました: {put_error}")
-                            # エラーが発生した場合は接続を閉じて返却
-                            try:
-                                self.pool.putconn(conn, close=True)
-                            except Exception:
-                                pass
-                if pending_exc is not None:
-                    raise pending_exc
-                return
+                # 検証成功 → リトライループを抜けて yield へ
+                break
                 
             except pool.PoolError as pool_error:
                 # 接続プールのエラー
+                if conn:
+                    try:
+                        self.pool.putconn(conn, close=True)
+                    except Exception:
+                        pass
+                    conn = None
                 if attempt < max_retries - 1:
                     wait_time = base_retry_delay * (2 ** attempt)
                     logger.warning(f"⚠️ 接続プールエラー（再試行します）: {pool_error}")
@@ -1303,7 +1282,7 @@ class TrendsCache:
                     raise psycopg2.OperationalError(f"接続プールから接続を取得できませんでした: {pool_error}")
             
             except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
-                # 接続エラー
+                # 接続エラー（取得・検証時のみここに来る）
                 if conn:
                     try:
                         self.pool.putconn(conn, close=True)
@@ -1322,8 +1301,49 @@ class TrendsCache:
                     logger.error(f"❌ データベース接続エラー（最大試行回数）: {e}")
                     raise
         
-        # 全ての再試行が失敗した場合
-        raise psycopg2.OperationalError("データベース接続を取得できませんでした（最大試行回数に達しました）")
+        if conn is None:
+            raise psycopg2.OperationalError("データベース接続を取得できませんでした（最大試行回数に達しました）")
+        
+        # 接続を返す（yield後の例外はリトライせずそのまま再送出 → generator didn't stop を防止）
+        pending_exc = None
+        try:
+            yield conn
+        except BaseException as e:
+            pending_exc = e
+        finally:
+            # 使用後に接続を返却
+            if conn:
+                try:
+                    try:
+                        transaction_status = conn.get_transaction_status()
+                        if transaction_status == extensions.TRANSACTION_STATUS_INTRANS:
+                            try:
+                                conn.rollback()
+                            except Exception:
+                                pass
+                        elif transaction_status == extensions.TRANSACTION_STATUS_INERROR:
+                            try:
+                                conn.rollback()
+                            except Exception:
+                                pass
+                    except (psycopg2.InterfaceError, psycopg2.OperationalError, AttributeError):
+                        pass
+                    
+                    try:
+                        self.pool.putconn(conn)
+                    except (psycopg2.InterfaceError, psycopg2.OperationalError):
+                        try:
+                            self.pool.putconn(conn, close=True)
+                        except Exception:
+                            pass
+                except Exception as put_error:
+                    logger.warning(f"⚠️ 接続の返却中にエラーが発生しました: {put_error}")
+                    try:
+                        self.pool.putconn(conn, close=True)
+                    except Exception:
+                        pass
+        if pending_exc is not None:
+            raise pending_exc
     
     def _execute_with_retry(self, query_func, max_retries=3, is_read_only=True):
         """接続エラーが発生した場合に自動的に再接続を試みるヘルパーメソッド

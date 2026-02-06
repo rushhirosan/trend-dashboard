@@ -440,6 +440,36 @@ def get_nhk_trends(manager):
         return handle_api_error('NHKニュース', e)
 
 
+@trend_bp.route('/prtimes-trends')
+@require_manager('prtimes')
+def get_prtimes_trends(manager):
+    """PR TIMES プレスリリース APIエンドポイント（日本向け）"""
+    try:
+        limit = int(request.args.get('limit', 25))
+        force_refresh = get_force_refresh()
+        
+        result = manager.get_trends(limit=limit, force_refresh=force_refresh)
+        return handle_trend_response(result, 'PR TIMES', 'PR TIMES RSS')
+        
+    except Exception as e:
+        return handle_api_error('PR TIMES', e)
+
+
+@trend_bp.route('/globenewswire-trends')
+@require_manager('globenewswire')
+def get_globenewswire_trends(manager):
+    """GlobeNewswire プレスリリース APIエンドポイント（US向け）"""
+    try:
+        limit = int(request.args.get('limit', 25))
+        force_refresh = get_force_refresh()
+        
+        result = manager.get_trends(limit=limit, force_refresh=force_refresh)
+        return handle_trend_response(result, 'GlobeNewswire', 'GlobeNewswire RSS')
+        
+    except Exception as e:
+        return handle_api_error('GlobeNewswire', e)
+
+
 @trend_bp.route('/wikipedia-trends')
 @require_manager('wikipedia')
 def get_wikipedia_trends(manager):

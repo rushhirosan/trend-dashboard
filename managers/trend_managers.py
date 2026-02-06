@@ -38,6 +38,8 @@ from services.trends.ebay_trends import eBayTrendsManager
 from services.trends.medium_trends import MediumTrendsManager
 from services.trends.devto_trends import DevToTrendsManager
 from services.trends.wikipedia_trends import WikipediaTrendsManager
+from services.trends.prtimes_trends import PRTimesTrendsManager
+from services.trends.globenewswire_trends import GlobeNewswireTrendsManager
 from utils.logger_config import get_logger
 
 # ロガーの初期化
@@ -77,6 +79,8 @@ MANAGER_CONFIGS = [
     ('medium', MediumTrendsManager, 'Medium'),
     ('devto', DevToTrendsManager, 'DEV.to'),
     ('wikipedia', WikipediaTrendsManager, 'Wikipedia'),
+    ('prtimes', PRTimesTrendsManager, 'PR TIMES'),
+    ('globenewswire', GlobeNewswireTrendsManager, 'GlobeNewswire'),
 ]
 
 
@@ -194,6 +198,7 @@ def refresh_all_trends(managers, force_refresh=True):
         logger.info("⚠️ Twitch: 認証情報未設定のためスキップ (TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET)")
     tasks.append(('qiita', lambda m: m.get_trends(limit=25, sort='likes_count', force_refresh=force_refresh), 'JP'))
     tasks.append(('nhk', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('prtimes', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
     tasks.append(('stock', lambda m: m.get_trends(market='JP', limit=25, force_refresh=force_refresh), 'JP'))
     tasks.append(('crypto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
     tasks.append(('movie', lambda m: m.get_trends(country='JP', time_window='day', limit=25, force_refresh=force_refresh), 'JP'))
@@ -228,6 +233,7 @@ def refresh_all_trends(managers, force_refresh=True):
     tasks.append(('hackernews', lambda m: m.get_trends('top', limit=25, force_refresh=force_refresh), 'US'))
     tasks.append(('producthunt', lambda m: m.get_trends(limit=25, sort='votes', force_refresh=force_refresh), 'US'))
     tasks.append(('cnn', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('globenewswire', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
     tasks.append(('stock', lambda m: m.get_trends(market='US', limit=25, force_refresh=force_refresh), 'US'))
     tasks.append(('crypto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
     tasks.append(('movie', lambda m: m.get_trends(country='US', time_window='day', limit=25, force_refresh=force_refresh), 'US'))

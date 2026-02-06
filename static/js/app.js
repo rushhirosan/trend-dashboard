@@ -1717,6 +1717,64 @@ function showNHKError(message) {
     }
 }
 
+// PR TIMES 結果表示（RSSのそのまま: title, url, published_date, tags）
+function displayPRTimesResults(data) {
+    const resultsElement = document.getElementById('prtimesResults');
+    const tableBody = document.getElementById('prtimesTrendsTableBody');
+    const errorEl = document.getElementById('prtimesErrorMessage');
+    function esc(s) {
+        if (s == null) return '';
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    if (!resultsElement || !tableBody) return;
+
+    tableBody.innerHTML = '';
+    if (errorEl) errorEl.style.display = 'none';
+
+    if (!data.data || data.data.length === 0) {
+        showPRTimesError('データがありません');
+        return;
+    }
+
+    data.data.forEach((item, index) => {
+        const row = document.createElement('tr');
+        const articleUrl = item.url || '#';
+        const articleTitle = item.title || 'タイトルなし';
+        const tags = item.tags || [];
+        const tagsHtml = tags.length
+            ? tags.map(function(t) {
+                const term = (t && (t.term != null ? t.term : t.label)) || '';
+                return term ? '<span class="badge bg-secondary me-1">' + esc(String(term)) + '</span>' : '';
+            }).filter(Boolean).join(' ')
+            : '-';
+        row.innerHTML =
+            '<td>' + (item.rank || index + 1) + '</td>' +
+            '<td><a href="' + esc(articleUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(articleTitle) + '</a></td>' +
+            '<td>' + (item.published_date ? new Date(item.published_date).toLocaleDateString('ja-JP') : '-') + '</td>' +
+            '<td class="small">' + tagsHtml + '</td>';
+        makeTableRowClickable(row, articleUrl, articleTitle + 'の記事を開く');
+        tableBody.appendChild(row);
+    });
+
+    resultsElement.style.display = 'block';
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(function() { syncToAllPane('prtimesTrendsTableBody', 'all-prtimesTrendsTableBody', 5); }, 0);
+    }
+}
+
+function showPRTimesError(message) {
+    const errorElement = document.getElementById('prtimesErrorMessage');
+    const resultsElement = document.getElementById('prtimesResults');
+    if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+    }
+    if (resultsElement) resultsElement.style.display = 'block';
+}
+
 // Wikipedia 人気記事 トレンド取得（日本語）
 async function fetchWikipediaTrends() {
     const resultsElement = document.getElementById('wikipediaResults');

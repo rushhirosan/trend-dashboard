@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 # 2) ファイルロック（フォールバック）: 同一マシン内の複数ワーカー用（DB利用不可時）
 SCHEDULER_LOCK_PATH = os.environ.get("TRENDS_SCHEDULER_LOCK_PATH", "/tmp/trends_scheduler.lock")
 SCHEDULER_LOCK_MINUTES = int(os.environ.get("TRENDS_SCHEDULER_LOCK_MINUTES", "30"))
+# 単一インスタンス運用時は false にするとDBロックを使わずファイルロックのみで確実に1本だけ実行する
+USE_DB_LOCK = os.environ.get("TRENDS_SCHEDULER_USE_DB_LOCK", "true").lower() == "true"
 
 class TrendsScheduler:
     """トレンド自動取得スケジューラークラス"""
@@ -78,29 +80,31 @@ class TrendsScheduler:
         import socket
         holder_id = f"{socket.gethostname()}-{os.getpid()}-{int(time.time())}"
         
-        # 1) DB分散ロックを優先（複数マシン・Fly.ioの複数インスタンスで共有）
-        try:
-            if self.db and hasattr(self.db, 'try_acquire_scheduler_lock_db'):
-                if self.db.try_acquire_scheduler_lock_db(holder_id, SCHEDULER_LOCK_MINUTES):
-                    logger.debug("🔒 スケジューラーDB分散ロックを取得しました")
-                    return ('db', holder_id)
-                # DBロックが「他が保持中」の場合はここで終了。ファイルロックにフォールバックしない
-                # （別マシンでは /tmp が共有されないため、フォールバックすると二重実行になる）
-                lock_status = None
-                if hasattr(self.db, 'get_scheduler_lock_status'):
-                    try:
-                        lock_status = self.db.get_scheduler_lock_status()
-                    except Exception:
-                        pass
-                logger.info(
-                    "⏭️ スケジューラーDB分散ロックは他プロセスが保持中のためスキップ（このプロセスでは実行しません） lock_status=%s",
-                    lock_status,
-                )
-                return None
-        except Exception as e:
-            logger.warning("⚠️ スケジューラーDBロック取得スキップ（フォールバック）: %s", e)
+        # 1) DB分散ロック（USE_DB_LOCK=true のときのみ。単一インスタンスでは false にして確実に1本動かす）
+        if USE_DB_LOCK:
+            try:
+                if self.db and hasattr(self.db, 'try_acquire_scheduler_lock_db'):
+                    if self.db.try_acquire_scheduler_lock_db(holder_id, SCHEDULER_LOCK_MINUTES):
+                        logger.debug("🔒 スケジューラーDB分散ロックを取得しました")
+                        return ('db', holder_id)
+                    # DBロックが「他が保持中」の場合はここで終了。ファイルロックにフォールバックしない
+                    lock_status = None
+                    if hasattr(self.db, 'get_scheduler_lock_status'):
+                        try:
+                            lock_status = self.db.get_scheduler_lock_status()
+                        except Exception:
+                            pass
+                    logger.info(
+                        "⏭️ スケジューラーDB分散ロックは他プロセスが保持中のためスキップ lock_status=%s",
+                        lock_status,
+                    )
+                    return None
+            except Exception as e:
+                logger.warning("⚠️ スケジューラーDBロック取得スキップ（フォールバック）: %s", e)
+        else:
+            logger.info("🔒 スケジューラー: DBロック無効（TRENDS_SCHEDULER_USE_DB_LOCK=false）。ファイルロックのみで1本実行します。")
         
-        # 2) ファイルロックにフォールバック（同一マシン内のgunicorn複数ワーカー用・DB障害時のみ）
+        # 2) ファイルロック（同一マシン内で1本のみ。DBロック無効時またはDB障害時のフォールバック）
         if fcntl is None:
             # Windows等: ロックなしで実行（単一ワーカー推奨）
             return ('none', -1)

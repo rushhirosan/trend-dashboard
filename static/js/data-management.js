@@ -676,6 +676,49 @@ function loadNHKTrendsFromCache() {
     }
 }
 
+// PR TIMES キャッシュデータ読み込み（RSSそのまま表示）
+function loadPRTimesTrendsFromCache() {
+    if (typeof loadTrendsFromCache === 'function') {
+        loadTrendsFromCache({
+            serviceName: 'PR TIMES',
+            apiEndpoint: '/api/prtimes-trends',
+            params: {},
+            uiIds: {
+                loading: 'prtimesLoading'
+            },
+            displayFunction: displayPRTimesResults,
+            allPaneSync: { mainTableBodyId: 'prtimesTrendsTableBody', allTableBodyId: 'all-prtimesTrendsTableBody', targetTabId: 'tab-news' }
+        });
+    } else {
+        console.log('📊 PR TIMES キャッシュデータ読み込み');
+        var loadingElement = document.getElementById('prtimesLoading');
+        if (loadingElement) loadingElement.style.display = 'block';
+        var controller = new AbortController();
+        var timeoutId = setTimeout(function() { controller.abort(); }, 30000);
+        fetchWithRetry('/api/prtimes-trends?force_refresh=false', { signal: controller.signal })
+            .then(function(response) {
+                clearTimeout(timeoutId);
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
+            })
+            .then(function(data) {
+                if (loadingElement) loadingElement.style.display = 'none';
+                if (data.data && data.data.length > 0 && typeof displayPRTimesResults === 'function') {
+                    displayPRTimesResults(data);
+                }
+                var resultsElement = document.getElementById('prtimesResults');
+                if (resultsElement) resultsElement.style.display = 'block';
+            })
+            .catch(function(error) {
+                clearTimeout(timeoutId);
+                console.error('PR TIMES キャッシュ読み込みエラー:', error);
+                if (loadingElement) loadingElement.style.display = 'none';
+                var resultsElement = document.getElementById('prtimesResults');
+                if (resultsElement) resultsElement.style.display = 'block';
+            });
+    }
+}
+
 // Wikipedia 人気記事 キャッシュデータ読み込み（日本語）
 function loadWikipediaTrendsFromCache() {
     if (typeof loadTrendsFromCache === 'function') {

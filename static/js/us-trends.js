@@ -1959,6 +1959,90 @@ function loadCryptoTrendsFromCacheUS() {
         });
 }
 
+// GlobeNewswire cache data loading for US (raw RSS with tags)
+function loadGlobeNewswireFromCacheUS() {
+    console.log('📊 GlobeNewswire cache data loading for US');
+    const loadingElement = document.getElementById('globenewswireLoading');
+    const resultsElement = document.getElementById('globenewswireResults');
+    if (loadingElement) loadingElement.style.display = 'block';
+    if (resultsElement) resultsElement.style.display = 'none';
+
+    fetchWithRetry('/api/globenewswire-trends?limit=25&force_refresh=false')
+        .then(response => {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        })
+        .then(data => {
+            if (loadingElement) loadingElement.style.display = 'none';
+            if (data.success && data.data && data.data.length > 0) {
+                displayGlobeNewswireResults(data);
+            } else {
+                showGlobeNewswireError(data.error || 'No data available');
+            }
+            if (resultsElement) resultsElement.style.display = 'block';
+        })
+        .catch(error => {
+            console.error('GlobeNewswire cache loading error:', error);
+            if (loadingElement) loadingElement.style.display = 'none';
+            showGlobeNewswireError('Failed to load GlobeNewswire: ' + error.message);
+            if (resultsElement) resultsElement.style.display = 'block';
+        });
+}
+
+function displayGlobeNewswireResults(data) {
+    const resultsElement = document.getElementById('globenewswireResults');
+    const errorElement = document.getElementById('globenewswireErrorMessage');
+    const tableBody = document.getElementById('globenewswireTrendsTableBody');
+    function esc(s) {
+        if (s == null) return '';
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+    if (!resultsElement || !tableBody) return;
+    tableBody.innerHTML = '';
+    if (errorElement) errorElement.style.display = 'none';
+    if (!data.data || data.data.length === 0) {
+        showGlobeNewswireError('No data available');
+        return;
+    }
+    data.data.forEach((item, index) => {
+        const row = document.createElement('tr');
+        const url = item.url || '#';
+        const title = item.title || 'N/A';
+        const publishedDate = item.published_date ? new Date(item.published_date).toLocaleDateString('en-US') : 'N/A';
+        const tags = item.tags || [];
+        const tagsHtml = tags.length
+            ? tags.map(t => {
+                const term = (t && (t.term != null ? t.term : t.label)) || '';
+                return term ? '<span class="badge bg-secondary me-1">' + esc(String(term)) + '</span>' : '';
+            }).filter(Boolean).join(' ')
+            : '-';
+        row.innerHTML =
+            '<td><span class="badge bg-secondary">' + (item.rank || index + 1) + '</span></td>' +
+            '<td><a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>' + esc(title) + '</strong></a></td>' +
+            '<td>' + publishedDate + '</td>' +
+            '<td class="small">' + tagsHtml + '</td>';
+        if (typeof makeTableRowClickable === 'function') {
+            makeTableRowClickable(row, url, 'Open ' + title + ' article');
+        }
+        tableBody.appendChild(row);
+    });
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('globenewswireTrendsTableBody', 'all-globenewswireTrendsTableBody', 5), 0);
+    }
+}
+
+function showGlobeNewswireError(message) {
+    const errorElement = document.getElementById('globenewswireErrorMessage');
+    const resultsElement = document.getElementById('globenewswireResults');
+    if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+    }
+    if (resultsElement) resultsElement.style.display = 'block';
+}
+
 // CNN News cache data loading for US
 function loadCNNFromCacheUS() {
     console.log('📊 CNN News cache data loading for US');

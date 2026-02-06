@@ -135,6 +135,7 @@ class TrendsCache:
                     keyword VARCHAR(255) NOT NULL,
                     score INTEGER NOT NULL,
                     region VARCHAR(10) NOT NULL,
+                    rank INTEGER DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
@@ -162,6 +163,7 @@ class TrendsCache:
                     artist VARCHAR(255) NOT NULL,
                     popularity INTEGER NOT NULL,
                     service VARCHAR(50) NOT NULL,
+                    rank INTEGER DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
@@ -192,6 +194,7 @@ class TrendsCache:
                     published_at TIMESTAMP NOT NULL,
                     category VARCHAR(50) NOT NULL,
                     country VARCHAR(10) NOT NULL,
+                    rank INTEGER DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
@@ -206,6 +209,7 @@ class TrendsCache:
                     url TEXT,
                     description TEXT,
                     image_url TEXT,
+                    rank INTEGER DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
@@ -215,6 +219,7 @@ class TrendsCache:
                     title TEXT NOT NULL,
                     price INTEGER NOT NULL,
                     category VARCHAR(100) NOT NULL,
+                    rank INTEGER DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
@@ -739,6 +744,13 @@ class TrendsCache:
                 CREATE INDEX IF NOT EXISTS idx_subscriptions_email ON subscriptions(email);
                 CREATE INDEX IF NOT EXISTS idx_subscriptions_active ON subscriptions(is_active);
                 CREATE INDEX IF NOT EXISTS idx_subscriptions_token ON subscriptions(unsubscribe_token);
+                
+                -- 既存テーブルにrankカラムがない場合のマイグレーション（CREATE TABLE IF NOT EXISTSでは更新されないため）
+                ALTER TABLE google_trends_cache ADD COLUMN IF NOT EXISTS rank INTEGER DEFAULT 0;
+                ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS rank INTEGER DEFAULT 0;
+                ALTER TABLE news_trends_cache ADD COLUMN IF NOT EXISTS rank INTEGER DEFAULT 0;
+                ALTER TABLE worldnews_trends_cache ADD COLUMN IF NOT EXISTS rank INTEGER DEFAULT 0;
+                ALTER TABLE rakuten_trends_cache ADD COLUMN IF NOT EXISTS rank INTEGER DEFAULT 0;
                 
                 -- すべてのキャッシュテーブルのrankカラムにインデックスを追加（パフォーマンス向上）
                 CREATE INDEX IF NOT EXISTS idx_google_trends_cache_rank ON google_trends_cache(rank);

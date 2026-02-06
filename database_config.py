@@ -776,10 +776,15 @@ class TrendsCache:
                 """
                 
                 # DDLは1文ずつ実行（複数文一括実行でcursor already closedが発生する場合があるため）
+                # 各文ごとに新しいカーソルを使用（前の文で失敗しても次の文に影響しない）
                 # autocommitで各文を独立トランザクションとして実行
                 old_isolation = conn.isolation_level
                 conn.set_isolation_level(extensions.ISOLATION_LEVEL_AUTOCOMMIT)
                 try:
+                    def _execute_sql(sql):
+                        with conn.cursor() as c:
+                            c.execute(sql)
+
                     # DO $$...$$ ブロックを保護して分割（DOブロック内の;で分割しない）
                     parts = re.split(r'(DO \$\$.*?END \$\$;)', create_tables_sql, flags=re.DOTALL)
                     for part in parts:
@@ -787,13 +792,13 @@ class TrendsCache:
                         if not part or part.startswith('--'):
                             continue
                         if part.startswith('DO $$'):
-                            cursor.execute(part)
+                            _execute_sql(part)
                             continue
                         # 通常の文は ; で分割
                         for stmt in part.split(';'):
                             stmt = stmt.strip()
                             if stmt and not stmt.startswith('--'):
-                                cursor.execute(stmt + ';')
+                                _execute_sql(stmt + ';')
                 finally:
                     conn.set_isolation_level(old_isolation)
                 

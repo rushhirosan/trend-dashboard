@@ -6,7 +6,7 @@
     
     <!-- SEO Meta Tags -->
     <title>US Trends Dashboard - Latest Trends in America | Google Trends, YouTube, Spotify, Reddit</title>
-    <meta name="description" content="アメリカの最新トレンド情報をリアルタイムで表示。Google Trends、YouTube、株価、Spotify、Reddit、Hacker News、Twitch、Podcastなどの人気トレンドを確認できます。仮想通貨や株式市場の動向も追跡可能。データは毎日1時、7時、13時、19時（JST）に更新処理を開始します（更新完了まで10〜20分かかる場合があります）。">
+    <meta name="description" content="U.S. trends in one dashboard: Google Trends, YouTube, Spotify, Reddit, Hacker News, S&P 500, cryptocurrency. America-focused trends updated 4 times daily (JST).">
     <meta name="keywords" content="trends, Google Trends, YouTube, Spotify, Reddit, Hacker News, Twitch, Podcast, US trends, America trends, Stock, Cryptocurrency, Bitcoin, Investment, Market trends, S&P 500, NASDAQ">
     <meta name="author" content="Trends Dashboard">
     <meta name="robots" content="index, follow">
@@ -15,7 +15,7 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://trends-dashboard.fly.dev/us">
     <meta property="og:title" content="US Trends Dashboard - Latest Trends in America">
-    <meta property="og:description" content="Displaying trend data from Google Trends, YouTube, Stock, Spotify, Reddit, Hacker News, Twitch, and Podcasts. Data update processing starts daily at 1 AM, 7 AM, 1 PM, and 7 PM (JST) (may take 10-20 minutes to complete).">
+    <meta property="og:description" content="U.S. trends in one dashboard: Google Trends, YouTube, Reddit, Hacker News, S&P 500, cryptocurrency. America-focused trends updated 4 times daily.">
     <meta property="og:image" content="https://trends-dashboard.fly.dev/static/images/og-image.png">
     <meta property="og:locale" content="en_US">
     <meta property="og:site_name" content="Trends Dashboard">
@@ -24,7 +24,7 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:url" content="https://trends-dashboard.fly.dev/us">
     <meta name="twitter:title" content="US Trends Dashboard - Latest Trends in America">
-    <meta name="twitter:description" content="Displaying trend data from Google Trends, YouTube, Stock, Spotify, Reddit, Hacker News, Twitch, and Podcasts. Data update processing starts daily at 1 AM, 7 AM, 1 PM, and 7 PM (JST) (may take 10-20 minutes to complete).">
+    <meta name="twitter:description" content="U.S. trends in one dashboard: Google Trends, YouTube, Reddit, Hacker News, S&P 500, cryptocurrency. America-focused trends updated 4 times daily.">
     <meta name="twitter:image" content="https://trends-dashboard.fly.dev/static/images/og-image.png">
     
     <!-- Canonical URL -->
@@ -50,7 +50,7 @@
       "@context": "https://schema.org",
       "@type": "WebApplication",
       "name": "US Trends Dashboard",
-      "description": "Displaying trend data from Google Trends, YouTube, Stock, Spotify, Reddit, Hacker News, Twitch, and Podcasts. Data update processing starts daily at 1 AM, 7 AM, 1 PM, and 7 PM (JST) (may take 10-20 minutes to complete).",
+      "description": "U.S. trends in one dashboard: Google Trends, YouTube, Reddit, Hacker News, S&P 500, cryptocurrency. America-focused trends updated 4 times daily.",
       "url": "https://trends-dashboard.fly.dev/us",
       "applicationCategory": "InformationApplication",
       "operatingSystem": "Web",
@@ -95,6 +95,11 @@
     {% set lang = 'en' %}
     {% include 'partials/header.html' with context %}
 
+    <noscript>
+        <div class="alert alert-info mx-3 mt-3 mb-0" role="alert">
+            To view the trends dashboard, please enable JavaScript. Track U.S. trends from Google Trends, YouTube, Reddit, Hacker News, Spotify, and more.
+        </div>
+    </noscript>
     <main class="container-fluid py-4">
         <div id="mainContent">
             <header class="mb-3">
@@ -156,7 +161,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-12 col-md-6 col-lg-4 d-none" data-all-card="globenewswire" data-ui-hidden="globenewswire">
+                            <div class="col-12 col-md-6 col-lg-4 d-none" data-all-card="globenewswire" data-ui-hidden="globenewswire" style="display:none !important">
                                 <div class="card h-100">
                                     <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center py-2">
                                         <h3 class="h6 mb-0"><i class="fas fa-bullhorn"></i> GlobeNewswire</h3>
@@ -602,7 +607,7 @@
             </div>
         </div>
             <!-- Row 2: GlobeNewswire (UI hidden, backend still fetches) -->
-            <div class="row g-3 mb-3 d-none" id="row-source-globenewswire">
+            <div class="row g-3 mb-3 d-none" id="row-source-globenewswire" style="display:none !important">
             <div class="col-12 col-md-6" id="source-globenewswire">
                 <div class="card h-100">
                     <div class="card-header bg-secondary text-white">

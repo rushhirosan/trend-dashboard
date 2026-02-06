@@ -2085,6 +2085,19 @@ class TrendsCache:
             logger.error(f"❌ cache_status更新エラー: {e}", exc_info=True)
             return False
     
+    def ensure_scheduler_lock_ready(self):
+        """起動時に scheduler_lock テーブルと id=1 の行が存在することを保証する。
+        init_database が途中で失敗した場合でも、スケジューラが最初のリクエストで UPDATE 失敗しないようにする。"""
+        try:
+            with self.get_connection() as conn:
+                self._ensure_scheduler_lock_table_and_row(conn)
+                conn.commit()
+                logger.info("✅ scheduler_lock テーブル/行を起動時に確認しました")
+                return True
+        except Exception as e:
+            logger.warning("⚠️ scheduler_lock 起動時準備エラー: %s", e)
+            return False
+
     def _ensure_scheduler_lock_table_and_row(self, conn):
         """scheduler_lock テーブルと id=1 の行が存在することを保証する。呼び出し元で conn の commit を行う。"""
         with conn.cursor() as cursor:

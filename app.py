@@ -98,6 +98,12 @@ def create_app():
             except Exception as init_error:
                 logger.error(f"❌ データベーステーブル作成エラー: {init_error}")
                 logger.warning("⚠️ データベーステーブル作成に失敗しましたが、アプリは起動を続行します")
+            # init_database が途中で失敗してもスケジューラが動くよう、scheduler_lock を起動時に保証
+            try:
+                if hasattr(cache, 'ensure_scheduler_lock_ready'):
+                    cache.ensure_scheduler_lock_ready()
+            except Exception as lock_err:
+                logger.warning("⚠️ scheduler_lock 起動時準備をスキップ: %s", lock_err)
         else:
             logger.warning("⚠️ データベース接続が確立されていません。一部機能が制限される可能性があります")
     except Exception as e:

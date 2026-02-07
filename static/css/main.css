@@ -5,9 +5,16 @@ body#trends-jp #row-source-prtimes,
 body#trends-jp #row-source-globenewswire,
 body#trends-jp #source-prtimes,
 body#trends-jp #source-globenewswire,
-body#trends-jp [data-all-card="prtimes"],
 body#trends-jp [data-all-card="globenewswire"] {
     display: none !important;
+}
+/* 日本ページの All タブ: 右上の「PR TIMES × はてブ」は不要のため非表示 */
+body#trends-jp #pane-all [data-all-card="prtimes_hatena"] {
+    display: none !important;
+}
+/* 日本ページの All タブでは PR TIMES（RSS）を GitHub の右隣で表示 */
+body#trends-jp #pane-all [data-all-card="prtimes"] {
+    display: block !important;
 }
 
 #mainHeader .nav-pills {

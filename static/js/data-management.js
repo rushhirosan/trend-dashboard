@@ -39,6 +39,7 @@ function loadCachedDataExternal() {
         loadZennTrendsFromCache,
         loadNoteTrendsFromCache,
         loadGitHubTrendsFromCache,
+        loadPRTimesTrendsFromCache,
         loadStockTrendsFromCache,
         loadCryptoTrendsFromCache,
         loadAppStoreTrendsFromCache,

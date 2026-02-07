@@ -29,19 +29,42 @@
 }
 
 /* USページ: フッター上の広大な余白を防ぐ（main/コンテンツをビューポートで伸ばさない） */
-body#trends-us main,
+body#trends-us {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    height: auto !important;
+}
+body#trends-us main {
+    flex: 0 0 auto !important;
+    flex-grow: 0 !important;
+    min-height: 0 !important;
+}
 body#trends-us #mainContent,
 body#trends-us #trends {
     min-height: 0 !important;
+    flex: none !important;
+    flex-grow: 0 !important;
 }
+body#trends-us #trendCategoryTabContent,
 body#trends-us #trendCategoryTabContent .tab-pane.active.show {
     min-height: 0 !important;
-}
-body#trends-us main {
     flex: none !important;
 }
-/* Allタブ・エンタメタブなどで行が伸びすぎないように（フッター上余白防止） */
+/* カード行を伸ばさない（フッター上余白の主要原因を打ち消す） */
+body#trends-us #trends .row {
+    align-items: flex-start !important;
+    flex-wrap: wrap !important;
+}
 body#trends-us #pane-all .row,
 body#trends-us #trendCategoryTabContent .row {
     align-items: flex-start !important;
+}
+/* フッターをコンテンツ直下に寄せる */
+body#trends-us main .container-fluid,
+body#trends-us #mainContent .container-fluid {
+    flex: none !important;
+}
+body#trends-us section#trends {
+    flex: none !important;
 }

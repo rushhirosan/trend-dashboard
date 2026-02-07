@@ -27,3 +27,21 @@
     height: auto !important;
     overflow: visible !important;
 }
+
+/* USページ: フッター上の広大な余白を防ぐ（main/コンテンツをビューポートで伸ばさない） */
+body#trends-us main,
+body#trends-us #mainContent,
+body#trends-us #trends {
+    min-height: 0 !important;
+}
+body#trends-us #trendCategoryTabContent .tab-pane.active.show {
+    min-height: 0 !important;
+}
+body#trends-us main {
+    flex: none !important;
+}
+/* Allタブ・エンタメタブなどで行が伸びすぎないように（フッター上余白防止） */
+body#trends-us #pane-all .row,
+body#trends-us #trendCategoryTabContent .row {
+    align-items: flex-start !important;
+}

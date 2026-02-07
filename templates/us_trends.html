@@ -204,7 +204,7 @@
                                 <div class="card h-100">
                                     <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center py-2">
                                         <h3 class="h6 mb-0"><i class="fas fa-bullhorn"></i> GlobeNewswire</h3>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" data-target-anchor="source-globenewswire" aria-label="Go to Search tab">More</a>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-globenewswire" aria-label="Go to Tech tab">More</a>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
@@ -783,45 +783,6 @@
                     </div>
                 </div>
             </div>
-            
-            <!-- GlobeNewswire (right of YouTube) -->
-            <div class="col-12 col-md-6 col-lg-4" id="source-globenewswire">
-                <div class="card h-100">
-                    <div class="card-header bg-secondary text-white">
-                        <h5><i class="fas fa-bullhorn"></i> GlobeNewswire</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="loading text-center py-5" id="globenewswireLoading" style="display: none;">
-                            <div class="spinner-border text-secondary" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <p class="mt-3">Loading GlobeNewswire data...</p>
-                        </div>
-                        <div id="globenewswireResults" style="display: none;">
-                            <div class="alert alert-danger" id="globenewswireErrorMessage" style="display: none;"></div>
-                            <div class="card trend-table category-card">
-                                <div class="card-body">
-                                    <div class="trend-table-container">
-                                        <div class="table-responsive">
-                                            <table class="table table-hover trend-table" id="globenewswireTrendsTable">
-                                                <thead class="table-dark">
-                                                    <tr>
-                                                        <th>Rank</th>
-                                                        <th>Title</th>
-                                                        <th>Published</th>
-                                                        <th>Tags</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody id="globenewswireTrendsTableBody"></tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
                     <!-- Wikipedia Most Read (English) -->
                     <div class="row g-3 mb-3">
@@ -1347,10 +1308,10 @@
             </div>
         </div>
 
-        <!-- Row 6: GitHub Trends + App Store Trends -->
+        <!-- Row 6: GitHub Trends + App Store Trends + GlobeNewswire -->
         <div class="row g-3 mb-3">
             <!-- Left: GitHub Trends -->
-            <div class="col-12 col-md-6" id="source-github">
+            <div class="col-12 col-md-4" id="source-github">
                 <div class="card h-100">
                     <div class="card-header bg-dark text-white">
                         <h5><i class="fab fa-github"></i> GitHub Trends</h5>
@@ -1421,8 +1382,8 @@
                     </div>
                 </div>
             </div>
-            <!-- Right: App Store Trends -->
-            <div class="col-12 col-md-6" id="source-appstore">
+            <!-- Center: App Store Trends -->
+            <div class="col-12 col-md-4" id="source-appstore">
                 <div class="card h-100">
                     <div class="card-header bg-success text-white">
                         <h5><i class="fab fa-apple"></i> App Store Trends</h5>
@@ -1484,6 +1445,44 @@
                                                         <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
                                                     </tr>
                                                 </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Right: GlobeNewswire -->
+            <div class="col-12 col-md-4" id="source-globenewswire">
+                <div class="card h-100">
+                    <div class="card-header bg-secondary text-white">
+                        <h5><i class="fas fa-bullhorn"></i> GlobeNewswire</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="loading text-center py-5" id="globenewswireLoading" style="display: none;">
+                            <div class="spinner-border text-secondary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Loading GlobeNewswire data...</p>
+                        </div>
+                        <div id="globenewswireResults" style="display: none;">
+                            <div class="alert alert-danger" id="globenewswireErrorMessage" style="display: none;"></div>
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                                    <div class="trend-table-container">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover trend-table" id="globenewswireTrendsTable">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>Rank</th>
+                                                        <th>Title</th>
+                                                        <th>Published</th>
+                                                        <th>Tags</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="globenewswireTrendsTableBody"></tbody>
                                             </table>
                                         </div>
                                     </div>
@@ -2182,27 +2181,6 @@
                 </div>
                 </div><!-- /.tab-pane#pane-entertainment -->
                 </div><!-- #trendCategoryTabContent -->
-            </section>
-
-            <!-- About section -->
-            <section class="mt-4" aria-label="About Trends Dashboard">
-                <div class="card">
-                    <div class="card-header bg-dark text-white">
-                        <h2 class="h5 mb-0"><i class="fas fa-info-circle" aria-hidden="true"></i> About Trends Dashboard</h2>
-                    </div>
-                    <div class="card-body">
-                        <p class="mb-3">Trends Dashboard is a free web app that displays the latest trend information from the US in one place. You can see keywords and content that are trending across multiple services on a single screen.</p>
-                        <h3 class="h6 fw-bold mt-4 mb-2">Features</h3>
-                        <ul class="mb-3">
-                            <li>Display trends from Google Trends, YouTube, Spotify, Hacker News, Twitch, Podcasts and more</li>
-                            <li>Tech platform trends: Product Hunt, DEV.to, Medium, GitHub</li>
-                            <li>Stock and cryptocurrency market trends</li>
-                            <li>News trends from CNN, World News, The Hacker News</li>
-                        </ul>
-                        <h3 class="h6 fw-bold mt-4 mb-2">Data Update</h3>
-                        <p class="mb-0">Data update processing starts daily at 1 AM, 7 AM, 1 PM, and 7 PM (JST). It may take 10-20 minutes to complete. Check the <a href="{{ url_for('data_status') }}">Data Freshness</a> page for the latest status.</p>
-                    </div>
-                </div>
             </section>
         </div>
     </main>

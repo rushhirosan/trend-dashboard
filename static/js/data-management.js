@@ -689,7 +689,7 @@ function loadPRTimesHatenaTrendsFromCache() {
                 results: 'prtimesHatenaResults'
             },
             displayFunction: displayPRTimesHatenaResults,
-            allPaneSync: { mainTableBodyId: 'prtimesHatenaTrendsTableBody', allTableBodyId: 'all-prtimesHatenaTrendsTableBody', targetTabId: 'tab-news', limit: 5 }
+            allPaneSync: { mainTableBodyId: 'prtimesHatenaTrendsTableBody', allTableBodyId: 'all-prtimesHatenaTrendsTableBody', targetTabId: 'tab-tech', limit: 5 }
         });
     } else {
         console.log('📊 PR TIMES × はてブ キャッシュデータ読み込み');

@@ -1,7 +1,8 @@
 """
-PR TIMES × はてなブックマーク トレンドマネージャー（ミニマル案）
+PR TIMES × はてなブックマーク トレンドマネージャー（スコアリング版）
 PR TIMES RSS の直近7日分を取得し、はてなブックマーク一括Count APIで件数を取得。
-ブクマ数 > 0 のみ残し、ブクマ数でソートして Top5 を返す。
+スコアリング（ブクマ数・キーワード・新着ボーナス）でソートして Top5 を返す。
+イベント告知より成果（発表/受賞/提携等）を優先。
 """
 
 import requests
@@ -22,7 +23,6 @@ HATENA_COUNT_BATCH_URL = "http://api.b.st-hatena.com/entry.counts"
 HATENA_BATCH_SIZE = 50
 
 # PR TIMES カテゴリページ（RSS URL取得用）
-# 全カテゴリ同一の index.rdf を指すが、将来的なカテゴリ別RSSに対応
 DEFAULT_CATEGORY_PAGE_URLS = [
     "https://prtimes.jp/technology/",
     "https://prtimes.jp/business/",
@@ -34,9 +34,55 @@ DEFAULT_CATEGORY_PAGE_URLS = [
 DAYS_AGO = 7
 TOP_N = 5
 
+# スコアリング用キーワード（イベント語は長い語を先に：発表会→発表の衝突を避ける）
+KEYWORDS_NEGA = ('キャンペーン', 'セール', 'プレゼント', '抽選', '期間限定', 'クーポン')  # -5
+KEYWORDS_EVENT = ('発表会', 'イベント', '展示会', 'カンファレンス', 'セミナー', 'ウェビナー')  # -2
+KEYWORDS_ACHIEVE = ('発表', '公開', '披露', '受賞', '選出', '採択', '登壇', 'リリース', '提供開始')  # +3
+KEYWORDS_POSITIVE = ('業務提携', '資本提携', '共同開発', '導入', '採用')  # +3
+
 
 class PRTimesHatenaTrendsManager(BaseTrendsManager):
-    """PR TIMES RSS × はてなブックマーク（7日以内・ブクマ数>0・Top5）"""
+    """PR TIMES RSS × はてなブックマーク（7日以内・スコアリングでTop5）"""
+
+    def _compute_keyword_score(self, text):
+        """
+        title + description からキーワードスコアを計算。
+        イベント語を先に判定（発表会等で成果語の「発表」と衝突を避ける）。
+        """
+        if not text:
+            return 0
+        t = (text or '').strip()
+        score = 0
+        for kw in KEYWORDS_NEGA:
+            if kw in t:
+                score -= 5
+                break
+        for kw in KEYWORDS_EVENT:
+            if kw in t:
+                score -= 2
+                break
+        for kw in KEYWORDS_ACHIEVE:
+            if kw == '発表' and '発表会' in t:
+                continue
+            if kw in t:
+                score += 3
+                break
+        for kw in KEYWORDS_POSITIVE:
+            if kw in t:
+                score += 3
+                break
+        return score
+
+    def _compute_recency_bonus(self, published_ts, now_ts):
+        """24h以内+3, 48h以内+2, 7日以内+1"""
+        age_seconds = now_ts - published_ts
+        if age_seconds <= 24 * 3600:
+            return 3
+        if age_seconds <= 48 * 3600:
+            return 2
+        if age_seconds <= DAYS_AGO * 24 * 3600:
+            return 1
+        return 0
 
     def __init__(self):
         super().__init__(service_name='prtimes_hatena', max_requests=15, window_seconds=60)
@@ -245,13 +291,14 @@ class PRTimesHatenaTrendsManager(BaseTrendsManager):
             limit=limit,
             force_refresh=force_refresh,
             auto_fetch_on_cache_miss=True,
-            sort_key='bookmark_count',
+            sort_key='score',
             sort_reverse=True,
         )
 
     def _fetch_trends(self, limit=TOP_N, *args, **kwargs):
         """
-        PR TIMES 7日分 → はてな一括Count → ブクマ>0 のみ → ブクマ数降順 Top5
+        PR TIMES 7日分 → はてな一括Count → スコアリング → Top5
+        score = bookmark_count*10 + keyword_score + recency_bonus
         """
         try:
             logger.info("PR TIMES × はてブ: 取得開始")
@@ -269,20 +316,28 @@ class PRTimesHatenaTrendsManager(BaseTrendsManager):
             url_list = [(i.get('url') or '').strip() for i in items if (i.get('url') or '').strip()]
             counts = self._get_bookmark_counts_batch(url_list)
 
+            now_ts = datetime.now(timezone.utc).timestamp()
             for item in items:
                 item['bookmark_count'] = counts.get((item.get('url') or '').strip(), 0)
-                # レスポンス用に published_date を ISO 文字列に
+                pub = item.get('published_date')
                 if 'published_date_iso' in item:
                     item['published_date'] = item['published_date_iso']
+                pub_ts = pub.timestamp() if pub and hasattr(pub, 'timestamp') else 0
+                text = (item.get('title') or '') + ' ' + (item.get('description') or '')
+                keyword_score = self._compute_keyword_score(text)
+                recency_bonus = self._compute_recency_bonus(pub_ts, now_ts)
+                item['score'] = (item.get('bookmark_count', 0) * 10) + keyword_score + recency_bonus
+                item['_sort_pub_ts'] = pub_ts
 
-            filtered = [i for i in items if (i.get('bookmark_count') or 0) > 0]
-            filtered.sort(key=lambda x: x.get('bookmark_count', 0), reverse=True)
-            top = filtered[:limit]
+            items.sort(key=lambda x: (-x.get('score', 0), -x.get('_sort_pub_ts', 0)))
+            top = items[:limit]
+            for item in top:
+                item.pop('_sort_pub_ts', None)
 
             for i, item in enumerate(top, 1):
                 item['rank'] = i
 
-            logger.info(f"✅ PR TIMES × はてブ: {len(top)}件（ブクマ>0）")
+            logger.info(f"✅ PR TIMES × はてブ: {len(top)}件（スコアリング）")
             return {
                 'success': True,
                 'data': top,

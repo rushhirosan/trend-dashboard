@@ -843,62 +843,64 @@ class TrendsCache:
                 finally:
                     conn.set_isolation_level(old_isolation)
                 
-                # ipa_trends_cacheテーブルのスキーマ更新（既存テーブルにカラムを追加）
-                try:
-                    cursor.execute("ALTER TABLE ipa_trends_cache ADD COLUMN IF NOT EXISTS last_updated_date TIMESTAMP WITH TIME ZONE")
-                    conn.commit()
-                    logger.info("✅ ipa_trends_cacheテーブルのスキーマ更新完了")
-                except Exception as e:
-                    logger.warning(f"⚠️ ipa_trends_cacheのスキーマ更新に失敗しました: {e}", exc_info=True)
-                
-                # scheduler_lockテーブル（分散ロック用）の作成（既存DBへのマイグレーション）
-                try:
-                    cursor.execute("""
-                        CREATE TABLE IF NOT EXISTS scheduler_lock (
-                            id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
-                            holder_id VARCHAR(255),
-                            locked_at TIMESTAMP,
-                            lock_until TIMESTAMP
-                        )
-                    """)
-                    cursor.execute("""
-                        INSERT INTO scheduler_lock (id, holder_id, locked_at, lock_until)
-                        VALUES (1, NULL, NULL, NULL) ON CONFLICT (id) DO NOTHING
-                    """)
-                    conn.commit()
-                    logger.info("✅ scheduler_lockテーブル作成/確認完了")
-                except Exception as e:
-                    logger.warning(f"⚠️ scheduler_lockテーブル作成スキップ: {e}", exc_info=True)
-                    conn.rollback()
-                
-                # wikipedia_trends_cache の作成（既存DBへのマイグレーション／psycopg2は1executeで1文のため確実に作成）
-                try:
-                    cursor.execute("""
-                        CREATE TABLE IF NOT EXISTS wikipedia_trends_cache (
-                            id SERIAL PRIMARY KEY,
-                            title TEXT NOT NULL,
-                            url TEXT,
-                            description TEXT,
-                            rank INTEGER DEFAULT 0,
-                            views INTEGER DEFAULT 0,
-                            lang VARCHAR(10) NOT NULL,
-                            cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                        )
-                    """)
-                    conn.commit()
-                    logger.info("✅ wikipedia_trends_cache テーブル作成/確認完了")
-                except Exception as e:
-                    logger.warning(f"⚠️ wikipedia_trends_cacheテーブル作成スキップ: {e}", exc_info=True)
-                    conn.rollback()
-                
-                # movie_trends_cacheテーブルのスキーマ更新（既存テーブルにカラムを追加）
-                try:
-                    cursor.execute("ALTER TABLE movie_trends_cache ADD COLUMN IF NOT EXISTS item_url TEXT")
-                    cursor.execute("ALTER TABLE movie_trends_cache ADD COLUMN IF NOT EXISTS amazon_link TEXT")
-                    conn.commit()
-                    logger.info("✅ movie_trends_cacheテーブルのスキーマ更新完了")
-                except Exception as e:
-                    logger.warning(f"⚠️ movie_trends_cacheのスキーマ更新に失敗しました: {e}", exc_info=True)
+                # DDLブロック後のスキーマ更新：isolation_level変更で古いcursorが無効になるため新しいcursorを取得
+                with conn.cursor() as cur:
+                    # ipa_trends_cacheテーブルのスキーマ更新（既存テーブルにカラムを追加）
+                    try:
+                        cur.execute("ALTER TABLE ipa_trends_cache ADD COLUMN IF NOT EXISTS last_updated_date TIMESTAMP WITH TIME ZONE")
+                        conn.commit()
+                        logger.info("✅ ipa_trends_cacheテーブルのスキーマ更新完了")
+                    except Exception as e:
+                        logger.warning(f"⚠️ ipa_trends_cacheのスキーマ更新に失敗しました: {e}", exc_info=True)
+                    
+                    # scheduler_lockテーブル（分散ロック用）の作成（既存DBへのマイグレーション）
+                    try:
+                        cur.execute("""
+                            CREATE TABLE IF NOT EXISTS scheduler_lock (
+                                id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+                                holder_id VARCHAR(255),
+                                locked_at TIMESTAMP,
+                                lock_until TIMESTAMP
+                            )
+                        """)
+                        cur.execute("""
+                            INSERT INTO scheduler_lock (id, holder_id, locked_at, lock_until)
+                            VALUES (1, NULL, NULL, NULL) ON CONFLICT (id) DO NOTHING
+                        """)
+                        conn.commit()
+                        logger.info("✅ scheduler_lockテーブル作成/確認完了")
+                    except Exception as e:
+                        logger.warning(f"⚠️ scheduler_lockテーブル作成スキップ: {e}", exc_info=True)
+                        conn.rollback()
+                    
+                    # wikipedia_trends_cache の作成（既存DBへのマイグレーション／psycopg2は1executeで1文のため確実に作成）
+                    try:
+                        cur.execute("""
+                            CREATE TABLE IF NOT EXISTS wikipedia_trends_cache (
+                                id SERIAL PRIMARY KEY,
+                                title TEXT NOT NULL,
+                                url TEXT,
+                                description TEXT,
+                                rank INTEGER DEFAULT 0,
+                                views INTEGER DEFAULT 0,
+                                lang VARCHAR(10) NOT NULL,
+                                cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        """)
+                        conn.commit()
+                        logger.info("✅ wikipedia_trends_cache テーブル作成/確認完了")
+                    except Exception as e:
+                        logger.warning(f"⚠️ wikipedia_trends_cacheテーブル作成スキップ: {e}", exc_info=True)
+                        conn.rollback()
+                    
+                    # movie_trends_cacheテーブルのスキーマ更新（既存テーブルにカラムを追加）
+                    try:
+                        cur.execute("ALTER TABLE movie_trends_cache ADD COLUMN IF NOT EXISTS item_url TEXT")
+                        cur.execute("ALTER TABLE movie_trends_cache ADD COLUMN IF NOT EXISTS amazon_link TEXT")
+                        conn.commit()
+                        logger.info("✅ movie_trends_cacheテーブルのスキーマ更新完了")
+                    except Exception as e:
+                        logger.warning(f"⚠️ movie_trends_cacheのスキーマ更新に失敗しました: {e}", exc_info=True)
                 
                 logger.info("✅ データベーステーブル作成完了")
                 return True

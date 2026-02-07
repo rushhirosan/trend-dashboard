@@ -3011,9 +3011,37 @@ function showEbayError(message, status = null) {
 }
 
 
+// 非アクティブなタブペインをレイアウトから完全に除外（広大な余白を解消）
+function hideInactivePanesUS() {
+    if (document.body.id !== 'trends-us') return;
+    const paneIds = ['pane-news', 'pane-search', 'pane-tech', 'pane-market', 'pane-entertainment'];
+    paneIds.forEach(function(id) {
+        const pane = document.getElementById(id);
+        if (!pane) return;
+        const isActive = pane.classList.contains('active') && pane.classList.contains('show');
+        if (isActive) {
+            pane.style.removeProperty('display');
+            pane.style.removeProperty('height');
+            pane.style.removeProperty('min-height');
+            pane.style.removeProperty('visibility');
+        } else {
+            pane.style.setProperty('display', 'none', 'important');
+            pane.style.setProperty('height', '0', 'important');
+            pane.style.setProperty('min-height', '0', 'important');
+            pane.style.setProperty('visibility', 'hidden', 'important');
+            pane.style.setProperty('overflow', 'hidden', 'important');
+        }
+    });
+}
+
 // Page initialization
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🇺🇸 US Trends page initialization');
+
+    // 非アクティブペインを確実に非表示（Bootstrap のインラインスタイルを上書き）
+    hideInactivePanesUS();
+    setTimeout(hideInactivePanesUS, 0);
+    setTimeout(hideInactivePanesUS, 100);
 
     // USページを開いたことを記憶（次回のルート訪問時のリダイレクト用）
     if (typeof setTrendPreference === 'function') {
@@ -3037,16 +3065,26 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // トレンドカテゴリタブ切り替え時: グラフリサイズ ＋ もっと見るからのアンカースクロール
+    // トレンドカテゴリタブ切り替え時: 非アクティブペインを非表示 ＋ グラフリサイズ ＋ もっと見るからのアンカースクロール ＋ ペイン先頭へスクロール
     const trendTabsEl = document.getElementById('trendCategoryTabs');
     if (trendTabsEl) {
-        trendTabsEl.addEventListener('shown.bs.tab', function() {
+        trendTabsEl.addEventListener('shown.bs.tab', function(e) {
+            hideInactivePanesUS();
             if (pendingMoreLinkAnchor) {
                 var anchor = document.getElementById(pendingMoreLinkAnchor);
                 if (anchor) {
                     anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
                 pendingMoreLinkAnchor = null;
+            } else {
+                // タブ切り替え時はアクティブペインの先頭を表示（データが見えない問題の対策）
+                var targetId = e.target.getAttribute('data-bs-target');
+                if (targetId) {
+                    var pane = document.querySelector(targetId);
+                    if (pane) {
+                        pane.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }
             }
             if (typeof currentGoogleChart !== 'undefined' && currentGoogleChart) {
                 try { currentGoogleChart.resize(); } catch (e) { /* ignore */ }

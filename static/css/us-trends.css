@@ -1,70 +1,102 @@
 /**
  * USトレンドページ専用スタイル
- * 日本ページ(index.html)と同じタブ切り替え挙動にする
+ * 日本ページ(index.html)と完全に同じタブ・表示・レイアウトにする
  */
 
-/* タブペイン: 日本トレンドと同一の表示制御（非アクティブは完全非表示） */
-#trends #trendCategoryTabContent > .tab-pane {
-    display: none !important;
-}
-#trends #trendCategoryTabContent > .tab-pane.active.show {
+/* === USページでトレンド本体を確実に表示（main.css の .tab-content 等と競合しないよう body#trends-us で上書き） === */
+body#trends-us main,
+body#trends-us #mainContent,
+body#trends-us section#trends {
     display: block !important;
+    visibility: visible !important;
 }
-/* 非アクティブなペインとその子孫を強制非表示（日本 main.css と同じルール） */
-#trends #trendCategoryTabContent > .tab-pane:not(.active.show),
-#trends #trendCategoryTabContent > .tab-pane:not(.active.show) * {
+body#trends-us #trendCategoryTabContent {
+    display: block !important;
+    visibility: visible !important;
+}
+body#trends-us #trendCategoryTabContent > .tab-pane.show.active,
+body#trends-us #trendCategoryTabContent > .tab-pane.active.show,
+body#trends-us #pane-all {
+    display: block !important;
+    visibility: visible !important;
+    height: auto !important;
+    overflow: visible !important;
+}
+body#trends-us #all-trends-container {
+    display: flex !important;
+    visibility: visible !important;
+}
+
+/* 非アクティブなペイン: 完全に非表示・レイアウトから除外（#pane-tech 等の広大な余白を解消） */
+/* ID 指定で詳細度を最大にし、Bootstrap JS のインラインスタイル等に確実に勝つ */
+body#trends-us #trends #pane-news:not(.active):not(.show),
+body#trends-us #trends #pane-search:not(.active):not(.show),
+body#trends-us #trends #pane-tech:not(.active):not(.show),
+body#trends-us #trends #pane-market:not(.active):not(.show),
+body#trends-us #trends #pane-entertainment:not(.active):not(.show) {
     display: none !important;
     visibility: hidden !important;
     height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
     overflow: hidden !important;
     padding: 0 !important;
     margin: 0 !important;
     border: none !important;
+    pointer-events: none !important;
+    opacity: 0 !important;
 }
-#trends #trendCategoryTabContent > .tab-pane.active.show {
+body#trends-us #trends #pane-news:not(.active):not(.show) *,
+body#trends-us #trends #pane-search:not(.active):not(.show) *,
+body#trends-us #trends #pane-tech:not(.active):not(.show) *,
+body#trends-us #trends #pane-market:not(.active):not(.show) *,
+body#trends-us #trends #pane-entertainment:not(.active):not(.show) * {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+}
+body#trends-us #trends #trendCategoryTabContent > .tab-pane.show.active,
+body#trends-us #trends #trendCategoryTabContent > .tab-pane.active.show,
+body#trends-us #trends #pane-all {
     display: block !important;
     visibility: visible !important;
     height: auto !important;
     overflow: visible !important;
 }
 
-/* USページ: フッター上の広大な余白を防ぐ（main/コンテンツをビューポートで伸ばさない） */
-body#trends-us {
-    display: flex !important;
-    flex-direction: column !important;
-    min-height: 0 !important;
-    height: auto !important;
+/* === 日本ページと同一レイアウト（広大な余白を解消） === */
+/* main.css の #trends .row と同じく align-items: stretch を使用（flex-start は余白の原因） */
+body#trends-us #trends .row {
+    align-items: stretch !important;
 }
-body#trends-us main {
-    flex: 0 0 auto !important;
-    flex-grow: 0 !important;
+/* コンテナ・余白を日本ページと揃える */
+body#trends-us main,
+body#trends-us #mainContent {
     min-height: 0 !important;
 }
-body#trends-us #mainContent,
 body#trends-us #trends {
     min-height: 0 !important;
-    flex: none !important;
-    flex-grow: 0 !important;
 }
 body#trends-us #trendCategoryTabContent,
-body#trends-us #trendCategoryTabContent .tab-pane.active.show {
+body#trends-us #trendCategoryTabContent > .tab-pane {
     min-height: 0 !important;
-    flex: none !important;
 }
-/* カード行を伸ばさない（フッター上余白の主要原因を打ち消す） */
-body#trends-us #trends .row {
-    align-items: flex-start !important;
-    flex-wrap: wrap !important;
+/* Allタブのrow・カードは日本ページと同じコンパクト表示 */
+body#trends-us #all-trends-container.row {
+    align-items: stretch !important;
 }
-body#trends-us #pane-all .row,
-body#trends-us #trendCategoryTabContent .row {
-    align-items: flex-start !important;
-}
-/* フッターをコンテンツ直下に寄せる */
-body#trends-us main .container-fluid,
-body#trends-us #mainContent .container-fluid {
-    flex: none !important;
-}
-body#trends-us section#trends {
-    flex: none !important;
+
+/* === 全タブ: テーブルにmax-heightを設定してデータを確実に表示（広大な余白・20kpx超の高さを防止） === */
+/* main.css の #hackernewsResults 等の max-height: none を USページで上書き（詳細度を高めて確実に適用） */
+body#trends-us #trends #pane-all .table-responsive,
+body#trends-us #trends #pane-tech .trend-table-container,
+body#trends-us #trends #pane-news .trend-table-container,
+body#trends-us #trends #pane-search .trend-table-container,
+body#trends-us #trends #pane-market .trend-table-container,
+body#trends-us #trends #pane-entertainment .trend-table-container {
+    max-height: 400px !important;
+    overflow-y: auto !important;
 }

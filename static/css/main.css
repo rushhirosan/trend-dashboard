@@ -3705,3 +3705,42 @@ ul.trend-category-tabs li.nav-item button.nav-link.active {
         font-size: 0.8125rem;
     }
 }
+
+/* ========== USページ: トレンド本体を確実に表示（.tab-content 等の上書き） ========== */
+body#trends-us main,
+body#trends-us #mainContent,
+body#trends-us section#trends {
+    display: block !important;
+    visibility: visible !important;
+}
+body#trends-us .tab-content#trendCategoryTabContent {
+    display: block !important;
+    visibility: visible !important;
+}
+body#trends-us .tab-content#trendCategoryTabContent > .tab-pane.show.active,
+body#trends-us .tab-content#trendCategoryTabContent > .tab-pane.active.show,
+body#trends-us #pane-all {
+    display: block !important;
+    visibility: visible !important;
+    height: auto !important;
+    min-height: 0;
+    overflow: visible !important;
+}
+body#trends-us #all-trends-container {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    visibility: visible !important;
+}
+body#trends-us #trends .row {
+    align-items: stretch !important;
+}
+/* USページ: テーブル高さを抑えて広大な余白を防止（us-trends.css と重複するがフォールバック） */
+body#trends-us #trends #pane-all .table-responsive,
+body#trends-us #trends #pane-tech .trend-table-container,
+body#trends-us #trends #pane-news .trend-table-container,
+body#trends-us #trends #pane-search .trend-table-container,
+body#trends-us #trends #pane-market .trend-table-container,
+body#trends-us #trends #pane-entertainment .trend-table-container {
+    max-height: 400px !important;
+    overflow-y: auto !important;
+}

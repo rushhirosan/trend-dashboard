@@ -55,6 +55,18 @@ def _inspect_entry_tags(manager, source_name, limit=3):
     print()
 
 
+def _print_sample_item(item, index=1, max_desc_len=200):
+    """1件分の全フィールドを表示（どんなデータが取れるか確認用）"""
+    print(f"  [{index}] title: {item.get('title', '')}")
+    print(f"       url: {item.get('url', '')}")
+    print(f"       published_date: {item.get('published_date', '')}")
+    desc = (item.get('description') or '')[:max_desc_len]
+    print(f"       description: {desc}{'...' if len((item.get('description') or '')) > max_desc_len else ''}")
+    tags = item.get('tags') or []
+    print(f"       tags ({len(tags)}): {tags}")
+    print(f"       rank: {item.get('rank', '-')}")
+
+
 def main():
     from services.trends.prtimes_trends import PRTimesTrendsManager
     from services.trends.globenewswire_trends import GlobeNewswireTrendsManager
@@ -69,6 +81,8 @@ def main():
         for i, item in enumerate(result["data"][:3], 1):
             print(f"  {i}. {item.get('title', '')[:60]}...")
             print(f"     {item.get('url', '')[:70]}...")
+        print("\n--- PR TIMES 1件分の全フィールド（サンプル） ---")
+        _print_sample_item(result["data"][0], 1)
     else:
         print(f"NG: {result.get('error', 'unknown')}")
     _inspect_entry_tags(pr, "PR TIMES")
@@ -83,6 +97,8 @@ def main():
         for i, item in enumerate(result["data"][:3], 1):
             print(f"  {i}. {item.get('title', '')[:60]}...")
             print(f"     {item.get('url', '')[:70]}...")
+        print("\n--- GlobeNewswire 1件分の全フィールド（サンプル） ---")
+        _print_sample_item(result["data"][0], 1)
     else:
         print(f"NG: {result.get('error', 'unknown')}")
     _inspect_entry_tags(gw, "GlobeNewswire")

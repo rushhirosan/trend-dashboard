@@ -33,6 +33,7 @@ function loadCachedDataExternal() {
         loadWikipediaTrendsFromCache,
         loadGoogleTrendsFromCache,
         loadYouTubeTrendsFromCache,
+        loadPRTimesHatenaTrendsFromCache,
         loadQiitaTrendsFromCache,
         loadHatenaTrendsFromCache,
         loadZennTrendsFromCache,
@@ -672,6 +673,50 @@ function loadNHKTrendsFromCache() {
                 clearTimeout(timeoutId);
                 console.error('NHK ニュース キャッシュ読み込みエラー:', error);
                 if (loadingElement) loadingElement.style.display = 'none';
+            });
+    }
+}
+
+// PR TIMES × はてブ キャッシュデータ読み込み
+function loadPRTimesHatenaTrendsFromCache() {
+    if (typeof loadTrendsFromCache === 'function') {
+        loadTrendsFromCache({
+            serviceName: 'PR TIMES × はてブ',
+            apiEndpoint: '/api/prtimes-hatena-trends',
+            params: { limit: 5 },
+            uiIds: {
+                loading: 'prtimesHatenaLoading',
+                results: 'prtimesHatenaResults'
+            },
+            displayFunction: displayPRTimesHatenaResults,
+            allPaneSync: { mainTableBodyId: 'prtimesHatenaTrendsTableBody', allTableBodyId: 'all-prtimesHatenaTrendsTableBody', targetTabId: 'tab-news', limit: 5 }
+        });
+    } else {
+        console.log('📊 PR TIMES × はてブ キャッシュデータ読み込み');
+        var loadingElement = document.getElementById('prtimesHatenaLoading');
+        if (loadingElement) loadingElement.style.display = 'block';
+        var controller = new AbortController();
+        var timeoutId = setTimeout(function() { controller.abort(); }, 30000);
+        fetchWithRetry('/api/prtimes-hatena-trends?limit=5&force_refresh=false', { signal: controller.signal })
+            .then(function(response) {
+                clearTimeout(timeoutId);
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
+            })
+            .then(function(data) {
+                if (loadingElement) loadingElement.style.display = 'none';
+                if (data.data && data.data.length > 0 && typeof displayPRTimesHatenaResults === 'function') {
+                    displayPRTimesHatenaResults(data);
+                }
+                var resultsElement = document.getElementById('prtimesHatenaResults');
+                if (resultsElement) resultsElement.style.display = 'block';
+            })
+            .catch(function(error) {
+                clearTimeout(timeoutId);
+                console.error('PR TIMES × はてブ キャッシュ読み込みエラー:', error);
+                if (loadingElement) loadingElement.style.display = 'none';
+                var resultsElement = document.getElementById('prtimesHatenaResults');
+                if (resultsElement) resultsElement.style.display = 'block';
             });
     }
 }

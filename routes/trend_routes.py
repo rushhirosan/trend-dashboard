@@ -455,6 +455,21 @@ def get_prtimes_trends(manager):
         return handle_api_error('PR TIMES', e)
 
 
+@trend_bp.route('/prtimes-hatena-trends')
+@require_manager('prtimes_hatena')
+def get_prtimes_hatena_trends(manager):
+    """PR TIMES × はてなブックマーク（7日以内・ブクマ数>0・Top5）APIエンドポイント"""
+    try:
+        limit = int(request.args.get('limit', 5))
+        force_refresh = get_force_refresh()
+        
+        result = manager.get_trends(limit=limit, force_refresh=force_refresh)
+        return handle_trend_response(result, 'PR TIMES × はてブ', 'PR TIMES RSS + Hatena Count API')
+        
+    except Exception as e:
+        return handle_api_error('PR TIMES × はてブ', e)
+
+
 @trend_bp.route('/globenewswire-trends')
 @require_manager('globenewswire')
 def get_globenewswire_trends(manager):
@@ -468,6 +483,21 @@ def get_globenewswire_trends(manager):
         
     except Exception as e:
         return handle_api_error('GlobeNewswire', e)
+
+
+@trend_bp.route('/globenewswire-market-reaction-trends')
+@require_manager('globenewswire_market_reaction')
+def get_globenewswire_market_reaction_trends(manager):
+    """GlobeNewswire × Market Reaction（株価/出来高）APIエンドポイント（US向け）"""
+    try:
+        limit = int(request.args.get('limit', 15))
+        force_refresh = get_force_refresh()
+        
+        result = manager.get_trends(limit=limit, force_refresh=force_refresh)
+        return handle_trend_response(result, 'GlobeNewswire × Market', 'globenewswire_market_reaction')
+        
+    except Exception as e:
+        return handle_api_error('GlobeNewswire × Market Reaction', e)
 
 
 @trend_bp.route('/wikipedia-trends')

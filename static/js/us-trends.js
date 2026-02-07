@@ -1055,6 +1055,7 @@ function loadCachedDataUS() {
         loadWikipediaFromCacheUS,
         loadGoogleTrendsFromCacheUS,
         loadYouTubeTrendsFromCacheUS,
+        loadGlobeNewswireFromCacheUS,
         loadHackerNewsFromCacheUS,
         loadProductHuntFromCacheUS,
         loadDevToFromCacheUS,

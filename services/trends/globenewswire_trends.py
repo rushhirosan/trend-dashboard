@@ -13,10 +13,11 @@ from services.trends.base_trends_manager import BaseTrendsManager
 
 logger = get_logger(__name__)
 
-# GlobeNewswire 公式RSS（Public Companies - 上場企業ニュース）
+# GlobeNewswire 公式ATOM（Public Companies - 上場企業ニュース）
+# RssFeed は404のため AtomFeed を使用（feedparser は両方対応）
 # https://www.globenewswire.com/Rss/List で公開されている公式フィード
 DEFAULT_RSS_URL = (
-    "https://www.globenewswire.com/RssFeed/orgclass/1/"
+    "https://www.globenewswire.com/AtomFeed/orgclass/1/"
     "feedTitle/GlobeNewswire%20-%20News%20about%20Public%20Companies"
 )
 

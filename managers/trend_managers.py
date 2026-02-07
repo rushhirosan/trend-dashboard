@@ -39,7 +39,9 @@ from services.trends.medium_trends import MediumTrendsManager
 from services.trends.devto_trends import DevToTrendsManager
 from services.trends.wikipedia_trends import WikipediaTrendsManager
 from services.trends.prtimes_trends import PRTimesTrendsManager
+from services.trends.prtimes_hatena_trends import PRTimesHatenaTrendsManager
 from services.trends.globenewswire_trends import GlobeNewswireTrendsManager
+from services.trends.globenewswire_market_reaction_trends import GlobeNewswireMarketReactionTrendsManager
 from utils.logger_config import get_logger
 
 # ロガーの初期化
@@ -80,7 +82,9 @@ MANAGER_CONFIGS = [
     ('devto', DevToTrendsManager, 'DEV.to'),
     ('wikipedia', WikipediaTrendsManager, 'Wikipedia'),
     ('prtimes', PRTimesTrendsManager, 'PR TIMES'),
+    ('prtimes_hatena', PRTimesHatenaTrendsManager, 'PR TIMES × はてブ'),
     ('globenewswire', GlobeNewswireTrendsManager, 'GlobeNewswire'),
+    ('globenewswire_market_reaction', GlobeNewswireMarketReactionTrendsManager, 'GlobeNewswire × Market'),
 ]
 
 
@@ -199,6 +203,7 @@ def refresh_all_trends(managers, force_refresh=True):
     tasks.append(('qiita', lambda m: m.get_trends(limit=25, sort='likes_count', force_refresh=force_refresh), 'JP'))
     tasks.append(('nhk', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
     tasks.append(('prtimes', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('prtimes_hatena', lambda m: m.get_trends(limit=5, force_refresh=force_refresh), 'JP'))
     tasks.append(('stock', lambda m: m.get_trends(market='JP', limit=25, force_refresh=force_refresh), 'JP'))
     tasks.append(('crypto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
     tasks.append(('movie', lambda m: m.get_trends(country='JP', time_window='day', limit=25, force_refresh=force_refresh), 'JP'))
@@ -234,6 +239,7 @@ def refresh_all_trends(managers, force_refresh=True):
     tasks.append(('producthunt', lambda m: m.get_trends(limit=25, sort='votes', force_refresh=force_refresh), 'US'))
     tasks.append(('cnn', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
     tasks.append(('globenewswire', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('globenewswire_market_reaction', lambda m: m.get_trends(limit=15, force_refresh=force_refresh), 'US'))
     tasks.append(('stock', lambda m: m.get_trends(market='US', limit=25, force_refresh=force_refresh), 'US'))
     tasks.append(('crypto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
     tasks.append(('movie', lambda m: m.get_trends(country='US', time_window='day', limit=25, force_refresh=force_refresh), 'US'))

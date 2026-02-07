@@ -20,6 +20,10 @@ logger = get_logger(__name__)
 DEFAULT_CATEGORY_PAGE_URLS = [
     "https://prtimes.jp/technology/",   # テクノロジー
     "https://prtimes.jp/business/",     # ビジネス
+    "https://prtimes.jp/entertainment/",  # エンタメ
+    "https://prtimes.jp/gourmet/",      # グルメ
+    "https://prtimes.jp/app/",          # アプリ
+    "https://prtimes.jp/lifestyle/",    # ライフスタイル
 ]
 
 

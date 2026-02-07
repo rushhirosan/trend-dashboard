@@ -398,6 +398,33 @@ class TrendsCache:
                 );
                 ALTER TABLE globenewswire_trends_cache ADD COLUMN IF NOT EXISTS tags TEXT;
                 
+                CREATE TABLE IF NOT EXISTS prtimes_hatena_trends_cache (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    url TEXT,
+                    published_date TIMESTAMP WITH TIME ZONE,
+                    description TEXT,
+                    rank INTEGER DEFAULT 0,
+                    bookmark_count INTEGER DEFAULT 0,
+                    tags TEXT,
+                    cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                
+                CREATE TABLE IF NOT EXISTS globenewswire_market_reaction_trends_cache (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    url TEXT,
+                    published_date TIMESTAMP WITH TIME ZONE,
+                    description TEXT,
+                    rank INTEGER DEFAULT 0,
+                    tags TEXT,
+                    ticker VARCHAR(20),
+                    change_percent DECIMAL(10, 2) DEFAULT 0,
+                    volume_spike DECIMAL(10, 2) DEFAULT 0,
+                    reaction_score DECIMAL(10, 2) DEFAULT 0,
+                    cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                
                 CREATE TABLE IF NOT EXISTS wikipedia_trends_cache (
                     id SERIAL PRIMARY KEY,
                     title TEXT NOT NULL,
@@ -769,7 +796,9 @@ class TrendsCache:
                 CREATE INDEX IF NOT EXISTS idx_nhk_trends_cache_rank ON nhk_trends_cache(rank);
                 CREATE INDEX IF NOT EXISTS idx_cnn_trends_cache_rank ON cnn_trends_cache(rank);
                 CREATE INDEX IF NOT EXISTS idx_prtimes_trends_cache_rank ON prtimes_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_prtimes_hatena_trends_cache_rank ON prtimes_hatena_trends_cache(rank);
                 CREATE INDEX IF NOT EXISTS idx_globenewswire_trends_cache_rank ON globenewswire_trends_cache(rank);
+                CREATE INDEX IF NOT EXISTS idx_globenewswire_market_reaction_trends_cache_rank ON globenewswire_market_reaction_trends_cache(rank);
                 CREATE INDEX IF NOT EXISTS idx_producthunt_trends_cache_rank ON producthunt_trends_cache(rank);
                 CREATE INDEX IF NOT EXISTS idx_stock_trends_cache_rank ON stock_trends_cache(rank);
                 CREATE INDEX IF NOT EXISTS idx_crypto_trends_cache_rank ON crypto_trends_cache(rank);
@@ -921,6 +950,10 @@ class TrendsCache:
                     elif cache_key == 'prtimes_trends':
                         cursor.execute(f"DELETE FROM {table_name}")
                     elif cache_key == 'globenewswire_trends':
+                        cursor.execute(f"DELETE FROM {table_name}")
+                    elif cache_key == 'prtimes_hatena_trends':
+                        cursor.execute(f"DELETE FROM {table_name}")
+                    elif cache_key == 'globenewswire_market_reaction_trends':
                         cursor.execute(f"DELETE FROM {table_name}")
                     elif cache_key == 'producthunt_trends':
                         cursor.execute(f"DELETE FROM {table_name}")
@@ -2320,6 +2353,8 @@ class TrendsCache:
                     'cnn_trends_cache',
                     'prtimes_trends_cache',
                     'globenewswire_trends_cache',
+                    'prtimes_hatena_trends_cache',
+                    'globenewswire_market_reaction_trends_cache',
                     'wikipedia_trends_cache',
                     'producthunt_trends_cache'
                 ]
@@ -3119,6 +3154,94 @@ class TrendsCache:
             logger.error(f"❌ prtimes_trendsキャッシュクリアエラー: {e}", exc_info=True)
             return False
 
+    # PR TIMES × はてブ キャッシュメソッド
+    def save_prtimes_hatena_trends_to_cache(self, data):
+        """PR TIMES × はてブ データをキャッシュに保存"""
+        if not data:
+            return False
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM prtimes_hatena_trends_cache")
+                    for item in data:
+                        tags_json = json.dumps(item.get('tags') or [], ensure_ascii=False) if (item.get('tags') is not None) else None
+                        cursor.execute("""
+                            INSERT INTO prtimes_hatena_trends_cache
+                            (title, url, published_date, description, rank, bookmark_count, tags)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            item.get('title', ''),
+                            item.get('url', ''),
+                            item.get('published_date'),
+                            item.get('description', ''),
+                            item.get('rank', 0),
+                            item.get('bookmark_count', 0),
+                            tags_json
+                        ))
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        ('prtimes_hatena_trends', now_jst, len(data), now_jst, len(data))
+                    )
+                    conn.commit()
+                    logger.info(f"✅ prtimes_hatena_trendsキャッシュを保存しました ({len(data)}件)")
+                    return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ prtimes_hatena_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ prtimes_hatena_trendsキャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def get_prtimes_hatena_trends_from_cache(self):
+        """PR TIMES × はてブ データをキャッシュから取得"""
+        def query_func(conn):
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT title, url, published_date, description, rank, bookmark_count, tags, cached_at
+                    FROM prtimes_hatena_trends_cache ORDER BY rank LIMIT 10
+                """)
+                data = cursor.fetchall()
+                result = []
+                for row in data:
+                    row_dict = dict(row)
+                    if row_dict.get('published_date') and isinstance(row_dict['published_date'], datetime):
+                        row_dict['published_date'] = row_dict['published_date'].isoformat()
+                    if row_dict.get('tags') and isinstance(row_dict['tags'], str):
+                        try:
+                            row_dict['tags'] = json.loads(row_dict['tags'])
+                        except (TypeError, ValueError):
+                            row_dict['tags'] = []
+                    elif row_dict.get('tags') is None:
+                        row_dict['tags'] = []
+                    result.append(row_dict)
+                return result
+        try:
+            return self._execute_with_retry(query_func)
+        except Exception as e:
+            logger.error(f"❌ PR TIMES × はてブ キャッシュ取得エラー: {e}", exc_info=True)
+            return None
+
+    def clear_prtimes_hatena_trends_cache(self):
+        """PR TIMES × はてブ キャッシュをクリア"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM prtimes_hatena_trends_cache")
+                    conn.commit()
+                    logger.info("✅ prtimes_hatena_trendsのキャッシュをクリアしました")
+                    return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ prtimes_hatena_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ prtimes_hatena_trendsキャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
     # GlobeNewswire Trends キャッシュメソッド
     def save_globenewswire_trends_to_cache(self, data):
         """GlobeNewswire Trendsデータをキャッシュに保存"""
@@ -3204,6 +3327,97 @@ class TrendsCache:
             return False
         except Exception as e:
             logger.error(f"❌ globenewswire_trendsキャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
+    # GlobeNewswire × Market Reaction キャッシュメソッド
+    def save_globenewswire_market_reaction_trends_to_cache(self, data):
+        """GlobeNewswire × Market Reaction データをキャッシュに保存"""
+        if not data:
+            return False
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM globenewswire_market_reaction_trends_cache")
+                    for item in data:
+                        tags_json = json.dumps(item.get('tags') or [], ensure_ascii=False) if (item.get('tags') is not None) else None
+                        cursor.execute("""
+                            INSERT INTO globenewswire_market_reaction_trends_cache
+                            (title, url, published_date, description, rank, tags, ticker, change_percent, volume_spike, reaction_score)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            item.get('title', ''),
+                            item.get('url', ''),
+                            item.get('published_date'),
+                            item.get('description', ''),
+                            item.get('rank', 0),
+                            tags_json,
+                            item.get('ticker'),
+                            item.get('change_percent', 0),
+                            item.get('volume_spike', 0),
+                            item.get('reaction_score', 0),
+                        ))
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        ('globenewswire_market_reaction_trends', now_jst, len(data), now_jst, len(data))
+                    )
+                    conn.commit()
+                    logger.info(f"✅ globenewswire_market_reaction_trendsキャッシュを保存しました ({len(data)}件)")
+                    return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ globenewswire_market_reaction_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ globenewswire_market_reaction_trendsキャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def get_globenewswire_market_reaction_trends_from_cache(self):
+        """GlobeNewswire × Market Reaction データをキャッシュから取得"""
+        def query_func(conn):
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT title, url, published_date, description, rank, tags, ticker, change_percent, volume_spike, reaction_score, cached_at
+                    FROM globenewswire_market_reaction_trends_cache ORDER BY rank LIMIT 50
+                """)
+                data = cursor.fetchall()
+                result = []
+                for row in data:
+                    row_dict = dict(row)
+                    if row_dict.get('published_date') and isinstance(row_dict['published_date'], datetime):
+                        row_dict['published_date'] = row_dict['published_date'].isoformat()
+                    if row_dict.get('tags') and isinstance(row_dict['tags'], str):
+                        try:
+                            row_dict['tags'] = json.loads(row_dict['tags'])
+                        except (TypeError, ValueError):
+                            row_dict['tags'] = []
+                    elif row_dict.get('tags') is None:
+                        row_dict['tags'] = []
+                    result.append(row_dict)
+                return result
+        try:
+            return self._execute_with_retry(query_func)
+        except Exception as e:
+            logger.error(f"❌ GlobeNewswire × Market Reaction キャッシュ取得エラー: {e}", exc_info=True)
+            return None
+
+    def clear_globenewswire_market_reaction_trends_cache(self):
+        """GlobeNewswire × Market Reaction キャッシュをクリア"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM globenewswire_market_reaction_trends_cache")
+                    conn.commit()
+                    logger.info("✅ globenewswire_market_reaction_trendsのキャッシュをクリアしました")
+                    return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ globenewswire_market_reaction_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ globenewswire_market_reaction_trendsキャッシュクリアエラー: {e}", exc_info=True)
             return False
     
     # Wikipedia Trends キャッシュメソッド

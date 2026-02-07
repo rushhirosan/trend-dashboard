@@ -87,7 +87,7 @@
     <script src="{{ url_for('static', filename='js/display-functions.js') }}"></script>
     <script src="{{ url_for('static', filename='js/us-trends.js') }}"></script>
 </head>
-<body class="bg-light">
+<body id="trends-us" class="bg-light">
     <!-- ヘッダー -->
     {% set page_title = 'Trends Dashboard' %}
     {% set page_icon = 'fas fa-chart-line' %}
@@ -161,19 +161,6 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-12 col-md-6 col-lg-4 d-none" data-all-card="globenewswire" data-ui-hidden="globenewswire" style="display:none !important">
-                                <div class="card h-100">
-                                    <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center py-2">
-                                        <h3 class="h6 mb-0"><i class="fas fa-bullhorn"></i> GlobeNewswire</h3>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-news" data-target-anchor="source-globenewswire" aria-label="Go to News tab">More</a>
-                                    </div>
-                                    <div class="card-body p-2">
-                                        <div class="table-responsive">
-                                            <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Title</th><th>Published</th><th>Tags</th></tr></thead><tbody id="all-globenewswireTrendsTableBody"></tbody></table>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                             <div class="col-12 col-md-6 col-lg-4" data-all-card="wikipedia">
                                 <div class="card h-100">
                                     <div class="card-header text-white d-flex justify-content-between align-items-center py-2" style="background:#636466;">
@@ -209,6 +196,19 @@
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
                                             <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Title</th><th>Channel</th><th>Views</th></tr></thead><tbody id="all-youtubeTrendsTableBody"></tbody></table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4" data-all-card="globenewswire">
+                                <div class="card h-100">
+                                    <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center py-2">
+                                        <h3 class="h6 mb-0"><i class="fas fa-bullhorn"></i> GlobeNewswire</h3>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" data-target-anchor="source-globenewswire" aria-label="Go to Search tab">More</a>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Title</th><th>Published</th><th>Tags</th></tr></thead><tbody id="all-globenewswireTrendsTableBody"></tbody></table>
                                         </div>
                                     </div>
                                 </div>
@@ -606,55 +606,14 @@
                 </div>
             </div>
         </div>
-            <!-- Row 2: GlobeNewswire (UI hidden, backend still fetches) -->
-            <div class="row g-3 mb-3 d-none" id="row-source-globenewswire" style="display:none !important">
-            <div class="col-12 col-md-6" id="source-globenewswire">
-                <div class="card h-100">
-                    <div class="card-header bg-secondary text-white">
-                        <h5><i class="fas fa-bullhorn"></i> GlobeNewswire</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="loading text-center py-5" id="globenewswireLoading" style="display: none;">
-                            <div class="spinner-border text-secondary" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <p class="mt-3">Loading GlobeNewswire data...</p>
-                        </div>
-                        <div id="globenewswireResults">
-                            <div class="alert alert-danger" id="globenewswireErrorMessage" style="display: none;"></div>
-                            <div class="card trend-table category-card">
-                                <div class="card-body">
-                                    <div class="trend-table-container">
-                                        <div class="table-responsive">
-                                            <table class="table table-hover trend-table" id="globenewswireTrendsTable">
-                                                <thead class="table-dark">
-                                                    <tr>
-                                                        <th>Rank</th>
-                                                        <th>Title</th>
-                                                        <th>Published</th>
-                                                        <th>Tags</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody id="globenewswireTrendsTableBody"></tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
                 </div>
                 </div><!-- /.tab-pane#pane-news -->
 
                     <!-- Search & Video tab -->
                     <div class="tab-pane fade" id="pane-search" role="tabpanel" aria-labelledby="tab-search">
         <div class="row g-3 mb-3">
-        <div class="row g-3 mb-3">
-            <!-- Left: Google Trends -->
-            <div class="col-12 col-md-6" id="source-google">
+            <!-- Google Trends -->
+            <div class="col-12 col-md-6 col-lg-4" id="source-google">
                 <!-- Google Trends -->
                 <div class="card h-100">
                     <div class="card-header bg-primary text-white">
@@ -739,8 +698,8 @@
                 </div>
             </div>
             
-            <!-- Right: YouTube Trends -->
-            <div class="col-12 col-md-6" id="source-youtube">
+            <!-- YouTube Trends -->
+            <div class="col-12 col-md-6 col-lg-4" id="source-youtube">
                 <div class="card h-100">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5><i class="fab fa-youtube text-danger"></i> YouTube Trends</h5>
@@ -816,6 +775,45 @@
                                         </tr>
                                     </tbody>
                                 </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- GlobeNewswire (right of YouTube) -->
+            <div class="col-12 col-md-6 col-lg-4" id="source-globenewswire">
+                <div class="card h-100">
+                    <div class="card-header bg-secondary text-white">
+                        <h5><i class="fas fa-bullhorn"></i> GlobeNewswire</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="loading text-center py-5" id="globenewswireLoading" style="display: none;">
+                            <div class="spinner-border text-secondary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Loading GlobeNewswire data...</p>
+                        </div>
+                        <div id="globenewswireResults" style="display: none;">
+                            <div class="alert alert-danger" id="globenewswireErrorMessage" style="display: none;"></div>
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                                    <div class="trend-table-container">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover trend-table" id="globenewswireTrendsTable">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>Rank</th>
+                                                        <th>Title</th>
+                                                        <th>Published</th>
+                                                        <th>Tags</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="globenewswireTrendsTableBody"></tbody>
+                                            </table>
                                         </div>
                                     </div>
                                 </div>
@@ -2227,6 +2225,7 @@
         /* アクティブなタブ内の結果エリアのみ表示（日本ページと同様のタブ切り替え） */
         #trendCategoryTabContent > .tab-pane.active.show #googleResults,
         #trendCategoryTabContent > .tab-pane.active.show #youtubeResults,
+        #trendCategoryTabContent > .tab-pane.active.show #globenewswireResults,
         #trendCategoryTabContent > .tab-pane.active.show #cnnResults,
         #trendCategoryTabContent > .tab-pane.active.show #worldnewsResults,
         #trendCategoryTabContent > .tab-pane.active.show #hackernewsResults,

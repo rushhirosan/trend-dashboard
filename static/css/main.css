@@ -1,12 +1,12 @@
 /* ヘッダーのスタイルは common.css で統一管理 */
 
-/* PR TIMES / GlobeNewswire は一時非表示（バックエンドは稼働継続） */
-#row-source-prtimes,
-#row-source-globenewswire,
-#source-prtimes,
-#source-globenewswire,
-[data-all-card="prtimes"],
-[data-all-card="globenewswire"] {
+/* PR TIMES / GlobeNewswire は日本ページのみ非表示（USではGlobeNewswire表示） */
+body#trends-jp #row-source-prtimes,
+body#trends-jp #row-source-globenewswire,
+body#trends-jp #source-prtimes,
+body#trends-jp #source-globenewswire,
+body#trends-jp [data-all-card="prtimes"],
+body#trends-jp [data-all-card="globenewswire"] {
     display: none !important;
 }
 

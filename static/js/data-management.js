@@ -974,7 +974,8 @@ function loadMovieTrendsFromCache() {
 }
 
 // 本トレンドキャッシュデータの読み込み（5択カテゴリ対応）
-function loadBookTrendsFromCache() {
+// @param {boolean} forceRefresh - カテゴリ切り替え時にAPIから再取得する場合はtrue
+function loadBookTrendsFromCache(forceRefresh) {
     var category = 'all';
     var bookCategorySelect = document.getElementById('bookCategorySelect');
     if (bookCategorySelect) category = bookCategorySelect.value || 'all';
@@ -988,15 +989,17 @@ function loadBookTrendsFromCache() {
                 results: 'bookResults'
             },
             displayFunction: displayBookResults,
+            alwaysCallDisplay: true,
+            forceRefresh: !!forceRefresh,
             allPaneSync: { mainTableBodyId: 'bookTrendsTableBody', allTableBodyId: 'all-bookTrendsTableBody', targetTabId: 'tab-entertainment' }
         });
     } else {
-        console.log('📊 Book Trends キャッシュデータ読み込み (category: ' + category + ')');
+        console.log('📊 Book Trends キャッシュデータ読み込み (category: ' + category + ', forceRefresh: ' + !!forceRefresh + ')');
         const loadingElement = document.getElementById('bookLoading');
         if (loadingElement) loadingElement.style.display = 'block';
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
-        fetchWithRetry('/api/book-trends?country=JP&limit=25&category=' + encodeURIComponent(category) + '&force_refresh=false', { signal: controller.signal })
+        fetchWithRetry('/api/book-trends?country=JP&limit=25&category=' + encodeURIComponent(category) + '&force_refresh=' + (!!forceRefresh), { signal: controller.signal })
             .then(response => {
                 clearTimeout(timeoutId);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -1004,7 +1007,7 @@ function loadBookTrendsFromCache() {
             })
             .then(data => {
                 if (loadingElement) loadingElement.style.display = 'none';
-                if (data.data && data.data.length > 0 && typeof displayBookResults === 'function') {
+                if (typeof displayBookResults === 'function') {
                     displayBookResults(data);
                 }
                 const resultsElement = document.getElementById('bookResults');

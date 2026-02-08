@@ -242,6 +242,10 @@ function displayBookResults(data) {
             makeTableRowClickable(row, bookLink, `${bookTitle}の本を開く`);
             tableBody.appendChild(row);
         });
+    } else {
+        const emptyRow = document.createElement('tr');
+        emptyRow.innerHTML = '<td colspan="4" class="text-center text-muted py-4">データがありません。次回のスケジューラ更新をお待ちください。</td>';
+        tableBody.appendChild(emptyRow);
     }
 
     // 結果セクションを表示

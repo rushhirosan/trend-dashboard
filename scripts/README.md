@@ -52,6 +52,18 @@ python scripts/check_cache_remote.py
 python scripts/check_cache_status.py
 ```
 
+### update_book_trends.py
+本トレンドの全カテゴリをAPIから取得しキャッシュを更新するスクリプト
+
+**使用方法:**
+```bash
+python scripts/update_book_trends.py
+```
+
+**動作:**
+- 日本: 総合・文芸・ビジネス・人文・社会・実用・IT の5カテゴリを楽天ブックスAPIから取得
+- US: All, Fiction, Business, Biography & History, Science & Tech の5カテゴリをGoogle Books APIから取得
+
 ### bootstrap_dummy_cache.py
 全カテゴリにダミーデータ（Lorem ipsum）を25件ずつキャッシュするスクリプト
 ローカル開発環境でUI/UXの確認用に使用

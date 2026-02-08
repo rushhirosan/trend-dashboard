@@ -207,7 +207,11 @@ def refresh_all_trends(managers, force_refresh=True):
     tasks.append(('stock', lambda m: m.get_trends(market='JP', limit=25, force_refresh=force_refresh), 'JP'))
     tasks.append(('crypto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
     tasks.append(('movie', lambda m: m.get_trends(country='JP', time_window='day', limit=25, force_refresh=force_refresh), 'JP'))
-    tasks.append(('book', lambda m: m.get_trends(country='JP', limit=25, force_refresh=force_refresh), 'JP'))
+    # Book: 全カテゴリをキャッシュ（総合・文芸・ビジネス・人文・社会・実用・IT）
+    for cat in ('all', 'fiction', 'business', 'humanities', 'practical'):
+        def book_jp_handler(m, category=cat):
+            return m.get_trends(country='JP', limit=25, force_refresh=force_refresh, category=category)
+        tasks.append(('book', book_jp_handler, 'JP'))
     tasks.append(('github', lambda m: m.get_trends(language='all', limit=25, force_refresh=force_refresh), 'JP'))
     tasks.append(('appstore', lambda m: m.get_trends(country='JP', category='all', limit=25, force_refresh=force_refresh), 'JP'))
     tasks.append(('ipa', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
@@ -243,7 +247,11 @@ def refresh_all_trends(managers, force_refresh=True):
     tasks.append(('stock', lambda m: m.get_trends(market='US', limit=25, force_refresh=force_refresh), 'US'))
     tasks.append(('crypto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
     tasks.append(('movie', lambda m: m.get_trends(country='US', time_window='day', limit=25, force_refresh=force_refresh), 'US'))
-    tasks.append(('book', lambda m: m.get_trends(country='US', limit=25, force_refresh=force_refresh), 'US'))
+    # Book: 全カテゴリをキャッシュ（all, fiction, business, biography, science）
+    for cat in ('all', 'fiction', 'business', 'biography', 'science'):
+        def book_us_handler(m, category=cat):
+            return m.get_trends(country='US', limit=25, force_refresh=force_refresh, category=category)
+        tasks.append(('book', book_us_handler, 'US'))
     tasks.append(('github', lambda m: m.get_trends(language='all', limit=25, force_refresh=force_refresh), 'US'))
     tasks.append(('appstore', lambda m: m.get_trends(country='US', category='all', limit=25, force_refresh=force_refresh), 'US'))
     tasks.append(('cisa_kev', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))

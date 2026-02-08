@@ -593,11 +593,12 @@ function loadMovieTrendsFromCacheUS() {
 }
 
 // Load Book Trends from Cache (US) — 5択カテゴリ対応
-function loadBookTrendsFromCacheUS() {
+// @param {boolean} forceRefresh - カテゴリ切り替え時にAPIから再取得する場合はtrue
+function loadBookTrendsFromCacheUS(forceRefresh) {
     let category = 'all';
     const bookCategorySelectUS = document.getElementById('bookCategorySelectUS');
     if (bookCategorySelectUS) category = bookCategorySelectUS.value || 'all';
-    console.log('📊 Book Trends cache data loading (US, category:', category + ')');
+    console.log('📊 Book Trends cache data loading (US, category:', category + ', forceRefresh:', !!forceRefresh + ')');
     const loadingElement = document.getElementById('bookLoading');
     const resultsElement = document.getElementById('bookResults');
     const statusMessage = document.getElementById('bookStatusMessage');
@@ -613,7 +614,7 @@ function loadBookTrendsFromCacheUS() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    fetchWithRetry('/api/book-trends?country=US&limit=25&category=' + encodeURIComponent(category) + '&force_refresh=false', { signal: controller.signal })
+    fetchWithRetry('/api/book-trends?country=US&limit=25&category=' + encodeURIComponent(category) + '&force_refresh=' + (!!forceRefresh), { signal: controller.signal })
         .then(response => {
             clearTimeout(timeoutId);
             if (!response.ok) {

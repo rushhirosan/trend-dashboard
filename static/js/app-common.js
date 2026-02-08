@@ -459,7 +459,9 @@ function loadTrendsFromCache(config) {
         params = {},
         uiIds = {},
         displayFunction,
-        timeout = 30000
+        timeout = 30000,
+        alwaysCallDisplay = false,
+        forceRefresh = false
     } = config;
 
     console.log(`📊 ${serviceName} Trends キャッシュデータ読み込み`);
@@ -476,10 +478,10 @@ function loadTrendsFromCache(config) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    // パラメータにforce_refresh=falseを追加
+    // パラメータにforce_refreshを追加
     const queryParams = {
         ...params,
-        force_refresh: false
+        force_refresh: forceRefresh
     };
     const queryString = new URLSearchParams(queryParams).toString();
     const url = `${apiEndpoint}?${queryString}`;
@@ -505,8 +507,9 @@ function loadTrendsFromCache(config) {
                 }
             }
 
-            if (data.data && data.data.length > 0) {
-                console.log(`${serviceName} Trends データ表示開始`);
+            const hasData = data.data && data.data.length > 0;
+            if (hasData || alwaysCallDisplay) {
+                console.log(`${serviceName} Trends データ表示開始`, hasData ? `(${data.data.length}件)` : '(空)');
                 if (typeof displayFunction === 'function') {
                     displayFunction(data);
                 } else {
@@ -514,7 +517,7 @@ function loadTrendsFromCache(config) {
                 }
                 // 全部入り（All）タブ用: メイン表の先頭10行をAll用tbodyへ同期
                 const allPaneSync = config.allPaneSync;
-                if (allPaneSync && typeof syncToAllPane === 'function') {
+                if (allPaneSync && typeof syncToAllPane === 'function' && hasData) {
                     setTimeout(function() {
                         syncToAllPane(allPaneSync.mainTableBodyId, allPaneSync.allTableBodyId, allPaneSync.limit || 5);
                     }, 0);

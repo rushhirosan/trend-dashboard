@@ -42,7 +42,6 @@ function displayNoteResults(data) {
         data.data.forEach((item, index) => {
             const row = document.createElement('tr');
             row.className = 'trend-card';
-            row.style.minHeight = '100px';
 
             // 公開日をフォーマット
             let publishedDate = 'N/A';
@@ -62,17 +61,10 @@ function displayNoteResults(data) {
             const articleUrl = item.url || '#';
             const articleTitle = item.title || 'N/A';
 
-            // リンクを追加
-            const articleLink = articleUrl !== '#' ?
-                `<br><a href="${articleUrl}" target="_blank" class="btn btn-sm btn-outline-secondary mt-1">
-                    <i class="fas fa-external-link-alt"></i> 記事を読む
-                </a>` : '';
-
+            // はてな・Zennと同様にタイトルリンクのみ（余分な改行・ボタンなしで行高を揃える）
             row.innerHTML = `
                 <td><span class="badge bg-secondary">${item.rank || index + 1}</span></td>
-                <td>
-                    <strong><a href="${articleUrl}" target="_blank">${articleTitle}</a></strong>${articleLink}
-                </td>
+                <td><strong><a href="${articleUrl}" target="_blank">${articleTitle}</a></strong></td>
                 <td>${publishedDate}</td>
             `;
             // 行全体をクリック可能にする（アクセシビリティ対応）

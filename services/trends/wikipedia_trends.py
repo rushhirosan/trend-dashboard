@@ -121,20 +121,34 @@ class WikipediaTrendsManager(BaseTrendsManager):
         dd = date.strftime("%d")
         url = f"{self.BASE_URL}/{lang}/featured/{yyyy}/{mm}/{dd}"
 
-        try:
-            self.rate_limiter.wait_if_needed()
-            resp = self.session.get(url, timeout=15)
-            resp.raise_for_status()
-            data = resp.json()
-        except requests.exceptions.Timeout:
-            logger.error("Wikipedia Featured API タイムアウト", exc_info=True)
+        timeout_sec = 30
+        max_attempts = 2
+        last_error = None
+        for attempt in range(max_attempts):
+            try:
+                self.rate_limiter.wait_if_needed()
+                resp = self.session.get(url, timeout=timeout_sec)
+                resp.raise_for_status()
+                data = resp.json()
+                last_error = None
+                break
+            except requests.exceptions.Timeout as e:
+                last_error = e
+                logger.warning(
+                    "Wikipedia Featured API タイムアウト (attempt %d/%d, timeout=%ds)",
+                    attempt + 1, max_attempts, timeout_sec,
+                )
+                if attempt + 1 >= max_attempts:
+                    logger.error("Wikipedia Featured API タイムアウト（リトライ後も失敗）", exc_info=True)
+                    return {"success": False, "error": "API timeout"}
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Wikipedia Featured API リクエストエラー: {e}", exc_info=True)
+                return {"success": False, "error": str(e)}
+            except ValueError as e:
+                logger.error(f"Wikipedia API JSON パースエラー: {e}", exc_info=True)
+                return {"success": False, "error": "Invalid JSON response"}
+        if last_error is not None:
             return {"success": False, "error": "API timeout"}
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Wikipedia Featured API リクエストエラー: {e}", exc_info=True)
-            return {"success": False, "error": str(e)}
-        except ValueError as e:
-            logger.error(f"Wikipedia API JSON パースエラー: {e}", exc_info=True)
-            return {"success": False, "error": "Invalid JSON response"}
 
         mostread = data.get("mostread") or {}
         articles = mostread.get("articles") or []

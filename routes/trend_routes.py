@@ -597,16 +597,15 @@ def get_movie_trends(manager):
 @trend_bp.route('/book-trends')
 @require_manager('book')
 def get_book_trends(manager):
-    """Book Trends APIエンドポイント"""
+    """Book Trends APIエンドポイント（5択カテゴリ対応）"""
     try:
-        country = request.args.get('country', 'JP').upper()  # 'JP' or 'US'
+        country = request.args.get('country', 'JP').upper()
+        category = request.args.get('category', 'all').lower().strip() or 'all'
         limit = int(request.args.get('limit', 25))
         force_refresh = get_force_refresh()
-        
-        result = manager.get_trends(country=country, limit=limit, force_refresh=force_refresh)
+        result = manager.get_trends(country=country, limit=limit, force_refresh=force_refresh, category=category)
         source = '楽天ブックスAPI' if country == 'JP' else 'Google Books API'
-        return handle_trend_response(result, 'Book Trends', source, country=country)
-        
+        return handle_trend_response(result, 'Book Trends', source, country=country, category=category)
     except Exception as e:
         return handle_api_error('Book Trends', e)
 

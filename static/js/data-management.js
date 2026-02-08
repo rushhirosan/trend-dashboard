@@ -973,13 +973,16 @@ function loadMovieTrendsFromCache() {
     }
 }
 
-// 本トレンドキャッシュデータの読み込み（共通化）
+// 本トレンドキャッシュデータの読み込み（5択カテゴリ対応）
 function loadBookTrendsFromCache() {
+    var category = 'all';
+    var bookCategorySelect = document.getElementById('bookCategorySelect');
+    if (bookCategorySelect) category = bookCategorySelect.value || 'all';
     if (typeof loadTrendsFromCache === 'function') {
         loadTrendsFromCache({
             serviceName: 'Book',
             apiEndpoint: '/api/book-trends',
-            params: { country: 'JP', limit: 25 },
+            params: { country: 'JP', limit: 25, category: category },
             uiIds: {
                 loading: 'bookLoading',
                 results: 'bookResults'
@@ -988,13 +991,12 @@ function loadBookTrendsFromCache() {
             allPaneSync: { mainTableBodyId: 'bookTrendsTableBody', allTableBodyId: 'all-bookTrendsTableBody', targetTabId: 'tab-entertainment' }
         });
     } else {
-        // フォールバック（共通関数が利用できない場合）
-        console.log('📊 Book Trends キャッシュデータ読み込み');
+        console.log('📊 Book Trends キャッシュデータ読み込み (category: ' + category + ')');
         const loadingElement = document.getElementById('bookLoading');
         if (loadingElement) loadingElement.style.display = 'block';
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
-        fetchWithRetry('/api/book-trends?country=JP&limit=25&force_refresh=false', { signal: controller.signal })
+        fetchWithRetry('/api/book-trends?country=JP&limit=25&category=' + encodeURIComponent(category) + '&force_refresh=false', { signal: controller.signal })
             .then(response => {
                 clearTimeout(timeoutId);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);

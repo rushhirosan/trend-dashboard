@@ -901,6 +901,13 @@ class TrendsCache:
                         logger.info("✅ movie_trends_cacheテーブルのスキーマ更新完了")
                     except Exception as e:
                         logger.warning(f"⚠️ movie_trends_cacheのスキーマ更新に失敗しました: {e}", exc_info=True)
+                    # book_trends_cache: カテゴリ対応
+                    try:
+                        cur.execute("ALTER TABLE book_trends_cache ADD COLUMN IF NOT EXISTS category VARCHAR(20) DEFAULT 'all'")
+                        conn.commit()
+                        logger.info("✅ book_trends_cache categoryカラム追加完了")
+                    except Exception as e:
+                        logger.warning(f"⚠️ book_trends_cacheのスキーマ更新に失敗しました: {e}", exc_info=True)
                 
                 logger.info("✅ データベーステーブル作成完了")
                 return True
@@ -4114,16 +4121,14 @@ class TrendsCache:
             logger.error(f"❌ movie_trendsキャッシュクリアエラー: {e}", exc_info=True)
             return False
     
-    def save_book_trends_to_cache(self, data, country='JP'):
+    def save_book_trends_to_cache(self, data, country='JP', category='all'):
         """Book Trendsデータをキャッシュに保存"""
         if not data:
             return False
-        
         try:
             with self.get_connection() as conn:
                 with conn.cursor() as cursor:
-                    # 既存のデータを削除（国別）
-                    cursor.execute("DELETE FROM book_trends_cache WHERE country = %s", (country,))
+                    cursor.execute("DELETE FROM book_trends_cache WHERE country = %s AND (category = %s OR category IS NULL)", (country, category))
                     
                     # 新しいデータを挿入
                     for item in data:
@@ -4139,9 +4144,9 @@ class TrendsCache:
                             from datetime import timezone
                             updated_at = datetime.now(timezone.utc)
                         
-                        # パラメータの準備
                         params = (
                             country,
+                            category,
                             item.get('id', ''),
                             item.get('isbn', ''),
                             item.get('title', ''),
@@ -4175,15 +4180,13 @@ class TrendsCache:
                         
                         cursor.execute("""
                             INSERT INTO book_trends_cache
-                            (country, book_id, isbn, title, subtitle, author, authors, publisher,
+                            (country, category, book_id, isbn, title, subtitle, author, authors, publisher,
                              price, sales, published_date, release_date, description, page_count,
                              categories, average_rating, ratings_count, language, item_url,
                              affiliate_url, preview_link, info_link, buy_link, image_url,
                              thumbnail, small_thumbnail, medium, large, rank, updated_at)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """, params)
-                    
-                    # cache_statusテーブルを更新
                     import pytz
                     jst = pytz.timezone('Asia/Tokyo')
                     now_jst = datetime.now(jst)
@@ -4193,10 +4196,10 @@ class TrendsCache:
                         ON CONFLICT (cache_key) DO UPDATE SET
                             last_updated = EXCLUDED.last_updated,
                             data_count = EXCLUDED.data_count
-                    """, (f'book_trends_{country}', now_jst, len(data)))
+                    """, (f'book_trends_{country}_{category}', now_jst, len(data)))
                     
                     conn.commit()
-                    logger.info(f"✅ book_trendsのキャッシュを保存しました ({country}, {len(data)}件)")
+                    logger.info(f"✅ book_trendsのキャッシュを保存しました ({country}, {category}, {len(data)}件)")
                     return True
                 
         except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError) as e:
@@ -4221,7 +4224,7 @@ class TrendsCache:
             logger.error(f"❌ book_trendsキャッシュ保存エラー: {e}", exc_info=True)
             return False
     
-    def get_book_trends_from_cache(self, country='JP'):
+    def get_book_trends_from_cache(self, country='JP', category='all'):
         """Book Trendsデータをキャッシュから取得"""
         try:
             with self.get_connection() as conn:
@@ -4233,13 +4236,13 @@ class TrendsCache:
                                affiliate_url, preview_link, info_link, buy_link, image_url,
                                thumbnail, small_thumbnail, medium, large, rank, updated_at, cached_at
                         FROM book_trends_cache 
-                        WHERE country = %s
+                        WHERE country = %s AND (category = %s OR category IS NULL)
                         ORDER BY rank ASC, cached_at DESC
                         LIMIT 50
-                    """, (country,))
+                    """, (country, category))
                     data = cursor.fetchall()
                     
-                    logger.info(f"🔍 Book Trends キャッシュ取得: country={country}, 取得件数={len(data)}")
+                    logger.info(f"🔍 Book Trends キャッシュ取得: country={country}, category={category}, 取得件数={len(data)}")
                     
                     # RealDictCursorの結果を辞書のリストに変換
                     result = []
@@ -4268,14 +4271,14 @@ class TrendsCache:
             logger.error(f"❌ Book Trendsキャッシュ取得エラー: {e}", exc_info=True)
             return None
     
-    def clear_book_trends_cache(self, country='JP'):
+    def clear_book_trends_cache(self, country='JP', category='all'):
         """Book Trendsキャッシュをクリア"""
         try:
             with self.get_connection() as conn:
                 with conn.cursor() as cursor:
-                    cursor.execute("DELETE FROM book_trends_cache WHERE country = %s", (country,))
+                    cursor.execute("DELETE FROM book_trends_cache WHERE country = %s AND (category = %s OR category IS NULL)", (country, category))
                     conn.commit()
-                    logger.info(f"✅ book_trendsのキャッシュをクリアしました ({country})")
+                    logger.info(f"✅ book_trendsのキャッシュをクリアしました ({country}, {category})")
                     return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ book_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)

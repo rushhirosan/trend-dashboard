@@ -911,6 +911,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     twitchManager.fetchTrends();
                 } else if (service === 'rakuten' && typeof fetchRakutenTrends === 'function') {
                     fetchRakutenTrends();
+                } else if (service === 'book' && typeof loadBookTrendsFromCache === 'function') {
+                    loadBookTrendsFromCache();
                 }
             }
         });
@@ -920,7 +922,8 @@ document.addEventListener('DOMContentLoaded', function() {
         { main: 'hatenaCategorySelect', all: 'all-hatenaCategorySelect' },
         { main: 'noteCategorySelect', all: 'all-noteCategorySelect' },
         { main: 'twitchTypeSelect', all: 'all-twitchTypeSelect' },
-        { main: 'rakutenGenreSelect', all: 'all-rakutenGenreSelect' }
+        { main: 'rakutenGenreSelect', all: 'all-rakutenGenreSelect' },
+        { main: 'bookCategorySelect', all: 'all-bookCategorySelect' }
     ];
     syncPairs.forEach(({ main, all }) => {
         const mainEl = document.getElementById(main);
@@ -930,6 +933,11 @@ document.addEventListener('DOMContentLoaded', function() {
             mainEl.addEventListener('change', () => { allEl.value = mainEl.value; });
         }
     });
+    // 本トレンド: カテゴリ変更で再読み込み
+    const bookCategorySelect = document.getElementById('bookCategorySelect');
+    if (bookCategorySelect && typeof loadBookTrendsFromCache === 'function') {
+        bookCategorySelect.addEventListener('change', function() { loadBookTrendsFromCache(); });
+    }
 
     // 要素の存在確認
     const elements = {

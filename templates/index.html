@@ -431,8 +431,17 @@
                         </div>
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="book">
                             <div class="card h-100">
-                                <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#2E7D32;color:#fff;">
-                                    <h3 class="h6 mb-0"><i class="fas fa-book"></i> 本</h3>
+                                <div class="card-header d-flex justify-content-between align-items-center py-2 flex-wrap gap-1" style="background:#2E7D32;color:#fff;">
+                                    <div class="d-flex align-items-center gap-2 flex-grow-1 min-width-0">
+                                        <h3 class="h6 mb-0"><i class="fas fa-book"></i> 本</h3>
+                                        <select class="form-select form-select-sm all-category-select" id="all-bookCategorySelect" data-main-select="bookCategorySelect" data-service="book" style="max-width: 8rem;">
+                                            <option value="all">総合</option>
+                                            <option value="fiction">文芸</option>
+                                            <option value="business">ビジネス</option>
+                                            <option value="humanities">人文・社会</option>
+                                            <option value="practical">実用・IT</option>
+                                        </select>
+                                    </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-book" aria-label="エンタメタブへ">もっと見る</a>
                                 </div>
                                 <div class="card-body p-2">
@@ -1686,8 +1695,18 @@
                     <!-- 右側: 本トレンド -->
                     <article class="col-12 col-md-6" id="source-book">
                         <div class="card h-100">
-                            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center flex-wrap gap-2">
                                 <h2 class="h5 mb-0"><i class="fas fa-book" aria-hidden="true"></i> 本トレンド</h2>
+                                <div class="d-flex align-items-center gap-2">
+                                    <label for="bookCategorySelect" class="form-label mb-0 small text-white">カテゴリ:</label>
+                                    <select class="form-select form-select-sm" id="bookCategorySelect" style="max-width: 10rem;" aria-label="本のカテゴリを選択">
+                                        <option value="all">総合</option>
+                                        <option value="fiction">文芸</option>
+                                        <option value="business">ビジネス</option>
+                                        <option value="humanities">人文・社会</option>
+                                        <option value="practical">実用・IT</option>
+                                    </select>
+                                </div>
                             </div>
                             <div class="card-body">
                                 <div class="loading text-center py-5" id="bookLoading" style="display: none;">

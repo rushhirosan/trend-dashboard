@@ -383,8 +383,17 @@
                             </div>
                             <div class="col-12 col-md-6 col-lg-4" data-all-card="book">
                                 <div class="card h-100">
-                                    <div class="card-header bg-info text-white d-flex justify-content-between align-items-center py-2">
-                                        <h3 class="h6 mb-0"><i class="fas fa-book"></i> Books</h3>
+                                    <div class="card-header bg-info text-white d-flex justify-content-between align-items-center py-2 flex-wrap gap-1">
+                                        <div class="d-flex align-items-center gap-2 flex-grow-1 min-width-0">
+                                            <h3 class="h6 mb-0"><i class="fas fa-book"></i> Books</h3>
+                                            <select class="form-select form-select-sm all-category-select" id="all-bookCategorySelectUS" data-main-select="bookCategorySelectUS" data-service="book" style="max-width: 8rem;">
+                                                <option value="all">All</option>
+                                                <option value="fiction">Fiction</option>
+                                                <option value="business">Business</option>
+                                                <option value="biography">Biography &amp; History</option>
+                                                <option value="science">Science &amp; Tech</option>
+                                            </select>
+                                        </div>
                                         <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-book" aria-label="Go to Entertainment tab">More</a>
                                     </div>
                                     <div class="card-body p-2">
@@ -1742,8 +1751,18 @@
             <!-- Right: Book Trends -->
             <div class="col-12 col-md-6" id="source-book">
                 <div class="card h-100">
-                    <div class="card-header bg-info text-white">
-                        <h5><i class="fas fa-book"></i> Book Trends</h5>
+                    <div class="card-header bg-info text-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h5 class="mb-0"><i class="fas fa-book"></i> Book Trends</h5>
+                        <div class="d-flex align-items-center gap-2">
+                            <label for="bookCategorySelectUS" class="form-label mb-0 small text-white">Category:</label>
+                            <select class="form-select form-select-sm" id="bookCategorySelectUS" style="max-width: 11rem;" aria-label="Select book category">
+                                <option value="all">All</option>
+                                <option value="fiction">Fiction</option>
+                                <option value="business">Business</option>
+                                <option value="biography">Biography &amp; History</option>
+                                <option value="science">Science &amp; Technology</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div class="loading text-center py-5" id="bookLoading" style="display: none;">

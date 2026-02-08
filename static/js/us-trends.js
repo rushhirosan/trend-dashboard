@@ -424,8 +424,10 @@ async function fetchBookTrendsUS() {
             statusMessage.style.display = 'none';
         }
         
-        // API call (US books)
-        const response = await fetchWithRetry('/api/book-trends?country=US&limit=25');
+        let category = 'all';
+        const bookCategorySelectUS = document.getElementById('bookCategorySelectUS');
+        if (bookCategorySelectUS) category = bookCategorySelectUS.value || 'all';
+        const response = await fetchWithRetry('/api/book-trends?country=US&limit=25&category=' + encodeURIComponent(category));
         const data = await response.json();
         
         // Hide loading
@@ -590,9 +592,12 @@ function loadMovieTrendsFromCacheUS() {
         });
 }
 
-// Load Book Trends from Cache (US)
+// Load Book Trends from Cache (US) — 5択カテゴリ対応
 function loadBookTrendsFromCacheUS() {
-    console.log('📊 Book Trends cache data loading (US)');
+    let category = 'all';
+    const bookCategorySelectUS = document.getElementById('bookCategorySelectUS');
+    if (bookCategorySelectUS) category = bookCategorySelectUS.value || 'all';
+    console.log('📊 Book Trends cache data loading (US, category:', category + ')');
     const loadingElement = document.getElementById('bookLoading');
     const resultsElement = document.getElementById('bookResults');
     const statusMessage = document.getElementById('bookStatusMessage');
@@ -608,7 +613,7 @@ function loadBookTrendsFromCacheUS() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    fetchWithRetry('/api/book-trends?country=US&limit=25&force_refresh=false', { signal: controller.signal })
+    fetchWithRetry('/api/book-trends?country=US&limit=25&category=' + encodeURIComponent(category) + '&force_refresh=false', { signal: controller.signal })
         .then(response => {
             clearTimeout(timeoutId);
             if (!response.ok) {
@@ -3110,6 +3115,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Book category selector (US)
+    const bookCategorySelectUS = document.getElementById('bookCategorySelectUS');
+    if (bookCategorySelectUS) {
+        bookCategorySelectUS.addEventListener('change', function() {
+            console.log('Book category changed to:', this.value);
+            loadBookTrendsFromCacheUS();
+        });
+    }
     // eBay category selector event listener
     const ebayCategorySelect = document.getElementById('ebayCategorySelectUS');
     if (ebayCategorySelect) {
@@ -3132,6 +3145,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     loadEbayFromCacheUS(this.value);
                 } else if (service === 'twitch') {
                     loadTwitchFromCacheUS(this.value);
+                } else if (service === 'book') {
+                    loadBookTrendsFromCacheUS();
                 }
             }
         });
@@ -3139,7 +3154,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Sync main select -> All dropdown (bidirectional)
     const usSyncPairs = [
         { main: 'ebayCategorySelectUS', all: 'all-ebayCategorySelectUS' },
-        { main: 'twitchTypeSelectUS', all: 'all-twitchTypeSelectUS' }
+        { main: 'twitchTypeSelectUS', all: 'all-twitchTypeSelectUS' },
+        { main: 'bookCategorySelectUS', all: 'all-bookCategorySelectUS' }
     ];
     usSyncPairs.forEach(({ main, all }) => {
         const mainEl = document.getElementById(main);

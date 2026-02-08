@@ -16,11 +16,12 @@ from services.trends.base_trends_manager import BaseTrendsManager
 logger = get_logger(__name__)
 
 # 日本（楽天）: 5択カテゴリ → 楽天 booksGenreId のリスト
-# 楽天ブックス実ジャンル: 001002=文学・エッセイ, 001003=絵本・児童書, 001004=小説・エッセイ,
-# 001005=パソコン・システム開発, 001006=ビジネス・経済・就職, 001007=旅行・留学・アウトドア,
-# 001008=人文・思想・社会, 001009=ホビー・スポーツ・美術, 001010=美容・暮らし・健康・料理
+# 楽天ブックス実ジャンル: 001001=本・雑誌（総合）, 001002=文学・エッセイ, 001003=絵本・児童書,
+# 001004=小説・エッセイ, 001005=パソコン・システム開発, 001006=ビジネス・経済・就職,
+# 001007=旅行・留学・アウトドア, 001008=人文・思想・社会, 001009=ホビー・スポーツ・美術, 001010=美容・暮らし・健康・料理
+# 総合: 001001 のみだとAPIが0件を返す場合があるため、サブジャンルをまとめて取得
 RAKUTEN_BOOK_CATEGORY_GENRES = {
-    'all': ['001001'],   # 本・雑誌（総合）
+    'all': ['001001', '001002', '001003', '001004', '001005', '001006', '001007', '001008', '001009', '001010'],
     'fiction': ['001004'],           # 文芸（小説・エッセイ）
     'business': ['001006'],          # ビジネス・経済・就職
     'humanities': ['001008'],        # 人文・思想・社会
@@ -299,6 +300,21 @@ class BookTrendsManager(BaseTrendsManager):
             logger.error(f"❌ Book (楽天) トレンド取得エラー: {e}", exc_info=True)
             return {'error': f'楽天ブックストレンドの取得に失敗しました: {str(e)}', 'success': False}
     
+    def _rakuten_response_items(self, data):
+        """APIレスポンスから商品リストを取得（Items/items の大文字小文字両対応）"""
+        return data.get('Items', data.get('items', []))
+
+    def _rakuten_item_payload(self, raw_item):
+        """raw_item から1件分の辞書を取得（Item/item の大文字小文字、またはフラット対応）"""
+        if isinstance(raw_item, dict):
+            inner = raw_item.get('Item', raw_item.get('item'))
+            if inner is not None:
+                return inner
+            # ラップなしで title/itemPrice 等が直で入っている場合
+            if raw_item.get('title') is not None or raw_item.get('itemName') is not None or raw_item.get('itemPrice') is not None:
+                return raw_item
+        return {}
+
     def _fetch_rakuten_books_trends(self, limit=25, category='all'):
         """楽天ブックスAPIから書籍データを取得（5択カテゴリ対応）"""
         try:
@@ -306,8 +322,8 @@ class BookTrendsManager(BaseTrendsManager):
             logger.info(f"📚 Book (楽天) API呼び出し開始 (category: {category}, genres: {len(genre_ids)}件)")
             url = self.rakuten_ranking_url
             all_items = []
-            seen_isbns = set()  # 重複除去用
-            
+            seen_keys = set()  # 重複除去用（ISBN or itemUrl）
+
             # 各ジャンルからデータを取得
             for genre_id in genre_ids:
                 params = {
@@ -335,21 +351,19 @@ class BookTrendsManager(BaseTrendsManager):
                     
                     if response.status_code == 200:
                         data = response.json()
-                        items = data.get('Items', [])
+                        items = self._rakuten_response_items(data)
                         
                         for item in items:
-                            item_data = item.get('Item', {})
-                            isbn = item_data.get('isbn', '')
-                            
-                            # 重複チェック
-                            if isbn and isbn not in seen_isbns:
-                                seen_isbns.add(isbn)
-                                all_items.append(item)
-                                
-                                # 必要な件数に達したら終了
-                                if len(all_items) >= limit * 2:  # 余裕を持たせる
-                                    break
-                        
+                            item_data = self._rakuten_item_payload(item)
+                            isbn = (item_data.get('isbn') or '').strip()
+                            item_url = (item_data.get('itemUrl') or '').strip()
+                            dedup_key = isbn or item_url or f"{item_data.get('title', '')}|{item_data.get('author', '')}"
+                            if not dedup_key or dedup_key in seen_keys:
+                                continue
+                            seen_keys.add(dedup_key)
+                            all_items.append(item)
+                            if len(all_items) >= limit * 2:
+                                break
                         if len(all_items) >= limit * 2:
                             break
                     else:
@@ -358,6 +372,36 @@ class BookTrendsManager(BaseTrendsManager):
                 except Exception as e:
                     logger.warning(f"楽天ブックス API リクエストエラー (ジャンル: {genre_id}): {e}")
                     continue
+            
+            # 単一ジャンルで0件のときは総合(001001)をフォールバックで取得
+            if not all_items and len(genre_ids) == 1 and genre_ids[0] != '001001':
+                fallback_id = '001001'
+                logger.info(f"📚 Book (楽天): ジャンル {genre_ids[0]} が0件のため、総合({fallback_id})をフォールバック取得")
+                get_rakuten_api_rate_limiter().wait_if_needed()
+                try:
+                    params = {
+                        'applicationId': self.rakuten_app_id,
+                        'format': 'json',
+                        'booksGenreId': fallback_id,
+                        'sort': 'sales',
+                        'hits': min(limit + 5, 20),
+                        'page': 1
+                    }
+                    if self.rakuten_affiliate_id:
+                        params['affiliateId'] = self.rakuten_affiliate_id
+                    response = requests.get(url, params=params, headers={'Accept': 'application/json', 'User-Agent': 'trends-dashboard/1.0.0'}, timeout=10)
+                    if response.status_code == 200:
+                        data = response.json()
+                        for item in self._rakuten_response_items(data):
+                            item_data = self._rakuten_item_payload(item)
+                            dedup_key = (item_data.get('isbn') or '').strip() or (item_data.get('itemUrl') or '').strip() or f"{item_data.get('title', '')}|{item_data.get('author', '')}"
+                            if dedup_key and dedup_key not in seen_keys:
+                                seen_keys.add(dedup_key)
+                                all_items.append(item)
+                                if len(all_items) >= limit * 2:
+                                    break
+                except Exception as e:
+                    logger.warning(f"楽天ブックス フォールバック取得エラー: {e}")
             
             if not all_items:
                 logger.warning("⚠️ Book (楽天): データが取得できませんでした")
@@ -368,7 +412,7 @@ class BookTrendsManager(BaseTrendsManager):
                 }
             
             # 売上順でソート（salesフィールドで）
-            all_items.sort(key=lambda x: x.get('Item', {}).get('sales', 0), reverse=True)
+            all_items.sort(key=lambda x: self._rakuten_item_payload(x).get('sales', 0), reverse=True)
             
             trends_data = []
             success_count = 0
@@ -376,14 +420,15 @@ class BookTrendsManager(BaseTrendsManager):
             
             for idx, item in enumerate(all_items[:limit], 1):
                 try:
-                    item_data = item.get('Item', {})
+                    item_data = self._rakuten_item_payload(item)
                     
-                    # 書籍情報を整形
-                    isbn = item_data.get('isbn', '')
+                    # 書籍情報を整形（title/itemName などAPIの表記ゆれに対応）
+                    isbn = item_data.get('isbn', '') or ''
+                    title = item_data.get('title', '') or item_data.get('itemName', '') or 'タイトル不明'
                     book_data = {
                         'rank': idx,
                         'isbn': isbn,
-                        'title': item_data.get('title', 'タイトル不明'),
+                        'title': title,
                         'author': item_data.get('author', ''),
                         'publisher': item_data.get('publisherName', ''),
                         'price': item_data.get('itemPrice', 0),
@@ -393,7 +438,7 @@ class BookTrendsManager(BaseTrendsManager):
                         # 楽天APIが返すaffiliateUrlがあれば使い、なければitemUrlを補完
                         'affiliate_url': item_data.get('affiliateUrl', '') or self._add_rakuten_affiliate(item_data.get('itemUrl', '')),
                         'amazon_link': self._generate_amazon_link(
-                            item_data.get('title', ''),
+                            title,
                             isbn,
                             'JP'
                         ),
@@ -406,7 +451,7 @@ class BookTrendsManager(BaseTrendsManager):
                     success_count += 1
                     
                 except Exception as e:
-                    logger.warning(f"書籍 {item.get('Item', {}).get('isbn', 'unknown')} 処理エラー: {str(e)[:100]}")
+                    logger.warning(f"書籍 {self._rakuten_item_payload(item).get('isbn', 'unknown')} 処理エラー: {str(e)[:100]}")
                     error_count += 1
                     continue
             

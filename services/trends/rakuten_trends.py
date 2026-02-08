@@ -184,7 +184,7 @@ class RakutenTrendsManager(BaseTrendsManager):
         result = super().get_trends(
             limit=limit,
             force_refresh=force_refresh,
-            auto_fetch_on_cache_miss=False,  # 楽天はキャッシュ未ヒット時はAPI呼び出さない（force_refresh時のみ）
+            auto_fetch_on_cache_miss=True,  # キャッシュ未ヒット時はAPI呼び出し（レート制限1秒1回で制御）
             sort_key='sales_count',
             sort_reverse=True,
             genre_id=cache_scope

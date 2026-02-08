@@ -103,6 +103,14 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
             apiEndpoint = '/api/medium-trends';
             params = '?limit=25';
             break;
+        case 'wikipedia':
+            apiEndpoint = '/api/wikipedia-trends';
+            params = '?lang=ja&limit=25';
+            break;
+        case 'prtimes_hatena':
+            apiEndpoint = '/api/prtimes-hatena-trends';
+            params = '?limit=25';
+            break;
         default:
             console.warn(`⚠️ 未知のプラットフォーム: ${platform}`);
             return;
@@ -152,7 +160,10 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                     '楽天': '楽天',
                     'Twitch': 'Twitch',
                     'DEV.to': 'DEV.to',
-                    'Medium': 'Medium'
+                    'Medium': 'Medium',
+                    'Wikipedia 人気記事 (日本語)': 'Wikipedia 人気記事 (日本語)',
+                    'Wikipedia 人気記事': 'Wikipedia 人気記事 (日本語)',
+                    'PR TIMES × はてブ': 'PR TIMES × はてブ'
                 };
                 
                 const displayName = platformNameMap[platformName] || platformName;
@@ -363,16 +374,19 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
 
 // データ鮮度情報を更新する関数（外部から呼び出し用）
 function refreshDataFreshnessExternal() {
-    // 各プラットフォームのデータ鮮度を更新（キャッシュのみ、API呼び出しなし）
-    // トレンドページの順序に合わせる: NHK → World News → Google → YouTube → はてな → Qiita → 株価 → 仮想通貨 → Spotify → Podcast → 映画 → 本 → 楽天 → Twitch
+    // 各プラットフォームのデータ鮮度を更新（全部入りAllタブの並び順に合わせる）
     updatePlatformStatusExternal('nhk', 'NHK ニュース');
     updatePlatformStatusExternal('news', 'World News');
+    updatePlatformStatusExternal('wikipedia', 'Wikipedia 人気記事 (日本語)');
     updatePlatformStatusExternal('google', 'Google Trends');
     updatePlatformStatusExternal('youtube', 'YouTube');
-    updatePlatformStatusExternal('hatena', 'はてなブックマーク');
+    updatePlatformStatusExternal('prtimes_hatena', 'PR TIMES × はてブ');
     updatePlatformStatusExternal('qiita', 'Qiita トレンド');
+    updatePlatformStatusExternal('hatena', 'はてなブックマーク');
     updatePlatformStatusExternal('zenn', 'Zenn');
     updatePlatformStatusExternal('note', 'Note');
+    updatePlatformStatusExternal('github', 'GitHub');
+    updatePlatformStatusExternal('appstore', 'App Store');
     updatePlatformStatusExternal('ipa', 'IPA注意喚起');
     updatePlatformStatusExternal('jpcert', 'JPCERT/CC');
     updatePlatformStatusExternal('stock', '株価トレンド');
@@ -381,15 +395,13 @@ function refreshDataFreshnessExternal() {
     updatePlatformStatusExternal('podcast', 'Podcast');
     updatePlatformStatusExternal('movie', '映画トレンド');
     updatePlatformStatusExternal('book', '本トレンド');
-    updatePlatformStatusExternal('github', 'GitHub');
-    updatePlatformStatusExternal('appstore', 'App Store');
     updatePlatformStatusExternal('rakuten', '楽天');
     updatePlatformStatusExternal('twitch', 'Twitch');
     
     // テキスト要素を強制的に表示
     setTimeout(() => {
         // 日本トレンドページの順序に合わせる
-        const platforms = ['nhk', 'news', 'google', 'youtube', 'hatena', 'qiita', 'zenn', 'note', 'ipa', 'jpcert', 'github', 'appstore', 'stock', 'crypto', 'movie', 'book', 'spotify', 'podcast', 'rakuten', 'twitch'];
+        const platforms = ['nhk', 'news', 'wikipedia', 'google', 'youtube', 'prtimes_hatena', 'qiita', 'hatena', 'zenn', 'note', 'github', 'appstore', 'ipa', 'jpcert', 'stock', 'crypto', 'spotify', 'podcast', 'movie', 'book', 'rakuten', 'twitch'];
         platforms.forEach(platform => {
             const lastUpdateElement = document.getElementById(`${platform}LastUpdate`);
             const dataCountElement = document.getElementById(`${platform}DataCount`);

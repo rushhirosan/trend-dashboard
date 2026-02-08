@@ -6,7 +6,7 @@
     
     <!-- SEO Meta Tags -->
     <title>データ鮮度情報 - トレンドダッシュボード</title>
-    <meta name="description" content="Google Trends、YouTube、株価、Spotify、はてなブックマーク、楽天、Twitch、Podcastなどのトレンドデータを表示しています。データは毎日1時、7時、13時、19時（JST）に更新処理を開始します（更新完了まで10〜20分かかる場合があります）。">
+    <meta name="description" content="日本・USのトレンドデータ鮮度情報。NHK、CNN、Google Trends、YouTube、はてなブックマーク、Qiita、Zenn、Note、Wikipedia、Hacker News、株価、Spotify、楽天、eBay、Twitch、Podcastなどを表示。データは毎日1時、7時、13時、19時（JST）に更新処理を開始します。">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://trends-dashboard.fly.dev/data-status">
     
@@ -133,7 +133,31 @@
                                 </div>
 
                                 <div class="row g-3 mt-2">
-                                    <!-- 2行目: Google Trends + YouTube -->
+                                    <!-- 2行目: Wikipedia + Google Trends（All順） -->
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-3">
+                                                    <i class="fab fa-wikipedia-w text-dark fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">Wikipedia 人気記事</h6>
+                                                </div>
+                                                <div class="row text-center">
+                                                    <div class="col-4">
+                                                        <small class="text-muted">最終更新/Last updated</small>
+                                                        <div class="fw-bold" id="wikipediaLastUpdate">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">データ件数/Data count</small>
+                                                        <div class="fw-bold" id="wikipediaDataCount">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">ステータス/Status</small>
+                                                        <div><span class="badge bg-secondary" id="wikipediaStatus">-</span></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div class="col-md-6">
                                         <div class="card h-100">
                                             <div class="card-body">
@@ -158,7 +182,10 @@
                                             </div>
                                         </div>
                                     </div>
-                                    
+                                </div>
+
+                                <div class="row g-3 mt-2">
+                                    <!-- 3行目: YouTube + PR TIMES × はてブ（All順） -->
                                     <div class="col-md-6">
                                         <div class="card h-100">
                                             <div class="card-body">
@@ -183,35 +210,34 @@
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-
-                                <div class="row g-3 mt-2">
-                                    <!-- 3行目: はてなブックマーク + Qiita -->
                                     <div class="col-md-6">
                                         <div class="card h-100">
                                             <div class="card-body">
                                                 <div class="d-flex align-items-center mb-3">
-                                                    <i class="fas fa-bookmark text-warning fs-4 me-3"></i>
-                                                    <h6 class="card-title mb-0">はてなブックマーク</h6>
+                                                    <i class="fas fa-bullhorn text-primary fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">PR TIMES × はてブ</h6>
                                                 </div>
                                                 <div class="row text-center">
                                                     <div class="col-4">
                                                         <small class="text-muted">最終更新/Last updated</small>
-                                                        <div class="fw-bold" id="hatenaLastUpdate">-</div>
+                                                        <div class="fw-bold" id="prtimes_hatenaLastUpdate">-</div>
                                                     </div>
                                                     <div class="col-4">
                                                         <small class="text-muted">データ件数/Data count</small>
-                                                        <div class="fw-bold" id="hatenaDataCount">-</div>
+                                                        <div class="fw-bold" id="prtimes_hatenaDataCount">-</div>
                                                     </div>
                                                     <div class="col-4">
                                                         <small class="text-muted">ステータス/Status</small>
-                                                        <div><span class="badge bg-secondary" id="hatenaStatus">-</span></div>
+                                                        <div><span class="badge bg-secondary" id="prtimes_hatenaStatus">-</span></div>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                    
+                                </div>
+
+                                <div class="row g-3 mt-2">
+                                    <!-- 4行目: Qiita + はてなブックマーク（All順） -->
                                     <div class="col-md-6">
                                         <div class="card h-100">
                                             <div class="card-body">
@@ -236,10 +262,34 @@
                                             </div>
                                         </div>
                                     </div>
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-3">
+                                                    <i class="fas fa-bookmark text-warning fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">はてなブックマーク</h6>
+                                                </div>
+                                                <div class="row text-center">
+                                                    <div class="col-4">
+                                                        <small class="text-muted">最終更新/Last updated</small>
+                                                        <div class="fw-bold" id="hatenaLastUpdate">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">データ件数/Data count</small>
+                                                        <div class="fw-bold" id="hatenaDataCount">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">ステータス/Status</small>
+                                                        <div><span class="badge bg-secondary" id="hatenaStatus">-</span></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="row g-3 mt-2">
-                                    <!-- 4行目: Zenn + Note -->
+                                    <!-- 5行目: Zenn + Note（All順） -->
                                     <div class="col-md-6">
                                         <div class="card h-100">
                                             <div class="card-body">
@@ -292,60 +342,7 @@
                                 </div>
 
                                 <div class="row g-3 mt-2">
-                                    <!-- 5行目: IPA注意喚起 + JPCERT/CC -->
-                                    <div class="col-md-6">
-                                        <div class="card h-100">
-                                            <div class="card-body">
-                                                <div class="d-flex align-items-center mb-3">
-                                                    <i class="fas fa-shield-alt text-danger fs-4 me-3"></i>
-                                                    <h6 class="card-title mb-0">IPA注意喚起</h6>
-                                                </div>
-                                                <div class="row text-center">
-                                                    <div class="col-4">
-                                                        <small class="text-muted">最終更新/Last updated</small>
-                                                        <div class="fw-bold" id="ipaLastUpdate">-</div>
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <small class="text-muted">データ件数/Data count</small>
-                                                        <div class="fw-bold" id="ipaDataCount">-</div>
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <small class="text-muted">ステータス/Status</small>
-                                                        <div><span class="badge bg-secondary" id="ipaStatus">-</span></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="col-md-6">
-                                        <div class="card h-100">
-                                            <div class="card-body">
-                                                <div class="d-flex align-items-center mb-3">
-                                                    <i class="fas fa-exclamation-triangle text-warning fs-4 me-3"></i>
-                                                    <h6 class="card-title mb-0">JPCERT/CC</h6>
-                                                </div>
-                                                <div class="row text-center">
-                                                    <div class="col-4">
-                                                        <small class="text-muted">最終更新/Last updated</small>
-                                                        <div class="fw-bold" id="jpcertLastUpdate">-</div>
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <small class="text-muted">データ件数/Data count</small>
-                                                        <div class="fw-bold" id="jpcertDataCount">-</div>
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <small class="text-muted">ステータス/Status</small>
-                                                        <div><span class="badge bg-secondary" id="jpcertStatus">-</span></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="row g-3 mt-2">
-                                    <!-- 6行目: GitHub + App Store -->
+                                    <!-- 6行目: GitHub + App Store（All順） -->
                                     <div class="col-md-6">
                                         <div class="card h-100">
                                             <div class="card-body">
@@ -370,7 +367,6 @@
                                             </div>
                                         </div>
                                     </div>
-                                    
                                     <div class="col-md-6">
                                         <div class="card h-100">
                                             <div class="card-body">
@@ -398,7 +394,59 @@
                                 </div>
 
                                 <div class="row g-3 mt-2">
-                                    <!-- 7行目: 株価 + 仮想通貨 -->
+                                    <!-- 7行目: IPA注意喚起 + JPCERT/CC（All順） -->
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-3">
+                                                    <i class="fas fa-shield-alt text-danger fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">IPA注意喚起</h6>
+                                                </div>
+                                                <div class="row text-center">
+                                                    <div class="col-4">
+                                                        <small class="text-muted">最終更新/Last updated</small>
+                                                        <div class="fw-bold" id="ipaLastUpdate">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">データ件数/Data count</small>
+                                                        <div class="fw-bold" id="ipaDataCount">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">ステータス/Status</small>
+                                                        <div><span class="badge bg-secondary" id="ipaStatus">-</span></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-3">
+                                                    <i class="fas fa-exclamation-triangle text-warning fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">JPCERT/CC</h6>
+                                                </div>
+                                                <div class="row text-center">
+                                                    <div class="col-4">
+                                                        <small class="text-muted">最終更新/Last updated</small>
+                                                        <div class="fw-bold" id="jpcertLastUpdate">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">データ件数/Data count</small>
+                                                        <div class="fw-bold" id="jpcertDataCount">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">ステータス/Status</small>
+                                                        <div><span class="badge bg-secondary" id="jpcertStatus">-</span></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mt-2">
+                                    <!-- 8行目: 株価 + 仮想通貨（All順） -->
                                     <div class="col-md-6">
                                         <div class="card h-100">
                                             <div class="card-body">
@@ -451,60 +499,7 @@
                                 </div>
 
                                 <div class="row g-3 mt-2">
-                                    <!-- 8行目: 映画 + 本 -->
-                                    <div class="col-md-6">
-                                        <div class="card h-100">
-                                            <div class="card-body">
-                                                <div class="d-flex align-items-center mb-3">
-                                                    <i class="fas fa-film text-primary fs-4 me-3"></i>
-                                                    <h6 class="card-title mb-0">映画トレンド</h6>
-                                                </div>
-                                                <div class="row text-center">
-                                                    <div class="col-4">
-                                                        <small class="text-muted">最終更新/Last updated</small>
-                                                        <div class="fw-bold" id="movieLastUpdate">-</div>
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <small class="text-muted">データ件数/Data count</small>
-                                                        <div class="fw-bold" id="movieDataCount">-</div>
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <small class="text-muted">ステータス/Status</small>
-                                                        <div><span class="badge bg-secondary" id="movieStatus">-</span></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="col-md-6">
-                                        <div class="card h-100">
-                                            <div class="card-body">
-                                                <div class="d-flex align-items-center mb-3">
-                                                    <i class="fas fa-book text-info fs-4 me-3"></i>
-                                                    <h6 class="card-title mb-0">本トレンド</h6>
-                                                </div>
-                                                <div class="row text-center">
-                                                    <div class="col-4">
-                                                        <small class="text-muted">最終更新/Last updated</small>
-                                                        <div class="fw-bold" id="bookLastUpdate">-</div>
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <small class="text-muted">データ件数/Data count</small>
-                                                        <div class="fw-bold" id="bookDataCount">-</div>
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <small class="text-muted">ステータス/Status</small>
-                                                        <div><span class="badge bg-secondary" id="bookStatus">-</span></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="row g-3 mt-2">
-                                    <!-- 9行目: Spotify + Podcast -->
+                                    <!-- 9行目: Spotify + Podcast（All順） -->
                                     <div class="col-md-6">
                                         <div class="card h-100">
                                             <div class="card-body">
@@ -529,7 +524,6 @@
                                             </div>
                                         </div>
                                     </div>
-                                    
                                     <div class="col-md-6">
                                         <div class="card h-100">
                                             <div class="card-body">
@@ -557,7 +551,59 @@
                                 </div>
 
                                 <div class="row g-3 mt-2">
-                                    <!-- 10行目: 楽天 + Twitch -->
+                                    <!-- 10行目: 映画 + 本（All順） -->
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-3">
+                                                    <i class="fas fa-film text-primary fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">映画トレンド</h6>
+                                                </div>
+                                                <div class="row text-center">
+                                                    <div class="col-4">
+                                                        <small class="text-muted">最終更新/Last updated</small>
+                                                        <div class="fw-bold" id="movieLastUpdate">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">データ件数/Data count</small>
+                                                        <div class="fw-bold" id="movieDataCount">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">ステータス/Status</small>
+                                                        <div><span class="badge bg-secondary" id="movieStatus">-</span></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-3">
+                                                    <i class="fas fa-book text-info fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">本トレンド</h6>
+                                                </div>
+                                                <div class="row text-center">
+                                                    <div class="col-4">
+                                                        <small class="text-muted">最終更新/Last updated</small>
+                                                        <div class="fw-bold" id="bookLastUpdate">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">データ件数/Data count</small>
+                                                        <div class="fw-bold" id="bookDataCount">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">ステータス/Status</small>
+                                                        <div><span class="badge bg-secondary" id="bookStatus">-</span></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mt-2">
+                                    <!-- 11行目: 楽天 + Twitch（All順） -->
                                     <div class="col-md-6">
                                         <div class="card h-100">
                                             <div class="card-body">
@@ -667,7 +713,31 @@
                                     </div>
 
                                     <div class="row g-3 mt-2">
-                                        <!-- US 2行目: Google Trends + YouTube -->
+                                        <!-- US 2行目: Wikipedia Most Read + Google Trends（All順） -->
+                                        <div class="col-md-6">
+                                            <div class="card h-100">
+                                                <div class="card-body">
+                                                    <div class="d-flex align-items-center mb-3">
+                                                        <i class="fab fa-wikipedia-w text-dark fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">Wikipedia Most Read</h6>
+                                                    </div>
+                                                    <div class="row text-center">
+                                                        <div class="col-4">
+                                                            <small class="text-muted">最終更新/Last updated</small>
+                                                            <div class="fw-bold" id="wikipediaUSLastUpdate">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">データ件数/Data count</small>
+                                                            <div class="fw-bold" id="wikipediaUSDataCount">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">ステータス/Status</small>
+                                                            <div><span class="badge bg-secondary" id="wikipediaUSStatus">-</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div class="col-md-6">
                                             <div class="card h-100">
                                                 <div class="card-body">
@@ -692,7 +762,10 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        
+                                    </div>
+
+                                    <div class="row g-3 mt-2">
+                                        <!-- US 3行目: YouTube + Hacker News（All順） -->
                                         <div class="col-md-6">
                                             <div class="card h-100">
                                                 <div class="card-body">
@@ -717,10 +790,6 @@
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-
-                                    <div class="row g-3 mt-2">
-                                        <!-- US 3行目: Hacker News + Product Hunt -->
                                         <div class="col-md-6">
                                             <div class="card h-100">
                                                 <div class="card-body">
@@ -745,7 +814,10 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        
+                                    </div>
+
+                                    <div class="row g-3 mt-2">
+                                        <!-- US 4行目: Product Hunt + DEV.to（All順） -->
                                         <div class="col-md-6">
                                             <div class="card h-100">
                                                 <div class="card-body">
@@ -770,10 +842,6 @@
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-
-                                    <div class="row g-3 mt-2">
-                                        <!-- US 4行目: DEV.to + Medium -->
                                         <div class="col-md-6">
                                             <div class="card h-100">
                                                 <div class="card-body">
@@ -798,7 +866,10 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        
+                                    </div>
+
+                                    <div class="row g-3 mt-2">
+                                        <!-- US 5行目: Medium + CISA KEV（All順） -->
                                         <div class="col-md-6">
                                             <div class="card h-100">
                                                 <div class="card-body">
@@ -823,10 +894,6 @@
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-
-                                    <div class="row g-3 mt-2">
-                                        <!-- US 5行目: CISA KEV + The Hacker News -->
                                         <div class="col-md-6">
                                             <div class="card h-100">
                                                 <div class="card-body">
@@ -851,7 +918,10 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        
+                                    </div>
+
+                                    <div class="row g-3 mt-2">
+                                        <!-- US 6行目: The Hacker News + GitHub（All順） -->
                                         <div class="col-md-6">
                                             <div class="card h-100">
                                                 <div class="card-body">
@@ -876,10 +946,6 @@
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-
-                                    <div class="row g-3 mt-2">
-                                        <!-- US 5行目: GitHub Trends + App Store Trends -->
                                         <div class="col-md-6">
                                             <div class="card h-100">
                                                 <div class="card-body">
@@ -904,7 +970,10 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        
+                                    </div>
+
+                                    <div class="row g-3 mt-2">
+                                        <!-- US 7行目: App Store + GlobeNewswire（All順） -->
                                         <div class="col-md-6">
                                             <div class="card h-100">
                                                 <div class="card-body">
@@ -929,10 +998,34 @@
                                                 </div>
                                             </div>
                                         </div>
+                                        <div class="col-md-6">
+                                            <div class="card h-100">
+                                                <div class="card-body">
+                                                    <div class="d-flex align-items-center mb-3">
+                                                        <i class="fas fa-bullhorn text-primary fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">GlobeNewswire</h6>
+                                                    </div>
+                                                    <div class="row text-center">
+                                                        <div class="col-4">
+                                                            <small class="text-muted">最終更新/Last updated</small>
+                                                            <div class="fw-bold" id="globenewswireUSLastUpdate">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">データ件数/Data count</small>
+                                                            <div class="fw-bold" id="globenewswireUSDataCount">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">ステータス/Status</small>
+                                                            <div><span class="badge bg-secondary" id="globenewswireUSStatus">-</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div class="row g-3 mt-2">
-                                        <!-- US 6行目: Stock Trends + Crypto Trends -->
+                                        <!-- US 8行目: Stock Trends + Crypto（All順） -->
                                         <div class="col-md-6">
                                             <div class="card h-100">
                                                 <div class="card-body">
@@ -985,60 +1078,7 @@
                                     </div>
 
                                     <div class="row g-3 mt-2">
-                                        <!-- US 7行目: Movie Trends + Book Trends -->
-                                        <div class="col-md-6">
-                                            <div class="card h-100">
-                                                <div class="card-body">
-                                                    <div class="d-flex align-items-center mb-3">
-                                                        <i class="fas fa-film text-primary fs-4 me-3"></i>
-                                                        <h6 class="card-title mb-0">Movie Trends</h6>
-                                                    </div>
-                                                    <div class="row text-center">
-                                                        <div class="col-4">
-                                                            <small class="text-muted">最終更新/Last updated</small>
-                                                            <div class="fw-bold" id="movieUSLastUpdate">-</div>
-                                                        </div>
-                                                        <div class="col-4">
-                                                            <small class="text-muted">データ件数/Data count</small>
-                                                            <div class="fw-bold" id="movieUSDataCount">-</div>
-                                                        </div>
-                                                        <div class="col-4">
-                                                            <small class="text-muted">ステータス/Status</small>
-                                                            <div><span class="badge bg-secondary" id="movieUSStatus">-</span></div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="col-md-6">
-                                            <div class="card h-100">
-                                                <div class="card-body">
-                                                    <div class="d-flex align-items-center mb-3">
-                                                        <i class="fas fa-book text-info fs-4 me-3"></i>
-                                                        <h6 class="card-title mb-0">Book Trends</h6>
-                                                    </div>
-                                                    <div class="row text-center">
-                                                        <div class="col-4">
-                                                            <small class="text-muted">最終更新/Last updated</small>
-                                                            <div class="fw-bold" id="bookUSLastUpdate">-</div>
-                                                        </div>
-                                                        <div class="col-4">
-                                                            <small class="text-muted">データ件数/Data count</small>
-                                                            <div class="fw-bold" id="bookUSDataCount">-</div>
-                                                        </div>
-                                                        <div class="col-4">
-                                                            <small class="text-muted">ステータス/Status</small>
-                                                            <div><span class="badge bg-secondary" id="bookUSStatus">-</span></div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="row g-3 mt-2">
-                                        <!-- US 8行目: Spotify Music + Podcast Trends -->
+                                        <!-- US 9行目: Spotify + Podcast（All順） -->
                                         <div class="col-md-6">
                                             <div class="card h-100">
                                                 <div class="card-body">
@@ -1091,7 +1131,59 @@
                                     </div>
 
                                     <div class="row g-3 mt-2">
-                                        <!-- US 10行目: eBay Popular/Trending + Twitch Trends -->
+                                        <!-- US 10行目: Movie Trends + Book Trends（All順） -->
+                                        <div class="col-md-6">
+                                            <div class="card h-100">
+                                                <div class="card-body">
+                                                    <div class="d-flex align-items-center mb-3">
+                                                        <i class="fas fa-film text-primary fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">Movie Trends</h6>
+                                                    </div>
+                                                    <div class="row text-center">
+                                                        <div class="col-4">
+                                                            <small class="text-muted">最終更新/Last updated</small>
+                                                            <div class="fw-bold" id="movieUSLastUpdate">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">データ件数/Data count</small>
+                                                            <div class="fw-bold" id="movieUSDataCount">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">ステータス/Status</small>
+                                                            <div><span class="badge bg-secondary" id="movieUSStatus">-</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="card h-100">
+                                                <div class="card-body">
+                                                    <div class="d-flex align-items-center mb-3">
+                                                        <i class="fas fa-book text-info fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">Book Trends</h6>
+                                                    </div>
+                                                    <div class="row text-center">
+                                                        <div class="col-4">
+                                                            <small class="text-muted">最終更新/Last updated</small>
+                                                            <div class="fw-bold" id="bookUSLastUpdate">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">データ件数/Data count</small>
+                                                            <div class="fw-bold" id="bookUSDataCount">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">ステータス/Status</small>
+                                                            <div><span class="badge bg-secondary" id="bookUSStatus">-</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-3 mt-2">
+                                        <!-- US 11行目: eBay + Twitch（All順） -->
                                         <div class="col-md-6">
                                             <div class="card h-100">
                                                 <div class="card-body">
@@ -1224,9 +1316,11 @@
             console.log('🔄 USデータ鮮度情報を更新中...');
             
             // US用のプラットフォーム一覧（トレンドページの順序通り）
+            // 全部入り(All)タブの並び順に合わせる
             const usPlatforms = [
                 { id: 'cnnUS', name: 'CNN News', endpoint: '/api/cnn-trends?limit=25' },
                 { id: 'newsUS', name: 'World News', endpoint: '/api/worldnews-trends?country=US&category=general' },
+                { id: 'wikipediaUS', name: 'Wikipedia 人気記事 (英語)', endpoint: '/api/wikipedia-trends?lang=en&limit=25' },
                 { id: 'googleUS', name: 'Google Trends', endpoint: '/api/google-trends?country=US' },
                 { id: 'youtubeUS', name: 'YouTube', endpoint: '/api/youtube-trends?region=US' },
                 { id: 'hackernewsUS', name: 'Hacker News', endpoint: '/api/hackernews-trends?type=top' },
@@ -1237,12 +1331,13 @@
                 { id: 'thehackernewsUS', name: 'The Hacker News', endpoint: '/api/thehackernews-trends?limit=25' },
                 { id: 'githubUS', name: 'GitHub Trends', endpoint: '/api/github-trends?language=all&limit=25' },
                 { id: 'appstoreUS', name: 'App Store Trends', endpoint: '/api/appstore-trends?country=US&category=all&limit=25' },
+                { id: 'globenewswireUS', name: 'GlobeNewswire', endpoint: '/api/globenewswire-trends?limit=25' },
                 { id: 'stockUS', name: 'Stock Trends', endpoint: '/api/stock-trends?market=US&limit=25' },
                 { id: 'cryptoUS', name: 'Cryptocurrency Trends', endpoint: '/api/crypto-trends?limit=25' },
-                { id: 'movieUS', name: 'Movie Trends', endpoint: '/api/movie-trends?country=US' },
-                { id: 'bookUS', name: 'Book Trends', endpoint: '/api/book-trends?country=US' },
                 { id: 'spotifyUS', name: 'Spotify', endpoint: '/api/music-trends?service=spotify&region=US' },
                 { id: 'podcastUS', name: 'Podcast', endpoint: '/api/podcast-trends?region=us' },
+                { id: 'movieUS', name: 'Movie Trends', endpoint: '/api/movie-trends?country=US' },
+                { id: 'bookUS', name: 'Book Trends', endpoint: '/api/book-trends?country=US' },
                 { id: 'ebayUS', name: 'eBay Popular/Trending', endpoint: '/api/ebay-trends?limit=25' },
                 { id: 'twitchUS', name: 'Twitch', endpoint: '/api/twitch-trends?type=games' }
             ];
@@ -1301,7 +1396,8 @@
                             'DEV.to': 'DEV.to',
                             'Medium': 'Medium',
                             'eBay Popular/Trending': 'eBay Popular/Trending',
-                            'Twitch': 'Twitch'
+                            'Twitch': 'Twitch',
+                            'GlobeNewswire': 'GlobeNewswire'
                         };
                         
                         const displayName = platformNameMap[platformName] || platformName;
@@ -1478,7 +1574,7 @@
             <div class="row">
                 <div class="col-md-6">
                     <h5 class="h6 mb-3">トレンドダッシュボード</h5>
-                    <p class="text-muted small mb-2">Google Trends、YouTube、株価、Spotify、はてなブックマーク、楽天、Twitch、Podcastなどのトレンドデータを表示しています。データは毎日1時、7時、13時、19時（JST）に更新処理を開始します（更新完了まで10〜20分かかる場合があります）。</p>
+                    <p class="text-muted small mb-2">日本・USのトレンドデータ鮮度を表示。NHK、CNN、Google Trends、YouTube、はてなブックマーク、Qiita、Zenn、Note、Wikipedia、Hacker News、株価、Spotify、楽天、eBay、Twitch、Podcastなど。データは毎日1時、7時、13時、19時（JST）に更新処理を開始します。</p>
                 </div>
                 <div class="col-md-6">
                     <h6 class="h6 mb-3">主要ページ</h6>

@@ -315,7 +315,7 @@
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="prtimes">
                             <div class="card h-100">
                                 <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center py-2">
-                                    <h3 class="h6 mb-0"><i class="fas fa-bullhorn"></i> PR TIMES</h3>
+                                    <h3 class="h6 mb-0"><i class="fas fa-bullhorn"></i> PR TIMES × はてブ</h3>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-news" data-target-anchor="source-prtimes" aria-label="ニュースタブへ">もっと見る</a>
                                 </div>
                                 <div class="card-body p-2">
@@ -577,19 +577,19 @@
                         </div>
                     </article>
                 </div>
-                    <!-- 3行目: PR TIMES（UI非表示・バックエンドは取得継続） -->
+                    <!-- 3行目: PR TIMES × はてブ（UI非表示・バックエンドは取得継続） -->
                     <div class="row g-3 mb-3 d-none" id="row-source-prtimes" style="display:none !important">
                     <article class="col-12 col-md-6" id="source-prtimes">
                         <div class="card h-100">
                             <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
-                                <h2 class="h5 mb-0"><i class="fas fa-bullhorn" aria-hidden="true"></i> PR TIMES</h2>
+                                <h2 class="h5 mb-0"><i class="fas fa-bullhorn" aria-hidden="true"></i> PR TIMES × はてブ</h2>
                             </div>
                             <div class="card-body">
                                 <div class="loading text-center py-5" id="prtimesLoading" style="display: none;">
                                     <div class="spinner-border text-secondary" role="status">
                                         <span class="visually-hidden">Loading...</span>
                                     </div>
-                                    <p class="mt-3">PR TIMES データを取得中...</p>
+                                    <p class="mt-3">PR TIMES × はてブ データを取得中...</p>
                                 </div>
                                 <div id="prtimesResults">
                                     <div class="alert alert-danger" id="prtimesErrorMessage" style="display: none;"></div>
@@ -2068,9 +2068,9 @@
                         <h3 class="h6 fw-bold mt-4 mb-2">主な機能</h3>
                         <ul class="mb-3">
                             <li>Google Trends・YouTube・Spotify・はてなブックマーク・楽天・Twitch・Podcastなど、複数ソースのトレンドを同時表示</li>
-                            <li>Zenn・Note・Qiitaなどの技術・創作系プラットフォームのトレンド表示</li>
+                            <li>Zenn・Note・Qiita・Wikipedia人気記事などの技術・創作系プラットフォームのトレンド表示</li>
                             <li>株価・仮想通貨（暗号資産）の市場動向の確認</li>
-                            <li>NHK・海外ニュースなどニュース系トレンドの表示</li>
+                            <li>NHK・World Newsなどニュース系トレンドの表示</li>
                         </ul>
                         <h3 class="h6 fw-bold mt-4 mb-2">データの更新</h3>
                         <p class="mb-0">データは毎日1時、7時、13時、19時（JST）に更新処理を開始します。更新完了まで10〜20分かかる場合があります。最新の状態は<a href="{{ url_for('data_status') }}">データ更新状況</a>ページで確認できます。</p>
@@ -2139,7 +2139,7 @@
             <div class="row">
                 <div class="col-md-6">
                     <h5 class="h6 mb-3">トレンドダッシュボード</h5>
-                    <p class="text-muted small mb-2">日本の最新トレンド情報を一括表示。Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Twitch、Podcastなどの人気トレンドを確認できます。データは毎日1時、7時、13時、19時（JST）に更新処理を開始します（更新完了まで10〜20分かかる場合があります）。</p>
+                    <p class="text-muted small mb-2">日本・USの最新トレンド情報を一括表示。NHK、CNN、Google Trends、YouTube、はてなブックマーク、Qiita、Zenn、Note、Wikipedia、Hacker News、Spotify、楽天、eBay、Twitch、Podcastなどの人気トレンドを確認できます。データは毎日1時、7時、13時、19時（JST）に更新処理を開始します（更新完了まで10〜20分かかる場合があります）。</p>
                 </div>
                 <div class="col-md-6">
                     <h6 class="h6 mb-3">主要ページ</h6>

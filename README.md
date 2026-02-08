@@ -20,12 +20,18 @@
 - YouTube Trends
 - はてなブックマーク
 - Qiita トレンド
+- Zenn
+- Note
+- Wikipedia 人気記事（日本語）
+- IPA注意喚起・JPCERT/CC
+- GitHub Trends
+- App Store Trends
 - 株価トレンド
 - 仮想通貨トレンド
-- Spotify 音楽トレンド
-- Podcast トレンド
 - 映画トレンド
 - 本トレンド
+- Spotify 音楽トレンド
+- Podcast トレンド
 - 楽天商品トレンド
 - Twitch ゲームトレンド
 
@@ -36,13 +42,19 @@
 - YouTube Trends
 - Hacker News
 - Product Hunt
+- DEV.to
+- Medium
+- CISA KEV・The Hacker News
+- Wikipedia Most Read（英語）
+- GitHub Trends
+- App Store Trends
 - 株価トレンド
 - 仮想通貨トレンド
-- Spotify 音楽トレンド
-- Podcast トレンド
 - 映画トレンド
 - 本トレンド
-- Reddit
+- Spotify 音楽トレンド
+- Podcast トレンド
+- eBay Popular/Trending
 - Twitch ゲームトレンド
 
 ### 主な機能

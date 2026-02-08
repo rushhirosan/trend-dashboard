@@ -158,8 +158,15 @@ function truncateText(text, maxLength = 100) {
  * @param {string} linkUrl - クリック時に遷移するURL
  * @param {string} ariaLabel - スクリーンリーダー用のラベル（オプション）
  */
+function isPlaceholderUrl(url) {
+    if (!url || url === '#') return true;
+    try {
+        const u = typeof url === 'string' ? url : (url.href || '');
+        return u.indexOf('example.com') !== -1;
+    } catch (_) { return true; }
+}
 function makeTableRowClickable(row, linkUrl, ariaLabel = null) {
-    if (!row || !linkUrl || linkUrl === '#') {
+    if (!row || !linkUrl || linkUrl === '#' || isPlaceholderUrl(linkUrl)) {
         return;
     }
 
@@ -187,9 +194,9 @@ function makeTableRowClickable(row, linkUrl, ariaLabel = null) {
             return;
         }
 
-        // 行全体がクリックされた場合は、最初のリンクを開く
+        // 行全体がクリックされた場合は、最初のリンクを開く（ダミーURLは開かない）
         const firstLink = row.querySelector('a[href]');
-        if (firstLink && firstLink.href && firstLink.href !== '#') {
+        if (firstLink && firstLink.href && firstLink.href !== '#' && !isPlaceholderUrl(firstLink.href)) {
             window.open(firstLink.href, firstLink.target || '_blank');
         }
     });
@@ -204,12 +211,22 @@ function makeTableRowClickable(row, linkUrl, ariaLabel = null) {
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             const firstLink = row.querySelector('a[href]');
-            if (firstLink && firstLink.href && firstLink.href !== '#') {
+            if (firstLink && firstLink.href && firstLink.href !== '#' && !isPlaceholderUrl(firstLink.href)) {
                 window.open(firstLink.href, firstLink.target || '_blank');
             }
         }
     });
 }
+
+// ダミー用 example.com リンクの直接クリックで遷移しない（キャッシュに古いダミーが残っている場合）
+document.addEventListener('DOMContentLoaded', function() {
+    document.body.addEventListener('click', function(e) {
+        var a = e.target && e.target.closest ? e.target.closest('a[href*="example.com"]') : null;
+        if (a) {
+            e.preventDefault();
+        }
+    }, true);
+});
 
 // ============================================
 // トレンド選択の保存・復元（localStorage）

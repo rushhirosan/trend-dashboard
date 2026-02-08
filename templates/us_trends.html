@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
     <!-- SEO Meta Tags -->
-    <title>US Trends Dashboard - Latest Trends in America | Google Trends, YouTube, Spotify, Reddit</title>
-    <meta name="description" content="U.S. trends in one dashboard: Google Trends, YouTube, Spotify, Reddit, Hacker News, S&P 500, cryptocurrency. America-focused trends updated 4 times daily (JST).">
-    <meta name="keywords" content="trends, Google Trends, YouTube, Spotify, Reddit, Hacker News, Twitch, Podcast, US trends, America trends, Stock, Cryptocurrency, Bitcoin, Investment, Market trends, S&P 500, NASDAQ">
+    <title>US Trends Dashboard - Latest Trends in America | Google Trends, YouTube, Spotify</title>
+    <meta name="description" content="U.S. trends in one dashboard: Google Trends, YouTube, Spotify, Hacker News, S&P 500, cryptocurrency. America-focused trends updated 4 times daily (JST).">
+    <meta name="keywords" content="trends, Google Trends, YouTube, Spotify, Hacker News, Twitch, Podcast, US trends, America trends, Stock, Cryptocurrency, Bitcoin, Investment, Market trends, S&P 500, NASDAQ">
     <meta name="author" content="Trends Dashboard">
     <meta name="robots" content="index, follow">
     
@@ -15,7 +15,7 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://trends-dashboard.fly.dev/us">
     <meta property="og:title" content="US Trends Dashboard - Latest Trends in America">
-    <meta property="og:description" content="U.S. trends in one dashboard: Google Trends, YouTube, Reddit, Hacker News, S&P 500, cryptocurrency. America-focused trends updated 4 times daily.">
+    <meta property="og:description" content="U.S. trends in one dashboard: Google Trends, YouTube, Hacker News, S&P 500, cryptocurrency. America-focused trends updated 4 times daily.">
     <meta property="og:image" content="https://trends-dashboard.fly.dev/static/images/og-image.png">
     <meta property="og:locale" content="en_US">
     <meta property="og:site_name" content="Trends Dashboard">
@@ -24,7 +24,7 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:url" content="https://trends-dashboard.fly.dev/us">
     <meta name="twitter:title" content="US Trends Dashboard - Latest Trends in America">
-    <meta name="twitter:description" content="U.S. trends in one dashboard: Google Trends, YouTube, Reddit, Hacker News, S&P 500, cryptocurrency. America-focused trends updated 4 times daily.">
+    <meta name="twitter:description" content="U.S. trends in one dashboard: Google Trends, YouTube, Hacker News, S&P 500, cryptocurrency. America-focused trends updated 4 times daily.">
     <meta name="twitter:image" content="https://trends-dashboard.fly.dev/static/images/og-image.png">
     
     <!-- Canonical URL -->
@@ -50,7 +50,7 @@
       "@context": "https://schema.org",
       "@type": "WebApplication",
       "name": "US Trends Dashboard",
-      "description": "U.S. trends in one dashboard: Google Trends, YouTube, Reddit, Hacker News, S&P 500, cryptocurrency. America-focused trends updated 4 times daily.",
+      "description": "U.S. trends in one dashboard: Google Trends, YouTube, Hacker News, S&P 500, cryptocurrency. America-focused trends updated 4 times daily.",
       "url": "https://trends-dashboard.fly.dev/us",
       "applicationCategory": "InformationApplication",
       "operatingSystem": "Web",
@@ -78,8 +78,7 @@
     <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/trends.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/data-status.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/subscription.css') }}" rel="stylesheet">
+    <!-- data-status.css, subscription.css は /data-status, /subscription 専用。USトレンドには不要（日本ページと同じレイアウトにするため） -->
     <link href="{{ url_for('static', filename='css/us-trends.css') }}" rel="stylesheet">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
@@ -97,14 +96,14 @@
 
     <noscript>
         <div class="alert alert-info mx-3 mt-3 mb-0" role="alert">
-            To view the trends dashboard, please enable JavaScript. Track U.S. trends from Google Trends, YouTube, Reddit, Hacker News, Spotify, and more.
+            To view the trends dashboard, please enable JavaScript. Track U.S. trends from Google Trends, YouTube, Hacker News, Spotify, and more.
         </div>
     </noscript>
     <main class="container-fluid py-4">
         <div id="mainContent">
             <header class="mb-3">
                 <h1 class="h3 fw-bold mb-2">US Trends - Latest Trends in America</h1>
-                <p class="text-muted small">Displaying latest trend data from Google Trends, YouTube, Stock markets, Spotify, Reddit, Hacker News, Twitch, and Podcasts. Track cryptocurrency and stock market movements. Data update processing starts daily at 1 AM, 7 AM, 1 PM, and 7 PM (JST) (may take 10-20 minutes to complete).</p>
+                <p class="text-muted small">Displaying latest trend data from Google Trends, YouTube, Stock markets, Spotify, Hacker News, Twitch, and Podcasts. Track cryptocurrency and stock market movements. Data update processing starts daily at 1 AM, 7 AM, 1 PM, and 7 PM (JST) (may take 10-20 minutes to complete).</p>
             </header>
             <section id="trends" aria-label="Trend information">
                 <!-- Category tabs (horizontal scroll on mobile) -->
@@ -446,7 +445,6 @@
 
                     <!-- News tab -->
                     <div class="tab-pane fade" id="pane-news" role="tabpanel" aria-labelledby="tab-news">
-                    <div class="row g-3 mb-3">
         <div class="row g-3 mb-3">
             <!-- Left: CNN News -->
             <div class="col-12 col-md-6" id="source-cnn">
@@ -606,8 +604,7 @@
                 </div>
             </div>
         </div>
-                </div>
-                </div><!-- /.tab-pane#pane-news -->
+                    </div><!-- /.tab-pane#pane-news -->
 
                     <!-- Search & Video tab -->
                     <div class="tab-pane fade" id="pane-search" role="tabpanel" aria-labelledby="tab-search">
@@ -820,7 +817,6 @@
 
                     <!-- Tech tab -->
                     <div class="tab-pane fade" id="pane-tech" role="tabpanel" aria-labelledby="tab-tech">
-        <div class="row g-3 mb-3">
         <div class="row g-3 mb-3">
             <!-- Left: Hacker News -->
             <div class="col-12 col-md-6" id="source-hackernews">
@@ -1493,12 +1489,10 @@
                 </div>
             </div>
         </div>
-                </div>
-                </div><!-- /.tab-pane#pane-tech -->
+                    </div><!-- /.tab-pane#pane-tech -->
 
                     <!-- Market tab -->
                     <div class="tab-pane fade" id="pane-market" role="tabpanel" aria-labelledby="tab-market">
-        <div class="row g-3 mb-3">
         <div class="row g-3 mb-3">
             <!-- Left: Stock Trends (US) -->
             <div class="col-12 col-md-6" id="source-stock">
@@ -1668,12 +1662,10 @@
                 </div>
             </div>
         </div>
-                </div>
-                </div><!-- /.tab-pane#pane-market -->
+                    </div><!-- /.tab-pane#pane-market -->
 
                     <!-- Entertainment tab -->
                     <div class="tab-pane fade" id="pane-entertainment" role="tabpanel" aria-labelledby="tab-entertainment">
-        <div class="row g-3 mb-3">
         <div class="row g-3 mb-3">
             <!-- Left: Movie Trends -->
             <div class="col-12 col-md-6" id="source-movie">
@@ -2178,8 +2170,7 @@
                 </div>
             </div>
         </div>
-                </div>
-                </div><!-- /.tab-pane#pane-entertainment -->
+                    </div><!-- /.tab-pane#pane-entertainment -->
                 </div><!-- #trendCategoryTabContent -->
             </section>
         </div>
@@ -2243,7 +2234,7 @@
             <div class="row">
                 <div class="col-md-6">
                     <h5 class="h6 mb-3">US Trends Dashboard</h5>
-                    <p class="text-muted small mb-2">Displaying trend data from Google Trends, YouTube, Stock, Spotify, Reddit, Hacker News, Twitch, and Podcasts. Data update processing starts daily at 1 AM, 7 AM, 1 PM, and 7 PM (JST) (may take 10-20 minutes to complete).</p>
+                    <p class="text-muted small mb-2">Displaying trend data from Google Trends, YouTube, Stock, Spotify, Hacker News, Twitch, and Podcasts. Data update processing starts daily at 1 AM, 7 AM, 1 PM, and 7 PM (JST) (may take 10-20 minutes to complete).</p>
                 </div>
                 <div class="col-md-6">
                     <h6 class="h6 mb-3">Main Pages</h6>

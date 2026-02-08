@@ -103,6 +103,10 @@ def get_data_freshness():
             'medium_trends': 'Medium',
             'wikipedia_trends_ja': 'Wikipedia 人気記事 (日本語)',
             'wikipedia_trends_en': 'Wikipedia 人気記事 (英語)',
+            # 日本: プレスリリーストレンド
+            'prtimes_hatena_trends': 'PR TIMES × はてブ',
+            # US: プレスリリーストレンド
+            'globenewswire_trends': 'GlobeNewswire',
         }
         
         freshness_info = {}

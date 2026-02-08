@@ -297,7 +297,8 @@ function loadPodcastTrendsFromCache() {
 
 // 楽天トレンドキャッシュデータの読み込み（共通化）
 function loadRakutenTrendsFromCache() {
-    var genreId = (typeof getTrendPreference === 'function' ? (getTrendPreference('rakuten') || '101070') : '101070');
+    var genreSelect = document.getElementById('rakutenGenreSelect');
+    var genreId = genreSelect ? genreSelect.value : (typeof getTrendPreference === 'function' ? (getTrendPreference('rakuten') || 'all') : 'all');
     if (typeof loadTrendsFromCache === 'function') {
         loadTrendsFromCache({
             serviceName: 'Rakuten',

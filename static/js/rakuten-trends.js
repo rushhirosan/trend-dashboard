@@ -1,180 +1,131 @@
-// 楽天トレンドデータを取得
-async function fetchRakutenTrends() {
-    console.log('fetchRakutenTrends: 開始');
+// 楽天トレンド関連の関数（はてな同様 createDropdownTrendsManager で共通化）
+let rakutenManager = null;
 
-    // 前回選択ジャンルを復元（無ければデフォルト 101070）
-    var genreId = (typeof getTrendPreference === 'function' ? (getTrendPreference('rakuten') || '101070') : '101070');
-    
-    // ローディング表示
-    showRakutenLoading();
-    hideRakutenResults();
-    hideError();
+if (typeof createDropdownTrendsManager === 'function') {
+    rakutenManager = createDropdownTrendsManager({
+        serviceName: 'rakuten',
+        selectId: 'rakutenGenreSelect',
+        apiEndpoint: '/api/rakuten-trends',
+        defaultValue: 'all',
+        paramName: 'genre_id',
+        storageKey: 'rakuten',
+        uiIds: {
+            loading: 'rakutenLoading',
+            results: 'rakutenResults',
+            tableBody: 'rakutenTrendsTableBody',
+            statusMessage: 'rakutenStatusMessage',
+            errorMessage: 'rakutenStatusMessage'
+        },
+        displayFunction: displayRakutenResults,
+        getParams: () => ({}),
+        allPaneSync: { mainTableBodyId: 'rakutenTrendsTableBody', allTableBodyId: 'all-rakutenTrendsTableBody', limit: 5, targetTabId: 'tab-entertainment' }
+    });
+}
 
-    try {
-        var url = '/api/rakuten-trends?genre_id=' + encodeURIComponent(genreId);
-        console.log('Rakuten API呼び出し:', url);
-        
-        const response = await fetch(url);
-        console.log('Rakuten API レスポンス受信:', response.status, response.ok);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        console.log('Rakuten APIレスポンス:', data);
-        
-        if (data.error) {
-            console.error('Rakuten API エラー:', data.error);
-            showRakutenError(data.error);
-            hideRakutenLoading();
-            return;
-        }
-        
-        // データの存在チェック
-        if (!data.data || !Array.isArray(data.data)) {
-            console.error('Rakuten API データ形式エラー:', data);
-            showRakutenError('データの形式が正しくありません');
-            hideRakutenLoading();
-            return;
-        }
-
-        // 取得成功時は今回の genre_id を保存（次回復元用）
-        if (typeof setTrendPreference === 'function') {
-            setTrendPreference('rakuten', genreId);
-        }
-        
-        console.log('fetchRakutenTrends: データ表示開始');
-        displayRakutenResults(data);
-        hideRakutenLoading();
-        console.log('fetchRakutenTrends: 完了');
-        
-    } catch (error) {
-        console.error('Rakuten Trends取得エラー:', error);
-        showRakutenError('楽天商品トレンドの取得に失敗しました: ' + error.message);
-        hideRakutenLoading();
-    } finally {
-        hideRakutenLoading();
+function fetchRakutenTrends() {
+    if (rakutenManager) {
+        rakutenManager.fetchTrends();
+    } else {
+        const selectEl = document.getElementById('rakutenGenreSelect');
+        const genreId = selectEl ? selectEl.value : 'all';
+        showRakutenLoading();
+        hideRakutenResults();
+        fetch('/api/rakuten-trends?genre_id=' + encodeURIComponent(genreId) + '&limit=25')
+            .then(r => r.json())
+            .then(data => {
+                hideRakutenLoading();
+                if (data && !data.error && data.data && Array.isArray(data.data)) {
+                    displayRakutenResults(data);
+                } else {
+                    showRakutenError(data && data.error ? data.error : 'データの取得に失敗しました');
+                }
+            })
+            .catch(err => {
+                hideRakutenLoading();
+                showRakutenError(err.message || '楽天商品トレンドの取得に失敗しました');
+            });
     }
 }
 
-// 楽天結果を表示
 function displayRakutenResults(data) {
     const tableBody = document.getElementById('rakutenTrendsTableBody');
     const statusMessage = document.getElementById('rakutenStatusMessage');
+    if (!tableBody) return;
 
-    // ステータスメッセージを更新
-    if (data.status === 'fresh') {
-        statusMessage.innerHTML = `<i class="fas fa-sync"></i> 楽天商品トレンドデータを新規取得しました！`;
-    } else {
-        statusMessage.innerHTML = `<i class="fas fa-info-circle"></i> 楽天商品トレンドデータを取得しました！`;
+    if (statusMessage) {
+        if (data.status === 'fresh') {
+            statusMessage.innerHTML = `<i class="fas fa-sync"></i> 楽天商品トレンドデータを新規取得しました！`;
+        } else {
+            statusMessage.innerHTML = `<i class="fas fa-info-circle"></i> 楽天商品トレンドデータを取得しました！`;
+        }
     }
 
-    // テーブルを更新
     tableBody.innerHTML = '';
-    data.data.forEach(item => {
-        const row = document.createElement('tr');
-        row.className = 'trend-card';
-        
-        // 価格をフォーマット
-        const price = item.price ? `¥${item.price.toLocaleString()}` : '価格不明';
-        
-        // レビュー情報をフォーマット
-        const reviewInfo = item.review_count > 0 
-            ? `${item.review_average || 0}/5.0`
-            : 'レビューなし';
-        
-        // レビュー数をフォーマット
-        const reviewCount = item.review_count > 0 
-            ? `${item.review_count}件`
-            : '0件';
-        
-        // 楽天商品リンクを作成
-        const rakutenUrl = item.url || '#';
-        
-        // 商品名を適切に表示（長すぎる場合は省略）
-        const displayTitle = item.title && item.title.length > 50 
-            ? item.title.substring(0, 50) + '...' 
-            : item.title;
-        
-        row.innerHTML = `
-            <td><span class="badge bg-danger">${item.rank}</span></td>
-            <td>
-                <strong><a href="${rakutenUrl}" target="_blank" class="text-decoration-none" title="${item.title}">${displayTitle}</a></strong>
-            </td>
-            <td>${price}</td>
-            <td>${reviewInfo}</td>
-            <td>${reviewCount}</td>
-            <td>${item.shop_name || '不明'}</td>
-        `;
-        // 行全体をクリック可能にする（アクセシビリティ対応）
-        makeTableRowClickable(row, rakutenUrl, `${item.title}の商品を開く`);
-        tableBody.appendChild(row);
-    });
-
-    // 結果を表示
-    showRakutenResults();
+    if (data.data && data.data.length > 0) {
+        data.data.forEach(item => {
+            const row = document.createElement('tr');
+            row.className = 'trend-card';
+            const price = item.price ? `¥${item.price.toLocaleString()}` : '価格不明';
+            const reviewInfo = item.review_count > 0 ? `${item.review_average || 0}/5.0` : 'レビューなし';
+            const reviewCount = item.review_count > 0 ? `${item.review_count}件` : '0件';
+            const rakutenUrl = item.url || '#';
+            const displayTitle = item.title && item.title.length > 50 ? item.title.substring(0, 50) + '...' : item.title;
+            row.innerHTML = `
+                <td><span class="badge bg-danger">${item.rank}</span></td>
+                <td>
+                    <strong><a href="${rakutenUrl}" target="_blank" class="text-decoration-none" title="${item.title || ''}">${displayTitle || ''}</a></strong>
+                </td>
+                <td>${price}</td>
+                <td>${reviewInfo}</td>
+                <td>${reviewCount}</td>
+                <td>${item.shop_name || '不明'}</td>
+            `;
+            if (typeof makeTableRowClickable === 'function') {
+                makeTableRowClickable(row, rakutenUrl, (item.title || '') + 'の商品を開く');
+            }
+            tableBody.appendChild(row);
+        });
+        showRakutenResults();
+    } else {
+        if (statusMessage) {
+            statusMessage.innerHTML = '<i class="fas fa-info-circle"></i> データがありません';
+        }
+        showRakutenResults();
+    }
 }
 
-// 楽天ローディング表示
 function showRakutenLoading() {
     const loadingElement = document.getElementById('rakutenLoading');
     const resultsElement = document.getElementById('rakutenResults');
-    
-    if (!loadingElement || !resultsElement) {
-        console.error('必要なDOM要素が見つかりません');
-        return;
-    }
-    
-    loadingElement.style.display = 'block';
-    resultsElement.style.display = 'none';
+    if (loadingElement) loadingElement.style.display = 'block';
+    if (resultsElement) resultsElement.style.display = 'none';
 }
 
-// 楽天ローディング非表示
 function hideRakutenLoading() {
     const loadingElement = document.getElementById('rakutenLoading');
-    
-    if (!loadingElement) {
-        console.error('rakutenLoading要素が見つかりません');
-        return;
-    }
-    
-    loadingElement.style.display = 'none';
+    if (loadingElement) loadingElement.style.display = 'none';
 }
 
-// 楽天結果表示
 function showRakutenResults() {
     const resultsElement = document.getElementById('rakutenResults');
-    
-    if (!resultsElement) {
-        console.error('rakutenResults要素が見つかりません');
-        return;
-    }
-    
-    resultsElement.style.display = 'block';
+    if (resultsElement) resultsElement.style.display = 'block';
 }
 
-// 楽天結果非表示
 function hideRakutenResults() {
     const resultsElement = document.getElementById('rakutenResults');
-    
-    if (!resultsElement) {
-        console.error('rakutenResults要素が見つかりません');
-        return;
-    }
-    
-    resultsElement.style.display = 'none';
+    if (resultsElement) resultsElement.style.display = 'none';
 }
 
-// 楽天エラー表示
 function showRakutenError(message) {
-    const errorElement = document.getElementById('errorMessage');
-    
-    if (!errorElement) {
-        console.error('errorMessage要素が見つかりません');
-        return;
+    if (rakutenManager) {
+        rakutenManager.showError(message);
+    } else {
+        const statusElement = document.getElementById('rakutenStatusMessage');
+        if (statusElement) {
+            statusElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
+            statusElement.className = 'alert alert-danger';
+            statusElement.style.display = 'block';
+        }
+        showRakutenResults();
     }
-    
-    errorElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
-    errorElement.style.display = 'block';
 }

@@ -444,8 +444,18 @@
                         </div>
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="rakuten">
                             <div class="card h-100">
-                                <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#BF0000;color:#fff;">
-                                    <h3 class="h6 mb-0">楽天トレンド</h3>
+                                <div class="card-header d-flex justify-content-between align-items-center py-2 flex-wrap gap-1" style="background:#BF0000;color:#fff;">
+                                    <div class="d-flex align-items-center gap-2 flex-grow-1 min-width-0">
+                                        <h3 class="h6 mb-0">楽天トレンド</h3>
+                                        <select class="form-select form-select-sm all-category-select" id="all-rakutenGenreSelect" data-main-select="rakutenGenreSelect" data-service="rakuten" style="max-width: 8rem;">
+                                            <option value="all">総合</option>
+                                            <option value="565162">テクノロジー</option>
+                                            <option value="100554">社会</option>
+                                            <option value="101205">エンタメ</option>
+                                            <option value="555086">暮らし</option>
+                                            <option value="100901">学び</option>
+                                        </select>
+                                    </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-rakuten" aria-label="エンタメタブへ">もっと見る</a>
                                 </div>
                                 <div class="card-body p-2">
@@ -1904,6 +1914,17 @@
                                 <h2 class="h5 mb-0"><i class="fas fa-shopping-cart" aria-hidden="true"></i> 楽天商品トレンド</h2>
                             </div>
                             <div class="card-body">
+                                <div class="mb-3">
+                                    <label for="rakutenGenreSelect" class="form-label">カテゴリを選択:</label>
+                                    <select class="form-select" id="rakutenGenreSelect">
+                                        <option value="all">総合</option>
+                                        <option value="565162">テクノロジー</option>
+                                        <option value="100554">ニュース・社会</option>
+                                        <option value="101205">エンタメ</option>
+                                        <option value="555086">暮らし</option>
+                                        <option value="100901">学び</option>
+                                    </select>
+                                </div>
                                 <div class="loading text-center py-5" id="rakutenLoading" style="display: none;">
                                     <div class="spinner-border text-danger" role="status">
                                         <span class="visually-hidden">Loading...</span>

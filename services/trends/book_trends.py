@@ -8,6 +8,7 @@ import requests
 from datetime import datetime
 from database_config import TrendsCache
 from utils.logger_config import get_logger
+from utils.rate_limiter import get_rakuten_api_rate_limiter
 from utils.dummy_data_generator import generate_dummy_book_data
 from services.trends.base_trends_manager import BaseTrendsManager
 
@@ -336,8 +337,8 @@ class BookTrendsManager(BaseTrendsManager):
                     'User-Agent': 'trends-dashboard/1.0.0'
                 }
                 
-                # レート制限をチェック
-                self.rate_limiter.wait_if_needed()
+                # レート制限をチェック（楽天APIは1秒1回のため共有制限を使用）
+                get_rakuten_api_rate_limiter().wait_if_needed()
                 
                 try:
                     response = requests.get(url, params=params, headers=headers, timeout=10)

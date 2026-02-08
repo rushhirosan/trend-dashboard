@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from database_config import TrendsCache
 from utils.logger_config import get_logger
 from utils.dummy_data_generator import generate_dummy_rakuten_data
+from utils.rate_limiter import get_rakuten_api_rate_limiter
 from services.trends.base_trends_manager import BaseTrendsManager
 
 # 環境変数を明示的に読み込み
@@ -13,6 +14,28 @@ load_dotenv()
 # ロガーの初期化
 logger = get_logger(__name__)
 
+# はてなカテゴリに合わせた楽天ジャンル対応（本は本トレンドで取得済みのため除外）
+# キー: カテゴリID（UI用）、値: 楽天ジャンルID（'all' または数値文字列）
+RAKUTEN_CATEGORY_GENRE_MAP = {
+    'all': 'all',           # 全ジャンル
+    'it': '565162',         # パソコン
+    'social': '100554',     # 生活雑貨
+    'entertainment': '101205',  # テレビゲーム
+    'life': '555086',       # レディーストップス（暮らし・ファッション）
+    'knowledge': '100901',  # 文房具・事務用品
+}
+
+# カテゴリ表示名（はてなに合わせたラベル）
+RAKUTEN_CATEGORY_LABELS = {
+    'all': '総合',
+    'it': 'テクノロジー',
+    'social': 'ニュース・社会',
+    'entertainment': 'エンタメ',
+    'life': '暮らし',
+    'knowledge': '学び',
+}
+
+
 class RakutenTrendsManager(BaseTrendsManager):
     """楽天のトレンドを取得・管理するクラス"""
     
@@ -20,6 +43,8 @@ class RakutenTrendsManager(BaseTrendsManager):
         """初期化"""
         # ベースクラスを初期化（rate_limiterも自動的に初期化される）
         super().__init__(service_name='rakuten', max_requests=10, window_seconds=60)
+        # 楽天API制限「1秒1回」に準拠するため共有レート制限を使用
+        self.rate_limiter = get_rakuten_api_rate_limiter()
         
         self.rakuten_app_id = os.getenv('RAKUTEN_APP_ID')
         self.rakuten_affiliate_id = os.getenv('RAKUTEN_AFFILIATE_ID')
@@ -148,6 +173,13 @@ class RakutenTrendsManager(BaseTrendsManager):
     def get_popular_items(self, genre_id=None, limit=25, force_refresh=False):
         """楽天人気商品を取得（get_trendsのエイリアス）"""
         return self.get_trends(genre_id=genre_id, limit=limit, force_refresh=force_refresh)
+
+    def get_available_categories(self):
+        """利用可能なカテゴリ一覧を取得（はてなに合わせた5+総合）"""
+        return [
+            {'id': k, 'name': RAKUTEN_CATEGORY_LABELS[k], 'genre_id': v}
+            for k, v in RAKUTEN_CATEGORY_GENRE_MAP.items()
+        ]
     
     def _get_rakuten_ranking(self, genre_id=None, limit=25):
         """楽天商品ランキングAPIを使用"""

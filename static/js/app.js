@@ -909,6 +909,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     noteManager.fetchTrends();
                 } else if (service === 'twitch' && typeof twitchManager !== 'undefined' && twitchManager) {
                     twitchManager.fetchTrends();
+                } else if (service === 'rakuten' && typeof fetchRakutenTrends === 'function') {
+                    fetchRakutenTrends();
                 }
             }
         });
@@ -917,7 +919,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const syncPairs = [
         { main: 'hatenaCategorySelect', all: 'all-hatenaCategorySelect' },
         { main: 'noteCategorySelect', all: 'all-noteCategorySelect' },
-        { main: 'twitchTypeSelect', all: 'all-twitchTypeSelect' }
+        { main: 'twitchTypeSelect', all: 'all-twitchTypeSelect' },
+        { main: 'rakutenGenreSelect', all: 'all-rakutenGenreSelect' }
     ];
     syncPairs.forEach(({ main, all }) => {
         const mainEl = document.getElementById(main);

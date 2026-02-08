@@ -129,6 +129,28 @@ API_RATE_LIMITS = {
     'book': {'max_requests': 10, 'window_seconds': 60},      # 10リクエスト/分（楽天ブックス/Google Books API）
 }
 
+# 楽天API共通レート制限（楽天商品・楽天ブックスは同じアプリIDを共有するため1秒1回に統一）
+_rakuten_api_rate_limiter: Optional[RateLimiter] = None
+_rakuten_api_rate_limiter_lock = threading.Lock()
+
+
+def get_rakuten_api_rate_limiter() -> RateLimiter:
+    """
+    楽天API（Ichiba商品・ブックス）共通のレート制限を取得
+    楽天ウェブサービスの制限「1秒に1回以下」に準拠。
+    楽天商品APIと楽天ブックスAPIは同一アプリIDを共有するため、共有のシングルトンを使用。
+    """
+    global _rakuten_api_rate_limiter
+    with _rakuten_api_rate_limiter_lock:
+        if _rakuten_api_rate_limiter is None:
+            _rakuten_api_rate_limiter = RateLimiter(
+                max_requests=1,
+                window_seconds=1,
+                name="RAKUTEN_API"
+            )
+            logger.debug("楽天API共通レート制限を初期化（1リクエスト/1秒）")
+        return _rakuten_api_rate_limiter
+
 
 def get_rate_limiter(api_name: str, max_requests: Optional[int] = None, window_seconds: Optional[int] = None) -> RateLimiter:
     """

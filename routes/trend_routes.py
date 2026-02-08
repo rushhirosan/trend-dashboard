@@ -259,7 +259,7 @@ def get_podcast_trends(manager):
 def get_rakuten_trends(manager):
     """楽天トレンド APIエンドポイント"""
     try:
-        genre_id = request.args.get('genre_id', '101070')
+        genre_id = request.args.get('genre_id', 'all')
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(genre_id, force_refresh=force_refresh)

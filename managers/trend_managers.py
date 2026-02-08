@@ -194,7 +194,7 @@ def refresh_all_trends(managers, force_refresh=True):
     tasks.append(('music', lambda m: m.get_trends('spotify', 'JP', force_refresh=force_refresh), 'JP'))
     tasks.append(('worldnews', lambda m: m.get_trends(country='jp', category=None, force_refresh=force_refresh), 'JP'))
     tasks.append(('podcast', lambda m: m.get_trends('best_podcasts', region='jp', force_refresh=force_refresh), 'JP'))
-    tasks.append(('rakuten', lambda m: m.get_trends(force_refresh=force_refresh), 'JP'))
+    tasks.append(('rakuten', lambda m: m.get_trends(force_refresh=force_refresh, fetch_all_categories=True), 'JP'))
     tasks.append(('hatena', lambda m: m.get_trends(category='all', limit=25, force_refresh=force_refresh, fetch_all_categories=True), 'JP'))
     if os.getenv('TWITCH_CLIENT_ID') and os.getenv('TWITCH_CLIENT_SECRET'):
         tasks.append(('twitch', lambda m: m._fetch_and_cache_all_categories(), 'JP'))

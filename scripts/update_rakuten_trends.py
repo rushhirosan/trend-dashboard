@@ -25,11 +25,11 @@ def update_rakuten_trends():
         manager = RakutenTrendsManager()
 
         logger.info("=" * 60)
-        logger.info("🛒 楽天トレンドを更新中（全ジャンルランキング）...")
+        logger.info("🛒 楽天トレンドを更新中（全6カテゴリ：総合・テクノロジー・ニュース・エンタメ・暮らし・学び）...")
         logger.info("=" * 60)
 
-        # genre_id なし = 'all' 扱い。楽天APIには genreId を送らず全ジャンルランキングを取得
-        result = manager.get_trends(genre_id=None, limit=25, force_refresh=True)
+        # スケジューラと同じ: 全カテゴリ（総合・テクノロジー・ニュース・エンタメ・暮らし・学び）を取得
+        result = manager.get_trends(limit=25, force_refresh=True, fetch_all_categories=True)
 
         if result.get("success"):
             data_count = len(result.get("data", []))

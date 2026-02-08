@@ -155,8 +155,31 @@ class RakutenTrendsManager(BaseTrendsManager):
             elif sc == 'N/A' or sc is None:
                 item['sales_count'] = 0
 
-    def get_trends(self, genre_id=None, limit=25, force_refresh=False):
+    def get_trends(self, genre_id=None, limit=25, force_refresh=False, fetch_all_categories=False):
         """楽天トレンドを取得（ベースクラスの共通処理を使用）"""
+        # 全カテゴリを取得する場合（スケジューラー用、はてな同様）
+        if fetch_all_categories:
+            logger.info("🔄 楽天商品: 全カテゴリのデータを取得します")
+            all_data = self._fetch_and_cache_all_categories(limit)
+            if all_data:
+                self._save_all_categories_to_cache(all_data)
+                all_category_data = [item for item in all_data if item.get('genre_id') == 'all']
+                return {
+                    'data': all_category_data[:limit] if all_category_data else [],
+                    'status': 'api_fetched',
+                    'genre_id': 'all',
+                    'source': '楽天商品ランキングAPI',
+                    'success': True
+                }
+            else:
+                return {
+                    'data': [],
+                    'status': 'api_error',
+                    'genre_id': 'all',
+                    'error': '全カテゴリのデータ取得に失敗しました',
+                    'success': False
+                }
+
         cache_scope = genre_id or 'all'
         result = super().get_trends(
             limit=limit,
@@ -180,7 +203,59 @@ class RakutenTrendsManager(BaseTrendsManager):
             {'id': k, 'name': RAKUTEN_CATEGORY_LABELS[k], 'genre_id': v}
             for k, v in RAKUTEN_CATEGORY_GENRE_MAP.items()
         ]
-    
+
+    def _fetch_and_cache_all_categories(self, limit=25):
+        """全カテゴリのデータを一度に取得（楽天APIは1秒1回制限のため順次取得）"""
+        if not self.rakuten_app_id:
+            logger.warning("楽天ランキングAPI: RAKUTEN_APP_ID が未設定です")
+            return []
+        try:
+            logger.info("🔄 楽天商品: 全カテゴリのデータを取得開始")
+            all_data = []
+            categories = self.get_available_categories()
+
+            for cat in categories:
+                genre_id = cat.get('genre_id', 'all')
+                cat_id = cat.get('id', genre_id)
+                logger.info(f"📊 楽天ジャンル '{genre_id}' ({RAKUTEN_CATEGORY_LABELS.get(cat_id, cat_id)}) のデータを取得中...")
+                result = self._get_rakuten_ranking(genre_id, limit)
+                if result and result.get('data'):
+                    for item in result['data']:
+                        item['genre_id'] = genre_id  # キャッシュ保存用のスコープ
+                    all_data.extend(result['data'])
+                    logger.info(f"✅ ジャンル '{genre_id}': {len(result['data'])}件取得")
+                else:
+                    logger.warning(f"❌ ジャンル '{genre_id}': データ取得失敗 - {result}")
+
+            if all_data:
+                logger.info(f"✅ 楽天商品: 全カテゴリのデータ取得完了 ({len(all_data)}件)")
+            else:
+                logger.warning("❌ 楽天商品: 取得したデータがありません")
+            return all_data
+        except Exception as e:
+            logger.error(f"❌ 楽天商品: 全カテゴリ取得エラー: {e}", exc_info=True)
+            return []
+
+    def _save_all_categories_to_cache(self, all_data):
+        """全カテゴリのデータをキャッシュに保存"""
+        if not all_data:
+            return 0
+        try:
+            saved_count = 0
+            for genre_id in RAKUTEN_CATEGORY_GENRE_MAP.values():
+                genre_data = [item for item in all_data if item.get('genre_id') == genre_id]
+                if genre_data:
+                    success = self.db.save_rakuten_trends_to_cache(genre_data, genre_id)
+                    if success:
+                        saved_count += len(genre_data)
+                        logger.info(f"✅ 楽天ジャンル '{genre_id}': {len(genre_data)}件をキャッシュに保存しました")
+            if saved_count > 0:
+                logger.info(f"✅ 楽天商品: 全カテゴリのデータをキャッシュに保存完了 ({saved_count}件)")
+            return saved_count
+        except Exception as e:
+            logger.error(f"❌ 楽天商品: 全カテゴリキャッシュ保存エラー: {e}", exc_info=True)
+            return 0
+
     def _get_rakuten_ranking(self, genre_id=None, limit=25):
         """楽天商品ランキングAPIを使用"""
         if not self.rakuten_app_id:

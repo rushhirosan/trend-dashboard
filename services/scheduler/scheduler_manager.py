@@ -867,18 +867,21 @@ class TrendsScheduler:
         else:
             alert_type = "warning"  # 一部失敗があるが異常ではない場合
         
-        # タイトルとメッセージを構築
+        # トリガー表示用ラベル（通知でどの実行か判別しやすくする）
+        trigger_label = self._trigger_label(trigger_source)
+
+        # タイトルとメッセージを構築（トリガーをメッセージにも含めて一覧で分かるようにする）
         if failed_count == 0:
             title = "✅ トレンド取得正常終了"
-            message = f"全てのトレンド取得が正常に完了しました。"
+            message = f"全てのトレンド取得が正常に完了しました。\nトリガー: {trigger_label}"
         else:
             title = "⚠️ トレンド取得完了（一部失敗）"
-            message = f"トレンド取得が完了しましたが、{failed_count}件の失敗があります。"
-        
+            message = f"トレンド取得が完了しましたが、{failed_count}件の失敗があります。\nトリガー: {trigger_label}"
+
         # 詳細情報を構築（トリガー元を先頭付近に表示）
         details = {
             "実行ID": execution_id,
-            "トリガー": self._trigger_label(trigger_source),
+            "トリガー": trigger_label,
             "成功": f"{success_count}/{total_count}",
             "失敗": str(failed_count),
             "失敗率": f"{failure_rate:.1f}%",

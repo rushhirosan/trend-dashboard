@@ -55,10 +55,23 @@ python scripts/check_cache_status.py
 ### update_book_trends.py
 本トレンドの全カテゴリをAPIから取得しキャッシュを更新するスクリプト
 
-**使用方法:**
+**ローカルでの使用方法:**
 ```bash
 python scripts/update_book_trends.py
 ```
+
+**本番（Fly.io）での実行:**
+```bash
+# 1. 本番マシンに SSH で入る
+fly ssh console -a trends-dashboard
+
+# 2. コンテナ内でスクリプトを実行（WORKDIR は /app）
+python scripts/update_book_trends.py
+
+# 3. 終了
+exit
+```
+本番では `fly secrets` で設定した `RAKUTEN_APP_ID` と `GOOGLE_BOOKS_API_KEY` が使われ、楽天・Google Books API から実データが取得されます。
 
 **動作:**
 - 日本: 総合・文芸・ビジネス・人文・社会・実用・IT の5カテゴリを楽天ブックスAPIから取得

@@ -20,12 +20,13 @@ logger = get_logger(__name__)
 # 001004=小説・エッセイ, 001005=パソコン・システム開発, 001006=ビジネス・経済・就職,
 # 001007=旅行・留学・アウトドア, 001008=人文・思想・社会, 001009=ホビー・スポーツ・美術, 001010=美容・暮らし・健康・料理
 # 総合: 001001 のみだとAPIが0件を返す場合があるため、サブジャンルをまとめて取得
+# 実用・IT: 旅行(001007)・ホビー(001009)を除き、PC・暮らしに限定（旅行ガイドが上位を占めないようにする）
 RAKUTEN_BOOK_CATEGORY_GENRES = {
     'all': ['001001', '001002', '001003', '001004', '001005', '001006', '001007', '001008', '001009', '001010'],
     'fiction': ['001004'],           # 文芸（小説・エッセイ）
     'business': ['001006'],          # ビジネス・経済・就職
     'humanities': ['001008'],        # 人文・思想・社会
-    'practical': ['001005', '001007', '001009', '001010'],  # 実用・IT（PC・旅行・ホビー・美容・暮らし）
+    'practical': ['001005', '001010'],  # 実用・IT（パソコン・システム開発、美容・暮らし・健康・料理）
 }
 
 # US（Google Books）: 5択カテゴリ → subject 検索クエリ
@@ -50,6 +51,7 @@ class BookTrendsManager(BaseTrendsManager):
         # 001001: 本・雑誌（総合）
         self.rakuten_base_url = "https://app.rakuten.co.jp/services/api/BooksTotal/Search/20170404"
         self.rakuten_ranking_url = "https://app.rakuten.co.jp/services/api/BooksBook/Search/20170404"
+        self.rakuten_genre_url = "https://app.rakuten.co.jp/services/api/BooksGenre/Search/20121128"
         self.rakuten_app_id = os.getenv('RAKUTEN_APP_ID')
         
         # Google Books API設定（US向け）
@@ -315,10 +317,65 @@ class BookTrendsManager(BaseTrendsManager):
                 return raw_item
         return {}
 
+    def _fetch_rakuten_book_child_genres(self, parent_genre_id: str):
+        """楽天 BooksGenre/Search API で指定親ジャンルの子ジャンルID一覧を取得する。
+        書籍検索APIは子ジャンル指定でないと0件になることがあるため使用する。
+        """
+        if not self.rakuten_app_id:
+            return []
+        get_rakuten_api_rate_limiter().wait_if_needed()
+        try:
+            params = {
+                'applicationId': self.rakuten_app_id,
+                'format': 'json',
+                'booksGenreId': parent_genre_id,
+            }
+            response = requests.get(
+                self.rakuten_genre_url,
+                params=params,
+                headers={'Accept': 'application/json', 'User-Agent': 'trends-dashboard/1.0.0'},
+                timeout=10,
+            )
+            if response.status_code != 200:
+                logger.warning(f"楽天 BooksGenre API エラー (parent={parent_genre_id}): HTTP {response.status_code}")
+                return []
+            data = response.json()
+            # レスポンス: children / Children。中身は [{"child": {...}}, ...] または {"child": [{...}, ...]}
+            raw = data.get('children', data.get('Children', []))
+            if isinstance(raw, dict):
+                raw = raw.get('child', raw.get('Child', []))
+            if not isinstance(raw, list):
+                raw = [raw] if raw else []
+            ids = []
+            for c in raw:
+                child = c.get('child', c.get('Child', c)) if isinstance(c, dict) else c
+                if isinstance(child, dict):
+                    gid = child.get('booksGenreId', child.get('BooksGenreId', ''))
+                    if gid and str(gid).strip():
+                        ids.append(str(gid).strip())
+            if ids:
+                logger.info(f"📚 Book (楽天): 親ジャンル {parent_genre_id} の子ジャンル {len(ids)} 件を取得: {ids[:5]}{'...' if len(ids) > 5 else ''}")
+            return ids
+        except Exception as e:
+            logger.warning(f"楽天 BooksGenre 取得エラー (parent={parent_genre_id}): {e}")
+            return []
+
+    def _resolve_rakuten_genre_ids(self, category: str):
+        """カテゴリに対応する楽天 booksGenreId のリストを返す。
+        ビジネスなど単一親ジャンルの場合は子ジャンルを取得して返す。
+        """
+        genre_ids = RAKUTEN_BOOK_CATEGORY_GENRES.get(category, RAKUTEN_BOOK_CATEGORY_GENRES['all'])
+        # ビジネス(001006)は BooksBook/Search で親IDだと0件になりやすいため子ジャンルで検索
+        if category == 'business' and genre_ids == ['001006']:
+            child_ids = self._fetch_rakuten_book_child_genres('001006')
+            if child_ids:
+                return child_ids
+        return genre_ids
+
     def _fetch_rakuten_books_trends(self, limit=25, category='all'):
         """楽天ブックスAPIから書籍データを取得（5択カテゴリ対応）"""
         try:
-            genre_ids = RAKUTEN_BOOK_CATEGORY_GENRES.get(category, RAKUTEN_BOOK_CATEGORY_GENRES['all'])
+            genre_ids = self._resolve_rakuten_genre_ids(category)
             logger.info(f"📚 Book (楽天) API呼び出し開始 (category: {category}, genres: {len(genre_ids)}件)")
             url = self.rakuten_ranking_url
             all_items = []
@@ -373,36 +430,9 @@ class BookTrendsManager(BaseTrendsManager):
                     logger.warning(f"楽天ブックス API リクエストエラー (ジャンル: {genre_id}): {e}")
                     continue
             
-            # 単一ジャンルで0件のときは総合(001001)をフォールバックで取得
-            if not all_items and len(genre_ids) == 1 and genre_ids[0] != '001001':
-                fallback_id = '001001'
-                logger.info(f"📚 Book (楽天): ジャンル {genre_ids[0]} が0件のため、総合({fallback_id})をフォールバック取得")
-                get_rakuten_api_rate_limiter().wait_if_needed()
-                try:
-                    params = {
-                        'applicationId': self.rakuten_app_id,
-                        'format': 'json',
-                        'booksGenreId': fallback_id,
-                        'sort': 'sales',
-                        'hits': min(limit + 5, 20),
-                        'page': 1
-                    }
-                    if self.rakuten_affiliate_id:
-                        params['affiliateId'] = self.rakuten_affiliate_id
-                    response = requests.get(url, params=params, headers={'Accept': 'application/json', 'User-Agent': 'trends-dashboard/1.0.0'}, timeout=10)
-                    if response.status_code == 200:
-                        data = response.json()
-                        for item in self._rakuten_response_items(data):
-                            item_data = self._rakuten_item_payload(item)
-                            dedup_key = (item_data.get('isbn') or '').strip() or (item_data.get('itemUrl') or '').strip() or f"{item_data.get('title', '')}|{item_data.get('author', '')}"
-                            if dedup_key and dedup_key not in seen_keys:
-                                seen_keys.add(dedup_key)
-                                all_items.append(item)
-                                if len(all_items) >= limit * 2:
-                                    break
-                except Exception as e:
-                    logger.warning(f"楽天ブックス フォールバック取得エラー: {e}")
-            
+            # 注: 単一ジャンルで0件でも総合(001001)でフォールバックしない。
+            # フォールバックすると「ビジネス」選択時に漫画など総合のデータが表示される不具合になる。
+
             if not all_items:
                 logger.warning("⚠️ Book (楽天): データが取得できませんでした")
                 return {

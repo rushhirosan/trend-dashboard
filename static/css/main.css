@@ -904,6 +904,11 @@ body {
     font-size: 0.7rem;
 }
 
+/* Noteの行高をはてな・Zennに揃える（コンパクト表示） */
+#noteResults .trend-table tbody td {
+    line-height: 1.25;
+}
+
 /* カードヘッダーのフォントサイズ */
 .card-header h5 {
     font-size: 0.9rem;

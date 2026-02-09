@@ -542,7 +542,6 @@ function displayNoteResults(data) {
                 <td><span class="badge bg-secondary">${item.rank || index + 1}</span></td>
                 <td>
                     <strong><a href="${url}" target="_blank">${title}</a></strong>
-                    ${item.description ? `<br><small class="text-muted">${truncateText(item.description, 100)}</small>` : ''}
                 </td>
                 <td>${publishedDate}</td>
             `;

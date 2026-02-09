@@ -732,6 +732,10 @@ class TrendsCache:
                 );
                 INSERT INTO scheduler_lock (id, holder_id, locked_at, lock_until) VALUES (1, NULL, NULL, NULL)
                 ON CONFLICT (id) DO NOTHING;
+                CREATE TABLE IF NOT EXISTS scheduler_slot_run (
+                    slot_key VARCHAR(64) PRIMARY KEY,
+                    started_at TIMESTAMPTZ NOT NULL
+                );
                 
                 CREATE TABLE IF NOT EXISTS subscriptions (
                     id SERIAL PRIMARY KEY,
@@ -2192,6 +2196,13 @@ class TrendsCache:
                 INSERT INTO scheduler_lock (id, holder_id, locked_at, lock_until)
                 VALUES (1, NULL, NULL, NULL) ON CONFLICT (id) DO NOTHING
             """)
+            # スロット単位の二重実行防止（複数プロセスで「当日このスロットは既に開始済み」を共有）
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS scheduler_slot_run (
+                    slot_key VARCHAR(64) PRIMARY KEY,
+                    started_at TIMESTAMPTZ NOT NULL
+                )
+            """)
 
     def try_acquire_scheduler_lock_db(self, holder_id: str, lock_minutes: int = 30) -> bool:
         """スケジューラー分散ロックを取得（DBベース、複数マシン・プロセス間で共有）
@@ -2271,6 +2282,36 @@ class TrendsCache:
         except Exception as e:
             logger.warning(f"⚠️ スケジューラーDBロック解放エラー: {e}", exc_info=True)
             return False
+
+    def has_slot_completed_recently(self, slot_key: str, window_minutes: int = 25) -> bool:
+        """指定スロットが window_minutes 以内に「完了済み」として記録されているか。
+        二重実行防止: 既に完了済みなら True（呼び出し側でスキップする）。
+        """
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT 1 FROM scheduler_slot_run
+                        WHERE slot_key = %s AND started_at > NOW() - %s * INTERVAL '1 minute'
+                    """, (slot_key, window_minutes))
+                    return cursor.fetchone() is not None
+        except Exception as e:
+            logger.warning("⚠️ has_slot_completed_recently エラー: %s", e)
+            return False  # fail-open: エラー時は「完了済みでない」とみなして実行を許可
+
+    def mark_slot_completed(self, slot_key: str) -> None:
+        """指定スロットを「完了済み」として記録する。成功完了時にのみ呼ぶ。"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        INSERT INTO scheduler_slot_run (slot_key, started_at)
+                        VALUES (%s, NOW())
+                        ON CONFLICT (slot_key) DO UPDATE SET started_at = NOW()
+                    """, (slot_key,))
+                    conn.commit()
+        except Exception as e:
+            logger.warning("⚠️ mark_slot_completed エラー: %s", e)
 
     def get_scheduler_lock_status(self):
         """スケジューラー分散ロックの現在状態を返す（デバッグ用）。取得失敗時は None。"""

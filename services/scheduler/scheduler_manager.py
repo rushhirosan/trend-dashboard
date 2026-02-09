@@ -387,7 +387,16 @@ class TrendsScheduler:
             now_jst = datetime.now(jst)
             today = now_jst.date()
 
-            # 既に当日実行済みかチェック（重複実行を防ぐ）
+            # スロット単位の二重実行防止（「完了済み」をDBで共有。成功した実行が1本になるよう、完了時のみ記録）
+            slot_key = self._slot_key_for_now(now_jst)
+            if not force and slot_key and self.db and hasattr(self.db, 'has_slot_completed_recently'):
+                if self.db.has_slot_completed_recently(slot_key, window_minutes=25):
+                    logger.info("⏰ 同一スロットが既に完了済みのためスキップします（slot=%s）", slot_key)
+                    self._release_scheduler_lock(lock_handle)
+                    self._fetching_in_progress = False
+                    return
+
+            # 既に当日実行済みかチェック（重複実行を防ぐ・同一プロセス用）
             # force=Trueの場合はスキップしない
             if not force:
                 # 1時前後（0:00-2:00）の実行の場合、1時間以内に1時ジョブが実行済みかチェック
@@ -395,27 +404,36 @@ class TrendsScheduler:
                     time_diff = (now_jst - self.last_night_execution_time).total_seconds()
                     if time_diff < 3600:  # 1時間以内
                         logger.info(f"⏰ 当日の1時のジョブは既に実行済みです（{time_diff:.0f}秒前）。重複実行をスキップします。")
+                        self._release_scheduler_lock(lock_handle)
+                        self._fetching_in_progress = False
                         return
                 # 7時前後（6:00-8:00）の実行の場合、当日の7時ジョブが既に実行済みかチェック
                 if 6 <= now_jst.hour < 8 and self.last_daily_execution_date == today:
                     logger.info(f"⏰ 当日の7時のジョブは既に実行済みです（{today}）。重複実行をスキップします。")
+                    self._release_scheduler_lock(lock_handle)
+                    self._fetching_in_progress = False
                     return
                 # 13時前後（12:00-14:00）の実行の場合、1時間以内に13時ジョブが実行済みかチェック
                 if 12 <= now_jst.hour < 14 and self.last_afternoon_execution_time:
                     time_diff = (now_jst - self.last_afternoon_execution_time).total_seconds()
                     if time_diff < 3600:  # 1時間以内
                         logger.info(f"⏰ 当日の13時のジョブは既に実行済みです（{time_diff:.0f}秒前）。重複実行をスキップします。")
+                        self._release_scheduler_lock(lock_handle)
+                        self._fetching_in_progress = False
                         return
                 # 19時前後（18:00-20:00）の実行の場合、1時間以内に19時ジョブが実行済みかチェック
                 if 18 <= now_jst.hour < 20 and self.last_evening_execution_time:
                     time_diff = (now_jst - self.last_evening_execution_time).total_seconds()
                     if time_diff < 3600:  # 1時間以内
                         logger.info(f"⏰ 当日の19時のジョブは既に実行済みです（{time_diff:.0f}秒前）。重複実行をスキップします。")
+                        self._release_scheduler_lock(lock_handle)
+                        self._fetching_in_progress = False
                         return
             
             logger.info("🔄 自動トレンド取得開始 [trigger=%s]", trigger_source)
             start_time = datetime.now(jst)
-            execution_id = f"scheduler_{start_time.strftime('%Y%m%d_%H%M%S')}"
+            # 同一秒で複数実行された場合にアラートで区別できるようミリ秒を含める
+            execution_id = f"scheduler_{start_time.strftime('%Y%m%d_%H%M%S')}_{start_time.microsecond // 1000:03d}"
             
             # メモリ節約のため、古いキャッシュデータを削除（2日以上経過したデータ）
             try:
@@ -429,6 +447,8 @@ class TrendsScheduler:
                 managers = self.app.config.get('TREND_MANAGERS')
                 if not managers:
                     logger.error("❌ トレンドマネージャーが初期化されていません")
+                    self._release_scheduler_lock(lock_handle)
+                    self._fetching_in_progress = False
                     return
                 
                 # 既存のrefresh_all_trends()関数を使用
@@ -633,6 +653,12 @@ class TrendsScheduler:
                 trigger_source=trigger_source,
             )
 
+            # スロットを「完了済み」として記録（二重実行防止。成功時のみ記録するため、クラッシュした場合は別プロセスが再実行可能）
+            now_jst = datetime.now(jst)
+            completed_slot = self._slot_key_for_now(now_jst)
+            if completed_slot and self.db and hasattr(self.db, 'mark_slot_completed'):
+                self.db.mark_slot_completed(completed_slot)
+
             # データ保存完了後、メール自動送信を実行
             # スケジューラー実行時（深夜1時・朝7時・昼13時・夜19時）のみメール送信
             # デプロイ時や手動実行時は、明示的に指示された場合のみメール送信
@@ -810,6 +836,20 @@ class TrendsScheduler:
         
         return has_anomaly
     
+    def _slot_key_for_now(self, now_jst) -> str | None:
+        """現在時刻が属するスロットのキーを返す（例: 7am_2026-02-10）。該当しなければ None。"""
+        date_str = now_jst.date().isoformat()
+        h = now_jst.hour
+        if 0 <= h < 2:
+            return f"1am_{date_str}"
+        if 6 <= h < 8:
+            return f"7am_{date_str}"
+        if 12 <= h < 14:
+            return f"1pm_{date_str}"
+        if 18 <= h < 20:
+            return f"7pm_{date_str}"
+        return None
+
     def _trigger_label(self, trigger_source: str) -> str:
         """トリガー元をDiscord表示用のラベルに変換"""
         labels = {

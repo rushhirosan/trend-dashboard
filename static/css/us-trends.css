@@ -14,21 +14,22 @@ body#trends-us #trendCategoryTabContent {
     display: block !important;
     visibility: visible !important;
 }
+/* アクティブなタブのペインのみ表示（日本ページと同じ挙動・そのタブのデータだけ表示） */
 body#trends-us #trendCategoryTabContent > .tab-pane.show.active,
-body#trends-us #trendCategoryTabContent > .tab-pane.active.show,
-body#trends-us #pane-all {
+body#trends-us #trendCategoryTabContent > .tab-pane.active.show {
     display: block !important;
     visibility: visible !important;
     height: auto !important;
     overflow: visible !important;
 }
-body#trends-us #all-trends-container {
+body#trends-us #trendCategoryTabContent > .tab-pane.active.show #all-trends-container {
     display: flex !important;
     visibility: visible !important;
 }
 
-/* 非アクティブなペイン: 完全に非表示・レイアウトから除外（#pane-tech 等の広大な余白を解消） */
+/* 非アクティブなペイン: 完全に非表示・レイアウトから除外（日本ページと同様にそのタブにはそのデータのみ） */
 /* ID 指定で詳細度を最大にし、Bootstrap JS のインラインスタイル等に確実に勝つ */
+body#trends-us #trends #pane-all:not(.active):not(.show),
 body#trends-us #trends #pane-news:not(.active):not(.show),
 body#trends-us #trends #pane-search:not(.active):not(.show),
 body#trends-us #trends #pane-tech:not(.active):not(.show),
@@ -46,6 +47,7 @@ body#trends-us #trends #pane-entertainment:not(.active):not(.show) {
     pointer-events: none !important;
     opacity: 0 !important;
 }
+body#trends-us #trends #pane-all:not(.active):not(.show) *,
 body#trends-us #trends #pane-news:not(.active):not(.show) *,
 body#trends-us #trends #pane-search:not(.active):not(.show) *,
 body#trends-us #trends #pane-tech:not(.active):not(.show) *,
@@ -59,8 +61,7 @@ body#trends-us #trends #pane-entertainment:not(.active):not(.show) * {
     pointer-events: none !important;
 }
 body#trends-us #trends #trendCategoryTabContent > .tab-pane.show.active,
-body#trends-us #trends #trendCategoryTabContent > .tab-pane.active.show,
-body#trends-us #trends #pane-all {
+body#trends-us #trends #trendCategoryTabContent > .tab-pane.active.show {
     display: block !important;
     visibility: visible !important;
     height: auto !important;

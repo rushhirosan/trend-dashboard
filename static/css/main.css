@@ -3717,16 +3717,16 @@ body#trends-us .tab-content#trendCategoryTabContent {
     display: block !important;
     visibility: visible !important;
 }
+/* アクティブなタブのペインのみ表示（日本ページと同様・そのタブのデータだけ表示） */
 body#trends-us .tab-content#trendCategoryTabContent > .tab-pane.show.active,
-body#trends-us .tab-content#trendCategoryTabContent > .tab-pane.active.show,
-body#trends-us #pane-all {
+body#trends-us .tab-content#trendCategoryTabContent > .tab-pane.active.show {
     display: block !important;
     visibility: visible !important;
     height: auto !important;
     min-height: 0;
     overflow: visible !important;
 }
-body#trends-us #all-trends-container {
+body#trends-us .tab-content#trendCategoryTabContent > .tab-pane.active.show #all-trends-container {
     display: flex !important;
     flex-wrap: wrap !important;
     visibility: visible !important;

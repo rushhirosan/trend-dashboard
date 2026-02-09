@@ -3017,20 +3017,36 @@ function showEbayError(message, status = null) {
 }
 
 
-// 非アクティブなタブペインをレイアウトから完全に除外（広大な余白を解消）
-function hideInactivePanesUS() {
+// 表示するペインを「ナビで選択中の1つ」に固定（日本ページと同様にそのタブのデータのみ表示）
+// activeTabTrigger: show.bs.tab の e.target を渡すとそのタブのペインを表示（省略時は .nav-link.active を参照）
+function hideInactivePanesUS(activeTabTrigger) {
     if (document.body.id !== 'trends-us') return;
-    const paneIds = ['pane-news', 'pane-search', 'pane-tech', 'pane-market', 'pane-entertainment'];
+    var activePaneId = 'pane-all';
+    if (activeTabTrigger && activeTabTrigger.getAttribute('data-bs-target')) {
+        activePaneId = activeTabTrigger.getAttribute('data-bs-target').replace(/^#/, '');
+    } else {
+        const tablist = document.getElementById('trendCategoryTabs');
+        if (tablist) {
+            const activeButton = tablist.querySelector('.nav-link.active');
+            const targetSelector = activeButton && activeButton.getAttribute('data-bs-target');
+            if (targetSelector) activePaneId = targetSelector.replace(/^#/, '');
+        }
+    }
+
+    const paneIds = ['pane-all', 'pane-news', 'pane-search', 'pane-tech', 'pane-market', 'pane-entertainment'];
     paneIds.forEach(function(id) {
         const pane = document.getElementById(id);
         if (!pane) return;
-        const isActive = pane.classList.contains('active') && pane.classList.contains('show');
+        const isActive = (id === activePaneId);
         if (isActive) {
+            pane.classList.add('active', 'show');
             pane.style.removeProperty('display');
             pane.style.removeProperty('height');
             pane.style.removeProperty('min-height');
             pane.style.removeProperty('visibility');
+            pane.style.removeProperty('overflow');
         } else {
+            pane.classList.remove('active', 'show');
             pane.style.setProperty('display', 'none', 'important');
             pane.style.setProperty('height', '0', 'important');
             pane.style.setProperty('min-height', '0', 'important');
@@ -3040,19 +3056,35 @@ function hideInactivePanesUS() {
     });
 }
 
+// 日本ページと同一のタブID一覧（前回タブ復元・保存で使用）
+var TREND_TAB_IDS_US = ['tab-all', 'tab-news', 'tab-search', 'tab-tech', 'tab-market', 'tab-entertainment'];
+
 // Page initialization
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🇺🇸 US Trends page initialization');
-
-    // 非アクティブペインを確実に非表示（Bootstrap のインラインスタイルを上書き）
-    hideInactivePanesUS();
-    setTimeout(hideInactivePanesUS, 0);
-    setTimeout(hideInactivePanesUS, 100);
 
     // USページを開いたことを記憶（次回のルート訪問時のリダイレクト用）
     if (typeof setTrendPreference === 'function') {
         setTrendPreference('page', 'us');
     }
+
+    // 前回開いていたタブを復元（日本ページと同様・loadCachedDataUS の前に実行）
+    var trendTabsEl = document.getElementById('trendCategoryTabs');
+    if (trendTabsEl && typeof getTrendPreference === 'function' && typeof bootstrap !== 'undefined') {
+        var savedTabId = getTrendPreference('active_tab');
+        if (savedTabId && TREND_TAB_IDS_US.indexOf(savedTabId) !== -1) {
+            var tabBtn = document.getElementById(savedTabId);
+            if (tabBtn) {
+                var tab = new bootstrap.Tab(tabBtn);
+                tab.show();
+            }
+        }
+    }
+
+    // 非アクティブペインを確実に非表示（Bootstrap のインラインスタイルを上書き）
+    hideInactivePanesUS();
+    setTimeout(hideInactivePanesUS, 0);
+    setTimeout(hideInactivePanesUS, 100);
 
     // All tab "More" link: タブ切り替え後に対象ソースのアンカーへスクロール
     var pendingMoreLinkAnchor = null;
@@ -3071,26 +3103,25 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // トレンドカテゴリタブ切り替え時: 非アクティブペインを非表示 ＋ グラフリサイズ ＋ もっと見るからのアンカースクロール ＋ ペイン先頭へスクロール
-    const trendTabsEl = document.getElementById('trendCategoryTabs');
+    // トレンドカテゴリタブ: クリック直後と表示完了時の両方で「表示ペインを1つに固定」（日本と同様にそのタブのデータのみ表示）
     if (trendTabsEl) {
+        trendTabsEl.addEventListener('show.bs.tab', function(e) {
+            hideInactivePanesUS(e.target);
+        });
         trendTabsEl.addEventListener('shown.bs.tab', function(e) {
-            hideInactivePanesUS();
+            hideInactivePanesUS(e.target);
+            // 日本ページと同様: 選択タブを保存
+            var tabId = e.target && e.target.id;
+            if (tabId && typeof setTrendPreference === 'function') {
+                setTrendPreference('active_tab', tabId);
+            }
+            // もっと見るからの遷移時のみアンカーへスクロール（日本と同一）
             if (pendingMoreLinkAnchor) {
                 var anchor = document.getElementById(pendingMoreLinkAnchor);
                 if (anchor) {
                     anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
                 pendingMoreLinkAnchor = null;
-            } else {
-                // タブ切り替え時はアクティブペインの先頭を表示（データが見えない問題の対策）
-                var targetId = e.target.getAttribute('data-bs-target');
-                if (targetId) {
-                    var pane = document.querySelector(targetId);
-                    if (pane) {
-                        pane.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }
-                }
             }
             if (typeof currentGoogleChart !== 'undefined' && currentGoogleChart) {
                 try { currentGoogleChart.resize(); } catch (e) { /* ignore */ }

@@ -3494,9 +3494,7 @@ class TrendsCache:
             logger.warning(f"⚠️ wikipedia_trends_cache テーブル作成スキップ: {e}")
 
     def save_wikipedia_trends_to_cache(self, data, lang='ja'):
-        """Wikipedia 人気記事をキャッシュに保存（言語別）"""
-        if not data:
-            return False
+        """Wikipedia 人気記事をキャッシュに保存（言語別）。data が空でも成功とする（その日付・言語で most read が未提供の場合に対応）。"""
         try:
             self._ensure_wikipedia_trends_cache_table()
         except Exception as ensure_e:

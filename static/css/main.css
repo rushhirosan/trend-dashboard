@@ -3629,11 +3629,11 @@ body.data-status-active #data-status .card-body {
     display: none;
 }
 
-/* ========== トレンドカテゴリタブ ========== */
+/* ========== トレンドカテゴリタブ（2段固定: ヘッダー直下に張り付く） ========== */
 .trend-tabs-wrapper {
     position: sticky;
-    top: 0;
-    z-index: 1020;
+    top: var(--header-height, 3.25rem);
+    z-index: 999;
     background-color: #f8f9fa;
     border-bottom: 1px solid rgba(0, 0, 0, 0.1);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);

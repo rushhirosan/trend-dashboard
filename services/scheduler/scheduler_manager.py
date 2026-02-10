@@ -541,6 +541,9 @@ class TrendsScheduler:
                     # Noteは複数のカテゴリがあるため、全てのカテゴリのキャッシュキーを返す
                     # リストを返すことで、呼び出し側で展開できる
                     return ['note_trends_all', 'note_trends_tech', 'note_trends_business', 'note_trends_lifestyle', 'note_trends_entertainment']
+                elif key == 'wikipedia':
+                    # Wikipediaは言語別: JP→ja, US→en（サービス側のcache_keyと一致させる）
+                    return f'wikipedia_trends_{"ja" if region == "JP" else "en"}'
                 else:
                     # 通常のケース: {key}_trends
                     return f'{key}_trends'

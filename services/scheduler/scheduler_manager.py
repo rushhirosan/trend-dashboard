@@ -870,6 +870,9 @@ class TrendsScheduler:
             source = detail.get('source', 'unknown')
             error = detail.get('error', 'unknown')
             status = detail.get('status', 'unknown')
+            # 汎用メッセージの場合は status を前面に出す（原因切り分けのため）
+            if str(error).strip().lower() in ('unknown', 'unknown error'):
+                error = f"エラー詳細なし (status: {status})"
             details_lines.append(f"• {source}: {error} (status: {status})")
         
         if len(failed_trends_details) > max_items:

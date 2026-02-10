@@ -357,7 +357,8 @@ class BaseTrendsManager(ABC):
             logger.warning(f"⚠️ {self.service_name}: キャッシュデータが見つかりません。外部APIを呼び出します")
             api_result = self._fetch_trends(*args, limit=limit, **kwargs)
 
-            if api_result and api_result.get("success") and api_result.get("data"):
+            # success が True の場合は data が空でも成功とする（例: Wikipedia で mostread が未提供の言語/日付）
+            if api_result and api_result.get("success"):
                 trends_data = api_result.get("data", [])
 
                 # キャッシュに保存を試みる
@@ -443,7 +444,13 @@ class BaseTrendsManager(ABC):
                     **{k: v for k, v in api_result.items() if k not in ["data", "success", "status", "source"]},
                 }
             else:
-                error_msg = api_result.get("error", "Unknown error") if api_result else "API call failed"
+                error_msg = (
+                    (api_result.get("error") or api_result.get("message") or api_result.get("detail"))
+                    if api_result and isinstance(api_result, dict)
+                    else None
+                )
+                if not error_msg:
+                    error_msg = "API call failed" if not api_result else "Unknown error"
                 logger.error(f"❌ {self.service_name}: 外部APIからデータを取得できませんでした: {error_msg}")
                 return {
                     "success": False,

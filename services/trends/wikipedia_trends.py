@@ -153,7 +153,11 @@ class WikipediaTrendsManager(BaseTrendsManager):
         mostread = data.get("mostread") or {}
         articles = mostread.get("articles") or []
         if not articles:
-            logger.warning("Wikipedia mostread.articles が空です")
+            # 言語/日付によっては mostread が含まれないことがある（API 仕様）
+            logger.warning(
+                "Wikipedia mostread.articles が空です (lang=%s, date=%s/%s/%s). 当該言語・日付では most read が提供されていない可能性があります.",
+                lang, yyyy, mm, dd,
+            )
             return {
                 "success": True,
                 "data": [],

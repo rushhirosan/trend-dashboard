@@ -774,9 +774,11 @@ function loadWikipediaTrendsFromCache() {
             apiEndpoint: '/api/wikipedia-trends',
             params: { lang: 'ja' },
             uiIds: {
-                loading: 'wikipediaLoading'
+                loading: 'wikipediaLoading',
+                results: 'wikipediaResults'
             },
             displayFunction: displayWikipediaResults,
+            alwaysCallDisplay: true,
             allPaneSync: { mainTableBodyId: 'wikipediaTrendsTableBody', allTableBodyId: 'all-wikipediaTrendsTableBody', targetTabId: 'tab-search' }
         });
     } else {
@@ -793,7 +795,7 @@ function loadWikipediaTrendsFromCache() {
             })
             .then(data => {
                 if (loadingElement) loadingElement.style.display = 'none';
-                if (data.success && data.data && data.data.length > 0 && typeof displayWikipediaResults === 'function') {
+                if (data.success && typeof displayWikipediaResults === 'function') {
                     displayWikipediaResults(data);
                 }
                 const resultsElement = document.getElementById('wikipediaResults');

@@ -1874,7 +1874,7 @@ function displayWikipediaResults(data) {
 
     tableBody.innerHTML = '';
     if (!data.data || data.data.length === 0) {
-        showWikipediaError('データがありません');
+        showWikipediaError('この日は人気記事データが提供されていません。しばらく後にお試しください。');
         return;
     }
 

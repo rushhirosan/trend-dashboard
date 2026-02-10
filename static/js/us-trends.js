@@ -2151,7 +2151,7 @@ function loadWikipediaFromCacheUS() {
             if (data.success && data.data && data.data.length > 0) {
                 displayWikipediaResultsUS(data);
             } else {
-                showWikipediaErrorUS(data.error || 'No data available');
+                showWikipediaErrorUS(data.error || 'No data available for this period. Please try again later.');
             }
             if (resultsElement) resultsElement.style.display = 'block';
         })

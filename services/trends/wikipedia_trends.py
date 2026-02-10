@@ -103,6 +103,27 @@ class WikipediaTrendsManager(BaseTrendsManager):
             })
         return result
 
+    def _fetch_one_day(self, lang: str, date: datetime, timeout_sec: int = 30) -> Dict[str, Any]:
+        """指定日1日分の API を叩き、articles リストを返す。失敗時は error を返す。"""
+        yyyy = date.strftime("%Y")
+        mm = date.strftime("%m")
+        dd = date.strftime("%d")
+        url = f"{self.BASE_URL}/{lang}/featured/{yyyy}/{mm}/{dd}"
+        try:
+            self.rate_limiter.wait_if_needed()
+            resp = self.session.get(url, timeout=timeout_sec)
+            resp.raise_for_status()
+            data = resp.json()
+        except requests.exceptions.Timeout:
+            return {"error": "timeout"}
+        except requests.exceptions.RequestException as e:
+            return {"error": str(e)}
+        except ValueError:
+            return {"error": "Invalid JSON response"}
+        mostread = data.get("mostread") or {}
+        articles = mostread.get("articles") or []
+        return {"articles": articles, "yyyy": yyyy, "mm": mm, "dd": dd}
+
     def _fetch_trends(
         self,
         lang: str = "ja",
@@ -112,72 +133,53 @@ class WikipediaTrendsManager(BaseTrendsManager):
     ) -> Dict[str, Any]:
         """
         Featured content API で指定日の most read を取得。
-        mostread は「前日」のデータなので、date は表示したい日（前日分を取るなら date=昨日）。
+        指定日にデータがなければ最大7日さかのぼってフォールバックする。
         """
         if not date:
             date = datetime.utcnow() - timedelta(days=1)
-        yyyy = date.strftime("%Y")
-        mm = date.strftime("%m")
-        dd = date.strftime("%d")
-        url = f"{self.BASE_URL}/{lang}/featured/{yyyy}/{mm}/{dd}"
-
         timeout_sec = 30
-        max_attempts = 2
-        last_error = None
-        for attempt in range(max_attempts):
-            try:
-                self.rate_limiter.wait_if_needed()
-                resp = self.session.get(url, timeout=timeout_sec)
-                resp.raise_for_status()
-                data = resp.json()
-                last_error = None
-                break
-            except requests.exceptions.Timeout as e:
-                last_error = e
-                logger.warning(
-                    "Wikipedia Featured API タイムアウト (attempt %d/%d, timeout=%ds)",
-                    attempt + 1, max_attempts, timeout_sec,
-                )
-                if attempt + 1 >= max_attempts:
-                    logger.error("Wikipedia Featured API タイムアウト（リトライ後も失敗）", exc_info=True)
-                    return {"success": False, "error": "API timeout"}
-            except requests.exceptions.RequestException as e:
-                logger.error(f"Wikipedia Featured API リクエストエラー: {e}", exc_info=True)
-                return {"success": False, "error": str(e)}
-            except ValueError as e:
-                logger.error(f"Wikipedia API JSON パースエラー: {e}", exc_info=True)
-                return {"success": False, "error": "Invalid JSON response"}
-        if last_error is not None:
-            return {"success": False, "error": "API timeout"}
+        max_fallback_days = 7
 
-        mostread = data.get("mostread") or {}
-        articles = mostread.get("articles") or []
-        if not articles:
-            # 言語/日付によっては mostread が含まれないことがある（API 仕様）
-            logger.warning(
-                "Wikipedia mostread.articles が空です (lang=%s, date=%s/%s/%s). 当該言語・日付では most read が提供されていない可能性があります.",
-                lang, yyyy, mm, dd,
+        for day_offset in range(max_fallback_days):
+            try_date = date - timedelta(days=day_offset)
+            result = self._fetch_one_day(lang, try_date, timeout_sec=timeout_sec)
+            if "error" in result:
+                if day_offset == 0:
+                    logger.error("Wikipedia Featured API エラー (date=%s): %s", try_date, result["error"])
+                    return {"success": False, "error": result["error"]}
+                continue
+            articles = result.get("articles") or []
+            if not articles:
+                logger.debug(
+                    "Wikipedia mostread が空 (lang=%s, date=%s/%s/%s)、前日を試します.",
+                    lang, result["yyyy"], result["mm"], result["dd"],
+                )
+                continue
+            formatted = self._parse_mostread_articles(articles, lang)
+            for i, item in enumerate(formatted[:limit], 1):
+                item["rank"] = i
+            logger.info(
+                "Wikipedia (%s): most read %d 件取得 (date=%s/%s/%s)",
+                lang, len(formatted), result["yyyy"], result["mm"], result["dd"],
             )
             return {
                 "success": True,
-                "data": [],
+                "data": formatted[:limit],
                 "status": "api_fetched",
                 "source": "wikipedia_featured",
-                "total_count": 0,
+                "total_count": len(formatted),
             }
 
-        formatted = self._parse_mostread_articles(articles, lang)
-        # rank を 1 から振り直し
-        for i, item in enumerate(formatted[:limit], 1):
-            item["rank"] = i
-
-        logger.info(f"Wikipedia ({lang}): most read {len(formatted)} 件取得")
+        logger.warning(
+            "Wikipedia: %d 日分試しましたが most read が取得できませんでした (lang=%s)",
+            max_fallback_days, lang,
+        )
         return {
             "success": True,
-            "data": formatted[:limit],
+            "data": [],
             "status": "api_fetched",
             "source": "wikipedia_featured",
-            "total_count": len(formatted),
+            "total_count": 0,
         }
 
     def get_trends(

@@ -362,12 +362,16 @@ class BookTrendsManager(BaseTrendsManager):
 
     def _resolve_rakuten_genre_ids(self, category: str):
         """カテゴリに対応する楽天 booksGenreId のリストを返す。
-        ビジネスなど単一親ジャンルの場合は子ジャンルを取得して返す。
+        ビジネス・人文・社会など単一親ジャンルの場合は子ジャンルを取得して返す。
         """
         genre_ids = RAKUTEN_BOOK_CATEGORY_GENRES.get(category, RAKUTEN_BOOK_CATEGORY_GENRES['all'])
-        # ビジネス(001006)は BooksBook/Search で親IDだと0件になりやすいため子ジャンルで検索
+        # 単一親ジャンルは BooksBook/Search で親IDだと0件になりやすいため子ジャンルで検索
         if category == 'business' and genre_ids == ['001006']:
             child_ids = self._fetch_rakuten_book_child_genres('001006')
+            if child_ids:
+                return child_ids
+        if category == 'humanities' and genre_ids == ['001008']:
+            child_ids = self._fetch_rakuten_book_child_genres('001008')
             if child_ids:
                 return child_ids
         return genre_ids

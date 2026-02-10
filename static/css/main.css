@@ -286,6 +286,7 @@ body {
     #noteResults .trend-table-container {
         max-height: 400px !important;
         overflow-y: auto !important;
+        padding-bottom: 1.5rem; /* 最後の1行（20番目）がスクロール時に完全に表示されるように */
     }
 
     /* 全部入り（All）タブ: カード内テーブルを高さ固定・スクロール可能に（他タブと同じ） */

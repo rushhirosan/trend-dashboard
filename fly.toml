@@ -7,6 +7,8 @@ primary_region = "nrt"
   PORT = "8080"
   FLASK_PORT = "8080"
   DEBUG = "False"
+  # スケジューラ二重実行防止: DB分散ロックを有効化（複数マシン・プロセスで1本のみ実行）
+  TRENDS_SCHEDULER_USE_DB_LOCK = "true"
   # デプロイ時の自動実行を無効化（UI/UX変更時など、データ更新が不要な場合を想定）
   SKIP_STARTUP_EXECUTION = "true"
   # デプロイ時のメール送信を無効化（スケジューラー実行時のみメール送信）

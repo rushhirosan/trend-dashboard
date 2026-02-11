@@ -2129,8 +2129,9 @@ function displayStockResults(data) {
         // 株価のリンクを生成（日本株はYahoo Finance JP、米国株はYahoo Finance US）
         const market = data.market || 'JP';
         const symbol = item.symbol || '';
+        const jpSymbol = symbol.includes('.') ? symbol : `${symbol}.T`;
         const stockUrl = market === 'JP'
-            ? `https://finance.yahoo.co.jp/quote/${symbol}.T`
+            ? `https://finance.yahoo.co.jp/quote/${jpSymbol}`
             : `https://finance.yahoo.com/quote/${symbol}`;
 
         const stockName = item.name || 'N/A';

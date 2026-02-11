@@ -132,8 +132,9 @@ function displayStockResultsUS(data) {
         // Stock link generation (US stocks use Yahoo Finance US)
         const market = data.market || 'US';
         const symbol = item.symbol || '';
+        const jpSymbol = symbol.includes('.') ? symbol : `${symbol}.T`;
         const stockUrl = market === 'JP' 
-            ? `https://finance.yahoo.co.jp/quote/${symbol}.T`
+            ? `https://finance.yahoo.co.jp/quote/${jpSymbol}`
             : `https://finance.yahoo.com/quote/${symbol}`;
         
         row.innerHTML = `

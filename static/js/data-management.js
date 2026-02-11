@@ -43,7 +43,6 @@ function loadCachedDataExternal() {
         loadJPCERTTrendsFromCache,
         loadCryptoTrendsFromCache,
         loadStockTrendsFromCache,
-        loadPRTimesTrendsFromCache,
         loadAppStoreTrendsFromCache,
         loadMusicTrendsFromCache,
         loadPodcastTrendsFromCache,
@@ -691,7 +690,7 @@ function loadPRTimesHatenaTrendsFromCache() {
                 results: 'prtimesHatenaResults'
             },
             displayFunction: displayPRTimesHatenaResults,
-            allPaneSync: { mainTableBodyId: 'prtimesHatenaTrendsTableBody', allTableBodyId: 'all-prtimesHatenaTrendsTableBody', targetTabId: 'tab-tech', limit: 5 }
+            allPaneSync: { mainTableBodyId: 'prtimesHatenaTrendsTableBody', allTableBodyId: 'all-prtimesHatenaTrendsTableBody', targetTabId: 'tab-news', limit: 5 }
         });
     } else {
         console.log('📊 PR TIMES × はてブ キャッシュデータ読み込み');
@@ -723,7 +722,7 @@ function loadPRTimesHatenaTrendsFromCache() {
     }
 }
 
-// PR TIMES キャッシュデータ読み込み（RSSそのまま表示）
+// PR TIMES 単体（RSS）: 紛らわしいためUI非使用。バッチからは呼ばない。
 function loadPRTimesTrendsFromCache() {
     if (typeof loadTrendsFromCache === 'function') {
         loadTrendsFromCache({

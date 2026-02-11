@@ -8,13 +8,12 @@ body#trends-jp #source-globenewswire,
 body#trends-jp [data-all-card="globenewswire"] {
     display: none !important;
 }
-/* 日本ページの All タブ: 右上の「PR TIMES × はてブ」は不要のため非表示 */
+/* 日本ページの All タブ: PR TIMES × はてブのみ表示（PR TIMES単体はコメントアウト済み） */
 body#trends-jp #pane-all [data-all-card="prtimes_hatena"] {
-    display: none !important;
-}
-/* 日本ページの All タブでは PR TIMES（RSS）を GitHub の右隣で表示 */
-body#trends-jp #pane-all [data-all-card="prtimes"] {
     display: block !important;
+}
+body#trends-jp #pane-all [data-all-card="prtimes"] {
+    display: none !important;
 }
 
 #mainHeader .nav-pills {

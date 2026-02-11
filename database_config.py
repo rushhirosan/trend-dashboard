@@ -3827,19 +3827,21 @@ class TrendsCache:
                             item.get('rank', 0),
                             item.get('updated_at')
                         ))
-                    # cache_statusテーブルを更新
-                    from datetime import datetime
-                    now = datetime.now()
+                    # cache_statusテーブルを更新（国別キー stock_trends_JP / stock_trends_US でスケジューラの一括更新と一致）
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cache_key = f'stock_trends_{market}'
                     cursor.execute("""
                         INSERT INTO cache_status (cache_key, last_updated, data_count)
                         VALUES (%s, %s, %s)
                         ON CONFLICT (cache_key) DO UPDATE SET
                             last_updated = EXCLUDED.last_updated,
                             data_count = EXCLUDED.data_count
-                    """, ('stock_trends', now, len(data)))
+                    """, (cache_key, now_jst, len(data)))
                     
                     conn.commit()
-                    logger.info(f"✅ stock_trendsのキャッシュを保存しました (market: {market}, {len(data)}件)")
+                    logger.info(f"✅ stock_trendsのキャッシュを保存しました (market: {market}, cache_key: {cache_key}, {len(data)}件)")
                     return True
                 
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:

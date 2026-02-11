@@ -116,7 +116,7 @@ def get_data_freshness():
                 cache_info = None
                 
                 # 国別のキャッシュキーを処理
-                if cache_key in ['movie_trends', 'book_trends', 'appstore_trends']:
+                if cache_key in ['movie_trends', 'book_trends', 'appstore_trends', 'stock_trends']:
                     cache_key_with_country = f'{cache_key}_{country}'
                     cache_info = all_cache_status.get(cache_key_with_country)
                     if not cache_info:

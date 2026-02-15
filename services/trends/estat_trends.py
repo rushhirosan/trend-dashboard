@@ -17,6 +17,8 @@ ESTAT_BASE = "https://api.e-stat.go.jp/rest/3.0/app/json"
 # 統計ダッシュボードAPI（appId不要・有効求人倍率 季節調整値 全国 月次）
 DASHBOARD_BASE = "https://dashboard.e-stat.go.jp/api/1.0/Json"
 JOB_RATIO_INDICATOR = "0301020001000010010"  # 有効求人倍率（一般職業紹介状況）
+# 消費者物価指数（総合・前年同月比）月次・全国（統計ダッシュボード）
+CPI_INDICATOR = "0703010501010090000"
 
 # 取得する指標の定義（先頭3件＝全部入りタブ用、以降＝行政タブのみ）
 # (indicator_id, name_ja, stats_data_id or None, year_from or None)
@@ -366,6 +368,46 @@ class EstatTrendsManager(BaseTrendsManager):
         rows.sort(key=lambda x: (x.get("period") or ""), reverse=True)
         return rows[:24]
 
+    def _fetch_cpi_from_dashboard(self, year_from: str = "2025") -> List[Dict[str, Any]]:
+        """統計ダッシュボードAPIから消費者物価指数（総合・前年同月比）全国月次を取得。appId不要。"""
+        url = f"{DASHBOARD_BASE}/getData"
+        params = {
+            "Lang": "JP",
+            "IndicatorCode": CPI_INDICATOR,
+            "RegionalRank": "2",  # 全国
+            "Cycle": "1",  # 月
+            "MetaGetFlg": "N",
+        }
+        try:
+            r = requests.get(url, params=params, timeout=20)
+            r.raise_for_status()
+            data = r.json()
+        except Exception as e:
+            logger.warning("統計ダッシュボードAPI CPI 失敗: %s", e)
+            return []
+        objs = (
+            data.get("GET_STATS", {})
+            .get("STATISTICAL_DATA", {})
+            .get("DATA_INF", {})
+            .get("DATA_OBJ", [])
+        )
+        if not objs:
+            return []
+        rows = []
+        for item in objs:
+            val_obj = item.get("VALUE")
+            if not isinstance(val_obj, dict):
+                continue
+            val = val_obj.get("$")
+            if val is None or val == "":
+                continue
+            t = val_obj.get("@time", "")
+            period = t[:6] if len(t) >= 6 and t[:6].isdigit() else t
+            if period and period[:4] >= year_from:
+                rows.append({"period": period, "value": str(val), "unit": "前年同月=100"})
+        rows.sort(key=lambda x: (x.get("period") or ""), reverse=True)
+        return rows[:24]
+
     def _fetch_one_indicator(
         self,
         indicator_id: str,
@@ -375,21 +417,46 @@ class EstatTrendsManager(BaseTrendsManager):
         year_from: Optional[str] = None,
     ) -> Dict[str, Any]:
         """1指標分を取得して共通フォーマットで返す。"""
-        # CPI: 東京都区部（速報）・全国（確定）の前年比%形式で取得
-        if indicator_id == "cpi" and self.app_id:
-            cpi_data = self._fetch_cpi_tokyo_nationwide()
-            if cpi_data.get("cpi_lines"):
+        # CPI: 要約は getStatsData（東京都区部・全国）、月次時系列は統計ダッシュボードを優先
+        if indicator_id == "cpi":
+            cpi_data = self._fetch_cpi_tokyo_nationwide() if self.app_id else {}
+            cpi_lines = list(cpi_data.get("cpi_lines") or [])
+            tendency = cpi_data.get("tendency") or ""
+            series = self._fetch_cpi_from_dashboard(year_from=year_from or "2025")
+            if len(series) < 2:
                 series = cpi_data.get("series") or []
+            if not cpi_lines and series:
+                # appId なしでダッシュボードのみのとき、直近1件で cpi_lines を補う
+                s = series[0]
+                period = s.get("period") or ""
+                y, m = period[:4], period[4:6] if len(period) >= 6 else ""
+                period_label = f"{y}年{int(m)}月" if m and m != "00" else f"{y}年"
+                try:
+                    val_f = float(str(s.get("value") or "").replace(",", ""))
+                    pct = round(val_f - 100.0, 1)
+                except (ValueError, TypeError):
+                    pct = None
+                cpi_lines = [{
+                    "area": "全国",
+                    "period": period,
+                    "period_label": period_label,
+                    "value": s.get("value"),
+                    "value_pct": pct,
+                    "label_suffix": "確定",
+                }]
+            if cpi_lines or series:
                 return {
                     "indicator_id": "cpi",
                     "name_ja": name_ja,
                     "unit": "前年同月=100",
                     "series": series,
-                    "updated_at": series[0].get("period") if series else None,
-                    "stats_data_id": "0003427113",
-                    "cpi_lines": cpi_data["cpi_lines"],
-                    "tendency": cpi_data.get("tendency") or "",
+                    "updated_at": (series[0].get("period") if series else None) or (cpi_lines[0].get("period") if cpi_lines else None),
+                    "stats_data_id": "dashboard" if len(series) >= 2 else "0003427113",
+                    "cpi_lines": cpi_lines,
+                    "tendency": tendency or "東京都区部（速報）と全国（確定）の前年同月比。",
                 }
+            if self.app_id:
+                pass  # 上で処理済み
             # 地域別が取れない場合は従来どおり単一系列
         # 有効求人倍率は統計ダッシュボードAPIから取得（正確な季節調整値）
         if indicator_id == "job_ratio":

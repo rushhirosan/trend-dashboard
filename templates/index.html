@@ -124,6 +124,8 @@
     <script src="{{ url_for('static', filename='js/twitch-trends.js') }}"></script>
     <script src="{{ url_for('static', filename='js/data-management.js') }}"></script>
     <script src="{{ url_for('static', filename='js/display-functions.js') }}"></script>
+    <!-- 行政データ統合: 外部APIは1回のみ呼び、キャッシュがあればそれを表示 -->
+    <script src="{{ url_for('static', filename='js/admin-trends.js') }}"></script>
 </head>
 <body id="trends-jp" class="bg-light">
     <!-- 前回USページを開いていた場合、外部からのルート(/)訪問時のみ /us へリダイレクト（サイト内の「日本トレンド」クリックではリダイレクトしない） -->
@@ -144,19 +146,89 @@
     {% include 'partials/header.html' with context %}
 
     <noscript>
-        <div class="alert alert-info mx-3 mt-3 mb-0" role="alert">
-            トレンド一覧を表示するには JavaScript を有効にしてください。日本の Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Zenn などの最新トレンドを確認できます。
+        <div class="alert alert-info mx-3 mt-3 mb-4" role="alert">
+            <h2 class="h5 mb-3">トレンドダッシュボードについて</h2>
+            <p class="mb-3">トレンドダッシュボードは、日本の最新トレンド情報を一括で確認できる無料のWebアプリケーションです。JavaScriptを有効にすることで、リアルタイムのトレンドデータを表示できます。</p>
+            <h3 class="h6 fw-bold mb-2">提供しているトレンド情報</h3>
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <h4 class="h6 fw-bold mb-2">検索・動画</h4>
+                    <ul class="small mb-0">
+                        <li>Google Trends - 日本で検索されている人気キーワード</li>
+                        <li>YouTube - 日本で人気の動画とチャンネル</li>
+                        <li>Wikipedia - 日本語版Wikipediaの人気記事</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h4 class="h6 fw-bold mb-2">テック・開発</h4>
+                    <ul class="small mb-0">
+                        <li>Zenn - 技術記事プラットフォームの人気記事</li>
+                        <li>Note - 創作・ビジネス記事の人気コンテンツ</li>
+                        <li>Qiita - プログラマー向け技術記事</li>
+                        <li>GitHub - 人気のオープンソースプロジェクト</li>
+                        <li>はてなブックマーク - テクノロジー・社会・エンタメなどの話題</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h4 class="h6 fw-bold mb-2">ニュース</h4>
+                    <ul class="small mb-0">
+                        <li>NHK - 日本の公共放送のニュース</li>
+                        <li>World News - 海外の主要ニュース</li>
+                        <li>PR TIMES - 企業のプレスリリース</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h4 class="h6 fw-bold mb-2">マーケット・エンタメ</h4>
+                    <ul class="small mb-0">
+                        <li>株価 - 日本の株式市場の動向</li>
+                        <li>仮想通貨 - ビットコインなどの暗号資産の価格動向</li>
+                        <li>Spotify - 音楽ストリーミングの人気楽曲</li>
+                        <li>楽天 - ショッピングサイトの人気商品</li>
+                        <li>Twitch - ゲーム配信プラットフォームの人気コンテンツ</li>
+                        <li>Podcast - 人気のポッドキャスト番組</li>
+                    </ul>
+                </div>
+            </div>
+            <p class="mb-0"><strong>データ更新頻度：</strong>すべてのトレンドデータは毎日1時、7時、13時、19時（JST）に自動更新されます。最新のデータを確認するには、JavaScriptを有効にしてページを再読み込みしてください。</p>
         </div>
     </noscript>
-    <main class="container-fluid py-4">
+    <main class="container-fluid main-content-compact">
         <div id="mainContent">
-            <header class="mb-3">
-                <h1 class="h3 fw-bold mb-2">日本の最新トレンド情報</h1>
-                <p class="text-muted small mb-0">Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Twitch、Podcast、Zenn、Note、Qiitaなどの人気トレンドを一括表示。株価や仮想通貨のトレンドも確認できます。データは毎日1時、7時、13時、19時（JST）に更新処理を開始します（更新完了まで10〜20分かかる場合があります）。主な機能：複数ソースの一括表示・カテゴリ別タブ・日米切り替え。対応：Google Trends、YouTube、Spotify、はてな、楽天、Twitch、Podcast、Zenn、Note、Qiita、NHK、Wikipedia、株価・仮想通貨。</p>
+            <header class="page-header-compact">
+                <h1 class="h3 fw-bold mb-1">日本の最新トレンド情報</h1>
+                <div class="row align-items-start g-2 header-row">
+                    <div class="col-12 col-lg-6">
+                        <p class="text-muted small mb-0">Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Twitch、Podcast、Zenn、Note、Qiitaなどの人気トレンドを一括表示。株価や仮想通貨のトレンドも確認できます。データは毎日1時、7時、13時、19時（JST）に更新処理を開始します（更新完了まで10〜20分かかる場合があります）。主な機能：複数ソースの一括表示・カテゴリ別タブ・日米切り替え。対応：Google Trends、YouTube、Spotify、はてな、楽天、Twitch、Podcast、Zenn、Note、Qiita、NHK、Wikipedia、株価・仮想通貨。</p>
+                    </div>
+                    <div class="col-12 col-lg-6">
+                        <div id="header-admin-unified" class="rounded border bg-light p-2 position-relative">
+                            <span class="position-absolute top-0 end-0 mt-1 me-1" style="font-size: 0.7rem;">
+                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" id="admin-refresh-btn-header" aria-label="データを再取得">再取得</button>
+                                <a href="#" class="btn btn-sm btn-outline-primary py-0 px-1 estat-goto-tab ms-1" data-target-tab="tab-admin" aria-label="行政データタブへ">もっと見る</a>
+                            </span>
+                            <div class="row g-2 mb-0 header-admin-cols">
+                                <div class="col-12 col-md-6 header-admin-col-left">
+                                    <div class="header-admin-section-title"><i class="fas fa-chart-line me-1"></i>景気・行政データ</div>
+                                    <div id="header-estat-compact-body">
+                                        <ul class="list-unstyled mb-0">
+                                            <li class="d-flex justify-content-between py-1 border-bottom border-light"><span class="text-secondary">取得中…</span><span></span></li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div class="col-12 col-md-6 header-admin-col-right">
+                                    <div class="header-admin-section-title">🇯🇵 官公需シグナル（直近30日）</div>
+                                    <div id="header-kkj-compact-body" class="header-kkj-body">
+                                        <span class="text-muted">取得中…</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </header>
             <section id="trends" aria-label="トレンド情報">
                 <!-- カテゴリ別タブナビ（モバイルは横スクロール） -->
-                <div class="trend-tabs-wrapper mb-3">
+                <div class="trend-tabs-wrapper trend-tabs-compact">
                     <ul class="nav nav-tabs trend-category-tabs flex-nowrap" id="trendCategoryTabs" role="tablist">
                         <li class="nav-item" role="presentation">
                             <button class="nav-link active" id="tab-all" data-bs-toggle="tab" data-bs-target="#pane-all" type="button" role="tab" aria-controls="pane-all" aria-selected="true">全部入り（All）</button>
@@ -176,10 +248,13 @@
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="tab-entertainment" data-bs-toggle="tab" data-bs-target="#pane-entertainment" type="button" role="tab" aria-controls="pane-entertainment" aria-selected="false">エンタメ</button>
                         </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-admin" data-bs-toggle="tab" data-bs-target="#pane-admin" type="button" role="tab" aria-controls="pane-admin" aria-selected="false">行政データ</button>
+                        </li>
                     </ul>
                 </div>
                 <div class="tab-content" id="trendCategoryTabContent">
-                <!-- 全部入り（All）: 各ジャンルのトップ5のみ表示、もっと見るでジャンルタブへ -->
+                <!-- 全部入り（All）: 各ジャンルのトップ5のみ表示。景気・行政はタブ上（ヘッダー）のみ。もっと見るでジャンルタブへ -->
                 <div class="tab-pane fade show active" id="pane-all" role="tabpanel" aria-labelledby="tab-all">
                     <p class="text-muted small mb-3">各ジャンルのトップ5件を表示しています。詳しく見る場合は「もっと見る」またはタブでジャンルを選んでください。</p>
                     <div id="all-trends-container" class="row g-3">
@@ -2134,6 +2209,27 @@
                     </article>
                     </div>
                 </div><!-- /.tab-pane#pane-entertainment -->
+
+                <!-- 行政データタブ: e-Stat ＋ Public Sector Signals（官公需） -->
+                <div class="tab-pane fade" id="pane-admin" role="tabpanel" aria-labelledby="tab-admin">
+                    <p class="text-muted small mb-3">景気・行政の主な指標（消費者物価指数・有効求人倍率・住宅着工）と、官公需情報ポータルの直近30日サマリ（AI/DX/サイバー件数・県別DX案件Top5）を表示しています。e-Statは2026年以降のデータ。出典：<a href="https://www.e-stat.go.jp/" target="_blank" rel="noopener">e-Stat</a>・<a href="https://www.kkj.go.jp/" target="_blank" rel="noopener">官公需情報ポータル</a>。 <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" id="admin-refresh-btn" aria-label="データを再取得">再取得</button></p>
+                    <div id="estat-full-loading" class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status"><span class="visually-hidden">読み込み中</span></div>
+                        <p class="mt-2 mb-0 small text-muted">行政データを取得中...</p>
+                    </div>
+                    <div id="estat-full-body" class="row g-3" style="display: none;">
+                        <!-- 各指標のカードはJSで挿入 -->
+                    </div>
+                    <div class="mt-4">
+                        <h3 class="h6 fw-bold mb-2">🇯🇵 官公需シグナル（直近30日）</h3>
+                        <div id="admin-kkj-body" class="card">
+                            <div class="card-body">
+                                <p class="text-muted small mb-0">取得中…</p>
+                            </div>
+                        </div>
+                    </div>
+                </div><!-- /.tab-pane#pane-admin -->
+
                 </div><!-- /.tab-content -->
             </section>
 
@@ -2162,6 +2258,24 @@
 
 
     <style>
+        /* ヘッダー行：余白を詰める */
+        .header-row { margin-bottom: 0 !important; }
+        /* 統合ボックス：もっと見るを右上に配置したためコンテンツに余白 */
+        #header-admin-unified .header-admin-cols { padding-top: 0.1rem; padding-right: 3rem; }
+        /* 左右のセクション見出し・本文の行間を揃える */
+        #header-admin-unified .header-admin-section-title { font-size: 0.7rem; line-height: 1.25; margin-bottom: 0.2rem; font-weight: 700; color: #6c757d !important; }
+        .estat-compact-box { min-height: auto; }
+        #header-estat-compact-body { font-size: 0.7rem; line-height: 1.25; padding: 0.1rem 0; color: #212529 !important; visibility: visible !important; }
+        #header-estat-compact-body .text-secondary { color: #6c757d !important; }
+        #header-estat-compact-body .text-muted { color: #6c757d !important; }
+        #header-estat-compact-body .list-unstyled { margin-bottom: 0 !important; }
+        #header-estat-compact-body li { padding-top: 0.15rem !important; padding-bottom: 0.15rem !important; }
+        /* Public Sector Signals：景気・行政と同一行間・フォントサイズ */
+        #header-kkj-compact-body.header-kkj-body,
+        #header-kkj-compact-body { font-size: 0.7rem; line-height: 1.25; padding: 0.1rem 0; color: #212529 !important; }
+        #header-kkj-compact-body .text-muted { color: #6c757d !important; }
+        #header-kkj-compact-body div { margin-top: 0; margin-bottom: 0.15rem; }
+        #estat-full-loading .spinner-border { display: inline-block !important; visibility: visible !important; opacity: 1 !important; height: 1rem !important; width: 1rem !important; overflow: visible !important; position: static !important; left: auto !important; }
         /* すべてのローディング表示を確実に非表示 */
         .loading,
         [id$="Loading"],

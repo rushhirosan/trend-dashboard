@@ -167,6 +167,13 @@ body {
         max-height: 400px;
         overflow: hidden;
     }
+    /* スクロールバーがカードの角丸からはみ出さないように .card-body でクリップ */
+    #trends .card.category-card > .card-body,
+    body#trends-us #trends .card.category-card > .card-body {
+        overflow: hidden;
+        border-bottom-left-radius: 0.375rem;
+        border-bottom-right-radius: 0.375rem;
+    }
 }
 
 /* Podcast結果内のカテゴリカードは高さ制限を無効化（デスクトップのみ） */
@@ -272,6 +279,7 @@ body {
         overflow-y: auto;
         flex: 1;
         min-height: 0;
+        padding-bottom: 0.5rem; /* 最後の1行が切れない最小余白（スクロールバー下端と行の高さを揃える） */
     }
     
     /* Zennの.trend-table-containerはmax-heightを無効化して高さを充分に使う */
@@ -285,13 +293,14 @@ body {
     #noteResults .trend-table-container {
         max-height: 400px !important;
         overflow-y: auto !important;
-        padding-bottom: 1.5rem; /* 最後の1行（20番目）がスクロール時に完全に表示されるように */
+        padding-bottom: 0.5rem; /* 最後の1行が切れない最小余白 */
     }
 
     /* 全部入り（All）タブ: カード内テーブルを高さ固定・スクロール可能に（他タブと同じ） */
     #pane-all .card.h-100 .card-body .table-responsive {
         max-height: 300px;
         overflow-y: auto;
+        padding-bottom: 0.5rem;
     }
 }
 
@@ -381,6 +390,7 @@ body {
 #rakutenResults .trend-table-container {
     max-height: 500px;
     overflow-y: auto;
+    padding-bottom: 0.5rem;
 }
 
 /* Podcastトレンドのcard-bodyが正しく広がるように（デスクトップのみ） */

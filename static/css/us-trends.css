@@ -100,4 +100,5 @@ body#trends-us #trends #pane-market .trend-table-container,
 body#trends-us #trends #pane-entertainment .trend-table-container {
     max-height: 400px !important;
     overflow-y: auto !important;
+    padding-bottom: 0.5rem !important; /* 最下部のタイトルが切れない最小余白（スクロールバー下端と行を揃える） */
 }

@@ -42,8 +42,6 @@ from services.trends.prtimes_trends import PRTimesTrendsManager
 from services.trends.prtimes_hatena_trends import PRTimesHatenaTrendsManager
 from services.trends.globenewswire_trends import GlobeNewswireTrendsManager
 from services.trends.globenewswire_market_reaction_trends import GlobeNewswireMarketReactionTrendsManager
-from services.trends.estat_trends import EstatTrendsManager
-from services.trends.kkj_trends import KKJTrendsManager
 from utils.logger_config import get_logger
 
 # ロガーの初期化
@@ -87,8 +85,6 @@ MANAGER_CONFIGS = [
     ('prtimes_hatena', PRTimesHatenaTrendsManager, 'PR TIMES × はてブ'),
     ('globenewswire', GlobeNewswireTrendsManager, 'GlobeNewswire'),
     ('globenewswire_market_reaction', GlobeNewswireMarketReactionTrendsManager, 'GlobeNewswire × Market'),
-    ('estat', EstatTrendsManager, 'e-Stat'),
-    ('kkj', KKJTrendsManager, '官公需'),
 ]
 
 

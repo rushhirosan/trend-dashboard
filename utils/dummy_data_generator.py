@@ -211,30 +211,6 @@ def generate_dummy_ebay_data(category: str = "fashion", limit: int = 25) -> List
     return dummy_data
 
 
-def generate_dummy_estat_data(limit: int = 6) -> List[Dict[str, Any]]:
-    """e-Stat（景気・行政指標）用のダミーデータを生成（indicator_id, name_ja, series 形式）"""
-    indicators = [
-        ("cpi", "消費者物価指数（総合・前年同月比）", "前年同月=100", "102.1", "202602"),
-        ("job_ratio", "有効求人倍率", "倍", "1.31", "202601"),
-        ("housing_starts", "住宅着工", "棟", "45230", "202601"),
-        ("unemployment", "完全失業率", "%", "2.4", "202601"),
-        ("real_wages", "実質賃金指数", "前年同月比", "97.5", "202512"),
-        ("trade", "貿易統計（輸出額）", "億円", "85000", "202601"),
-    ]
-    dummy_data: List[Dict[str, Any]] = []
-    for i, (ind_id, name_ja, unit, val, period) in enumerate(indicators[:limit]):
-        item: Dict[str, Any] = {
-            "indicator_id": ind_id,
-            "name_ja": name_ja,
-            "unit": unit,
-            "series": [{"period": period, "value": val, "unit": unit}],
-            "updated_at": period,
-            "stats_data_id": None,
-        }
-        dummy_data.append(item)
-    return dummy_data
-
-
 def generate_dummy_rakuten_data(limit: int = 25, genre_id: str = "all") -> List[Dict[str, Any]]:
     """楽天トレンド用のダミーデータを生成（rakuten_trends_cache スキーマ互換）"""
     dummy_data: List[Dict[str, Any]] = []

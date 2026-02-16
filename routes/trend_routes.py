@@ -623,68 +623,6 @@ def get_cisa_kev_trends(manager):
     except Exception as e:
         return handle_api_error('CISA KEV Trends', e)
 
-
-@trend_bp.route('/admin-trends')
-def get_admin_trends():
-    """
-    行政データ統合API（e-Stat + 官公需）
-    通常時はキャッシュのみ使用（外部APIは呼ばない）。
-    再取得ボタン（force_refresh=true）のときのみ e-Stat 外部API を呼ぶ。
-    """
-    managers = get_managers()
-    estat_mgr = managers.get('estat')
-    kkj_mgr = managers.get('kkj')
-    force_refresh = get_force_refresh()
-    estat_result = {"success": False, "data": [], "error": "e-Stat Managerが初期化されていません"}
-    kkj_result = {"success": False, "data": None, "error": "官公需 Managerが初期化されていません"}
-    if estat_mgr:
-        try:
-            estat_result = estat_mgr.get_trends(
-                limit=6, force_refresh=force_refresh, cache_only=not force_refresh
-            )
-        except Exception as e:
-            logger.exception("e-Stat取得エラー: %s", e)
-            estat_result = {"success": False, "data": [], "error": str(e)}
-    if kkj_mgr:
-        try:
-            kkj_result = kkj_mgr.get_public_sector_signals(
-                force_refresh=force_refresh,
-                cache_only=not force_refresh,
-            )
-        except Exception as e:
-            logger.exception("官公需取得エラー: %s", e)
-            kkj_result = {"success": False, "data": None, "error": str(e)}
-    return jsonify({
-        "success": estat_result.get("success", False) or kkj_result.get("success", False),
-        "estat": estat_result,
-        "kkj": kkj_result,
-    })
-
-
-@trend_bp.route('/estat-trends')
-@require_manager('estat')
-def get_estat_trends(manager):
-    """e-Stat（CPI・有効求人倍率・住宅着工・完全失業率・実質賃金指数・貿易統計）APIエンドポイント"""
-    try:
-        force_refresh = get_force_refresh()
-        result = manager.get_trends(limit=6, force_refresh=force_refresh)
-        return handle_trend_response(result, 'e-Stat', 'e-Stat API')
-    except Exception as e:
-        return handle_api_error('e-Stat Trends', e)
-
-
-@trend_bp.route('/kkj-trends')
-@require_manager('kkj')
-def get_kkj_trends(manager):
-    """官公需 Public Sector Signals（直近30日×AI/DX/サイバー件数＋都道府県ランキング）APIエンドポイント"""
-    try:
-        force_refresh = get_force_refresh()
-        result = manager.get_public_sector_signals(force_refresh=force_refresh)
-        return jsonify(result)
-    except Exception as e:
-        return handle_api_error('官公需 KKJ Trends', e)
-
-
 @trend_bp.route('/thehackernews-trends')
 @require_manager('thehackernews')
 def get_thehackernews_trends(manager):

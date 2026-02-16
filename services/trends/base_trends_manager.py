@@ -236,7 +236,6 @@ class BaseTrendsManager(ABC):
         self,
         limit: int = 25,
         force_refresh: bool = False,
-        cache_only: bool = False,  # True のときはキャッシュのみ、外部APIは呼ばない
         auto_fetch_on_cache_miss: bool = True,  # キャッシュがない場合に自動的にAPIを呼び出すかどうか
         sort_key: Optional[str] = None,  # ソートキー（Noneの場合はrankでソート）
         sort_reverse: bool = True,  # 降順かどうか
@@ -248,7 +247,6 @@ class BaseTrendsManager(ABC):
         Args:
             limit: 取得件数
             force_refresh: 強制更新フラグ
-            cache_only: True のときはキャッシュのみ返し、外部APIは呼ばない（キャッシュが空なら空データ）
             auto_fetch_on_cache_miss: キャッシュがない場合に自動的にAPIを呼び出すかどうか
             sort_key: ソートキー（Noneの場合はrankでソート）
             sort_reverse: 降順かどうか
@@ -278,14 +276,6 @@ class BaseTrendsManager(ABC):
                 if not force_refresh:
                     cached_dummy_data = self._get_from_cache(*args, **kwargs)
 
-                if cached_dummy_data and len(cached_dummy_data) > 0:
-                    if hasattr(self, "_is_valid_cached_data") and not self._is_valid_cached_data(cached_dummy_data):
-                        try:
-                            self._clear_cache(*args, **kwargs)
-                        except Exception:
-                            pass
-                        cached_dummy_data = None
-                        logger.info(f"🔄 {self.service_name}: キャッシュ形式が不正なためクリアして再生成します")
                 if cached_dummy_data and len(cached_dummy_data) > 0:
                     cached_dummy_data = self._apply_default_sorting(
                         cached_dummy_data, sort_key=sort_key, reverse=sort_reverse
@@ -338,26 +328,6 @@ class BaseTrendsManager(ABC):
             if not force_refresh:
                 cached_data = self._get_from_cache(*args, **kwargs)
 
-            # キャッシュの形式検証（一部マネージャーは _is_valid_cached_data で形式チェック）
-            if cached_data and hasattr(self, "_is_valid_cached_data") and not self._is_valid_cached_data(cached_data):
-                try:
-                    self._clear_cache(*args, **kwargs)
-                except Exception:
-                    pass
-                cached_data = None
-                logger.info(f"🔄 {self.service_name}: キャッシュ形式が不正なためクリアし、APIから再取得します")
-
-            # cache_only のときはキャッシュがなければ空を返し、外部APIは呼ばない
-            if cache_only and (not cached_data or len(cached_data) == 0):
-                logger.info(f"✅ {self.service_name}: cache_only - キャッシュなしのため空データを返します（外部API非呼び出し）")
-                return {
-                    "success": True,
-                    "data": [],
-                    "status": "cache_only_empty",
-                    "source": "database_cache",
-                    **kwargs,
-                }
-
             # キャッシュデータがある場合はそれを返す
             if cached_data and len(cached_data) > 0:
                 cached_data = self._apply_default_sorting(cached_data, sort_key=sort_key, reverse=sort_reverse)
@@ -379,16 +349,6 @@ class BaseTrendsManager(ABC):
                     "success": True,
                     "data": [],
                     "status": "cache_not_found",
-                    "source": "database_cache",
-                    **kwargs,
-                }
-
-            if cache_only:
-                # cache_only 指定時はここには到達しない想定だが、念のため空を返す
-                return {
-                    "success": True,
-                    "data": [],
-                    "status": "cache_only_empty",
                     "source": "database_cache",
                     **kwargs,
                 }

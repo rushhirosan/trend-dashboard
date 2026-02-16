@@ -3638,6 +3638,26 @@ body.data-status-active #data-status .card-body {
     display: none;
 }
 
+/* ========== メイン・ヘッダー余白の短縮（タブ直下のトレンドが見やすいように） ========== */
+.main-content-compact {
+    padding-top: 0.5rem;
+    padding-bottom: 1rem;
+}
+.page-header-compact {
+    margin-bottom: 0.5rem;
+}
+.trend-tabs-compact {
+    margin-bottom: 0.5rem;
+}
+
+/* 景気・行政データと官公需シグナルの間の縦の区切り線（並んでいる時のみ） */
+@media (min-width: 768px) {
+    .header-admin-col-right {
+        border-left: 1px solid rgba(0, 0, 0, 0.15);
+        padding-left: 0.75rem;
+    }
+}
+
 /* ========== トレンドカテゴリタブ（2段固定: ヘッダー直下に張り付く） ========== */
 .trend-tabs-wrapper {
     position: sticky;

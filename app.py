@@ -633,7 +633,8 @@ def main():
         port = config['PORT']
 
         logger.info(f"🚀 アプリケーションをポート {port} で起動します")
-        app.run(debug=config['DEBUG'], host=config['HOST'], port=port)
+        # 長時間リクエストがあってもヘルスチェックが止まらないようスレッド有効化
+        app.run(debug=config['DEBUG'], host=config['HOST'], port=port, threaded=True)
         
     except KeyboardInterrupt:
         logger.info("\n🛑 アプリケーション終了中...")

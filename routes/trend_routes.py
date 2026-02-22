@@ -639,18 +639,23 @@ def get_admin_trends():
     estat_result = {"success": False, "data": [], "error": "e-Stat Managerが初期化されていません"}
     if estat_mgr:
         try:
-            estat_result = estat_mgr.get_trends(limit=6, force_refresh=force_refresh)
+            if force_refresh:
+                estat_result = estat_mgr.get_trends(limit=6, force_refresh=True)
+            else:
+                # 初期表示はキャッシュのみ（外部APIを呼ばない）
+                estat_result = estat_mgr.get_trends(limit=6, cache_only=True, auto_fetch_on_cache_miss=False)
         except Exception as e:
             logger.exception("e-Stat取得エラー: %s", e)
             estat_result = {"success": False, "data": [], "error": str(e)}
     kkj_result = {"success": False, "data": None, "error": "政府調達 Managerが初期化されていません"}
     if kkj_mgr:
         try:
-            # 通常時はキャッシュ優先。再取得時は政府調達APIを呼ぶ。キャッシュが無い場合もAPI取得を試行。
-            kkj_result = kkj_mgr.get_public_sector_signals(
-                force_refresh=force_refresh,
-                cache_only=False,
-            )
+            if force_refresh:
+                # 再取得時は政府調達APIを呼ぶ
+                kkj_result = kkj_mgr.get_public_sector_signals(force_refresh=True, cache_only=False)
+            else:
+                # 初期表示はキャッシュのみ（外部APIを呼ばない）
+                kkj_result = kkj_mgr.get_public_sector_signals(cache_only=True)
         except Exception as e:
             logger.exception("政府調達取得エラー: %s", e)
             kkj_result = {"success": False, "data": None, "error": str(e)}

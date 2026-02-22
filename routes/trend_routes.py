@@ -627,34 +627,32 @@ def get_cisa_kev_trends(manager):
 @trend_bp.route('/admin-trends')
 def get_admin_trends():
     """
-    行政データ統合API（e-Stat + 官公需）
-    通常時はキャッシュのみ使用（外部APIは呼ばない）。
-    再取得ボタン（force_refresh=true）のときのみ e-Stat 外部API を呼ぶ。
+    行政データ統合API（e-Stat ＋ 政府調達）
+    通常時はキャッシュ優先。再取得ボタン（force_refresh=true）のときは両方の外部APIを呼ぶ。
     """
     managers = get_managers()
     estat_mgr = managers.get('estat')
     kkj_mgr = managers.get('kkj')
     force_refresh = get_force_refresh()
+
+    # e-Stat（完全失業率・実質賃金指数・小売販売額など6指標）
     estat_result = {"success": False, "data": [], "error": "e-Stat Managerが初期化されていません"}
-    kkj_result = {"success": False, "data": None, "error": "官公需 Managerが初期化されていません"}
     if estat_mgr:
         try:
-            # 指標ごとにキャッシュがあれば使う・なければAPI取得（get_trends内でマージ）
-            estat_result = estat_mgr.get_trends(
-                limit=6, force_refresh=force_refresh, cache_only=False
-            )
+            estat_result = estat_mgr.get_trends(limit=6, force_refresh=force_refresh)
         except Exception as e:
             logger.exception("e-Stat取得エラー: %s", e)
             estat_result = {"success": False, "data": [], "error": str(e)}
+    kkj_result = {"success": False, "data": None, "error": "政府調達 Managerが初期化されていません"}
     if kkj_mgr:
         try:
-            # 官公需API障害のため外部APIは呼ばずキャッシュのみ使用（再取得時もスキップ）
+            # 通常時はキャッシュ優先。再取得時は政府調達APIを呼ぶ。キャッシュが無い場合もAPI取得を試行。
             kkj_result = kkj_mgr.get_public_sector_signals(
-                force_refresh=False,
-                cache_only=True,
+                force_refresh=force_refresh,
+                cache_only=False,
             )
         except Exception as e:
-            logger.exception("官公需取得エラー: %s", e)
+            logger.exception("政府調達取得エラー: %s", e)
             kkj_result = {"success": False, "data": None, "error": str(e)}
     return jsonify({
         "success": estat_result.get("success", False) or kkj_result.get("success", False),
@@ -666,7 +664,7 @@ def get_admin_trends():
 @trend_bp.route('/estat-trends')
 @require_manager('estat')
 def get_estat_trends(manager):
-    """e-Stat（CPI・有効求人倍率・住宅着工・完全失業率・実質賃金指数・貿易統計）APIエンドポイント"""
+    """e-Stat（CPI・有効求人倍率・住宅着工・完全失業率・実質賃金指数・小売業販売額）APIエンドポイント"""
     try:
         force_refresh = get_force_refresh()
         result = manager.get_trends(limit=6, force_refresh=force_refresh)
@@ -675,16 +673,50 @@ def get_estat_trends(manager):
         return handle_api_error('e-Stat Trends', e)
 
 
+@trend_bp.route('/us-admin-trends')
+def get_us_admin_trends():
+    """
+    US行政データ統合API（BLS景気指標 ＋ USAspending政府支出）
+    1タブで US景気（上）＋ US政府支出（下）を返す。
+    """
+    managers = get_managers()
+    bls_mgr = managers.get('bls')
+    usaspending_mgr = managers.get('usaspending')
+    force_refresh = get_force_refresh()
+
+    bls_result = {"success": False, "data": [], "error": "BLS Managerが初期化されていません"}
+    if bls_mgr:
+        try:
+            bls_result = bls_mgr.get_trends(limit=10, force_refresh=force_refresh)
+        except Exception as e:
+            logger.exception("BLS取得エラー: %s", e)
+            bls_result = {"success": False, "data": [], "error": str(e)}
+
+    usaspending_result = {"success": False, "data": None, "error": "USAspending Managerが初期化されていません"}
+    if usaspending_mgr:
+        try:
+            usaspending_result = usaspending_mgr.get_trends(force_refresh=force_refresh)
+        except Exception as e:
+            logger.exception("USAspending取得エラー: %s", e)
+            usaspending_result = {"success": False, "data": None, "error": str(e)}
+
+    return jsonify({
+        "success": bls_result.get("success", False) or usaspending_result.get("success", False),
+        "bls": bls_result,
+        "usaspending": usaspending_result,
+    })
+
+
 @trend_bp.route('/kkj-trends')
 @require_manager('kkj')
 def get_kkj_trends(manager):
-    """官公需 Public Sector Signals（直近30日×AI/DX/サイバー件数＋都道府県ランキング）APIエンドポイント"""
+    """政府調達 Public Sector Signals（直近30日×AI/DX/サイバー件数＋都道府県ランキング）APIエンドポイント"""
     try:
         force_refresh = get_force_refresh()
         result = manager.get_public_sector_signals(force_refresh=force_refresh)
         return jsonify(result)
     except Exception as e:
-        return handle_api_error('官公需 KKJ Trends', e)
+        return handle_api_error('政府調達 KKJ Trends', e)
 
 
 @trend_bp.route('/thehackernews-trends')

@@ -1,5 +1,5 @@
 /**
- * 官公需 Public Sector Signals（直近30日×AI/DX/サイバー件数＋都道府県ランキング）
+ * 政府調達 Public Sector Signals（直近30日×AI/DX/サイバー件数＋都道府県ランキング）
  * ヘッダー・全部入り用のコンパクト表示（高さ抑えめ）
  */
 (function () {
@@ -17,7 +17,7 @@
     function renderCompactBody(data) {
         if (!data) return '';
         if (data.api_unreachable) {
-            return '<div class="mt-0 text-warning">官公需APIに接続できません（タイムアウト）。しばらく後にお試しください。</div>';
+            return '<div class="mt-0 text-warning">政府調達APIに接続できません（タイムアウト）。しばらく後にお試しください。</div>';
         }
         var signals = data.signals || [];
         var rankings = data.prefecture_rankings || {};
@@ -42,7 +42,7 @@
     function renderAdminTabBody(data) {
         if (!data) return '';
         if (data.api_unreachable) {
-            return '<p class="text-warning mb-0">官公需APIに接続できません（タイムアウト）。しばらく後にお試しください。</p>';
+            return '<p class="text-warning mb-0">政府調達APIに接続できません（タイムアウト）。しばらく後にお試しください。</p>';
         }
         var signals = data.signals || [];
         var rankings = data.prefecture_rankings || {};

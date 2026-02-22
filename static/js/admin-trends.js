@@ -1,5 +1,5 @@
 /**
- * 行政データ統合表示（e-Stat + 官公需）
+ * 行政データ統合表示（e-Stat + 政府調達）
  * 外部APIは1回だけ呼び、キャッシュがあればそれを表示する。
  * /api/admin-trends を1回呼び出して estat + kkj を一度に取得。
  */
@@ -30,38 +30,15 @@
         return y + '年';
     }
 
-    // --- e-Stat 描画（CPI: 東京都区部/全国 前年比%、住宅着工: 直近12ヶ月+2026年度予測） ---
-    function renderEstatCompactHtml(data) {
-        if (!data || !data.length) return '';
-        var html = '<ul class="list-unstyled mb-0">';
-        (data.length > 3 ? data.slice(0, 3) : data).forEach(function (item) {
-            var name = item.name_ja || item.indicator_id || '—';
-            if (item.indicator_id === 'cpi' && item.cpi_lines && item.cpi_lines.length > 0) {
-                // 全部入り: 直近1行のみ（全国を優先、なければ先頭）
-                var line = item.cpi_lines.find(function (l) { return l.area === '全国'; }) || item.cpi_lines[0];
-                var pct = line.value_pct != null ? (line.value_pct >= 0 ? '+' + line.value_pct : String(line.value_pct)) : '—';
-                var label = escapeHtml(line.area) + (line.period_label ? '（' + line.period_label + (line.label_suffix ? '・' + line.label_suffix : '') + '）' : '');
-                html += '<li class="d-flex justify-content-between py-1 border-bottom border-light"><span class="text-secondary">' + label + '</span><span>前年比<strong>' + pct + '%</strong></span></li>';
-                return;
-            }
-            // 住宅着工: CPI・有効求人倍率と同じ月次1行スタイル（直近1件＋期間）
-            if (item.indicator_id === 'housing_starts') {
-                var latest = item.series && item.series[0];
-                var val = latest ? latest.value : '—';
-                var period = latest ? formatPeriod(latest.period) : '';
-                var unit = (latest && latest.unit) || item.unit || '戸';
-                html += '<li class="d-flex justify-content-between py-1 border-bottom border-light"><span class="text-secondary">' + escapeHtml(name) + (period ? '（' + period + '）' : '') + '</span><span><strong>' + escapeHtml(val) + '</strong>' + (unit ? ' ' + escapeHtml(unit) : '') + '</span></li>';
-                return;
-            }
-            var latest = item.series && item.series[0];
-            var val = latest ? latest.value : '—';
-            var period = latest ? formatPeriod(latest.period) : '';
-            var unit = (latest && latest.unit) || item.unit || '';
-            html += '<li class="d-flex justify-content-between py-1 border-bottom border-light"><span class="text-secondary">' + escapeHtml(name) + '</span><span><strong>' + escapeHtml(val) + '</strong>' + (unit ? ' ' + escapeHtml(unit) : '') + (period ? ' <span class="text-muted">(' + period + ')</span>' : '') + '</span></li>';
-        });
-        html += '</ul>';
-        return html;
-    }
+    // ニュース・テックタブと同様のカード見た目（指標ごとにヘッダー色・アイコン）
+    var ESTAT_CARD_STYLE = {
+        cpi:            { header: 'bg-primary text-white',    icon: 'fa-chart-line' },
+        job_ratio:      { header: 'bg-info text-white',       icon: 'fa-briefcase' },
+        housing_starts: { header: 'bg-success text-white',    icon: 'fa-home' },
+        unemployment:   { header: 'bg-warning text-dark',      icon: 'fa-user-clock' },
+        real_wages:     { header: 'bg-secondary text-white',  icon: 'fa-yen-sign' },
+        retail_sales:   { header: 'bg-dark text-white',       icon: 'fa-shopping-cart' }
+    };
 
     function renderEstatFullCard(item) {
         var body = '';
@@ -84,19 +61,18 @@
                     return '<tr><td>' + escapeHtml(formatPeriod(s.period)) + '</td><td>' + pctStr + '</td><td class="text-muted small">' + escapeHtml(s.unit || '前年同月=100') + '</td></tr>';
                 }).join('');
                 body += '<p class="small text-muted mb-1">直近1年（その月から過去12ヶ月）</p>';
-                body += '<div class="table-responsive mt-2"><table class="table table-sm table-hover mb-0"><thead class="table-light"><tr><th>期間</th><th>前年比</th><th>単位</th></tr></thead><tbody>' + cpiRows + '</tbody></table></div>';
+                body += '<div class="table-responsive mt-2"><table class="table table-sm table-hover trend-table mb-0"><thead class="table-dark"><tr><th>期間</th><th>前年比</th><th>単位</th></tr></thead><tbody>' + cpiRows + '</tbody></table></div>';
                 if (item.series.length <= 1) {
                     body += '<p class="text-muted small mt-1 mb-0">※ この統計表で月次が取得できない場合は1行のみ表示されます。再取得で月次データが利用可能か確認できます。</p>';
                 }
             }
         } else if (item.indicator_id === 'housing_starts') {
-            // CPI・有効求人倍率と同様に月次テーブルをメインで表示
             if (item.series && item.series.length) {
                 var rows = item.series.slice(0, 12).map(function (s) {
                     return '<tr><td>' + escapeHtml(formatPeriod(s.period)) + '</td><td>' + escapeHtml(s.value) + '</td><td class="text-muted small">' + escapeHtml(s.unit || '戸') + '</td></tr>';
                 }).join('');
                 body += '<p class="small text-muted mb-1">直近1年（その月から過去12ヶ月）</p>';
-                body += '<div class="table-responsive mt-2"><table class="table table-sm table-hover mb-0"><thead class="table-light"><tr><th>期間</th><th>戸数</th><th>単位</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+                body += '<div class="table-responsive mt-2"><table class="table table-sm table-hover trend-table mb-0"><thead class="table-dark"><tr><th>期間</th><th>戸数</th><th>単位</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
                 var total12 = item.total_12m;
                 if (total12 == null && item.series && item.series.length > 0) {
                     total12 = 0;
@@ -115,16 +91,20 @@
                 return '<tr><td>' + escapeHtml(formatPeriod(s.period)) + '</td><td>' + escapeHtml(s.value) + '</td><td class="text-muted small">' + escapeHtml(s.unit || '') + '</td></tr>';
             }).join('');
             body = rows
-                ? '<div class="table-responsive"><table class="table table-sm table-hover mb-0"><thead class="table-light"><tr><th>期間</th><th>値</th><th>単位</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+                ? '<div class="table-responsive"><table class="table table-sm table-hover trend-table mb-0"><thead class="table-dark"><tr><th>期間</th><th>値</th><th>単位</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
                 : '<p class="text-muted small mb-0">2026年以降のデータはまだありません。</p>';
         }
+        var style = ESTAT_CARD_STYLE[item.indicator_id] || { header: 'bg-secondary text-white', icon: 'fa-chart-bar' };
+        var title = escapeHtml(item.name_ja || item.indicator_id || '');
         return (
-            '<div class="col-12 col-lg-4">' +
+            '<article class="col-12 col-md-6 col-lg-4" aria-label="' + title + '">' +
             '  <div class="card h-100">' +
-            '    <div class="card-header bg-secondary text-white"><span class="small fw-bold">' + escapeHtml(item.name_ja) + '</span></div>' +
-            '    <div class="card-body p-2">' + body + '</div>' +
+            '    <div class="card-header ' + style.header + ' d-flex justify-content-between align-items-center">' +
+            '      <h2 class="h5 mb-0"><i class="fas ' + style.icon + '" aria-hidden="true"></i> ' + title + '</h2>' +
+            '    </div>' +
+            '    <div class="card-body">' + body + '</div>' +
             '  </div>' +
-            '</div>'
+            '</article>'
         );
     }
 
@@ -134,58 +114,270 @@
     function renderKkjCompactBody(data) {
         if (!data) return '';
         if (data.api_unreachable) {
-            return '<div class="mt-0 text-warning">官公需APIに接続できません（タイムアウト）。しばらく後にお試しください。</div>';
+            return '<div class="text-warning">政府調達APIに接続できません（タイムアウト）。</div>';
         }
         var signals = data.signals || [];
-        var rankings = data.prefecture_rankings || {};
+        var signalsMonthly = data.signals_monthly || {};
+        var latestPeriod = '';
+        var monthPeriod = '';
+        if (signalsMonthly.ai && signalsMonthly.ai.length > 0 && signalsMonthly.ai[0].period) {
+            latestPeriod = signalsMonthly.ai[0].period;
+            monthPeriod = formatPeriod(latestPeriod);
+        }
+        var aiMonth = signalsMonthly.ai && signalsMonthly.ai[0] ? signalsMonthly.ai[0].value : null;
+        var dxMonth = signalsMonthly.dx && signalsMonthly.dx[0] ? signalsMonthly.dx[0].value : null;
+        var cyMonth = signalsMonthly.cyber && signalsMonthly.cyber[0] ? signalsMonthly.cyber[0].value : null;
         var parts = [];
-        signals.forEach(function (s) {
-            parts.push(escapeHtml(s.label) + ' <strong>' + (s.count != null ? s.count : '—') + '</strong>件');
-        });
-        var line1 = parts.length ? parts.join('　') : '—';
-        var lines = ['<div class="mt-0">' + line1 + '</div>'];
-        ['ai', 'dx', 'cyber'].forEach(function (key) {
-            var ranking = rankings[key] || (key === 'dx' ? (data.prefecture_ranking || []) : []);
-            var rankParts = ranking.slice(0, 5).map(function (r) {
-                return r.rank + '.' + escapeHtml((r.name || '').replace(/(県|府|都)$/, ''));
+        if (aiMonth != null || dxMonth != null || cyMonth != null) {
+            parts.push('AI関連 <strong>' + (aiMonth != null ? aiMonth : '—') + '</strong>件');
+            parts.push('DX関連 <strong>' + (dxMonth != null ? dxMonth : '—') + '</strong>件');
+            parts.push('サイバー <strong>' + (cyMonth != null ? cyMonth : '—') + '</strong>件');
+        } else {
+            parts = signals.map(function (s) {
+                var label = s.label || KKJ_RANKING_LABELS[s.key] || s.key || '';
+                var count = s.count != null ? s.count : '—';
+                return escapeHtml(label) + ' <strong>' + count + '</strong>件';
             });
-            var line2 = rankParts.length ? rankParts.join(' ') : '—';
-            lines.push('<div class="mt-0 text-muted">県別 ' + (KKJ_RANKING_LABELS[key] || key) + ' Top5: ' + line2 + '</div>');
-        });
-        return lines.join('');
+        }
+        var summary = parts.length ? parts.join(' / ') : '—';
+        return '<div class="header-admin-latest-title">' + summary + '</div>';
     }
 
-    function renderKkjAdminTabBody(data) {
-        if (!data) return '';
-        if (data.api_unreachable) {
-            return '<p class="text-warning mb-0">官公需APIに接続できません（タイムアウト）。しばらく後にお試しください。</p>';
+    function formatPeriod(period) {
+        if (!period || period.length < 4) return period || '';
+        var y = period.substring(0, 4);
+        if (period.length >= 6) {
+            var m = period.substring(4, 6);
+            if (m && m !== '00') return y + '年' + parseInt(m, 10) + '月';
         }
-        var signals = data.signals || [];
-        var rankings = data.prefecture_rankings || {};
-        var asOf = data.as_of || '';
-        var parts = [];
-        parts.push('<div class="row g-3">');
-        parts.push('<div class="col-12 col-md-6"><h4 class="h6 text-secondary mb-2">キーワード別件数（直近30日）</h4><ul class="list-unstyled mb-0">');
-        signals.forEach(function (s) {
-            parts.push('<li class="d-flex justify-content-between py-1 border-bottom border-light"><span>' + escapeHtml(s.label) + '</span><span><strong>' + (s.count != null ? s.count : '—') + '</strong>件</span></li>');
-        });
-        parts.push('</ul></div>');
-        parts.push('<div class="col-12 col-md-6"><h4 class="h6 text-secondary mb-2">県別 案件 Top5（AI / DX / サイバー）</h4>');
-        ['ai', 'dx', 'cyber'].forEach(function (key) {
-            var ranking = rankings[key] || (key === 'dx' ? (data.prefecture_ranking || []) : []);
-            parts.push('<p class="small fw-bold mb-1 mt-2">県別 ' + (KKJ_RANKING_LABELS[key] || key) + ' Top5</p>');
-            if (ranking.length) {
-                parts.push('<ol class="list-unstyled mb-0">');
-                ranking.forEach(function (r) {
-                    parts.push('<li class="py-1 border-bottom border-light">' + r.rank + '. ' + escapeHtml(r.name || '') + ' <span class="text-muted">(' + (r.count != null ? r.count : '—') + '件)</span></li>');
-                });
-                parts.push('</ol>');
-            } else {
-                parts.push('<p class="text-muted small mb-0">—</p>');
+        return y + '年';
+    }
+
+    function parsePeriodLabel(label) {
+        if (!label) return 0;
+        var m = label.match(/(\d{4})年(\d{1,2})月/);
+        if (!m) return 0;
+        var yy = parseInt(m[1], 10);
+        var mm = parseInt(m[2], 10);
+        if (!yy || !mm) return 0;
+        return yy * 100 + mm;
+    }
+
+    function getEstatLatestPeriod(data) {
+        var bestKey = 0;
+        var bestLabel = '';
+        (data || []).forEach(function (item) {
+            var key = 0;
+            var label = '';
+            if (item && item.series && item.series[0] && item.series[0].period) {
+                key = parseInt(item.series[0].period, 10) || 0;
+                label = formatPeriod(item.series[0].period);
+            } else if (item && item.updated_at) {
+                key = parseInt(item.updated_at, 10) || 0;
+                label = formatPeriod(item.updated_at);
+            } else if (item && item.cpi_lines && item.cpi_lines[0] && item.cpi_lines[0].period_label) {
+                key = parsePeriodLabel(item.cpi_lines[0].period_label);
+                label = item.cpi_lines[0].period_label;
+            }
+            if (key >= bestKey) {
+                bestKey = key;
+                bestLabel = label;
             }
         });
-        parts.push('</div></div>');
+        return bestLabel;
+    }
+
+    function renderEstatCompactLatest(data) {
+        if (!data || !data.length) return '<span class="text-muted">—</span>';
+        var shortLabels = {
+            cpi: 'CPI',
+            job_ratio: '求人',
+            housing_starts: '住宅',
+            unemployment: '失業',
+            real_wages: '賃金',
+            retail_sales: '小売'
+        };
+        var unitOverride = {
+            job_ratio: '倍',
+            housing_starts: '戸',
+            unemployment: '%',
+            real_wages: '指数',
+            retail_sales: '億円'
+        };
+        var parts = [];
+        (data || []).forEach(function (item) {
+            if (!item) return;
+            var id = item.indicator_id || '';
+            var label = shortLabels[id] || (item.name_ja || id || '—');
+            if (id === 'cpi' && item.cpi_lines && item.cpi_lines.length > 0) {
+                var line = item.cpi_lines.find(function (l) { return l.area === '全国'; }) || item.cpi_lines[0];
+                var pct = line.value_pct != null ? (line.value_pct >= 0 ? '+' + line.value_pct : String(line.value_pct)) : '—';
+                parts.push(escapeHtml(label) + ' ' + pct + '%');
+                return;
+            }
+            var latest = item.series && item.series[0];
+            var val = latest ? latest.value : '—';
+            var unit = unitOverride[id] || (latest && latest.unit) || item.unit || '';
+            var unitText = unit ? ' ' + escapeHtml(unit) : '';
+            parts.push(escapeHtml(label) + ' ' + escapeHtml(val) + unitText);
+        });
+        var summary = parts.length ? parts.join(' / ') : '—';
+        var latestPeriod = getEstatLatestPeriod(data);
+        var periodText = latestPeriod ? '（最新: ' + escapeHtml(latestPeriod) + '）' : '';
+        var periodEl = document.getElementById('header-estat-latest-period');
+        if (periodEl) {
+            periodEl.textContent = periodText;
+        }
+        var firstLine = summary;
+        var secondLine = '';
+        if (parts.length > 3) {
+            var splitIndex = Math.ceil(parts.length / 2);
+            firstLine = parts.slice(0, splitIndex).join(' / ');
+            secondLine = parts.slice(splitIndex).join(' / ');
+        }
+        return (
+            '<div class="header-admin-latest-title">' +
+            '<span class="header-admin-latest-line">' + firstLine + '</span>' +
+            (secondLine ? '<span class="header-admin-latest-line">' + secondLine + '</span>' : '') +
+            '</div>'
+        );
+    }
+
+    function renderKkjAdminTabBody(data, selectedKeyword) {
+        if (!data) return '';
+        if (data.api_unreachable) {
+            return '<p class="text-warning mb-0">政府調達APIに接続できません（タイムアウト）。しばらく後にお試しください。</p>';
+        }
+        selectedKeyword = selectedKeyword || 'all';
+        var signals = data.signals || [];
+        var rankings = data.prefecture_rankings || {};
+        var categoryLabels = data.category_labels || {};
+        var categoryOrder = data.category_order || ['digital', 'security'];
+        var keywordCategory = data.keyword_category || {};
+        var asOf = data.as_of || '';
+        var periodDays = data.period_days != null ? data.period_days : 30;
+        var keysToShow = selectedKeyword === 'all'
+            ? (categoryOrder.reduce(function (acc, catKey) {
+                ['ai', 'dx', 'cyber'].forEach(function (k) { if ((keywordCategory[k] || '') === catKey) acc.push(k); });
+                return acc;
+            }, []).length ? categoryOrder.reduce(function (acc, catKey) {
+                ['ai', 'dx', 'cyber'].forEach(function (k) { if ((keywordCategory[k] || '') === catKey) acc.push(k); });
+                return acc;
+            }, []) : ['ai', 'dx', 'cyber'])
+            : [selectedKeyword];
+        if (keysToShow.length === 0) keysToShow = ['ai', 'dx', 'cyber'];
+
+        var parts = [];
+        var summaryParts = signals.map(function (s) {
+            var label = s.label || KKJ_RANKING_LABELS[s.key] || s.key || '';
+            var count = s.count != null ? s.count : '—';
+            return escapeHtml(label) + ' <strong>' + count + '</strong>件';
+        });
+        var summaryLine = summaryParts.length ? summaryParts.join(' / ') : '';
+        var summaryMeta = [];
+        if (asOf) summaryMeta.push('更新: ' + escapeHtml(asOf));
+        if (periodDays != null) summaryMeta.push('直近' + periodDays + '日');
+        if (summaryLine || summaryMeta.length) {
+            parts.push('<div class="mb-3">');
+            if (summaryLine) parts.push('<div class="header-admin-latest-title">' + summaryLine + '</div>');
+            if (summaryMeta.length) parts.push('<div class="header-admin-latest-value text-muted">' + summaryMeta.join(' / ') + '</div>');
+            parts.push('</div>');
+        }
+        // はてなブックマーク同様: キーワードをドロップダウンで選択
+        parts.push('<div class="mb-3">');
+        parts.push('<label for="kkjKeywordSelect" class="form-label">キーワードを選択:</label>');
+        parts.push('<select class="form-select form-select-sm" id="kkjKeywordSelect" style="max-width: 12rem;" aria-label="政府調達キーワード選択">');
+        parts.push('<option value="all"' + (selectedKeyword === 'all' ? ' selected' : '') + '>すべて</option>');
+        parts.push('<option value="ai"' + (selectedKeyword === 'ai' ? ' selected' : '') + '>AI案件</option>');
+        parts.push('<option value="dx"' + (selectedKeyword === 'dx' ? ' selected' : '') + '>DX案件</option>');
+        parts.push('<option value="cyber"' + (selectedKeyword === 'cyber' ? ' selected' : '') + '>サイバー案件</option>');
+        parts.push('</select>');
+        parts.push('</div>');
+
+        // 2列レイアウト: NHK・World Newsと同じカード形式で統一
+        parts.push('<div class="row g-3 mt-1 mb-3">');
+
+        // 左列: キーワード別 注目の案件 Top5（NHK形式）
+        var keywordTopCases = data.keyword_top_cases || {};
+        var hasTopCases = (keywordTopCases.ai && keywordTopCases.ai.length > 0) ||
+            (keywordTopCases.dx && keywordTopCases.dx.length > 0) ||
+            (keywordTopCases.cyber && keywordTopCases.cyber.length > 0);
+        parts.push('<article class="col-12 col-md-6" id="source-kkj-cases">');
+        parts.push('<div class="card h-100">');
+        parts.push('<div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">');
+        parts.push('<h2 class="h5 mb-0"><i class="fas fa-file-contract" aria-hidden="true"></i> 注目の案件 Top5（案件名・リンク）</h2>');
+        parts.push('</div>');
+        parts.push('<div class="card-body">');
+        parts.push('<div class="card trend-table category-card">');
+        parts.push('<div class="card-body">');
+        parts.push('<div class="trend-table-container">');
+        parts.push('<div class="table-responsive">');
+        if (hasTopCases) {
+            var caseRows = [];
+            keysToShow.forEach(function (key) {
+                var cases = keywordTopCases[key] || [];
+                cases.forEach(function (c) {
+                    var title = (c.title || '').substring(0, 80) + (c.title && c.title.length > 80 ? '…' : '');
+                    var linkCell = c.url
+                        ? '<a href="' + escapeHtml(c.url) + '" target="_blank" rel="noopener noreferrer" class="text-decoration-none">' + escapeHtml(title) + '</a>'
+                        : escapeHtml(title);
+                    if (selectedKeyword === 'all') {
+                        caseRows.push('<tr><td>' + escapeHtml(KKJ_RANKING_LABELS[key] || key) + '</td><td class="text-end">' + c.rank + '</td><td class="small">' + linkCell + '</td><td class="small text-muted">' + escapeHtml(c.organization || '') + '</td><td class="small">' + escapeHtml(c.cft_issue_date || '') + '</td><td class="small">' + escapeHtml(c.prefecture || '') + '</td></tr>');
+                    } else {
+                        caseRows.push('<tr><td class="text-end">' + c.rank + '</td><td class="small">' + linkCell + '</td><td class="small text-muted">' + escapeHtml(c.organization || '') + '</td><td class="small">' + escapeHtml(c.cft_issue_date || '') + '</td><td class="small">' + escapeHtml(c.prefecture || '') + '</td></tr>');
+                    }
+                });
+            });
+            var caseTableHeader = selectedKeyword === 'all'
+                ? '<tr><th>キーワード</th><th class="text-end">順位</th><th>案件名</th><th>機関</th><th>公告日</th><th>都道府県</th></tr>'
+                : '<tr><th class="text-end">順位</th><th>案件名</th><th>機関</th><th>公告日</th><th>都道府県</th></tr>';
+            parts.push('<table class="table table-hover trend-table mb-0" id="kkjCasesTrendsTable"><thead class="table-dark">' + caseTableHeader + '</thead><tbody>' + caseRows.join('') + '</tbody></table>');
+        } else {
+            parts.push('<table class="table table-hover trend-table mb-0"><tbody><tr><td class="text-muted">—</td></tr></tbody></table>');
+        }
+        parts.push('</div></div></div></div>');
+        if (hasTopCases) {
+            parts.push('<p class="text-muted small mt-2 mb-0">※ リンクは公告時のURLのため、切れている場合があります。詳細は<a href="https://www.kkj.go.jp/" target="_blank" rel="noopener">官公需情報ポータル</a>で検索してください。</p>');
+        } else {
+            parts.push('<p class="text-muted small mt-2 mb-0"><strong>「再取得」</strong>ボタンを押すと、AI・DX・サイバー各キーワードの注目案件が表示されます。</p>');
+        }
+        parts.push('</div></div></article>');
+
+        // 右列: キーワード別月次件数（World News形式）
+        var signalsMonthly = data.signals_monthly || {};
+        var periodMonths = data.period_months != null ? data.period_months : 12;
+        parts.push('<article class="col-12 col-md-6" id="source-kkj-monthly">');
+        parts.push('<div class="card h-100">');
+        parts.push('<div class="card-header bg-info text-white d-flex justify-content-between align-items-center">');
+        parts.push('<h2 class="h5 mb-0"><i class="fas fa-chart-bar" aria-hidden="true"></i> 月次件数（直近' + periodMonths + 'ヶ月）</h2>');
+        parts.push('</div>');
+        parts.push('<div class="card-body">');
+        parts.push('<div class="card trend-table category-card">');
+        parts.push('<div class="card-body">');
+        parts.push('<div class="trend-table-container">');
+        parts.push('<div class="table-responsive">');
+        if (signalsMonthly.ai && signalsMonthly.ai.length > 0) {
+            var months = signalsMonthly.ai;
+            var headers = '<tr><th>期間</th><th>AI関連</th><th>DX関連</th><th>サイバー</th></tr>';
+            var rows = months.map(function (m) {
+                var p = m.period || '';
+                var y = p.length >= 4 ? p.substring(0, 4) : '';
+                var mo = p.length >= 6 ? p.substring(4, 6) : '';
+                var periodLabel = y && mo ? y + '年' + parseInt(mo, 10) + '月' : p;
+                var aiVal = (signalsMonthly.ai && signalsMonthly.ai.find(function (x) { return x.period === p; })) ? (signalsMonthly.ai.find(function (x) { return x.period === p; }).value) : '—';
+                var dxVal = (signalsMonthly.dx && signalsMonthly.dx.find(function (x) { return x.period === p; })) ? (signalsMonthly.dx.find(function (x) { return x.period === p; }).value) : '—';
+                var cyVal = (signalsMonthly.cyber && signalsMonthly.cyber.find(function (x) { return x.period === p; })) ? (signalsMonthly.cyber.find(function (x) { return x.period === p; }).value) : '—';
+                return '<tr><td>' + escapeHtml(periodLabel) + '</td><td>' + aiVal + '</td><td>' + dxVal + '</td><td>' + cyVal + '</td></tr>';
+            }).join('');
+            parts.push('<table class="table table-hover trend-table mb-0" id="kkjMonthlyTrendsTable"><thead class="table-dark">' + headers + '</thead><tbody>' + rows + '</tbody></table>');
+        } else {
+            parts.push('<table class="table table-hover trend-table mb-0"><tbody><tr><td class="text-muted">月次データはありません。</td></tr></tbody></table>');
+        }
+        parts.push('</div></div></div></div>');
         if (asOf) parts.push('<p class="small text-muted mt-2 mb-0">更新: ' + escapeHtml(asOf) + '</p>');
+        parts.push('</div></div></article>');
+
+        parts.push('</div>');
         return parts.join('');
     }
 
@@ -225,8 +417,10 @@
                     ? estat.data : null;
                 if (estatCompact) {
                     estatCompact.innerHTML = estatData
-                        ? renderEstatCompactHtml(estatData.length > 3 ? estatData.slice(0, 3) : estatData)
-                        : '<p class="text-danger small mb-0">' + escapeHtml(estat.error || '取得できませんでした') + '</p>';
+                        ? renderEstatCompactLatest(estatData)
+                        : '<span class="text-muted">' + escapeHtml(estat.error || '取得できませんでした') + '</span>';
+                    var periodEl = document.getElementById('header-estat-latest-period');
+                    if (periodEl && !estatData) periodEl.textContent = '';
                 }
                 if (loading) loading.style.display = 'none';
                 if (fullBody) {
@@ -250,12 +444,20 @@
                         : '<span class="text-muted">' + escapeHtml(kkj.error || '取得できませんでした') + '</span>';
                 }
                 if (kkjAdminBody) {
-                    var cardBody = kkjAdminBody.querySelector('.card-body');
-                    if (cardBody) {
-                        cardBody.innerHTML = kkjData
-                            ? renderKkjAdminTabBody(kkjData) || '<p class="text-muted small mb-0">データがありません</p>'
-                            : '<p class="text-muted small mb-0">' + escapeHtml(kkj.error || '取得できませんでした') + '</p>';
+                    window.__lastKkjData = kkjData;
+                    kkjAdminBody.innerHTML = kkjData
+                        ? renderKkjAdminTabBody(kkjData, 'all') || '<p class="text-muted small mb-0">データがありません</p>'
+                        : '<p class="text-muted small mb-0">' + escapeHtml(kkj.error || '取得できませんでした') + '</p>';
+                    function bindKkjKeywordSelect() {
+                        var sel = document.getElementById('kkjKeywordSelect');
+                        if (sel && window.__lastKkjData) {
+                            sel.onchange = function () {
+                                kkjAdminBody.innerHTML = renderKkjAdminTabBody(window.__lastKkjData, this.value);
+                                bindKkjKeywordSelect();
+                            };
+                        }
                     }
+                    bindKkjKeywordSelect();
                 }
 
                 bindGotoTab();
@@ -267,7 +469,11 @@
                     fullBody.style.display = 'block';
                     fullBody.innerHTML = '<div class="col-12"><div class="alert alert-danger mb-0">' + escapeHtml(msg) + '</div></div>';
                 }
-                if (estatCompact) estatCompact.innerHTML = '<p class="text-danger small mb-0">' + escapeHtml(msg) + '</p>';
+                if (estatCompact) {
+                    estatCompact.innerHTML = '<span class="text-muted">' + escapeHtml(msg) + '</span>';
+                    var periodEl = document.getElementById('header-estat-latest-period');
+                    if (periodEl) periodEl.textContent = '';
+                }
                 if (kkjCompact) kkjCompact.innerHTML = '<span class="text-muted">' + escapeHtml(msg) + '</span>';
                 bindGotoTab();
             });

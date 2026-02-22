@@ -387,6 +387,7 @@ body {
     display: none !important;
 }
 
+
 #rakutenResults .trend-table-container {
     max-height: 500px;
     overflow-y: auto;
@@ -3650,6 +3651,49 @@ body.data-status-active #data-status .card-body {
     margin-bottom: 0.5rem;
 }
 
+/* ========== ヘッダー説明文（モバイルは2行でクランプ） ========== */
+.header-description-wrapper {
+    position: relative;
+}
+.header-desc-toggle {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+.header-desc-more {
+    display: none;
+    font-size: 0.75rem;
+    color: #0d6efd;
+    cursor: pointer;
+    user-select: none;
+}
+.header-desc-less-text {
+    display: none;
+}
+@media (max-width: 576px) {
+    .header-description {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        overflow: hidden;
+    }
+    .header-desc-more {
+        display: inline-block;
+        margin-top: 0.25rem;
+    }
+    .header-desc-toggle:checked ~ .header-description {
+        -webkit-line-clamp: unset;
+        max-height: none;
+        overflow: visible;
+    }
+    .header-desc-toggle:checked ~ .header-desc-more .header-desc-more-text {
+        display: none;
+    }
+    .header-desc-toggle:checked ~ .header-desc-more .header-desc-less-text {
+        display: inline;
+    }
+}
+
 /* 景気・行政データと官公需シグナルの間の縦の区切り線（並んでいる時のみ） */
 @media (min-width: 768px) {
     .header-admin-col-right {
@@ -3701,6 +3745,56 @@ ul.trend-category-tabs li.nav-item button.nav-link.active {
 }
 #trendCategoryTabContent .tab-pane {
     padding-top: 0.5rem;
+}
+
+/* 全部入りタブ: 先頭3件は常時表示、続きをトグルで開閉 */
+#pane-all .all-card-collapse {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+}
+#pane-all .all-accordion-chevron {
+    display: none !important;
+}
+#pane-all .all-accordion-trigger {
+    cursor: default;
+    pointer-events: none;
+}
+@media (min-width: 768px) {
+#pane-all .all-more-tbody {
+        display: table-row-group !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+    #pane-all .all-more-toggle {
+        display: none !important;
+    }
+    .category-more-tbody {
+        display: table-row-group !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+    .category-more-toggle {
+        display: none !important;
+    }
+}
+
+/* モバイル: テーブルの横スクロールは維持（必要なため無効化しない） */
+
+/* 続き行: 非表示/表示の切り替え */
+.more-row {
+    display: none;
+}
+.more-rows-open .more-row {
+    display: table-row;
+}
+
+/* 分割箇所の線だけ消す */
+.more-row-end td {
+    border-bottom: none !important;
+}
+.more-row-start td {
+    border-top: none !important;
 }
 
 /* モバイル: タブを横スクロール・タップしやすく */
@@ -3779,3 +3873,4 @@ body#trends-us #trends #pane-entertainment .trend-table-container {
     max-height: 400px !important;
     overflow-y: auto !important;
 }
+

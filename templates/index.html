@@ -115,8 +115,8 @@
     <link href="{{ url_for('static', filename='css/data-status.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/subscription.css') }}" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/app-common.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app-common.js') }}?v=20260221-accordion"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=20260221-accordion"></script>
     <script src="{{ url_for('static', filename='js/rakuten-trends.js') }}"></script>
     <script src="{{ url_for('static', filename='js/hatena-trends.js') }}"></script>
     <script src="{{ url_for('static', filename='js/note-trends.js') }}"></script>
@@ -198,25 +198,32 @@
                 <h1 class="h3 fw-bold mb-1">日本の最新トレンド情報</h1>
                 <div class="row align-items-start g-2 header-row">
                     <div class="col-12 col-lg-6">
-                        <p class="text-muted small mb-0">Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Twitch、Podcast、Zenn、Note、Qiitaなどの人気トレンドを一括表示。株価や仮想通貨のトレンドも確認できます。データは毎日1時、7時、13時、19時（JST）に更新処理を開始します（更新完了まで10〜20分かかる場合があります）。主な機能：複数ソースの一括表示・カテゴリ別タブ・日米切り替え。対応：Google Trends、YouTube、Spotify、はてな、楽天、Twitch、Podcast、Zenn、Note、Qiita、NHK、Wikipedia、株価・仮想通貨。</p>
+                        <div class="header-description-wrapper">
+                            <input type="checkbox" id="header-desc-toggle-jp" class="header-desc-toggle" aria-label="説明文の展開">
+                            <p class="text-muted small mb-0 header-description">Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Twitch、Podcast、Zenn、Note、Qiitaなどの人気トレンドを一括表示。株価や仮想通貨のトレンドも確認できます。データは毎日1時、7時、13時、19時（JST）に更新処理を開始します（更新完了まで10〜20分かかる場合があります）。主な機能：複数ソースの一括表示・カテゴリ別タブ・日米切り替え。対応：Google Trends、YouTube、Spotify、はてな、楽天、Twitch、Podcast、Zenn、Note、Qiita、NHK、Wikipedia、株価・仮想通貨。</p>
+                            <label for="header-desc-toggle-jp" class="header-desc-more">
+                                <span class="header-desc-more-text">もっと見る</span>
+                                <span class="header-desc-less-text">閉じる</span>
+                            </label>
+                        </div>
                     </div>
                     <div class="col-12 col-lg-6">
                         <div id="header-admin-unified" class="rounded border bg-light p-2 position-relative">
                             <span class="position-absolute top-0 end-0 mt-1 me-1" style="font-size: 0.7rem;">
-                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" id="admin-refresh-btn-header" aria-label="データを再取得">再取得</button>
                                 <a href="#" class="btn btn-sm btn-outline-primary py-0 px-1 estat-goto-tab ms-1" data-target-tab="tab-admin" aria-label="行政データタブへ">もっと見る</a>
                             </span>
                             <div class="row g-2 mb-0 header-admin-cols">
                                 <div class="col-12 col-md-6 header-admin-col-left">
-                                    <div class="header-admin-section-title"><i class="fas fa-chart-line me-1"></i>景気・行政データ</div>
-                                    <div id="header-estat-compact-body">
-                                        <ul class="list-unstyled mb-0">
-                                            <li class="d-flex justify-content-between py-1 border-bottom border-light"><span class="text-secondary">取得中…</span><span></span></li>
-                                        </ul>
+                                    <div class="header-admin-section-title">
+                                        <i class="fas fa-chart-line me-1"></i>景気・行政データ
+                                        <span id="header-estat-latest-period" class="text-muted ms-1"></span>
+                                    </div>
+                                    <div id="header-estat-compact-body" class="header-admin-latest" aria-live="polite">
+                                        <span class="text-muted">取得中…</span>
                                     </div>
                                 </div>
                                 <div class="col-12 col-md-6 header-admin-col-right">
-                                    <div class="header-admin-section-title">🇯🇵 官公需シグナル（直近30日）</div>
+                                    <div class="header-admin-section-title">🇯🇵 政府調達シグナル（直近30日）</div>
                                     <div id="header-kkj-compact-body" class="header-kkj-body">
                                         <span class="text-muted">取得中…</span>
                                     </div>
@@ -262,78 +269,108 @@
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="nhk">
                             <div class="card h-100">
                                 <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-2">
-                                    <h3 class="h6 mb-0"><i class="fas fa-newspaper"></i> NHK ニュース</h3>
+                                    <div class="all-accordion-trigger d-flex align-items-center flex-grow-1 min-width-0" data-bs-toggle="collapse" data-bs-target="#all-collapse-nhk" aria-expanded="false" aria-controls="all-collapse-nhk">
+                                        <h3 class="h6 mb-0"><i class="fas fa-newspaper"></i> NHK ニュース</h3>
+                                        <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                    </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-news" data-target-anchor="source-nhk" aria-label="ニュースタブへ">もっと見る</a>
                                 </div>
+                                <div id="all-collapse-nhk" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>公開日</th></tr></thead><tbody id="all-nhkTrendsTableBody"></tbody></table>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="news">
                             <div class="card h-100">
                                 <div class="card-header bg-info text-white d-flex justify-content-between align-items-center py-2">
-                                    <h3 class="h6 mb-0"><i class="fas fa-globe"></i> World News</h3>
+                                    <div class="all-accordion-trigger d-flex align-items-center flex-grow-1 min-width-0" data-bs-toggle="collapse" data-bs-target="#all-collapse-news" aria-expanded="false" aria-controls="all-collapse-news">
+                                        <h3 class="h6 mb-0"><i class="fas fa-globe"></i> World News</h3>
+                                        <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                    </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-news" data-target-anchor="source-news" aria-label="ニュースタブへ">もっと見る</a>
                                 </div>
+                                <div id="all-collapse-news" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>ソース</th></tr></thead><tbody id="all-newsTrendsTableBody"></tbody></table>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="wikipedia">
                             <div class="card h-100">
                                 <div class="card-header text-white d-flex justify-content-between align-items-center py-2" style="background:#636466;">
-                                    <h3 class="h6 mb-0"><i class="fab fa-wikipedia-w"></i> Wikipedia 人気記事</h3>
+                                    <div class="all-accordion-trigger d-flex align-items-center flex-grow-1 min-width-0" data-bs-toggle="collapse" data-bs-target="#all-collapse-wikipedia" aria-expanded="false" aria-controls="all-collapse-wikipedia">
+                                        <h3 class="h6 mb-0"><i class="fab fa-wikipedia-w"></i> Wikipedia 人気記事</h3>
+                                        <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                    </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" data-target-anchor="source-wikipedia" aria-label="検索・動画タブへ">もっと見る</a>
                                 </div>
+                                <div id="all-collapse-wikipedia" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>閲覧数</th></tr></thead><tbody id="all-wikipediaTrendsTableBody"></tbody></table>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="google">
                             <div class="card h-100">
                                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
-                                    <h3 class="h6 mb-0"><i class="fab fa-google"></i> Google Trends</h3>
+                                    <div class="all-accordion-trigger d-flex align-items-center flex-grow-1 min-width-0" data-bs-toggle="collapse" data-bs-target="#all-collapse-google" aria-expanded="false" aria-controls="all-collapse-google">
+                                        <h3 class="h6 mb-0"><i class="fab fa-google"></i> Google Trends</h3>
+                                        <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                    </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" data-target-anchor="source-google" aria-label="検索・動画タブへ">もっと見る</a>
                                 </div>
+                                <div id="all-collapse-google" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>キーワード</th><th>人気度</th><th>検索</th></tr></thead><tbody id="all-googleTrendsTableBody"></tbody></table>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="youtube">
                             <div class="card h-100">
                                 <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center py-2">
-                                    <h3 class="h6 mb-0"><i class="fab fa-youtube"></i> YouTube</h3>
+                                    <div class="all-accordion-trigger d-flex align-items-center flex-grow-1 min-width-0" data-bs-toggle="collapse" data-bs-target="#all-collapse-youtube" aria-expanded="false" aria-controls="all-collapse-youtube">
+                                        <h3 class="h6 mb-0"><i class="fab fa-youtube"></i> YouTube</h3>
+                                        <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                    </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" data-target-anchor="source-youtube" aria-label="検索・動画タブへ">もっと見る</a>
                                 </div>
+                                <div id="all-collapse-youtube" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>チャンネル</th><th>視聴回数</th></tr></thead><tbody id="all-youtubeTrendsTableBody"></tbody></table>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="qiita">
                             <div class="card h-100">
                                 <div class="card-header bg-success text-white d-flex justify-content-between align-items-center py-2">
-                                    <h3 class="h6 mb-0"><i class="fab fa-qiita"></i> Qiita</h3>
+                                    <div class="all-accordion-trigger d-flex align-items-center flex-grow-1 min-width-0" data-bs-toggle="collapse" data-bs-target="#all-collapse-qiita" aria-expanded="false" aria-controls="all-collapse-qiita">
+                                        <h3 class="h6 mb-0"><i class="fab fa-qiita"></i> Qiita</h3>
+                                        <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                    </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-qiita" aria-label="テック・開発タブへ">もっと見る</a>
                                 </div>
+                                <div id="all-collapse-qiita" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>ユーザー</th><th>いいね</th></tr></thead><tbody id="all-qiitaTrendsTableBody"></tbody></table>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
@@ -341,7 +378,10 @@
                             <div class="card h-100">
                                 <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center py-2 flex-wrap gap-1">
                                     <div class="d-flex align-items-center gap-2 flex-grow-1 min-width-0">
-                                        <h3 class="h6 mb-0"><i class="fas fa-bookmark"></i> はてな</h3>
+                                        <div class="all-accordion-trigger d-flex align-items-center" data-bs-toggle="collapse" data-bs-target="#all-collapse-hatena" aria-expanded="false" aria-controls="all-collapse-hatena">
+                                            <h3 class="h6 mb-0"><i class="fas fa-bookmark"></i> はてな</h3>
+                                            <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                        </div>
                                         <select class="form-select form-select-sm all-category-select" id="all-hatenaCategorySelect" data-main-select="hatenaCategorySelect" data-service="hatena" style="max-width: 8rem;">
                                             <option value="all">総合</option>
                                             <option value="it">テクノロジー</option>
@@ -353,23 +393,30 @@
                                     </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-hatena" aria-label="テック・開発タブへ">もっと見る</a>
                                 </div>
+                                <div id="all-collapse-hatena" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>BM数</th></tr></thead><tbody id="all-hatenaTrendsTableBody"></tbody></table>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="zenn">
                             <div class="card h-100">
                                 <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#3EA8FF;color:#fff;">
-                                    <h3 class="h6 mb-0">Zenn</h3>
+                                    <div class="all-accordion-trigger d-flex align-items-center flex-grow-1 min-width-0" data-bs-toggle="collapse" data-bs-target="#all-collapse-zenn" aria-expanded="false" aria-controls="all-collapse-zenn">
+                                        <h3 class="h6 mb-0">Zenn</h3>
+                                        <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                    </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-zenn" aria-label="テック・開発タブへ">もっと見る</a>
                                 </div>
+                                <div id="all-collapse-zenn" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>いいね</th></tr></thead><tbody id="all-zennTrendsTableBody"></tbody></table>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
@@ -377,7 +424,10 @@
                             <div class="card h-100">
                                 <div class="card-header d-flex justify-content-between align-items-center py-2 flex-wrap gap-1" style="background:#41C9B4;color:#fff;">
                                     <div class="d-flex align-items-center gap-2 flex-grow-1 min-width-0">
-                                        <h3 class="h6 mb-0">Note</h3>
+                                        <div class="all-accordion-trigger d-flex align-items-center" data-bs-toggle="collapse" data-bs-target="#all-collapse-note" aria-expanded="false" aria-controls="all-collapse-note">
+                                            <h3 class="h6 mb-0">Note</h3>
+                                            <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                        </div>
                                         <select class="form-select form-select-sm all-category-select" id="all-noteCategorySelect" data-main-select="noteCategorySelect" data-service="note" style="max-width: 8rem;">
                                             <option value="all">総合</option>
                                             <option value="tech">テクノロジー</option>
@@ -388,88 +438,120 @@
                                     </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-note" aria-label="テック・開発タブへ">もっと見る</a>
                                 </div>
+                                <div id="all-collapse-note" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>いいね</th></tr></thead><tbody id="all-noteTrendsTableBody"></tbody></table>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="github">
                             <div class="card h-100">
                                 <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-2">
-                                    <h3 class="h6 mb-0"><i class="fab fa-github"></i> GitHub</h3>
+                                    <div class="all-accordion-trigger d-flex align-items-center flex-grow-1 min-width-0" data-bs-toggle="collapse" data-bs-target="#all-collapse-github" aria-expanded="false" aria-controls="all-collapse-github">
+                                        <h3 class="h6 mb-0"><i class="fab fa-github"></i> GitHub</h3>
+                                        <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                    </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-github" aria-label="テック・開発タブへ">もっと見る</a>
                                 </div>
+                                <div id="all-collapse-github" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>リポジトリ</th><th>言語</th><th>スター数</th></tr></thead><tbody id="all-githubTrendsTableBody"></tbody></table>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="ipa">
                             <div class="card h-100">
                                 <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center py-2">
-                                    <h3 class="h6 mb-0"><i class="fas fa-shield-alt"></i> IPA注意喚起</h3>
+                                    <div class="all-accordion-trigger d-flex align-items-center flex-grow-1 min-width-0" data-bs-toggle="collapse" data-bs-target="#all-collapse-ipa" aria-expanded="false" aria-controls="all-collapse-ipa">
+                                        <h3 class="h6 mb-0"><i class="fas fa-shield-alt"></i> IPA注意喚起</h3>
+                                        <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                    </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-ipa" aria-label="テック・開発タブへ">もっと見る</a>
                                 </div>
+                                <div id="all-collapse-ipa" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>公開日</th></tr></thead><tbody id="all-ipaTrendsTableBody"></tbody></table>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="jpcert">
                             <div class="card h-100">
                                 <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center py-2">
-                                    <h3 class="h6 mb-0"><i class="fas fa-exclamation-triangle"></i> JPCERT/CC</h3>
+                                    <div class="all-accordion-trigger d-flex align-items-center flex-grow-1 min-width-0" data-bs-toggle="collapse" data-bs-target="#all-collapse-jpcert" aria-expanded="false" aria-controls="all-collapse-jpcert">
+                                        <h3 class="h6 mb-0"><i class="fas fa-exclamation-triangle"></i> JPCERT/CC</h3>
+                                        <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                    </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-jpcert" aria-label="テック・開発タブへ">もっと見る</a>
                                 </div>
+                                <div id="all-collapse-jpcert" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>公開日</th></tr></thead><tbody id="all-jpcertTrendsTableBody"></tbody></table>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="crypto">
                             <div class="card h-100">
                                 <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center py-2">
-                                    <h3 class="h6 mb-0"><i class="fab fa-bitcoin"></i> 仮想通貨</h3>
+                                    <div class="all-accordion-trigger d-flex align-items-center flex-grow-1 min-width-0" data-bs-toggle="collapse" data-bs-target="#all-collapse-crypto" aria-expanded="false" aria-controls="all-collapse-crypto">
+                                        <h3 class="h6 mb-0"><i class="fab fa-bitcoin"></i> 仮想通貨</h3>
+                                        <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                    </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-market" data-target-anchor="source-crypto" aria-label="マーケットタブへ">もっと見る</a>
                                 </div>
+                                <div id="all-collapse-crypto" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>通貨</th><th>価格</th><th>24h</th></tr></thead><tbody id="all-cryptoTrendsTableBody"></tbody></table>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="stock">
                             <div class="card h-100">
                                 <div class="card-header bg-info text-white d-flex justify-content-between align-items-center py-2">
-                                    <h3 class="h6 mb-0"><i class="fas fa-chart-line"></i> 株価（日本）</h3>
+                                    <div class="all-accordion-trigger d-flex align-items-center flex-grow-1 min-width-0" data-bs-toggle="collapse" data-bs-target="#all-collapse-stock" aria-expanded="false" aria-controls="all-collapse-stock">
+                                        <h3 class="h6 mb-0"><i class="fas fa-chart-line"></i> 株価（日本）</h3>
+                                        <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                    </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-market" data-target-anchor="source-stock" aria-label="マーケットタブへ">もっと見る</a>
                                 </div>
+                                <div id="all-collapse-stock" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>銘柄</th><th>現在値</th><th>変動率</th></tr></thead><tbody id="all-stockTrendsTableBody"></tbody></table>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="prtimes_hatena">
                             <div class="card h-100">
                                 <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center py-2">
-                                    <h3 class="h6 mb-0"><i class="fas fa-bullhorn"></i> PR TIMES × はてブ</h3>
+                                    <div class="all-accordion-trigger d-flex align-items-center flex-grow-1 min-width-0" data-bs-toggle="collapse" data-bs-target="#all-collapse-prtimes_hatena" aria-expanded="false" aria-controls="all-collapse-prtimes_hatena">
+                                        <h3 class="h6 mb-0"><i class="fas fa-bullhorn"></i> PR TIMES × はてブ</h3>
+                                        <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                    </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-news" data-target-anchor="source-prtimes-hatena" aria-label="ニュースタブへ">もっと見る</a>
                                 </div>
+                                <div id="all-collapse-prtimes_hatena" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>ブクマ数</th><th>公開日</th></tr></thead><tbody id="all-prtimesHatenaTrendsTableBody"></tbody></table>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
@@ -492,52 +574,72 @@
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="appstore">
                             <div class="card h-100">
                                 <div class="card-header bg-success text-white d-flex justify-content-between align-items-center py-2">
-                                    <h3 class="h6 mb-0"><i class="fab fa-apple"></i> App Store</h3>
+                                    <div class="all-accordion-trigger d-flex align-items-center flex-grow-1 min-width-0" data-bs-toggle="collapse" data-bs-target="#all-collapse-appstore" aria-expanded="false" aria-controls="all-collapse-appstore">
+                                        <h3 class="h6 mb-0"><i class="fab fa-apple"></i> App Store</h3>
+                                        <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                    </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-appstore" aria-label="テック・開発タブへ">もっと見る</a>
                                 </div>
+                                <div id="all-collapse-appstore" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>アプリ名</th><th>開発者</th><th>評価</th></tr></thead><tbody id="all-appstoreTrendsTableBody"></tbody></table>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="music">
                             <div class="card h-100">
                                 <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#1DB954;color:#fff;">
-                                    <h3 class="h6 mb-0"><i class="fab fa-spotify"></i> Spotify</h3>
+                                    <div class="all-accordion-trigger d-flex align-items-center flex-grow-1 min-width-0" data-bs-toggle="collapse" data-bs-target="#all-collapse-music" aria-expanded="false" aria-controls="all-collapse-music">
+                                        <h3 class="h6 mb-0"><i class="fab fa-spotify"></i> Spotify</h3>
+                                        <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                    </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-music" aria-label="エンタメタブへ">もっと見る</a>
                                 </div>
+                                <div id="all-collapse-music" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>曲名</th><th>アーティスト</th><th>再生回数</th></tr></thead><tbody id="all-musicTrendsTableBody"></tbody></table>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="podcast">
                             <div class="card h-100">
                                 <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#E14B32;color:#fff;">
-                                    <h3 class="h6 mb-0"><i class="fas fa-podcast"></i> Podcast</h3>
+                                    <div class="all-accordion-trigger d-flex align-items-center flex-grow-1 min-width-0" data-bs-toggle="collapse" data-bs-target="#all-collapse-podcast" aria-expanded="false" aria-controls="all-collapse-podcast">
+                                        <h3 class="h6 mb-0"><i class="fas fa-podcast"></i> Podcast</h3>
+                                        <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                    </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-podcast" aria-label="エンタメタブへ">もっと見る</a>
                                 </div>
+                                <div id="all-collapse-podcast" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>配信者</th><th>スコア</th></tr></thead><tbody id="all-podcastTrendsTableBody"></tbody></table>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
                         <div class="col-12 col-md-6 col-lg-4" data-all-card="movie">
                             <div class="card h-100">
                                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
-                                    <h3 class="h6 mb-0"><i class="fas fa-film"></i> 映画</h3>
+                                    <div class="all-accordion-trigger d-flex align-items-center flex-grow-1 min-width-0" data-bs-toggle="collapse" data-bs-target="#all-collapse-movie" aria-expanded="false" aria-controls="all-collapse-movie">
+                                        <h3 class="h6 mb-0"><i class="fas fa-film"></i> 映画</h3>
+                                        <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                    </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-movie" aria-label="エンタメタブへ">もっと見る</a>
                                 </div>
+                                <div id="all-collapse-movie" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>評価</th><th>公開日</th></tr></thead><tbody id="all-movieTrendsTableBody"></tbody></table>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
@@ -545,7 +647,10 @@
                             <div class="card h-100">
                                 <div class="card-header d-flex justify-content-between align-items-center py-2 flex-wrap gap-1" style="background:#2E7D32;color:#fff;">
                                     <div class="d-flex align-items-center gap-2 flex-grow-1 min-width-0">
-                                        <h3 class="h6 mb-0"><i class="fas fa-book"></i> 本</h3>
+                                        <div class="all-accordion-trigger d-flex align-items-center" data-bs-toggle="collapse" data-bs-target="#all-collapse-book" aria-expanded="false" aria-controls="all-collapse-book">
+                                            <h3 class="h6 mb-0"><i class="fas fa-book"></i> 本</h3>
+                                            <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                        </div>
                                         <select class="form-select form-select-sm all-category-select" id="all-bookCategorySelect" data-main-select="bookCategorySelect" data-service="book" style="max-width: 8rem;">
                                             <option value="all">総合</option>
                                             <option value="fiction">文芸</option>
@@ -556,10 +661,12 @@
                                     </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-book" aria-label="エンタメタブへ">もっと見る</a>
                                 </div>
+                                <div id="all-collapse-book" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>著者</th><th>価格</th></tr></thead><tbody id="all-bookTrendsTableBody"></tbody></table>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
@@ -567,7 +674,10 @@
                             <div class="card h-100">
                                 <div class="card-header d-flex justify-content-between align-items-center py-2 flex-wrap gap-1" style="background:#BF0000;color:#fff;">
                                     <div class="d-flex align-items-center gap-2 flex-grow-1 min-width-0">
-                                        <h3 class="h6 mb-0">楽天トレンド</h3>
+                                        <div class="all-accordion-trigger d-flex align-items-center" data-bs-toggle="collapse" data-bs-target="#all-collapse-rakuten" aria-expanded="false" aria-controls="all-collapse-rakuten">
+                                            <h3 class="h6 mb-0">楽天トレンド</h3>
+                                            <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                        </div>
                                         <select class="form-select form-select-sm all-category-select" id="all-rakutenGenreSelect" data-main-select="rakutenGenreSelect" data-service="rakuten" style="max-width: 8rem;">
                                             <option value="all">総合</option>
                                             <option value="565162">テクノロジー</option>
@@ -579,10 +689,12 @@
                                     </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-rakuten" aria-label="エンタメタブへ">もっと見る</a>
                                 </div>
+                                <div id="all-collapse-rakuten" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>商品名</th><th>価格</th><th>レビュー</th><th>レビュー数</th><th>ショップ</th></tr></thead><tbody id="all-rakutenTrendsTableBody"></tbody></table>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
@@ -590,7 +702,10 @@
                             <div class="card h-100">
                                 <div class="card-header d-flex justify-content-between align-items-center py-2 flex-wrap gap-1" style="background:#9146FF;color:#fff;">
                                     <div class="d-flex align-items-center gap-2 flex-grow-1 min-width-0">
-                                        <h3 class="h6 mb-0"><i class="fab fa-twitch"></i> Twitch</h3>
+                                        <div class="all-accordion-trigger d-flex align-items-center" data-bs-toggle="collapse" data-bs-target="#all-collapse-twitch" aria-expanded="false" aria-controls="all-collapse-twitch">
+                                            <h3 class="h6 mb-0"><i class="fab fa-twitch"></i> Twitch</h3>
+                                            <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                        </div>
                                         <select class="form-select form-select-sm all-category-select" id="all-twitchTypeSelect" data-main-select="twitchTypeSelect" data-service="twitch" style="max-width: 8rem;">
                                             <option value="games">ゲーム</option>
                                             <option value="streams">ストリーム</option>
@@ -599,10 +714,12 @@
                                     </div>
                                     <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-twitch" aria-label="エンタメタブへ">もっと見る</a>
                                 </div>
+                                <div id="all-collapse-twitch" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>ゲーム</th><th>視聴者</th></tr></thead><tbody id="all-twitchTrendsTableBody"></tbody></table>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
@@ -2210,20 +2327,22 @@
                     </div>
                 </div><!-- /.tab-pane#pane-entertainment -->
 
-                <!-- 行政データタブ: e-Stat ＋ Public Sector Signals（官公需） -->
+                <!-- 行政データタブ: e-Stat ＋ Public Sector Signals（政府調達） ※ニュース・テックタブと同様のカードレイアウト -->
                 <div class="tab-pane fade" id="pane-admin" role="tabpanel" aria-labelledby="tab-admin">
-                    <p class="text-muted small mb-3">景気・行政の主な指標（消費者物価指数・有効求人倍率・住宅着工）と、官公需情報ポータルの直近30日サマリ（AI/DX/サイバー件数・県別DX案件Top5）を表示しています。e-Statは2026年以降のデータ。出典：<a href="https://www.e-stat.go.jp/" target="_blank" rel="noopener">e-Stat</a>・<a href="https://www.kkj.go.jp/" target="_blank" rel="noopener">官公需情報ポータル</a>。 <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" id="admin-refresh-btn" aria-label="データを再取得">再取得</button></p>
-                    <div id="estat-full-loading" class="text-center py-4">
+                    <p class="text-muted small mb-3">景気・行政の主な指標（消費者物価指数・有効求人倍率・住宅着工・完全失業率・実質賃金指数・小売業販売額）と、政府調達（官公需情報ポータル）の直近30日サマリを表示しています。出典：<a href="https://www.e-stat.go.jp/" target="_blank" rel="noopener">e-Stat</a>・<a href="https://www.kkj.go.jp/" target="_blank" rel="noopener">官公需情報ポータル</a>。</p>
+                    <div id="estat-full-loading" class="text-center py-5">
                         <div class="spinner-border text-primary" role="status"><span class="visually-hidden">読み込み中</span></div>
-                        <p class="mt-2 mb-0 small text-muted">行政データを取得中...</p>
+                        <p class="mt-3 mb-0 small text-muted">行政データを取得中...</p>
                     </div>
-                    <div id="estat-full-body" class="row g-3" style="display: none;">
-                        <!-- 各指標のカードはJSで挿入 -->
+                    <div id="estat-full-body" class="row g-3 mb-3" style="display: none;">
+                        <!-- 各指標のカードはJSで挿入（article.col でニュース・テックと同じカードスタイル） -->
                     </div>
                     <div class="mt-4">
-                        <h3 class="h6 fw-bold mb-2">🇯🇵 官公需シグナル（直近30日）</h3>
-                        <div id="admin-kkj-body" class="card">
-                            <div class="card-body">
+                        <div class="card">
+                            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                                <h3 class="h5 mb-0"><i class="fas fa-building" aria-hidden="true"></i> 🇯🇵 政府調達シグナル（直近30日）</h3>
+                            </div>
+                            <div id="admin-kkj-body" class="card-body">
                                 <p class="text-muted small mb-0">取得中…</p>
                             </div>
                         </div>
@@ -2265,16 +2384,40 @@
         /* 左右のセクション見出し・本文の行間を揃える */
         #header-admin-unified .header-admin-section-title { font-size: 0.7rem; line-height: 1.25; margin-bottom: 0.2rem; font-weight: 700; color: #6c757d !important; }
         .estat-compact-box { min-height: auto; }
-        #header-estat-compact-body { font-size: 0.7rem; line-height: 1.25; padding: 0.1rem 0; color: #212529 !important; visibility: visible !important; }
-        #header-estat-compact-body .text-secondary { color: #6c757d !important; }
+        #header-estat-compact-body,
+        #header-kkj-compact-body {
+            font-size: 0.7rem;
+            line-height: 1.25;
+            padding: 0.1rem 0;
+            color: #212529 !important;
+            min-height: 2.2rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 0.1rem;
+        }
+        #header-kkj-compact-body .text-muted,
         #header-estat-compact-body .text-muted { color: #6c757d !important; }
-        #header-estat-compact-body .list-unstyled { margin-bottom: 0 !important; }
-        #header-estat-compact-body li { padding-top: 0.15rem !important; padding-bottom: 0.15rem !important; }
-        /* Public Sector Signals：景気・行政と同一行間・フォントサイズ */
-        #header-kkj-compact-body.header-kkj-body,
-        #header-kkj-compact-body { font-size: 0.7rem; line-height: 1.25; padding: 0.1rem 0; color: #212529 !important; }
-        #header-kkj-compact-body .text-muted { color: #6c757d !important; }
-        #header-kkj-compact-body div { margin-top: 0; margin-bottom: 0.15rem; }
+        .header-admin-latest-title,
+        .header-admin-latest-value {
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .header-admin-latest-line {
+            display: block;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        /* 官公需シグナル: NHK・World Newsと同じカードレイアウト・高さを統一 */
+        #admin-kkj-body .row .card.h-100 { display: flex; flex-direction: column; }
+        #admin-kkj-body .row .card.h-100 .card-body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+        #admin-kkj-body .row .card.trend-table.category-card { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+        #admin-kkj-body .row .trend-table-container { flex: 1; min-height: 0; overflow: auto; }
+        @media (min-width: 992px) {
+            #admin-kkj-body .row .card.trend-table.category-card { max-height: 400px; overflow: hidden; }
+            #admin-kkj-body .row .trend-table-container { max-height: 300px; }
+        }
         #estat-full-loading .spinner-border { display: inline-block !important; visibility: visible !important; opacity: 1 !important; height: 1rem !important; width: 1rem !important; overflow: visible !important; position: static !important; left: auto !important; }
         /* すべてのローディング表示を確実に非表示 */
         .loading,
@@ -2319,6 +2462,7 @@
             display: block !important;
             visibility: visible !important;
         }
+
     </style>
     <script>
         // ページ読み込み完了のログのみ（データ読み込みはapp.jsのDOMContentLoadedで実行）

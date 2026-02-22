@@ -630,12 +630,10 @@ def main():
         
         # Flaskアプリを開始
         config = AppConfig.get_config_dict()
-        logger.info(f"🚀 アプリケーションをポート {config['PORT']} で起動します")
-        app.run(
-            debug=config['DEBUG'],
-            host=config['HOST'],
-            port=config['PORT']
-        )
+        port = config['PORT']
+
+        logger.info(f"🚀 アプリケーションをポート {port} で起動します")
+        app.run(debug=config['DEBUG'], host=config['HOST'], port=port)
         
     except KeyboardInterrupt:
         logger.info("\n🛑 アプリケーション終了中...")

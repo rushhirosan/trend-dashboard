@@ -85,6 +85,10 @@ def get_data_freshness():
             'hackernews_trends': 'Hacker News',
             'github_trends': 'GitHub',
             'appstore_trends': 'App Store',
+            'estat_trends': 'e-Stat',
+            'kkj_trends': '政府調達',
+            'bls_trends': 'BLS',
+            'usaspending_trends': 'USAspending',
             # 新しく追加されたセキュリティトレンド
             'ipa_trends': 'IPA',
             'jpcert_trends': 'JPCERT/CC',

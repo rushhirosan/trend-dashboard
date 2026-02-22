@@ -606,12 +606,31 @@ function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 5) {
     const mainTbody = document.getElementById(mainTableBodyId);
     const allTbody = document.getElementById(allTableBodyId);
     if (!mainTbody || !allTbody) return;
+    const table = allTbody.closest('table');
+    if (!table) return;
+    const cardBody = table.closest('.card-body');
     const dataRows = Array.from(mainTbody.querySelectorAll('tr:not(.skeleton-row)'));
     const toCopy = dataRows.slice(0, limit);
+    const topCount = 3;
+    const visibleRows = toCopy.slice(0, topCount);
+    const hiddenRows = toCopy.slice(topCount);
+    const moreTbodyId = `all-more-${allTableBodyId}`;
+
+    // 旧方式の残骸を削除
+    const existingMoreList = table.querySelectorAll(`tbody[data-all-more-for="${allTableBodyId}"]`);
+    existingMoreList.forEach(node => node.remove());
+    if (cardBody) {
+        const existingToggles = cardBody.querySelectorAll(`[data-all-more-toggle="${moreTbodyId}"]`);
+        existingToggles.forEach(node => node.remove());
+    }
+
+    const wasOpen = allTbody.dataset.moreOpen === 'true';
     allTbody.innerHTML = '';
-    toCopy.forEach(tr => {
+    allTbody.classList.remove('has-more', 'more-rows-open');
+
+    const cloneWithWrapper = (tr, extraClass) => {
         const cloned = tr.cloneNode(true);
-        // Safari対応: td内にラッパーを入れ、overflowをdivに適用（td直接ではSafariで効かないため）
+        if (extraClass) cloned.classList.add(extraClass);
         cloned.querySelectorAll('td').forEach(td => {
             const wrapper = document.createElement('div');
             wrapper.className = 'all-td-inner';
@@ -620,6 +639,176 @@ function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 5) {
             }
             td.appendChild(wrapper);
         });
-        allTbody.appendChild(cloned);
+        return cloned;
+    };
+
+    if (!isMobileViewport()) {
+        toCopy.forEach(tr => allTbody.appendChild(cloneWithWrapper(tr)));
+        return;
+    }
+
+    visibleRows.forEach((tr, index) => {
+        const isLastVisible = index === visibleRows.length - 1 && hiddenRows.length > 0;
+        const extraClass = isLastVisible ? 'more-row-end' : '';
+        allTbody.appendChild(cloneWithWrapper(tr, extraClass));
     });
+    hiddenRows.forEach((tr, index) => {
+        const extraClass = index === 0 ? 'more-row-start' : '';
+        const hiddenClone = cloneWithWrapper(tr, extraClass);
+        hiddenClone.classList.add('more-row');
+        hiddenClone.style.display = wasOpen ? 'table-row' : 'none';
+        allTbody.appendChild(hiddenClone);
+    });
+
+    if (hiddenRows.length > 0 && cardBody) {
+        allTbody.classList.add('has-more');
+        if (wasOpen) {
+            allTbody.classList.add('more-rows-open');
+        }
+        allTbody.dataset.moreOpen = wasOpen ? 'true' : 'false';
+        const isUsPage = document.body && document.body.id === 'trends-us';
+        const moreText = isUsPage ? 'Show more' : '続きを表示';
+        const lessText = isUsPage ? 'Show less' : '閉じる';
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'btn btn-sm btn-outline-secondary w-100 mt-2 all-more-toggle';
+        toggle.setAttribute('aria-expanded', wasOpen ? 'true' : 'false');
+        toggle.setAttribute('data-all-more-toggle', moreTbodyId);
+        toggle.textContent = wasOpen ? lessText : moreText;
+        toggle.addEventListener('click', function () {
+            const isOpen = allTbody.classList.toggle('more-rows-open');
+            allTbody.dataset.moreOpen = isOpen ? 'true' : 'false';
+            allTbody.querySelectorAll('.more-row').forEach(row => {
+                row.style.display = isOpen ? 'table-row' : 'none';
+            });
+            this.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            this.textContent = isOpen ? lessText : moreText;
+        });
+        cardBody.appendChild(toggle);
+    }
+}
+
+// ============================================
+// カテゴリタブ（メイン表）: モバイルで先頭N件＋続きを表示
+// ============================================
+
+function isMobileViewport() {
+    return window.matchMedia && window.matchMedia('(max-width: 767.98px)').matches;
+}
+
+function applyCategoryRowAccordion(tbodyId, limit = 5) {
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody || tbodyId.startsWith('all-') || tbodyId.startsWith('more-')) return;
+    const table = tbody.closest('table');
+    if (!table) return;
+
+    const cardBody = table.closest('.card-body') || table.parentElement;
+    const moreTbodyId = `more-${tbodyId}`;
+    const existingMoreList = table.querySelectorAll(`tbody[data-more-for="${tbodyId}"]`);
+    const existingToggleList = cardBody ? cardBody.querySelectorAll(`[data-more-toggle="${moreTbodyId}"]`) : [];
+    const wasOpen = (
+        table.dataset.moreOpen === 'true' ||
+        tbody.classList.contains('more-rows-open') ||
+        Array.from(existingToggleList).some(node => node.getAttribute('aria-expanded') === 'true')
+    );
+
+    const mainRows = Array.from(tbody.querySelectorAll('tr:not(.skeleton-row)'));
+    const moreRows = existingMoreList.length
+        ? Array.from(existingMoreList).flatMap(node => Array.from(node.querySelectorAll('tr:not(.skeleton-row)')))
+        : [];
+    const allRows = mainRows.concat(moreRows);
+    if (allRows.length === 0) return;
+
+    tbody.innerHTML = '';
+    existingMoreList.forEach(node => node.remove());
+    existingToggleList.forEach(node => node.remove());
+
+    if (!isMobileViewport() || allRows.length <= limit) {
+        tbody.classList.remove('has-more', 'more-rows-open');
+        allRows.forEach(tr => {
+            tr.classList.remove('more-row', 'more-row-start', 'more-row-end');
+            tbody.appendChild(tr);
+        });
+        return;
+    }
+
+    const visibleRows = allRows.slice(0, limit);
+    const hiddenRows = allRows.slice(limit);
+    tbody.classList.add('has-more');
+    if (wasOpen) {
+        tbody.classList.add('more-rows-open');
+        table.dataset.moreOpen = 'true';
+    } else {
+        tbody.classList.remove('more-rows-open');
+        table.dataset.moreOpen = 'false';
+    }
+
+    allRows.forEach(tr => tr.classList.remove('more-row', 'more-row-start', 'more-row-end'));
+    visibleRows.forEach((tr, index) => {
+        if (index === visibleRows.length - 1 && hiddenRows.length > 0) {
+            tr.classList.add('more-row-end');
+        }
+        tbody.appendChild(tr);
+    });
+    hiddenRows.forEach((tr, index) => {
+        tr.classList.add('more-row');
+        if (index === 0) tr.classList.add('more-row-start');
+        tr.style.display = wasOpen ? 'table-row' : 'none';
+        tbody.appendChild(tr);
+    });
+
+    if (cardBody) {
+        const isUsPage = document.body && document.body.id === 'trends-us';
+        const moreText = isUsPage ? 'Show more' : '続きを表示';
+        const lessText = isUsPage ? 'Show less' : '閉じる';
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'btn btn-sm btn-outline-secondary w-100 mt-2 category-more-toggle';
+        toggle.setAttribute('aria-expanded', wasOpen ? 'true' : 'false');
+        toggle.setAttribute('data-more-toggle', moreTbodyId);
+        toggle.textContent = wasOpen ? lessText : moreText;
+        toggle.addEventListener('click', function () {
+            const isOpen = tbody.classList.toggle('more-rows-open');
+            tbody.querySelectorAll('.more-row').forEach(row => {
+                row.style.display = isOpen ? 'table-row' : 'none';
+            });
+            this.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            this.textContent = isOpen ? lessText : moreText;
+            table.dataset.moreOpen = isOpen ? 'true' : 'false';
+        });
+        cardBody.appendChild(toggle);
+    }
+}
+
+function applyCategoryAccordionForAllTables(limit = 5) {
+    const selector = '#trendCategoryTabContent .tab-pane:not(#pane-all) tbody[id$="TrendsTableBody"]:not([id^="more-"])';
+    document.querySelectorAll(selector).forEach((tbody) => {
+        if (tbody.id && !tbody.id.startsWith('all-')) {
+            applyCategoryRowAccordion(tbody.id, limit);
+        }
+    });
+}
+
+function setupCategoryAccordionObserver(limit = 5) {
+    const container = document.getElementById('trendCategoryTabContent');
+    if (!container) return;
+    let timer = null;
+    const schedule = () => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => applyCategoryAccordionForAllTables(limit), 50);
+    };
+    const observer = new MutationObserver((mutations) => {
+        if (mutations.some(m => m.type === 'childList')) {
+            schedule();
+        }
+    });
+    observer.observe(container, { childList: true, subtree: true });
+    schedule();
+    window.addEventListener('resize', schedule);
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => setupCategoryAccordionObserver(5));
+} else {
+    setupCategoryAccordionObserver(5);
 }

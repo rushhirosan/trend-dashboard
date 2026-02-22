@@ -4,6 +4,7 @@
 APIキー不要。http://www.kkj.go.jp/api/
 """
 
+import calendar
 import re
 import requests
 import xml.etree.ElementTree as ET
@@ -20,19 +21,29 @@ KKJ_API_BASE = "http://www.kkj.go.jp/api/"
 
 # 直近何日分を対象にするか
 SIGNALS_DAYS = 30
+# キーワード別月次データの取得月数（直近）
+SIGNALS_MONTHS = 12
 
-# Public Sector Signals 用キーワード（APIのQueryパラメータ）
+# カテゴリ定義（表示用ラベル）。キーワードをカテゴリ化して表示する
+KKJ_CATEGORY_LABELS = {
+    "digital": "デジタル技術",
+    "security": "セキュリティ",
+}
+# 表示順
+KKJ_CATEGORY_ORDER = ["digital", "security"]
+
+# Public Sector Signals 用キーワード（key, 表示ラベル, APIのQuery, カテゴリkey）
 SIGNALS_QUERIES = [
-    ("ai", "AI関連", "AI OR 人工知能"),
-    ("dx", "DX関連", "DX OR デジタル"),
-    ("cyber", "サイバー", "サイバー"),
+    ("ai", "AI関連", "AI OR 人工知能", "digital"),
+    ("dx", "DX関連", "DX OR デジタル", "digital"),
+    ("cyber", "サイバー", "サイバー", "security"),
 ]
 
 # 都道府県ランキング用: 単一キーワードで取得（APIが "OR" 付きでは結果リストを返さない場合があるため）
 RANKING_QUERIES = [
-    ("ai", "AI関連", "人工知能"),
-    ("dx", "DX関連", "デジタル"),
-    ("cyber", "サイバー", "サイバー"),
+    ("ai", "AI関連", "人工知能", "digital"),
+    ("dx", "DX関連", "デジタル", "digital"),
+    ("cyber", "サイバー", "サイバー", "security"),
 ]
 RANKING_COUNT = 1000
 
@@ -58,9 +69,31 @@ def _text(elem: Optional[ET.Element]) -> str:
 
 
 def _parse_date_range(days: int) -> str:
-    """APIの期間形式 'YYYY-MM-DD' を返す（その日以降）。e-Govではハイフン区切りが標準。"""
+    """APIの期間形式 'YYYY-MM-DD/' を返す（その日以降）。APIガイド: 開始日/ で終了日なし＝以降。"""
     start = (datetime.now() - timedelta(days=days)).replace(hour=0, minute=0, second=0, microsecond=0)
-    return start.strftime("%Y-%m-%d")
+    return start.strftime("%Y-%m-%d") + "/"
+
+
+def _month_range(year: int, month: int) -> Tuple[str, str]:
+    """指定年月の月初日・月末日を API 形式 'YYYY-MM-DD' で返す。"""
+    first = f"{year:04d}-{month:02d}-01"
+    _, last_day = calendar.monthrange(year, month)
+    last = f"{year:04d}-{month:02d}-{last_day:02d}"
+    return first, last
+
+
+def _last_n_months(n: int) -> List[Tuple[int, int]]:
+    """直近 n ヶ月の (year, month) のリストを新しい順で返す。"""
+    now = datetime.now()
+    y, m = now.year, now.month
+    out: List[Tuple[int, int]] = []
+    for _ in range(n):
+        out.append((y, m))
+        m -= 1
+        if m <= 0:
+            m += 12
+            y -= 1
+    return out
 
 
 def _strip_namespace(element: ET.Element) -> None:
@@ -99,19 +132,32 @@ def _find_element(root: ET.Element, *tags: str) -> Optional[ET.Element]:
 
 
 def _find_all(root: ET.Element, *parent_tags: str) -> List[ET.Element]:
-    """SearchResult 要素のリストを返す。"""
+    """SearchResult 要素のリストを返す。APIはルートが SearchResults のことがある。"""
+    # ルート自身が SearchResults の場合はその子が SearchResult
+    root_tag = (root.tag or "").strip()
+    if root_tag and root_tag.lower().replace("_", "") == "searchresults":
+        for child_tag in ("SearchResult", "searchresult"):
+            items = root.findall(child_tag)
+            if items:
+                return items
+    # 子要素に SearchResults がある場合
     parent = _find_element(root, *parent_tags)
     if parent is not None:
         for child_tag in ("SearchResult", "searchresult"):
             items = parent.findall(child_tag)
             if items:
                 return items
-    # 親が見つからない場合は root 直下を探す
+    # root 直下の SearchResult
     for tag in ("SearchResult", "searchresult"):
         items = root.findall(tag)
         if items:
             return items
-    return []
+    # 子孫をたどって SearchResult をすべて収集（ネストや名前空間の違いに対応）
+    out: List[ET.Element] = []
+    for el in root.iter():
+        if el.tag and el.tag.lower().replace("_", "") == "searchresult":
+            out.append(el)
+    return out
 
 
 def _iter_all_elements(element: ET.Element):
@@ -177,6 +223,17 @@ def _lg_code_to_prefecture(code: str) -> str:
     return ""
 
 
+def _get_child_text(element: ET.Element, *tags: str) -> str:
+    """子要素のテキストを返す。複数タグ名を試す（大文字小文字の違いに対応）。"""
+    for tag in tags:
+        el = element.find(tag)
+        if el is not None:
+            text = (el.text or "").strip()
+            if text:
+                return text
+    return ""
+
+
 def _get_prefecture_from_result(sr: ET.Element) -> str:
     """SearchResult 要素から都道府県名を抽出。APIは Organization_Name, LG_Code 等を使用。"""
     # 1. PrefectureName, Organization_Name など都道府県名らしき文字列
@@ -196,11 +253,68 @@ def _get_prefecture_from_result(sr: ET.Element) -> str:
     return ""
 
 
+def _get_case_from_result(sr: ET.Element) -> Dict[str, Any]:
+    """SearchResult 要素から案件情報（件名・URL・機関・公告日・都道府県）を抽出。"""
+    pref = _get_prefecture_from_result(sr)
+    if pref and ("県" not in pref and "府" not in pref and "都" not in pref):
+        m = re.search(r"^(北海道|東京都|大阪府|京都府|.{2,4}県)", pref)
+        pref = m.group(1) if m else pref
+    # APIは ProjectName / Project_Name 等のバリエーションがあり得る
+    title = _get_child_text(sr, "ProjectName", "projectname", "Project_Name", "project_name", "Title", "title")
+    url = _get_child_text(sr, "ExternalDocumentURI", "externaldocumenturi", "URL", "url", "DocumentURI", "documenturi")
+    organization = _get_child_text(sr, "OrganizationName", "organizationname", "Organization_Name", "organization_name")
+    cft_raw = _get_child_text(sr, "CftIssueDate", "cftissuedate", "Cft_Issue_Date", "cft_issue_date")
+    cft_issue_date = ""
+    if cft_raw and "T" in cft_raw:
+        cft_issue_date = cft_raw.split("T")[0]  # YYYY-MM-DD 部分のみ
+    elif cft_raw:
+        cft_issue_date = cft_raw[:10] if len(cft_raw) >= 10 else cft_raw
+    return {
+        "prefecture": pref,
+        "title": title or "",
+        "url": url or "",
+        "organization": organization or "",
+        "cft_issue_date": cft_issue_date,
+    }
+
+
+def _fetch_hits_for_date_range(
+    query: str,
+    date_from: str,
+    date_to: str,
+    count: int = 1,
+    rate_limiter=None,
+) -> Tuple[Optional[int], bool]:
+    """
+    指定期間（開始日/終了日）で SearchHits のみ取得。月次件数用。
+    Returns: (search_hits or 0, connection_ok).
+    """
+    if rate_limiter:
+        rate_limiter.wait_if_needed()
+    # APIガイド: 開始日/終了日 で期間指定
+    period = f"{date_from}/{date_to}"
+    params = {
+        "Query": query,
+        "CFT_Issue_Date": period,
+        "Count": str(count),
+    }
+    root = _fetch_kkj_xml(params)
+    if root is None:
+        return 0, False
+    err = _get_error_message(root)
+    if err:
+        logger.warning("官公需API エラー（期間）: %s", err)
+        return 0, True
+    hits = _get_search_hits(root)
+    return (hits if hits is not None else 0), True
+
+
 def _fetch_hits_for_query(
     query: str, date_from: str, count: int = 1, rate_limiter=None
 ) -> Tuple[Optional[int], List[Dict[str, Any]], bool]:
     """
     1回の検索で SearchHits（総件数）と結果リストを返す。
+    date_from は 'YYYY-MM-DD' または 'YYYY-MM-DD/'（その日以降）。
     Returns: (search_hits or None, list_of_result_dicts, connection_ok).
     connection_ok が False のときはタイムアウト等でAPIに接続できなかった。
     """
@@ -208,7 +322,7 @@ def _fetch_hits_for_query(
         rate_limiter.wait_if_needed()
     params = {
         "Query": query,
-        "CFT_Issue_Date": date_from,
+        "CFT_Issue_Date": date_from if date_from.endswith("/") else date_from + "/",
         "Count": str(count),
     }
     root = _fetch_kkj_xml(params)
@@ -224,14 +338,11 @@ def _fetch_hits_for_query(
         child_tags = [c.tag for c in root if c.tag]
         logger.info("官公需API 0件: Query=%s, CFT_Issue_Date=%s, root.tag=%s, 子=%s", query[:30], date_from, root.tag, child_tags[:15])
     results = []
-    for sr in _find_all(root, "SearchResults", "searchresults"):
-        pref = _get_prefecture_from_result(sr)
-        if pref and ("県" in pref or "府" in pref or "都" in pref):
-            pass
-        elif pref:
-            m = re.search(r"^(北海道|東京都|大阪府|京都府|.{2,4}県)", pref)
-            pref = m.group(1) if m else pref
-        results.append({"prefecture": pref})
+    result_elements = _find_all(root, "SearchResults", "searchresults")
+    for sr in result_elements:
+        results.append(_get_case_from_result(sr))
+    if total and total > 0 and len(results) == 0:
+        logger.info("官公需API: SearchHits=%s だが SearchResult を0件しか取得できませんでした。ルートタグ=%s", total, root.tag)
     return total, results, True
 
 
@@ -273,27 +384,51 @@ class KKJTrendsManager(BaseTrendsManager):
         # --- Public Sector Signals: キーワード別件数 ---
         signals = []
         connection_ok_count = 0
-        for key, label, query in SIGNALS_QUERIES:
+        keyword_category: Dict[str, str] = {}
+        for key, label, query, category_key in SIGNALS_QUERIES:
             total, _, ok = _fetch_hits_for_query(
                 query, date_from, count=1, rate_limiter=self.rate_limiter
             )
             if ok:
                 connection_ok_count += 1
+            keyword_category[key] = category_key
             signals.append({
                 "key": key,
                 "label": label,
                 "count": total if total is not None else 0,
                 "trend": "up",
+                "category": category_key,
             })
 
-        # --- 都道府県ランキング: AI / DX / サイバーそれぞれで取得して Top5 ---
+        # --- キーワード別月次件数（直近 SIGNALS_MONTHS ヶ月）---
+        signals_monthly: Dict[str, List[Dict[str, Any]]] = {}
+        for key, label, query, _ in SIGNALS_QUERIES:
+            series: List[Dict[str, Any]] = []
+            for y, m in _last_n_months(SIGNALS_MONTHS):
+                first, last = _month_range(y, m)
+                cnt, ok = _fetch_hits_for_date_range(
+                    query, first, last, count=1, rate_limiter=self.rate_limiter
+                )
+                if ok:
+                    connection_ok_count += 1
+                period = f"{y:04d}{m:02d}"
+                series.append({"period": period, "value": cnt if cnt is not None else 0})
+            series.sort(key=lambda x: (x.get("period") or ""), reverse=True)
+            signals_monthly[key] = series
+
+        # --- 都道府県ランキング と キーワード別 注目の案件 Top5 ---
+        # キーワード別件数はAPIの「総件数」、県別は「一覧取得した結果」の都道府県別集計。
+        # APIは総件数と一覧の返却件数が異なる場合があり、県別の合計は総件数と一致しない。
         prefecture_rankings: Dict[str, List[Dict[str, Any]]] = {}
-        for key, label, query in RANKING_QUERIES:
+        keyword_top_cases: Dict[str, List[Dict[str, Any]]] = {}
+        ranking_result_count: Dict[str, int] = {}  # 県別集計の元になった一覧取得件数（総件数と異なる場合あり）
+        for key, label, query, _ in SIGNALS_QUERIES:
             _, results, ok = _fetch_hits_for_query(
                 query, date_from, count=RANKING_COUNT, rate_limiter=self.rate_limiter
             )
             if ok:
                 connection_ok_count += 1
+            ranking_result_count[key] = len(results) if results else 0
             prefecture_counts = {}
             for r in results:
                 pref = (r.get("prefecture") or "").strip()
@@ -306,6 +441,26 @@ class KKJTrendsManager(BaseTrendsManager):
                     sorted(prefecture_counts.items(), key=lambda x: -x[1])[:5], start=1
                 )
             ]
+            # 同一検索結果の先頭5件を「注目の案件 Top5」として保持（案件名・リンク付き）
+            seen_urls = set()
+            top5 = []
+            for r in results:
+                if len(top5) >= 5:
+                    break
+                url = (r.get("url") or "").strip()
+                if url and url in seen_urls:
+                    continue
+                if url:
+                    seen_urls.add(url)
+                top5.append({
+                    "rank": len(top5) + 1,
+                    "title": (r.get("title") or "").strip() or "—",
+                    "url": url,
+                    "organization": (r.get("organization") or "").strip(),
+                    "cft_issue_date": (r.get("cft_issue_date") or "").strip(),
+                    "prefecture": (r.get("prefecture") or "").strip(),
+                })
+            keyword_top_cases[key] = top5
         # 後方互換: prefecture_ranking は DX のランキング
         ranking = prefecture_rankings.get("dx", [])
 
@@ -313,9 +468,16 @@ class KKJTrendsManager(BaseTrendsManager):
         api_unreachable = connection_ok_count == 0
         payload = {
             "signals": signals,
+            "signals_monthly": signals_monthly,
             "prefecture_ranking": ranking,
             "prefecture_rankings": prefecture_rankings,
+            "keyword_top_cases": keyword_top_cases,
+            "ranking_result_count": ranking_result_count,
+            "keyword_category": keyword_category,
+            "category_labels": dict(KKJ_CATEGORY_LABELS),
+            "category_order": list(KKJ_CATEGORY_ORDER),
             "period_days": SIGNALS_DAYS,
+            "period_months": SIGNALS_MONTHS,
             "as_of": as_of,
             "api_unreachable": api_unreachable,
         }
@@ -340,7 +502,19 @@ class KKJTrendsManager(BaseTrendsManager):
         キャッシュのみ返す（無い場合は空で返す）。再取得は force_refresh=True のときのみ。
         """
         cached = None if force_refresh else self._get_from_cache()
-        if cached is not None and self._has_any_signal_count(cached):
+        # キャッシュは「キーワード別件数＋県別Top5」の構造があれば有効（0件でも表示用に使う）
+        if cached is not None and (cached.get("signals") is not None or cached.get("prefecture_rankings") is not None):
+            # 古いキャッシュに keyword_top_cases / ranking_result_count がない場合があるので補う
+            if "keyword_top_cases" not in cached:
+                cached = {**cached, "keyword_top_cases": {}}
+            if "ranking_result_count" not in cached:
+                cached = {**cached, "ranking_result_count": {}}
+            if "keyword_category" not in cached:
+                cached = {**cached, "keyword_category": {}}
+            if "category_labels" not in cached:
+                cached = {**cached, "category_labels": dict(KKJ_CATEGORY_LABELS)}
+            if "category_order" not in cached:
+                cached = {**cached, "category_order": list(KKJ_CATEGORY_ORDER)}
             return {
                 "success": True,
                 "data": cached,
@@ -350,26 +524,26 @@ class KKJTrendsManager(BaseTrendsManager):
         if cache_only:
             return {
                 "success": True,
-                "data": {"signals": [], "prefecture_ranking": [], "prefecture_rankings": {}, "period_days": 30, "as_of": ""},
+                "data": {
+                    "signals": [],
+                    "signals_monthly": {},
+                    "prefecture_ranking": [],
+                    "prefecture_rankings": {},
+                    "keyword_top_cases": {},
+                    "ranking_result_count": {},
+                    "keyword_category": {},
+                    "category_labels": {},
+                    "category_order": [],
+                    "period_days": 30,
+                    "period_months": SIGNALS_MONTHS,
+                    "as_of": "",
+                },
                 "status": "cache_only_empty",
                 "source": "官公需情報ポータルサイト検索API",
             }
         result = self._fetch_trends()
         data = result.get("data") if result.get("success") else None
         if data:
-            if self._has_any_signal_count(data):
-                self._save_to_cache(data)
-            else:
-                # APIが0件を返した場合はキャッシュを上書きしない。
-                fallback = self._get_from_cache()
-                if fallback is not None and self._has_any_signal_count(fallback):
-                    return {
-                        "success": True,
-                        "data": fallback,
-                        "status": "cached",
-                        "source": "官公需情報ポータルサイト検索API",
-                    }
-                # キャッシュも0件の場合は悪いキャッシュをクリアし、次回の再取得でまっさらから試せるようにする
-                if fallback is not None:
-                    self._clear_cache()
+            # 0件でもAPI応答はキャッシュする（毎回叩かず表示を安定させる）
+            self._save_to_cache(data)
         return result

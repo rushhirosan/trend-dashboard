@@ -398,7 +398,59 @@
                                 </div>
 
                                 <div class="row g-3 mt-2">
-                                    <!-- 7行目: IPA注意喚起 + JPCERT/CC（All順） -->
+                                    <!-- 7行目: 行政データ（e-Stat） + 行政データ（政府調達） -->
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-3">
+                                                    <i class="fas fa-landmark text-secondary fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">行政データ（e-Stat）</h6>
+                                                </div>
+                                                <div class="row text-center">
+                                                    <div class="col-4">
+                                                        <small class="text-muted">最終更新/Last updated</small>
+                                                        <div class="fw-bold" id="estatLastUpdate">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">データ件数/Data count</small>
+                                                        <div class="fw-bold" id="estatDataCount">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">ステータス/Status</small>
+                                                        <div><span class="badge bg-secondary" id="estatStatus">-</span></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-3">
+                                                    <i class="fas fa-building text-primary fs-4 me-3"></i>
+                                                    <h6 class="card-title mb-0">行政データ（政府調達）</h6>
+                                                </div>
+                                                <div class="row text-center">
+                                                    <div class="col-4">
+                                                        <small class="text-muted">最終更新/Last updated</small>
+                                                        <div class="fw-bold" id="kkjLastUpdate">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">データ件数/Data count</small>
+                                                        <div class="fw-bold" id="kkjDataCount">-</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">ステータス/Status</small>
+                                                        <div><span class="badge bg-secondary" id="kkjStatus">-</span></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mt-2">
+                                    <!-- 8行目: IPA注意喚起 + JPCERT/CC（All順） -->
                                     <div class="col-md-6">
                                         <div class="card h-100">
                                             <div class="card-body">
@@ -1029,7 +1081,60 @@
                                     </div>
 
                                     <div class="row g-3 mt-2">
-                                        <!-- US 8行目: Stock Trends + Crypto（All順） -->
+                                        <!-- US 8行目: Gov Data (BLS) + Gov Data (USAspending) -->
+                                        <div class="col-md-6">
+                                            <div class="card h-100">
+                                                <div class="card-body">
+                                                    <div class="d-flex align-items-center mb-3">
+                                                        <i class="fas fa-university text-secondary fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">Gov Data (BLS)</h6>
+                                                    </div>
+                                                    <div class="row text-center">
+                                                        <div class="col-4">
+                                                            <small class="text-muted">最終更新/Last updated</small>
+                                                            <div class="fw-bold" id="blsUSLastUpdate">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">データ件数/Data count</small>
+                                                            <div class="fw-bold" id="blsUSDataCount">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">ステータス/Status</small>
+                                                            <div><span class="badge bg-secondary" id="blsUSStatus">-</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-md-6">
+                                            <div class="card h-100">
+                                                <div class="card-body">
+                                                    <div class="d-flex align-items-center mb-3">
+                                                        <i class="fas fa-dollar-sign text-success fs-4 me-3"></i>
+                                                        <h6 class="card-title mb-0">Gov Data (USAspending)</h6>
+                                                    </div>
+                                                    <div class="row text-center">
+                                                        <div class="col-4">
+                                                            <small class="text-muted">最終更新/Last updated</small>
+                                                            <div class="fw-bold" id="usaspendingUSLastUpdate">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">データ件数/Data count</small>
+                                                            <div class="fw-bold" id="usaspendingUSDataCount">-</div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <small class="text-muted">ステータス/Status</small>
+                                                            <div><span class="badge bg-secondary" id="usaspendingUSStatus">-</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-3 mt-2">
+                                        <!-- US 9行目: Stock Trends + Crypto（All順） -->
                                         <div class="col-md-6">
                                             <div class="card h-100">
                                                 <div class="card-body">
@@ -1336,6 +1441,8 @@
                 { id: 'githubUS', name: 'GitHub Trends', endpoint: '/api/github-trends?language=all&limit=25' },
                 { id: 'appstoreUS', name: 'App Store Trends', endpoint: '/api/appstore-trends?country=US&category=all&limit=25' },
                 { id: 'globenewswireUS', name: 'GlobeNewswire', endpoint: '/api/globenewswire-trends?limit=25' },
+                { id: 'blsUS', name: 'Gov Data (BLS)', endpoint: '/api/us-admin-trends' },
+                { id: 'usaspendingUS', name: 'Gov Data (USAspending)', endpoint: '/api/us-admin-trends' },
                 { id: 'stockUS', name: 'Stock Trends', endpoint: '/api/stock-trends?market=US&limit=25' },
                 { id: 'cryptoUS', name: 'Cryptocurrency Trends', endpoint: '/api/crypto-trends?limit=25' },
                 { id: 'spotifyUS', name: 'Spotify', endpoint: '/api/music-trends?service=spotify&region=US' },
@@ -1401,7 +1508,11 @@
                             'Medium': 'Medium',
                             'eBay Popular/Trending': 'eBay Popular/Trending',
                             'Twitch': 'Twitch',
-                            'GlobeNewswire': 'GlobeNewswire'
+                            'GlobeNewswire': 'GlobeNewswire',
+                            'Gov Data (BLS)': 'BLS',
+                            'Gov Data (USAspending)': 'USAspending',
+                            'BLS': 'BLS',
+                            'USAspending': 'USAspending'
                         };
                         
                         const displayName = platformNameMap[platformName] || platformName;
@@ -1578,7 +1689,7 @@
             <div class="row">
                 <div class="col-md-6">
                     <h5 class="h6 mb-3">トレンドダッシュボード</h5>
-                    <p class="text-muted small mb-2">日本・USのトレンドデータ鮮度を表示。NHK、CNN、Google Trends、YouTube、はてなブックマーク、Qiita、Zenn、Note、Wikipedia、Hacker News、株価、Spotify、楽天、eBay、Twitch、Podcastなど。データは毎日1時、7時、13時、19時（JST）に更新処理を開始します。</p>
+                    <p class="text-muted small mb-2">日本・USのトレンドデータ鮮度を表示。NHK、CNN、Google Trends、YouTube、はてなブックマーク、Qiita、Zenn、Note、Wikipedia、Hacker News、株価、Spotify、楽天、eBay、Twitch、Podcast、行政データ（e-Stat/政府調達、BLS、USAspending）など。データは毎日1時、7時、13時、19時（JST）に更新処理を開始します。</p>
                 </div>
                 <div class="col-md-6">
                     <h6 class="h6 mb-3">主要ページ</h6>

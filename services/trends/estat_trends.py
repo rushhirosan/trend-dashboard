@@ -19,6 +19,14 @@ DASHBOARD_BASE = "https://dashboard.e-stat.go.jp/api/1.0/Json"
 JOB_RATIO_INDICATOR = "0301020001000010010"  # 有効求人倍率（一般職業紹介状況）
 # 消費者物価指数（総合・前年同月比）月次・全国（統計ダッシュボード）
 CPI_INDICATOR = "0703010501010090000"
+# 新設住宅着工戸数（総戸数）月次・全国（統計ダッシュボード＝2025/2026年データあり）
+HOUSING_STARTS_INDICATOR = "0802010103000010000"
+# 完全失業率（男女計）月次・全国（統計ダッシュボード）
+UNEMPLOYMENT_INDICATOR = "0301010000020020010"
+# 実質賃金指数（現金給与総額）月次・全国（統計ダッシュボード）
+REAL_WAGES_INDICATOR = "0302030201010090010"
+# 小売業販売額（名目）月次・全国（統計ダッシュボード）
+RETAIL_SALES_INDICATOR = "0601010201010010000"
 
 # 取得する指標の定義（先頭3件＝全部入りタブ用、以降＝行政タブのみ）
 # (indicator_id, name_ja, stats_data_id or None, year_from or None)
@@ -27,10 +35,10 @@ CPI_INDICATOR = "0703010501010090000"
 INDICATORS = [
     ("cpi", "消費者物価指数（総合・前年同月比）", "0003427113", None),
     ("job_ratio", "有効求人倍率", None, "2025"),
-    ("housing_starts", "住宅着工", "0003119713", "2020"),  # 建築着工 時系列表（月次）year_from=2020で広めに取得
+    ("housing_starts", "住宅着工", "0003119713", "2020"),  # 建築着工時系列（@time が YYYY00MM?? の月次）
     ("unemployment", "完全失業率", None, None),
     ("real_wages", "実質賃金指数", None, None),
-    ("trade", "貿易統計（輸出額）", None, None),
+    ("retail_sales", "小売業販売額", None, None),
 ]
 
 
@@ -62,6 +70,10 @@ class EstatTrendsManager(BaseTrendsManager):
         except Exception as e:
             logger.debug("estat キャッシュクリア: %s", e)
             return False
+
+    def _use_real_data_when_dummy_mode(self) -> bool:
+        """USE_DUMMY_DATA=true でも行政データタブでは実データ（e-Stat API/キャッシュ）を使う"""
+        return True
 
     def _generate_dummy_data(self, limit: int = 6, *args, **kwargs) -> list:
         """e-Stat用のダミーデータを生成（indicator_id, name_ja, series 形式）"""
@@ -128,8 +140,9 @@ class EstatTrendsManager(BaseTrendsManager):
         stats_data_id: str,
         max_series: int = 24,
         extra_params: Optional[Dict[str, str]] = None,
+        area_only: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """getStatsData で数値を取得し、時系列リスト [{ period, value, unit }] を返す。"""
+        """getStatsData で数値を取得し、時系列リスト [{ period, value, unit }] を返す。area_only 指定時はその地域のみ。"""
         self.rate_limiter.wait_if_needed()
         url = f"{ESTAT_BASE}/getStatsData"
         params = {
@@ -158,9 +171,13 @@ class EstatTrendsManager(BaseTrendsManager):
             return []
         if not isinstance(value_list, list):
             value_list = [value_list]
-        # 時系列: @time を優先し、月次（6桁以上）があればそれを採用。同一 period は1件だけ採用。
+        # 時系列: 月次は @year+@month で YYYYMM、それ以外は @time/@cat03/@year。同一 period は1件だけ採用。
         def _pick_period(v: dict) -> str:
-            raw = v.get("@time") or v.get("@cat03") or v.get("@year") or ""
+            year = (v.get("@year") or "").strip()
+            month = (v.get("@month") or "").strip()
+            if year and month:
+                return year + (month.zfill(2) if len(month) <= 2 else month[:2])
+            raw = v.get("@time") or v.get("@cat03") or (year if year else "")
             if raw:
                 return raw
             # 統計表によっては時間軸が @cat01, @cat02 等の別名で返る場合がある
@@ -170,9 +187,12 @@ class EstatTrendsManager(BaseTrendsManager):
             return ""
 
         def _normalize_period(p: str) -> str:
-            """数値のとき YYYYMM に正規化（2026010000 → 202601）して表示を「2026年1月」にする"""
+            """数値のとき YYYYMM に正規化。建築着工は @time が 2024000101（2024年1月）形式なので YYYY+MM にする"""
             if not p or len(p) < 6:
                 return p
+            if p.isdigit() and len(p) >= 10 and p[4:6] == "00":
+                # 2024000101 → 202401（年4桁 + 月2桁）
+                return p[:4] + p[6:8]
             if p.isdigit() and len(p) > 6:
                 return p[:6]
             return p
@@ -181,6 +201,8 @@ class EstatTrendsManager(BaseTrendsManager):
         rows = []
         for v in value_list:
             if not isinstance(v, dict):
+                continue
+            if area_only is not None and (v.get("@area") or "").strip() != area_only:
                 continue
             val = v.get("$")
             if val is None or val == "" or (isinstance(val, str) and val.strip() in ("", "*", "-", "x")):
@@ -431,6 +453,122 @@ class EstatTrendsManager(BaseTrendsManager):
         rows = sorted(by_period.values(), key=lambda x: (x.get("period") or ""), reverse=True)
         return rows[:24]
 
+    def _fetch_housing_starts_from_dashboard(
+        self, year_from: str = "2024", max_series: int = 24
+    ) -> List[Dict[str, Any]]:
+        """統計ダッシュボードAPIから新設住宅着工戸数（総戸数）月次・全国を取得。2025/2026年データあり。appId不要。"""
+        url = f"{DASHBOARD_BASE}/getData"
+        params = {
+            "Lang": "JP",
+            "IndicatorCode": HOUSING_STARTS_INDICATOR,
+            "RegionalRank": "2",  # 全国
+            "Cycle": "1",  # 月
+            "IsSeasonalAdjustment": "1",  # 原数値
+            "MetaGetFlg": "N",
+        }
+        try:
+            r = requests.get(url, params=params, timeout=20)
+            r.raise_for_status()
+            data = r.json()
+        except Exception as e:
+            logger.warning("統計ダッシュボードAPI 住宅着工 失敗: %s", e)
+            return []
+        objs = (
+            data.get("GET_STATS", {})
+            .get("STATISTICAL_DATA", {})
+            .get("DATA_INF", {})
+            .get("DATA_OBJ", [])
+        )
+        if not isinstance(objs, list):
+            objs = [objs] if objs else []
+        rows = []
+        for item in objs:
+            val_obj = item.get("VALUE")
+            if not isinstance(val_obj, dict):
+                continue
+            val = val_obj.get("$") or val_obj.get("\u0024")
+            if val is None or val == "":
+                continue
+            t = (val_obj.get("@time") or "")[:8]
+            if len(t) >= 6 and t.isdigit():
+                period = t[:4] + t[4:6]  # 20251200 → 202512
+                if period[:4] >= year_from:
+                    rows.append({"period": period, "value": str(val), "unit": "戸"})
+        rows.sort(key=lambda x: (x.get("period") or ""), reverse=True)
+        return rows[:max_series]
+
+    def _fetch_dashboard_monthly_series(
+        self,
+        indicator_code: str,
+        unit: str,
+        year_from: str = "2024",
+        max_series: int = 24,
+    ) -> List[Dict[str, Any]]:
+        """統計ダッシュボードAPIで月次・全国の系列を取得。appId不要。"""
+        url = f"{DASHBOARD_BASE}/getData"
+        params = {
+            "Lang": "JP",
+            "IndicatorCode": indicator_code,
+            "RegionalRank": "2",
+            "Cycle": "1",
+            "IsSeasonalAdjustment": "1",
+            "MetaGetFlg": "N",
+        }
+        try:
+            r = requests.get(url, params=params, timeout=20)
+            r.raise_for_status()
+            data = r.json()
+        except Exception as e:
+            logger.warning("統計ダッシュボードAPI getData 失敗 (%s): %s", indicator_code[:12], e)
+            return []
+        objs = (
+            data.get("GET_STATS", {})
+            .get("STATISTICAL_DATA", {})
+            .get("DATA_INF", {})
+            .get("DATA_OBJ", [])
+        )
+        if not isinstance(objs, list):
+            objs = [objs] if objs else []
+        rows = []
+        for item in objs:
+            val_obj = item.get("VALUE")
+            if not isinstance(val_obj, dict):
+                continue
+            val = val_obj.get("$") or val_obj.get("\u0024")
+            if val is None or val == "":
+                continue
+            t = (val_obj.get("@time") or "")[:8]
+            if len(t) >= 6 and t.isdigit():
+                period = t[:4] + t[4:6]
+                if period[:4] >= year_from:
+                    rows.append({"period": period, "value": str(val), "unit": unit})
+        rows.sort(key=lambda x: (x.get("period") or ""), reverse=True)
+        return rows[:max_series]
+
+    def _fetch_unemployment_from_dashboard(
+        self, year_from: str = "2025", max_series: int = 24
+    ) -> List[Dict[str, Any]]:
+        """完全失業率（男女計）月次・全国。2025年1月以降。"""
+        return self._fetch_dashboard_monthly_series(
+            UNEMPLOYMENT_INDICATOR, "％", year_from=year_from, max_series=max_series
+        )
+
+    def _fetch_real_wages_from_dashboard(
+        self, year_from: str = "2025", max_series: int = 24
+    ) -> List[Dict[str, Any]]:
+        """実質賃金指数（現金給与総額）月次・全国。2020年=100。2025年1月以降。"""
+        return self._fetch_dashboard_monthly_series(
+            REAL_WAGES_INDICATOR, "2020年=100", year_from=year_from, max_series=max_series
+        )
+
+    def _fetch_retail_sales_from_dashboard(
+        self, year_from: str = "2025", max_series: int = 24
+    ) -> List[Dict[str, Any]]:
+        """小売業販売額（名目）月次・全国。単位は億円。2025年1月以降。"""
+        return self._fetch_dashboard_monthly_series(
+            RETAIL_SALES_INDICATOR, "億円", year_from=year_from, max_series=max_series
+        )
+
     def _fetch_one_indicator(
         self,
         indicator_id: str,
@@ -495,16 +633,88 @@ class EstatTrendsManager(BaseTrendsManager):
                 "updated_at": latest,
                 "stats_data_id": "dashboard",
             }
+        # 住宅着工は統計ダッシュボードを優先（2025/2026年データあり）。失敗時は e-Stat 0003119713
+        if indicator_id == "housing_starts":
+            series = self._fetch_housing_starts_from_dashboard(
+                year_from=year_from or "2024", max_series=24
+            )
+            if series:
+                series.sort(key=lambda x: (x.get("period") or ""), reverse=True)
+                total_12m = 0
+                for s in series[:12]:
+                    try:
+                        total_12m += int(str(s.get("value") or "0").replace(",", ""))
+                    except (ValueError, TypeError):
+                        pass
+                housing_extra = {
+                    "total_12m": total_12m,
+                    "forecast_2026_man": 77.7,
+                    "forecast_2026_note": "前年度比+5.5％増と予測",
+                }
+                return {
+                    "indicator_id": indicator_id,
+                    "name_ja": name_ja,
+                    "unit": (series[0].get("unit") or "戸") if series else "戸",
+                    "series": series,
+                    "updated_at": series[0].get("period") if series else None,
+                    "stats_data_id": "dashboard",
+                    **housing_extra,
+                }
+        # 完全失業率は統計ダッシュボードから取得（appId不要）。2025年1月から。
+        if indicator_id == "unemployment":
+            series = self._fetch_unemployment_from_dashboard(
+                year_from=year_from or "2025", max_series=24
+            )
+            if series:
+                return {
+                    "indicator_id": indicator_id,
+                    "name_ja": name_ja,
+                    "unit": (series[0].get("unit") or "％") if series else "％",
+                    "series": series,
+                    "updated_at": series[0].get("period") if series else None,
+                    "stats_data_id": "dashboard",
+                }
+        # 実質賃金指数は統計ダッシュボードから取得（appId不要）。2025年1月から。
+        if indicator_id == "real_wages":
+            series = self._fetch_real_wages_from_dashboard(
+                year_from=year_from or "2025", max_series=24
+            )
+            if series:
+                return {
+                    "indicator_id": indicator_id,
+                    "name_ja": name_ja,
+                    "unit": (series[0].get("unit") or "2020年=100") if series else "2020年=100",
+                    "series": series,
+                    "updated_at": series[0].get("period") if series else None,
+                    "stats_data_id": "dashboard",
+                }
+        # 小売業販売額は統計ダッシュボードから取得（appId不要）。2025年1月から。
+        if indicator_id == "retail_sales":
+            series = self._fetch_retail_sales_from_dashboard(
+                year_from=year_from or "2025", max_series=24
+            )
+            if series:
+                return {
+                    "indicator_id": indicator_id,
+                    "name_ja": name_ja,
+                    "unit": (series[0].get("unit") or "億円") if series else "億円",
+                    "series": series,
+                    "updated_at": series[0].get("period") if series else None,
+                    "stats_data_id": "dashboard",
+                }
         sid = stats_data_id
         series = []
         if not sid and search_word:
             sid = self._stats_list(search_word)
+        stats_data_kwargs: Dict[str, Any] = {"max_series": 24}
+        if indicator_id == "housing_starts":
+            stats_data_kwargs["area_only"] = "00000"  # 全国のみ
         if sid:
-            series = self._stats_data(sid, max_series=24)
+            series = self._stats_data(sid, **stats_data_kwargs)
             if not series and stats_data_id and search_word:
                 sid = self._stats_list(search_word)
                 if sid:
-                    series = self._stats_data(sid, max_series=24)
+                    series = self._stats_data(sid, **stats_data_kwargs)
         if not sid:
             return {
                 "indicator_id": indicator_id,
@@ -583,7 +793,7 @@ class EstatTrendsManager(BaseTrendsManager):
             "housing_starts": "建築着工統計 住宅 月次",
             "unemployment": "労働力調査 完全失業率",
             "real_wages": "現金給与総額 実質",
-            "trade": "貿易統計 輸出額",
+            "retail_sales": "商業統計 小売業 販売額",
         }
         to_fetch = set(fetch_indicator_ids) if fetch_indicator_ids else None
         for row in INDICATORS:

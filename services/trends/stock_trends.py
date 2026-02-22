@@ -351,31 +351,9 @@ class StockTrendsManager(BaseTrendsManager):
             dict: トレンドデータ
         """
         try:
-            # --- ダミーモード（USE_DUMMY_DATA時・ローカルキャッシュはダミーのみ） ---
+            # --- ダミーモード（USE_DUMMY_DATA時・キャッシュは使わず常にダミー生成） ---
             if self._is_dummy_mode():
-                logger.info(f"🎭 stock: ダミーモードが有効です。ダミーデータのみ使用します (market: {market})")
-                if force_refresh:
-                    logger.info(f"🔄 stock: (dummy) force_refresh のため {market} のキャッシュをクリアします")
-                    try:
-                        self._clear_cache(market=market)
-                    except Exception as e:
-                        logger.warning(f"⚠️ stock: ダミーモード キャッシュクリア中にエラー: {e}")
-                # キャッシュにあればそれを使用（更新しない）
-                cached_data = self._get_from_cache(market=market)
-                if cached_data and len(cached_data) > 0:
-                    cached_data.sort(key=lambda x: abs(x.get('change_percent', 0)), reverse=True)
-                    for i, item in enumerate(cached_data, 1):
-                        item['rank'] = i
-                    logger.info(f"✅ stock: ダミーキャッシュから {len(cached_data)} 件取得 (market: {market})")
-                    return {
-                        'success': True,
-                        'data': cached_data[:limit],
-                        'status': 'dummy_cached',
-                        'source': 'dummy_database_cache',
-                        'market': market,
-                        'total_count': len(cached_data),
-                    }
-                # キャッシュが空のときだけ生成・保存
+                logger.info(f"🎭 stock: ダミーモードが有効です。キャッシュは使わずダミーデータを返します (market: {market})")
                 dummy_data = self._generate_dummy_data(limit=limit, market=market)
                 try:
                     if self._save_to_cache(dummy_data, market=market):

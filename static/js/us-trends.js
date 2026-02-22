@@ -3060,9 +3060,65 @@ function hideInactivePanesUS(activeTabTrigger) {
 // 日本ページと同一のタブID一覧（前回タブ復元・保存で使用）
 var TREND_TAB_IDS_US = ['tab-all', 'tab-news', 'tab-search', 'tab-tech', 'tab-market', 'tab-entertainment'];
 
+function setupAllTabAccordionUS() {
+    const cards = document.querySelectorAll('#pane-all [data-all-card] .card');
+    cards.forEach(card => {
+        const allCard = card.closest('[data-all-card]');
+        const key = allCard ? allCard.getAttribute('data-all-card') : null;
+        const header = card.querySelector('.card-header');
+        const body = card.querySelector('.card-body');
+        if (!header || !body || !key) return;
+
+        if (!header.querySelector('.all-accordion-trigger')) {
+            const title = header.querySelector('h3');
+            if (title) {
+                const titleWrapper = title.parentElement;
+                const hasSelect = !!titleWrapper && !!titleWrapper.querySelector('.all-category-select');
+                const trigger = document.createElement('div');
+                trigger.className = hasSelect
+                    ? 'all-accordion-trigger d-flex align-items-center'
+                    : 'all-accordion-trigger d-flex align-items-center flex-grow-1 min-width-0';
+                trigger.setAttribute('data-bs-toggle', 'collapse');
+                trigger.setAttribute('data-bs-target', `#all-collapse-${key}`);
+                trigger.setAttribute('aria-expanded', 'false');
+                trigger.setAttribute('aria-controls', `all-collapse-${key}`);
+
+                const chevron = document.createElement('i');
+                chevron.className = 'fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0';
+                chevron.setAttribute('aria-hidden', 'true');
+
+                if (hasSelect && titleWrapper) {
+                    titleWrapper.insertBefore(trigger, title);
+                } else {
+                    const moreLink = header.querySelector('.all-more-link');
+                    if (moreLink) {
+                        header.insertBefore(trigger, moreLink);
+                    } else {
+                        header.insertBefore(trigger, header.firstChild);
+                    }
+                }
+
+                trigger.appendChild(title);
+                trigger.appendChild(chevron);
+            }
+        }
+
+        if (!body.closest('.all-card-collapse')) {
+            const collapse = document.createElement('div');
+            collapse.id = `all-collapse-${key}`;
+            collapse.className = 'collapse all-card-collapse';
+            body.parentNode.insertBefore(collapse, body);
+            collapse.appendChild(body);
+        }
+    });
+}
+
 // Page initialization
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🇺🇸 US Trends page initialization');
+
+    // Allタブのカードヘッダーを日本ページ同様のアコーディオン構造に揃える
+    setupAllTabAccordionUS();
 
     // USページを開いたことを記憶（次回のルート訪問時のリダイレクト用）
     if (typeof setTrendPreference === 'function') {

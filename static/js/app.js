@@ -835,12 +835,30 @@ function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 5) {
     const mainTbody = document.getElementById(mainTableBodyId);
     const allTbody = document.getElementById(allTableBodyId);
     if (!mainTbody || !allTbody) return;
+    const table = allTbody.closest('table');
+    if (!table) return;
+    const cardBody = table.closest('.card-body');
     const dataRows = Array.from(mainTbody.querySelectorAll('tr:not(.skeleton-row)'));
     const toCopy = dataRows.slice(0, limit);
+    const topCount = 3;
+    const visibleRows = toCopy.slice(0, topCount);
+    const hiddenRows = toCopy.slice(topCount);
+    const moreTbodyId = `all-more-${allTableBodyId}`;
+
+    const existingMoreList = table.querySelectorAll(`tbody[data-all-more-for="${allTableBodyId}"]`);
+    existingMoreList.forEach(node => node.remove());
+    if (cardBody) {
+        const existingToggles = cardBody.querySelectorAll(`[data-all-more-toggle="${moreTbodyId}"]`);
+        existingToggles.forEach(node => node.remove());
+    }
+
+    const wasOpen = allTbody.dataset.moreOpen === 'true';
     allTbody.innerHTML = '';
-    toCopy.forEach(tr => {
+    allTbody.classList.remove('has-more', 'more-rows-open');
+
+    const cloneWithWrapper = (tr, extraClass) => {
         const cloned = tr.cloneNode(true);
-        // Safari対応: td内にラッパーを入れ、overflowをdivに適用（td直接ではSafariで効かないため）
+        if (extraClass) cloned.classList.add(extraClass);
         cloned.querySelectorAll('td').forEach(td => {
             const wrapper = document.createElement('div');
             wrapper.className = 'all-td-inner';
@@ -849,8 +867,51 @@ function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 5) {
             }
             td.appendChild(wrapper);
         });
-        allTbody.appendChild(cloned);
+        return cloned;
+    };
+
+    const isMobile = window.matchMedia && window.matchMedia('(max-width: 767.98px)').matches;
+    if (!isMobile) {
+        toCopy.forEach(tr => allTbody.appendChild(cloneWithWrapper(tr)));
+        return;
+    }
+
+    visibleRows.forEach((tr, index) => {
+        const isLastVisible = index === visibleRows.length - 1 && hiddenRows.length > 0;
+        const extraClass = isLastVisible ? 'more-row-end' : '';
+        allTbody.appendChild(cloneWithWrapper(tr, extraClass));
     });
+    hiddenRows.forEach((tr, index) => {
+        const extraClass = index === 0 ? 'more-row-start' : '';
+        const hiddenClone = cloneWithWrapper(tr, extraClass);
+        hiddenClone.classList.add('more-row');
+        hiddenClone.style.display = 'none';
+        allTbody.appendChild(hiddenClone);
+    });
+
+    if (hiddenRows.length > 0 && cardBody) {
+        allTbody.classList.add('has-more');
+        if (wasOpen) {
+            allTbody.classList.add('more-rows-open');
+        }
+        allTbody.dataset.moreOpen = wasOpen ? 'true' : 'false';
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'btn btn-sm btn-outline-secondary w-100 mt-2 all-more-toggle';
+        toggle.setAttribute('aria-expanded', wasOpen ? 'true' : 'false');
+        toggle.setAttribute('data-all-more-toggle', moreTbodyId);
+        toggle.textContent = wasOpen ? '閉じる' : '続きを表示';
+        toggle.addEventListener('click', function () {
+            const isOpen = allTbody.classList.toggle('more-rows-open');
+            allTbody.dataset.moreOpen = isOpen ? 'true' : 'false';
+            allTbody.querySelectorAll('.more-row').forEach(row => {
+                row.style.display = isOpen ? 'table-row' : 'none';
+            });
+            this.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            this.textContent = isOpen ? '閉じる' : '続きを表示';
+        });
+        cardBody.appendChild(toggle);
+    }
 }
 
 // 前回開いていたタブを復元するための有効なタブID一覧

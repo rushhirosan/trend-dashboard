@@ -178,7 +178,7 @@
                 if (fullBody) {
                     fullBody.style.display = 'flex';
                     if (data) {
-                        // 行政タブは全指標を表示（6件：CPI・有効求人倍率・住宅着工・完全失業率・実質賃金指数・貿易統計）
+                        // 行政タブは全指標を表示（6件：CPI・有効求人倍率・住宅着工・完全失業率・実質賃金指数・小売業販売額）
                         fullBody.innerHTML = data.map(renderFullCard).join('');
                     } else {
                         fullBody.innerHTML = '<div class="col-12 mb-2"><span class="badge bg-warning text-dark">サンプルデータ</span></div>' + SAMPLE_DATA.map(renderFullCard).join('');

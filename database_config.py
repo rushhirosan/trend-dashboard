@@ -719,6 +719,18 @@ class TrendsCache:
                     cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
+                CREATE TABLE IF NOT EXISTS bls_trends_cache (
+                    id SERIAL PRIMARY KEY,
+                    data_json TEXT NOT NULL,
+                    cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                
+                CREATE TABLE IF NOT EXISTS usaspending_trends_cache (
+                    id SERIAL PRIMARY KEY,
+                    data_json TEXT NOT NULL,
+                    cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                
                 CREATE TABLE IF NOT EXISTS cache_status (
                     id SERIAL PRIMARY KEY,
                     cache_key VARCHAR(255) NOT NULL UNIQUE,
@@ -4516,6 +4528,131 @@ class TrendsCache:
             return False
         except Exception as e:
             logger.error(f"❌ kkj_trendsキャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    # BLS Trends キャッシュメソッド
+    def save_bls_trends_to_cache(self, data):
+        """BLS（CPI・失業率・雇用数等）データをキャッシュに保存"""
+        if not data:
+            return False
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM bls_trends_cache")
+                    data_json = json.dumps(data, ensure_ascii=False)
+                    cursor.execute(
+                        "INSERT INTO bls_trends_cache (data_json) VALUES (%s)",
+                        (data_json,)
+                    )
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        ('bls_trends', now_jst, len(data), now_jst, len(data))
+                    )
+                    conn.commit()
+                    logger.info(f"✅ bls_trendsキャッシュを保存しました ({len(data)}件)")
+                    return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ bls_trendsキャッシュ保存中に接続エラー: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ bls_trendsキャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def get_bls_trends_from_cache(self):
+        """BLSデータをキャッシュから取得"""
+        def query_func(conn):
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    "SELECT data_json, cached_at FROM bls_trends_cache ORDER BY id DESC LIMIT 1"
+                )
+                row = cursor.fetchone()
+                if not row or not row.get('data_json'):
+                    return None
+                return json.loads(row['data_json'])
+        return self._execute_with_retry(query_func)
+
+    def clear_bls_trends_cache(self):
+        """BLSキャッシュをクリア"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM bls_trends_cache")
+                    conn.commit()
+                    logger.info("✅ bls_trendsのキャッシュをクリアしました")
+                    return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ bls_trendsキャッシュクリア中に接続エラー: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ bls_trendsキャッシュクリアエラー: {e}", exc_info=True)
+            return False
+
+    # USAspending Trends キャッシュメソッド
+    def save_usaspending_trends_to_cache(self, data):
+        """USAspending（政府支出）データをキャッシュに保存"""
+        if not data:
+            return False
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM usaspending_trends_cache")
+                    data_json = json.dumps(data, ensure_ascii=False)
+                    cursor.execute(
+                        "INSERT INTO usaspending_trends_cache (data_json) VALUES (%s)",
+                        (data_json,)
+                    )
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    data_count = 1  # nested dict
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        ('usaspending_trends', now_jst, data_count, now_jst, data_count)
+                    )
+                    conn.commit()
+                    logger.info("✅ usaspending_trendsキャッシュを保存しました")
+                    return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ usaspending_trendsキャッシュ保存中に接続エラー: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ usaspending_trendsキャッシュ保存エラー: {e}", exc_info=True)
+            return False
+
+    def get_usaspending_trends_from_cache(self):
+        """USAspendingデータをキャッシュから取得"""
+        def query_func(conn):
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    "SELECT data_json, cached_at FROM usaspending_trends_cache ORDER BY id DESC LIMIT 1"
+                )
+                row = cursor.fetchone()
+                if not row or not row.get('data_json'):
+                    return None
+                return json.loads(row['data_json'])
+        return self._execute_with_retry(query_func)
+
+    def clear_usaspending_trends_cache(self):
+        """USAspendingキャッシュをクリア"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM usaspending_trends_cache")
+                    conn.commit()
+                    logger.info("✅ usaspending_trendsのキャッシュをクリアしました")
+                    return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ usaspending_trendsキャッシュクリア中に接続エラー: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ usaspending_trendsキャッシュクリアエラー: {e}", exc_info=True)
             return False
 
     def get_kkj_trends_from_cache(self):

@@ -87,6 +87,14 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
             apiEndpoint = '/api/appstore-trends';
             params = '?country=JP&category=all&limit=25';
             break;
+        case 'estat':
+            apiEndpoint = '/api/estat-trends';
+            params = '';
+            break;
+        case 'kkj':
+            apiEndpoint = '/api/kkj-trends';
+            params = '';
+            break;
         case 'cnn':
             apiEndpoint = '/api/cnn-trends';
             params = '?limit=25';
@@ -151,6 +159,10 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                     'JPCERT/CC': 'JPCERT/CC',
                     'GitHub': 'GitHub',
                     'App Store': 'App Store',
+                    '行政データ（e-Stat）': 'e-Stat',
+                    '行政データ（政府調達）': '政府調達',
+                    'e-Stat': 'e-Stat',
+                    '政府調達': '政府調達',
                     '株価トレンド': '株価トレンド',
                     '仮想通貨トレンド': '仮想通貨トレンド',
                     '映画トレンド': '映画トレンド',
@@ -387,6 +399,8 @@ function refreshDataFreshnessExternal() {
     updatePlatformStatusExternal('note', 'Note');
     updatePlatformStatusExternal('github', 'GitHub');
     updatePlatformStatusExternal('appstore', 'App Store');
+    updatePlatformStatusExternal('estat', '行政データ（e-Stat）');
+    updatePlatformStatusExternal('kkj', '行政データ（政府調達）');
     updatePlatformStatusExternal('ipa', 'IPA注意喚起');
     updatePlatformStatusExternal('jpcert', 'JPCERT/CC');
     updatePlatformStatusExternal('stock', '株価トレンド');
@@ -401,7 +415,7 @@ function refreshDataFreshnessExternal() {
     // テキスト要素を強制的に表示
     setTimeout(() => {
         // 日本トレンドページの順序に合わせる
-        const platforms = ['nhk', 'news', 'wikipedia', 'google', 'youtube', 'prtimes_hatena', 'qiita', 'hatena', 'zenn', 'note', 'github', 'appstore', 'ipa', 'jpcert', 'stock', 'crypto', 'spotify', 'podcast', 'movie', 'book', 'rakuten', 'twitch'];
+        const platforms = ['nhk', 'news', 'wikipedia', 'google', 'youtube', 'prtimes_hatena', 'qiita', 'hatena', 'zenn', 'note', 'github', 'appstore', 'estat', 'kkj', 'ipa', 'jpcert', 'stock', 'crypto', 'spotify', 'podcast', 'movie', 'book', 'rakuten', 'twitch'];
         platforms.forEach(platform => {
             const lastUpdateElement = document.getElementById(`${platform}LastUpdate`);
             const dataCountElement = document.getElementById(`${platform}DataCount`);

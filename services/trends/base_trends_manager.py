@@ -61,6 +61,14 @@ class BaseTrendsManager(ABC):
         use_dummy = os.getenv("USE_DUMMY_DATA", "").strip().lower()
         return use_dummy in ("true", "1", "yes")
 
+    def _use_real_data_when_dummy_mode(self) -> bool:
+        """USE_DUMMY_DATA=true のときでも実データ（API/キャッシュ）を使うか。
+
+        行政データタブ（e-Stat・官公需）のみ True にし、それ以外は False（常にダミー返却）。
+        デフォルトは False。
+        """
+        return False
+
     def _generate_dummy_data(self, limit: int = 25, *args, **kwargs) -> List[Dict[str, Any]]:
         """ダミーデータを生成する（デフォルト実装）
 
@@ -265,42 +273,11 @@ class BaseTrendsManager(ABC):
         """
         try:
             # --- ダミーモード（ローカル開発用） ---
-            if self._is_dummy_mode():
-                logger.info(f"🎭 {self.service_name}: ダミーモードが有効です。ダミーデータを処理します")
+            # 行政データタブ（e-Stat等）は _use_real_data_when_dummy_mode()=True で通常モードへ
+            if self._is_dummy_mode() and not self._use_real_data_when_dummy_mode():
+                logger.info(f"🎭 {self.service_name}: ダミーモードが有効です。キャッシュは使わずダミーデータを返します")
 
-                # force_refresh の場合はキャッシュをクリア
-                if force_refresh:
-                    logger.info(f"🔄 {self.service_name}: (dummy) force_refresh指定のためキャッシュをクリアします")
-                    self._clear_cache(*args, **kwargs)
-
-                # まずキャッシュからダミーデータを取得
-                cached_dummy_data: Optional[List[Dict[str, Any]]] = None
-                if not force_refresh:
-                    cached_dummy_data = self._get_from_cache(*args, **kwargs)
-
-                if cached_dummy_data and len(cached_dummy_data) > 0:
-                    if hasattr(self, "_is_valid_cached_data") and not self._is_valid_cached_data(cached_dummy_data):
-                        try:
-                            self._clear_cache(*args, **kwargs)
-                        except Exception:
-                            pass
-                        cached_dummy_data = None
-                        logger.info(f"🔄 {self.service_name}: キャッシュ形式が不正なためクリアして再生成します")
-                if cached_dummy_data and len(cached_dummy_data) > 0:
-                    cached_dummy_data = self._apply_default_sorting(
-                        cached_dummy_data, sort_key=sort_key, reverse=sort_reverse
-                    )
-                    logger.info(f"✅ {self.service_name}: ダミーモード - キャッシュから{len(cached_dummy_data)}件のデータを取得しました")
-                    return {
-                        "success": True,
-                        "data": cached_dummy_data[:limit],
-                        "status": "dummy_cached",
-                        "source": "dummy_database_cache",
-                        **kwargs,
-                    }
-
-                # キャッシュがない場合はダミーデータを生成
-                logger.info(f"⚠️ {self.service_name}: ダミーモードのキャッシュデータが見つかりません。新しくダミーデータを生成します")
+                # USE_DUMMY_DATA 時はキャッシュに残っている実データを返さないため、常に新規ダミー生成
                 dummy_data = self._generate_dummy_data(limit=limit, *args, **kwargs)
 
                 # キャッシュ保存はベストエフォート（失敗してもアラートは飛ばさない）

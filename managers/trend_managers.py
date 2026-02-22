@@ -44,6 +44,8 @@ from services.trends.globenewswire_trends import GlobeNewswireTrendsManager
 from services.trends.globenewswire_market_reaction_trends import GlobeNewswireMarketReactionTrendsManager
 from services.trends.estat_trends import EstatTrendsManager
 from services.trends.kkj_trends import KKJTrendsManager
+from services.trends.bls_trends import BlsTrendsManager
+from services.trends.usaspending_trends import UsaspendingTrendsManager
 from utils.logger_config import get_logger
 
 # ロガーの初期化
@@ -88,7 +90,9 @@ MANAGER_CONFIGS = [
     ('globenewswire', GlobeNewswireTrendsManager, 'GlobeNewswire'),
     ('globenewswire_market_reaction', GlobeNewswireMarketReactionTrendsManager, 'GlobeNewswire × Market'),
     ('estat', EstatTrendsManager, 'e-Stat'),
-    ('kkj', KKJTrendsManager, '官公需'),
+    ('kkj', KKJTrendsManager, '政府調達'),
+    ('bls', BlsTrendsManager, 'BLS'),
+    ('usaspending', UsaspendingTrendsManager, 'USAspending'),
 ]
 
 
@@ -223,6 +227,9 @@ def refresh_all_trends(managers, force_refresh=True):
     tasks.append(('zenn', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
     tasks.append(('note', lambda m: m.get_trends(category='all', limit=25, force_refresh=force_refresh, fetch_all_categories=True), 'JP'))
     tasks.append(('wikipedia', lambda m: m.get_trends(lang='ja', limit=25, force_refresh=force_refresh), 'JP'))
+    # 行政データ（e-Stat）/ 政府調達（KKJ）も定期取得（JPのみ）
+    tasks.append(('estat', lambda m: m.get_trends(limit=6, force_refresh=force_refresh), 'JP'))
+    tasks.append(('kkj', lambda m: m.get_public_sector_signals(force_refresh=force_refresh, cache_only=False), 'JP'))
 
     # USのデータを更新するタスク
     logger.info("🇺🇸 USのデータを更新中（並列実行）...")
@@ -263,6 +270,8 @@ def refresh_all_trends(managers, force_refresh=True):
     tasks.append(('medium', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
     tasks.append(('devto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
     tasks.append(('wikipedia', lambda m: m.get_trends(lang='en', limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('bls', lambda m: m.get_trends(limit=10, force_refresh=force_refresh), 'US'))
+    tasks.append(('usaspending', lambda m: m.get_trends(force_refresh=force_refresh), 'US'))
 
     # 並列実行（最大20スレッド）
     max_workers = min(20, len(tasks))

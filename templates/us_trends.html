@@ -82,9 +82,10 @@
     <link href="{{ url_for('static', filename='css/us-trends.css') }}" rel="stylesheet">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/app-common.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app-common.js') }}?v=20260221-accordion"></script>
     <script src="{{ url_for('static', filename='js/display-functions.js') }}"></script>
     <script src="{{ url_for('static', filename='js/us-trends.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/us-admin-trends.js') }}"></script>
 </head>
 <body id="trends-us" class="bg-light">
     <!-- ヘッダー -->
@@ -99,15 +100,50 @@
             To view the trends dashboard, please enable JavaScript. Track U.S. trends from Google Trends, YouTube, Hacker News, Spotify, and more.
         </div>
     </noscript>
-    <main class="container-fluid py-4">
+    <main class="container-fluid main-content-compact">
         <div id="mainContent">
-            <header class="mb-3">
-                <h1 class="h3 fw-bold mb-2">US Trends - Latest Trends in America</h1>
-                <p class="text-muted small">Displaying latest trend data from Google Trends, YouTube, Stock markets, Spotify, Hacker News, Twitch, and Podcasts. Track cryptocurrency and stock market movements. Data update processing starts daily at 1 AM, 7 AM, 1 PM, and 7 PM (JST) (may take 10-20 minutes to complete).</p>
+            <header class="page-header-compact">
+                <h1 class="h3 fw-bold mb-1">US Trends - Latest Trends in America</h1>
+                <div class="row align-items-start g-2 header-row">
+                    <div class="col-12 col-lg-6">
+                        <div class="header-description-wrapper">
+                            <input type="checkbox" id="header-desc-toggle-us" class="header-desc-toggle" aria-label="Toggle description">
+                            <p class="text-muted small mb-0 header-description">Displaying latest trend data from Google Trends, YouTube, Stock markets, Spotify, Hacker News, Twitch, and Podcasts. Track cryptocurrency and stock market movements. Data update processing starts daily at 1 AM, 7 AM, 1 PM, and 7 PM (JST) (may take 10-20 minutes to complete).</p>
+                            <label for="header-desc-toggle-us" class="header-desc-more">
+                                <span class="header-desc-more-text">More</span>
+                                <span class="header-desc-less-text">Less</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-12 col-lg-6">
+                        <div id="header-admin-unified" class="rounded border bg-light p-2 position-relative">
+                            <span class="position-absolute top-0 end-0 mt-1 me-1" style="font-size: 0.7rem;">
+                                <a href="#" class="btn btn-sm btn-outline-primary py-0 px-1 estat-goto-tab ms-1" data-target-tab="tab-govdata" aria-label="Go to Gov Data tab">More</a>
+                            </span>
+                            <div class="row g-2 mb-0 header-admin-cols">
+                                <div class="col-12 col-md-6 header-admin-col-left">
+                                    <div class="header-admin-section-title">
+                                        <i class="fas fa-chart-line me-1"></i>US Economy (BLS)
+                                        <span id="header-estat-latest-period" class="text-muted ms-1"></span>
+                                    </div>
+                                    <div id="header-estat-compact-body" class="header-admin-latest" aria-live="polite">
+                                        <span class="text-muted">Loading...</span>
+                                    </div>
+                                </div>
+                                <div class="col-12 col-md-6 header-admin-col-right">
+                                    <div class="header-admin-section-title">US Government Spending (USAspending)</div>
+                                    <div id="header-kkj-compact-body" class="header-kkj-body">
+                                        <span class="text-muted">Loading...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </header>
             <section id="trends" aria-label="Trend information">
                 <!-- Category tabs (horizontal scroll on mobile) -->
-                <div class="trend-tabs-wrapper mb-3">
+                <div class="trend-tabs-wrapper trend-tabs-compact">
                     <ul class="nav nav-tabs trend-category-tabs flex-nowrap" id="trendCategoryTabs" role="tablist">
                         <li class="nav-item" role="presentation">
                             <button class="nav-link active" id="tab-all" data-bs-toggle="tab" data-bs-target="#pane-all" type="button" role="tab" aria-controls="pane-all" aria-selected="true">All</button>
@@ -126,6 +162,9 @@
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="tab-entertainment" data-bs-toggle="tab" data-bs-target="#pane-entertainment" type="button" role="tab" aria-controls="pane-entertainment" aria-selected="false">Entertainment</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-govdata" data-bs-toggle="tab" data-bs-target="#pane-govdata" type="button" role="tab" aria-controls="pane-govdata" aria-selected="false">Gov Data</button>
                         </li>
                     </ul>
                 </div>
@@ -2190,6 +2229,21 @@
             </div>
         </div>
                     </div><!-- /.tab-pane#pane-entertainment -->
+
+                    <!-- Gov Data tab: US Economy (BLS) + US Government Spending (USAspending) -->
+                    <div class="tab-pane fade" id="pane-govdata" role="tabpanel" aria-labelledby="tab-govdata">
+                        <p class="text-muted small mb-3">US economic indicators (CPI, unemployment, employment, JOLTS, ECI, construction) and federal spending data. Sources: <a href="https://www.bls.gov/" target="_blank" rel="noopener">BLS</a>, <a href="https://www.usaspending.gov/" target="_blank" rel="noopener">USAspending.gov</a>.</p>
+                        <div id="us-gov-loading" class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading</span></div>
+                            <p class="mt-3 mb-0 small text-muted">Loading government data...</p>
+                        </div>
+                        <div id="us-gov-body" style="display: none;">
+                            <h3 class="h5 mt-2 mb-2"><i class="fas fa-chart-line"></i> US Economy (BLS)</h3>
+                            <div id="us-bls-cards" class="row g-3 mb-4"></div>
+                            <h3 class="h5 mt-4 mb-2"><i class="fas fa-university"></i> US Government Spending</h3>
+                            <div id="us-usaspending-cards"></div>
+                        </div>
+                    </div><!-- /.tab-pane#pane-govdata -->
                 </div><!-- #trendCategoryTabContent -->
             </section>
         </div>

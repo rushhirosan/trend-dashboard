@@ -219,7 +219,7 @@ def generate_dummy_estat_data(limit: int = 6) -> List[Dict[str, Any]]:
         ("housing_starts", "住宅着工", "棟", "45230", "202601"),
         ("unemployment", "完全失業率", "%", "2.4", "202601"),
         ("real_wages", "実質賃金指数", "前年同月比", "97.5", "202512"),
-        ("trade", "貿易統計（輸出額）", "億円", "85000", "202601"),
+        ("retail_sales", "小売業販売額", "億円", "14821", "202601"),
     ]
     dummy_data: List[Dict[str, Any]] = []
     for i, (ind_id, name_ja, unit, val, period) in enumerate(indicators[:limit]):
@@ -230,6 +230,32 @@ def generate_dummy_estat_data(limit: int = 6) -> List[Dict[str, Any]]:
             "series": [{"period": period, "value": val, "unit": unit}],
             "updated_at": period,
             "stats_data_id": None,
+        }
+        dummy_data.append(item)
+    return dummy_data
+
+
+def generate_dummy_bls_data(limit: int = 8) -> List[Dict[str, Any]]:
+    """BLS（米国労働統計）用のダミーデータを生成（indicator_id, name_en, series 形式）"""
+    indicators = [
+        ("cpi", "CPI (All Items, SA)", "1982-84=100", "314.2", "202601"),
+        ("unemployment", "Unemployment Rate", "%", "3.9", "202601"),
+        ("employment", "Total Nonfarm Employment", "thousands", "159526", "202601"),
+        ("jolts_openings", "JOLTS Job Openings", "thousands", "9125", "202512"),
+        ("jolts_hires", "JOLTS Hires", "thousands", "5923", "202512"),
+        ("jolts_quits", "JOLTS Quits", "thousands", "3521", "202512"),
+        ("eci", "Employment Cost Index (Wages)", "index", "158.2", "202510"),
+        ("construction_emp", "Construction Employment", "thousands", "8275", "202601"),
+    ]
+    dummy_data: List[Dict[str, Any]] = []
+    for i, (ind_id, name_en, unit, val, period) in enumerate(indicators[:limit]):
+        item: Dict[str, Any] = {
+            "indicator_id": ind_id,
+            "name_en": name_en,
+            "unit": unit,
+            "series": [{"period": period, "value": val, "unit": unit}],
+            "updated_at": period,
+            "series_id": f"BLS_{ind_id}",
         }
         dummy_data.append(item)
     return dummy_data

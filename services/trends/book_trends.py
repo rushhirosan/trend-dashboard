@@ -204,25 +204,7 @@ class BookTrendsManager(BaseTrendsManager):
         """
         try:
             if self._is_dummy_mode():
-                logger.info(f"🎭 Book: ダミーモードが有効です。ダミーデータのみ返却します (country: {country}, category: {category})")
-                if force_refresh:
-                    try:
-                        self._clear_cache(country=country, category=category)
-                    except Exception as e:
-                        logger.warning(f"⚠️ Book: ダミーモード キャッシュクリア中にエラー: {e}")
-                cached_data = self._get_from_cache(country=country, category=category)
-                if cached_data and len(cached_data) > 0:
-                    cached_data.sort(key=lambda x: x.get('rank', 999999))
-                    logger.info(f"✅ Book: ダミーキャッシュから {len(cached_data)} 件取得 (country: {country})")
-                    return {
-                        'success': True,
-                        'data': cached_data[:limit],
-                        'status': 'dummy_cached',
-                        'source': 'dummy_database_cache',
-                        'country': country,
-                        'category': category,
-                        'total_count': len(cached_data),
-                    }
+                logger.info(f"🎭 Book: ダミーモードが有効です。キャッシュは使わずダミーデータを返します (country: {country}, category: {category})")
                 dummy_data = generate_dummy_book_data(country=country, limit=limit)
                 try:
                     if self._save_to_cache(dummy_data, country=country, category=category):

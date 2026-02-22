@@ -34,7 +34,8 @@ body#trends-us #trends #pane-news:not(.active):not(.show),
 body#trends-us #trends #pane-search:not(.active):not(.show),
 body#trends-us #trends #pane-tech:not(.active):not(.show),
 body#trends-us #trends #pane-market:not(.active):not(.show),
-body#trends-us #trends #pane-entertainment:not(.active):not(.show) {
+body#trends-us #trends #pane-entertainment:not(.active):not(.show),
+body#trends-us #trends #pane-govdata:not(.active):not(.show) {
     display: none !important;
     visibility: hidden !important;
     height: 0 !important;
@@ -52,7 +53,8 @@ body#trends-us #trends #pane-news:not(.active):not(.show) *,
 body#trends-us #trends #pane-search:not(.active):not(.show) *,
 body#trends-us #trends #pane-tech:not(.active):not(.show) *,
 body#trends-us #trends #pane-market:not(.active):not(.show) *,
-body#trends-us #trends #pane-entertainment:not(.active):not(.show) * {
+body#trends-us #trends #pane-entertainment:not(.active):not(.show) *,
+body#trends-us #trends #pane-govdata:not(.active):not(.show) * {
     display: none !important;
     visibility: hidden !important;
     height: 0 !important;
@@ -97,8 +99,46 @@ body#trends-us #trends #pane-tech .trend-table-container,
 body#trends-us #trends #pane-news .trend-table-container,
 body#trends-us #trends #pane-search .trend-table-container,
 body#trends-us #trends #pane-market .trend-table-container,
-body#trends-us #trends #pane-entertainment .trend-table-container {
+body#trends-us #trends #pane-entertainment .trend-table-container,
+body#trends-us #trends #pane-govdata .trend-table-container {
     max-height: 400px !important;
     overflow-y: auto !important;
     padding-bottom: 0.5rem !important; /* 最下部のタイトルが切れない最小余白（スクロールバー下端と行を揃える） */
+}
+
+/* === USヘッダー: Gov Data 最新表示 === */
+/* === USヘッダー: 日本ページと同じレイアウト === */
+body#trends-us .header-row { margin-bottom: 0 !important; }
+body#trends-us #header-admin-unified .header-admin-cols { padding-top: 0.1rem; padding-right: 3rem; }
+body#trends-us #header-admin-unified .header-admin-section-title {
+    font-size: 0.7rem;
+    line-height: 1.25;
+    margin-bottom: 0.2rem;
+    font-weight: 700;
+    color: #6c757d !important;
+}
+body#trends-us #header-estat-compact-body,
+body#trends-us #header-kkj-compact-body {
+    font-size: 0.7rem;
+    line-height: 1.25;
+    padding: 0.1rem 0;
+    color: #212529 !important;
+    min-height: 2.2rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.1rem;
+}
+body#trends-us #header-kkj-compact-body .text-muted,
+body#trends-us #header-estat-compact-body .text-muted { color: #6c757d !important; }
+body#trends-us .header-admin-latest-title,
+body#trends-us .header-admin-latest-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+body#trends-us .header-admin-latest-line {
+    display: block;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
 }

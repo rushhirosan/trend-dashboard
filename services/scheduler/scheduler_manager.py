@@ -1,5 +1,6 @@
 import os
 import logging
+import socket
 import time
 import signal
 from datetime import datetime
@@ -7,6 +8,19 @@ try:
     import fcntl
 except ImportError:
     fcntl = None  # Windows等では未使用（複数ワーカー時は二重実行の可能性あり）
+
+
+def _process_identity():
+    """二重実行の原因調査用: ホスト名とプロセスIDを返す"""
+    try:
+        host = socket.gethostname()
+        # Fly.ioのホスト名は長いことがあるため先頭12文字に省略
+        host_short = (host[:12] + "..") if len(host) > 12 else host
+        return host_short, os.getpid()
+    except Exception:
+        return "unknown", os.getpid()
+
+
 import pytz
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -77,7 +91,6 @@ class TrendsScheduler:
             ('db', holder_id) or ('file', fd): 取得成功時
             None: 取得失敗（他プロセスが実行中）
         """
-        import socket
         holder_id = f"{socket.gethostname()}-{os.getpid()}-{int(time.time())}"
         
         # 1) DB分散ロック（USE_DB_LOCK=true のときのみ。単一インスタンスでは false にして確実に1本動かす）
@@ -94,9 +107,11 @@ class TrendsScheduler:
                             lock_status = self.db.get_scheduler_lock_status()
                         except Exception:
                             pass
-                    logger.info(
-                        "⏭️ スケジューラーDB分散ロックは他プロセスが保持中のためスキップ lock_status=%s",
-                        lock_status,
+                    host_short, pid = _process_identity()
+                    logger.warning(
+                        "⏭️ [二重実行防止] スケジューラーDB分散ロックは他プロセスが保持中のためスキップ "
+                        "host=%s pid=%s lock_status=%s",
+                        host_short, pid, lock_status,
                     )
                     return None
             except Exception as e:
@@ -114,6 +129,12 @@ class TrendsScheduler:
             logger.debug("🔒 スケジューラーファイルロックを取得しました（DBロック未使用）")
             return ('file', fd)
         except (BlockingIOError, OSError):
+            host_short, pid = _process_identity()
+            logger.warning(
+                "⏭️ [二重実行防止] スケジューラーファイルロック取得失敗（他プロセスが保持中） "
+                "host=%s pid=%s",
+                host_short, pid,
+            )
             return None
         except Exception as e:
             logger.warning("⚠️ スケジューラロック取得エラー: %s", e)
@@ -378,7 +399,11 @@ class TrendsScheduler:
         # 分散ロック取得（DB優先→ファイルロック、複数マシン・二重Discord通知を防ぐ）
         lock_handle = self._try_acquire_scheduler_lock()
         if lock_handle is None:
-            logger.info("⏭️ 他プロセス/他マシンがスケジューラを実行中のため、このプロセスではスキップします")
+            host_short, pid = _process_identity()
+            logger.warning(
+                "⏭️ [二重実行防止] 他プロセス/他マシンがスケジューラを実行中のためスキップ host=%s pid=%s",
+                host_short, pid,
+            )
             return
 
         self._fetching_in_progress = True
@@ -432,8 +457,9 @@ class TrendsScheduler:
             
             logger.info("🔄 自動トレンド取得開始 [trigger=%s]", trigger_source)
             start_time = datetime.now(jst)
-            # 同一秒で複数実行された場合にアラートで区別できるようミリ秒を含める
-            execution_id = f"scheduler_{start_time.strftime('%Y%m%d_%H%M%S')}_{start_time.microsecond // 1000:03d}"
+            # 同一秒で複数実行された場合にアラートで区別できるようミリ秒・プロセスIDを含める
+            host_short, pid = _process_identity()
+            execution_id = f"scheduler_{start_time.strftime('%Y%m%d_%H%M%S')}_{start_time.microsecond // 1000:03d}_p{pid}"
             
             # メモリ節約のため、古いキャッシュデータを削除（2日以上経過したデータ）
             try:
@@ -924,10 +950,13 @@ class TrendsScheduler:
             title = "⚠️ トレンド取得完了（一部失敗）"
             message = f"トレンド取得が完了しましたが、{failed_count}件の失敗があります。\nトリガー: {trigger_label}"
 
-        # 詳細情報を構築（トリガー元を先頭付近に表示）
+        # 詳細情報を構築（トリガー元を先頭付近に表示。二重実行調査用にホスト・PIDを追加）
+        host_short, pid = _process_identity()
         details = {
             "実行ID": execution_id,
             "トリガー": trigger_label,
+            "ホスト": host_short,
+            "プロセスID": str(pid),
             "成功": f"{success_count}/{total_count}",
             "失敗": str(failed_count),
             "失敗率": f"{failure_rate:.1f}%",

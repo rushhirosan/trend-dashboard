@@ -38,6 +38,9 @@ venv.bak/
 # IDE
 .vscode/
 .idea/
+
+# Cursor IDE
+.cursor-local-server.log
 *.swp
 *.swo
 *~

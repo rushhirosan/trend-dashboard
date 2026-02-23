@@ -261,6 +261,31 @@ def generate_dummy_bls_data(limit: int = 8) -> List[Dict[str, Any]]:
     return dummy_data
 
 
+def generate_dummy_youtube_data(region_code: str = "JP", limit: int = 25) -> List[Dict[str, Any]]:
+    """YouTube トレンド用のダミーデータを生成（USE_DUMMY_DATA 時・表示フォーマット互換）
+
+    displayYouTubeResults が期待する video_id, channel_title, view_count 等を含む。
+    """
+    dummy_data: List[Dict[str, Any]] = []
+    now = datetime.now().isoformat()
+    for i in range(1, limit + 1):
+        view_count = random.randint(10_000, 10_000_000)
+        item: Dict[str, Any] = {
+            "rank": i,
+            "title": generate_lorem_text(2, 6).rstrip("."),
+            "channel_title": f"Channel {generate_lorem_text(1, 2).rstrip('.')}",
+            "view_count": view_count,
+            "like_count": random.randint(100, 100000),
+            "comment_count": random.randint(10, 5000),
+            "published_at": now,
+            "video_id": f"dummy{i:06d}vid",
+            "thumbnail_url": "",
+            "description": generate_lorem_text(5, 15),
+        }
+        dummy_data.append(item)
+    return dummy_data
+
+
 def generate_dummy_rakuten_data(limit: int = 25, genre_id: str = "all") -> List[Dict[str, Any]]:
     """楽天トレンド用のダミーデータを生成（rakuten_trends_cache スキーマ互換）"""
     dummy_data: List[Dict[str, Any]] = []

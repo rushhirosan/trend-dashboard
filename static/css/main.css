@@ -1864,6 +1864,13 @@ body.data-status-active #data-status .card-body {
 
 /* レスポンシブデザイン - モバイル環境でのカード高さ調整（991px以下） */
 @media (max-width: 991px) {
+    /* モバイル: タイトル下のグレーサブテキスト（説明文）を非表示にして行の高さを抑える */
+    .trend-card td:has(strong) br,
+    .trend-card td:has(strong) small.text-muted,
+    .trend-card td:has(strong) div.text-muted {
+        display: none !important;
+    }
+
     /* モバイル表示でQiitaとPodcastをSpotifyと同じスタイルに */
     /* ChatGPTのアドバイスに基づく修正：高さ0、overflow問題を解決 */
     
@@ -3816,13 +3823,13 @@ ul.trend-category-tabs li.nav-item button.nav-link.active {
     #pane-all .all-more-toggle {
         display: none !important;
     }
-    .category-more-tbody {
-        display: table-row-group !important;
-        height: auto !important;
-        overflow: visible !important;
-    }
+    /* PC: カテゴリタブは全件表示、続きを表示ボタンは非表示（モバイル時のみ5行+アコーディオン） */
     .category-more-toggle {
         display: none !important;
+    }
+    #trends tbody tr.more-row,
+    body#trends-us #trends tbody tr.more-row {
+        display: table-row !important;
     }
 }
 
@@ -3834,6 +3841,15 @@ ul.trend-category-tabs li.nav-item button.nav-link.active {
 }
 .more-rows-open .more-row {
     display: table-row;
+}
+
+/* モバイル: 5行+アコーディオン - 強制表示ルール(#xxxResults tr)を上書きし、続き行を閉じた時は非表示に */
+@media (max-width: 991.98px) {
+    #trends tbody:not(.more-rows-open) tr.more-row,
+    body#trends-us #trends tbody:not(.more-rows-open) tr.more-row {
+        display: none !important;
+        visibility: hidden !important;
+    }
 }
 
 /* 分割箇所の線だけ消す */

@@ -66,6 +66,9 @@ function displayHatenaResults(data) {
         });
 
         showHatenaResults();
+        if (typeof applyCategoryAccordionForAllTables === 'function') {
+            setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+        }
     } else {
         showHatenaError('データが見つかりませんでした');
     }

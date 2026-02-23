@@ -9,6 +9,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from database_config import TrendsCache
 from utils.logger_config import get_logger
+from utils.dummy_data_generator import generate_dummy_youtube_data
 from services.trends.base_trends_manager import BaseTrendsManager
 
 # ロガーの初期化
@@ -62,6 +63,11 @@ class YouTubeTrendsManager(BaseTrendsManager):
             logger.warning(f"⚠️ YouTube: cache_status更新エラー: {e}")
             return False
     
+    def _generate_dummy_data(self, limit: int = 25, *args, **kwargs):
+        """YouTube用ダミーデータを生成（USE_DUMMY_DATA 時・表示フォーマット互換）"""
+        region_code = kwargs.get('region_code', 'JP')
+        return generate_dummy_youtube_data(region_code=region_code, limit=limit)
+
     def get_trends(self, region_code: str = 'JP', max_results: int = 25, force_refresh=False):
         """YouTubeのトレンド動画を取得（キャッシュデータが存在しない場合は外部APIを呼び出し）"""
         # ベースクラスのget_trendsを使用し、視聴回数でソートするように設定

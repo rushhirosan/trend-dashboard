@@ -151,6 +151,9 @@ function displayStockResultsUS(data) {
     if (typeof syncToAllPane === 'function') {
         setTimeout(() => syncToAllPane('stockTrendsTableBody', 'all-stockTrendsTableBody', 5), 0);
     }
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+    }
     console.log('✅ Stock Results display completed');
 }
 
@@ -281,6 +284,9 @@ function displayCryptoResultsUS(data) {
     if (typeof syncToAllPane === 'function') {
         setTimeout(() => syncToAllPane('cryptoTrendsTableBody', 'all-cryptoTrendsTableBody', 5), 0);
     }
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+    }
 }
 
 // Movie Trends data fetch for US
@@ -399,6 +405,9 @@ function displayMovieResultsUS(data) {
     resultsElement.style.setProperty('display', 'block', 'important');
     if (typeof syncToAllPane === 'function') {
         setTimeout(() => syncToAllPane('movieTrendsTableBody', 'all-movieTrendsTableBody', 5), 0);
+    }
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
     }
 }
 
@@ -530,6 +539,9 @@ function displayBookResultsUS(data) {
     resultsElement.style.setProperty('display', 'block', 'important');
     if (typeof syncToAllPane === 'function') {
         setTimeout(() => syncToAllPane('bookTrendsTableBody', 'all-bookTrendsTableBody', 5), 0);
+    }
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
     }
 }
 
@@ -918,6 +930,9 @@ function displayGoogleResults(data) {
     if (typeof syncToAllPane === 'function') {
         setTimeout(() => syncToAllPane('googleTrendsTableBody', 'all-googleTrendsTableBody', 5), 0);
     }
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+    }
     console.log('displayGoogleResults: Completed');
 }
 
@@ -947,15 +962,36 @@ function displayYouTubeResults(data) {
     // Hide status message
     statusMessage.style.display = 'none';
     
-    // Clear table
-    tableBody.innerHTML = '';
-    
     // 視聴回数でソート（降順）
-    const sortedData = [...data.data].sort((a, b) => {
-        const viewCountA = a.view_count || a.views || a.viewCount || 0;
-        const viewCountB = b.view_count || b.views || b.viewCount || 0;
-        return viewCountB - viewCountA; // 降順ソート
-    });
+    const sortedData = (data.data && Array.isArray(data.data))
+        ? [...data.data].sort((a, b) => {
+            const viewCountA = a.view_count || a.views || a.viewCount || 0;
+            const viewCountB = b.view_count || b.views || b.viewCount || 0;
+            return viewCountB - viewCountA; // 降順ソート
+        })
+        : [];
+    
+    // データが空のときはスケルトン（ダミー）を表示
+    if (sortedData.length === 0) {
+        tableBody.innerHTML = `
+            <tr class="skeleton-row"><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton skeleton-text skeleton-text-long"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text skeleton-text-short"></div></td></tr>
+            <tr class="skeleton-row"><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton skeleton-text skeleton-text-long"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text skeleton-text-short"></div></td></tr>
+            <tr class="skeleton-row"><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton skeleton-text skeleton-text-long"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text skeleton-text-short"></div></td></tr>
+            <tr class="skeleton-row"><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton skeleton-text skeleton-text-long"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text skeleton-text-short"></div></td></tr>
+            <tr class="skeleton-row"><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton skeleton-text skeleton-text-long"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text skeleton-text-short"></div></td></tr>
+        `;
+        if (typeof syncToAllPane === 'function') {
+            setTimeout(() => syncToAllPane('youtubeTrendsTableBody', 'all-youtubeTrendsTableBody', 5), 0);
+        }
+        if (typeof applyCategoryAccordionForAllTables === 'function') {
+            setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+        }
+        console.log('displayYouTubeResults: No data, showing skeleton');
+        return;
+    }
+    
+    // Clear table and add data
+    tableBody.innerHTML = '';
     
     // Add data to table
     console.log('YouTube data structure check:', sortedData[0]); // Debug: Check first item structure
@@ -980,6 +1016,9 @@ function displayYouTubeResults(data) {
     
     if (typeof syncToAllPane === 'function') {
         setTimeout(() => syncToAllPane('youtubeTrendsTableBody', 'all-youtubeTrendsTableBody', 5), 0);
+    }
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
     }
     console.log('displayYouTubeResults: Completed');
 }
@@ -1257,6 +1296,9 @@ function displayWorldNewsResults(data) {
     if (typeof syncToAllPane === 'function') {
         setTimeout(() => syncToAllPane('worldnewsTrendsTableBody', 'all-worldnewsTrendsTableBody', 5), 0);
     }
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+    }
     console.log('displayWorldNewsResults: Completed');
 }
 
@@ -1310,6 +1352,9 @@ function displaySpotifyResults(data) {
     
     if (typeof syncToAllPane === 'function') {
         setTimeout(() => syncToAllPane('spotifyTrendsTableBody', 'all-spotifyTrendsTableBody', 5), 0);
+    }
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
     }
     console.log('displaySpotifyResults: Completed');
 }
@@ -1476,6 +1521,9 @@ function displayRedditResults(data) {
         tableBody.appendChild(row);
     });
     
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+    }
     console.log('displayRedditResults: Completed');
 }
 
@@ -1616,6 +1664,9 @@ function displayPodcastResults(data) {
     if (typeof syncToAllPane === 'function') {
         setTimeout(() => syncToAllPane('podcastTrendsTableBody', 'all-podcastTrendsTableBody', 5), 0);
     }
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+    }
     console.log('displayPodcastResults: Completed -', tableBody.children.length, 'rows added');
 }
 
@@ -1744,6 +1795,9 @@ function displayTwitchResults(data, type = 'games') {
     if (typeof syncToAllPane === 'function') {
         setTimeout(() => syncToAllPane('twitchTrendsTableBody', 'all-twitchTrendsTableBody', 5), 0);
     }
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+    }
     console.log('displayTwitchResults: Completed');
 }
 
@@ -1865,6 +1919,9 @@ function displayHackerNewsResults(data) {
     
     if (typeof syncToAllPane === 'function') {
         setTimeout(() => syncToAllPane('hackernewsTrendsTableBody', 'all-hackernewsTrendsTableBody', 5), 0);
+    }
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
     }
     console.log('displayHackerNewsResults: Completed');
 }
@@ -2039,6 +2096,9 @@ function displayGlobeNewswireResults(data) {
     if (typeof syncToAllPane === 'function') {
         setTimeout(() => syncToAllPane('globenewswireTrendsTableBody', 'all-globenewswireTrendsTableBody', 5), 0);
     }
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+    }
 }
 
 function showGlobeNewswireError(message) {
@@ -2131,6 +2191,9 @@ function displayCNNResults(data) {
     if (typeof syncToAllPane === 'function') {
         setTimeout(() => syncToAllPane('cnnTrendsTableBody', 'all-cnnTrendsTableBody', 5), 0);
     }
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+    }
     console.log('displayCNNResults: Completed');
 }
 
@@ -2191,6 +2254,9 @@ function displayWikipediaResultsUS(data) {
 
     if (typeof syncToAllPane === 'function') {
         setTimeout(() => syncToAllPane('wikipediaTrendsTableBody', 'all-wikipediaTrendsTableBody', 5), 0);
+    }
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
     }
 }
 
@@ -2319,6 +2385,9 @@ function displayProductHuntResults(data) {
     if (typeof syncToAllPane === 'function') {
         setTimeout(() => syncToAllPane('producthuntTrendsTableBody', 'all-producthuntTrendsTableBody', 5), 0);
     }
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+    }
     console.log('displayProductHuntResults: Completed');
 }
 
@@ -2376,6 +2445,9 @@ function loadGitHubTrendsFromCacheUS() {
                 console.log('GitHub Trends data display starting');
                 if (typeof displayGitHubResults === 'function') {
                     displayGitHubResults(data);
+                    if (typeof applyCategoryAccordionForAllTables === 'function') {
+                        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+                    }
                 } else {
                     console.error('displayGitHubResults function not found');
                 }
@@ -2429,6 +2501,9 @@ function loadAppStoreTrendsFromCacheUS() {
                 console.log('App Store Trends data display starting');
                 if (typeof displayAppStoreResults === 'function') {
                     displayAppStoreResults(data);
+                    if (typeof applyCategoryAccordionForAllTables === 'function') {
+                        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+                    }
                 } else {
                     console.error('displayAppStoreResults function not found');
                 }
@@ -2481,6 +2556,9 @@ function loadCISAKEVTrendsFromCacheUS() {
                 console.log('CISA KEV data display starting');
                 if (typeof displayCISAKEVResults === 'function') {
                     displayCISAKEVResults(data);
+                    if (typeof applyCategoryAccordionForAllTables === 'function') {
+                        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+                    }
                 } else {
                     console.error('displayCISAKEVResults function not found');
                 }
@@ -2533,6 +2611,9 @@ function loadTheHackerNewsTrendsFromCacheUS() {
                 console.log('The Hacker News data display starting');
                 if (typeof displayTheHackerNewsResults === 'function') {
                     displayTheHackerNewsResults(data);
+                    if (typeof applyCategoryAccordionForAllTables === 'function') {
+                        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+                    }
                 } else {
                     console.error('displayTheHackerNewsResults function not found');
                 }
@@ -2786,6 +2867,9 @@ function displayDevToResults(data) {
     if (typeof syncToAllPane === 'function') {
         setTimeout(() => syncToAllPane('devtoTrendsTableBody', 'all-devtoTrendsTableBody', 5), 0);
     }
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+    }
     resultsElement.style.setProperty('display', 'block', 'important');
 }
 
@@ -2836,6 +2920,9 @@ function displayMediumResults(data) {
     
     if (typeof syncToAllPane === 'function') {
         setTimeout(() => syncToAllPane('mediumTrendsTableBody', 'all-mediumTrendsTableBody', 5), 0);
+    }
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
     }
     resultsElement.style.setProperty('display', 'block', 'important');
 }
@@ -2952,6 +3039,9 @@ function displayEbayResults(data) {
     resultsElement.style.setProperty('display', 'block', 'important');
     if (typeof syncToAllPane === 'function') {
         setTimeout(() => syncToAllPane('ebayTrendsTableBody', 'all-ebayTrendsTableBody', 5), 0);
+    }
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
     }
 }
 

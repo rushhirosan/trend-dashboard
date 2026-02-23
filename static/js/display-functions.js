@@ -69,6 +69,9 @@ function displayHatenaResults(data) {
 
     // 結果セクションを表示
     document.getElementById('hatenaResults').style.display = 'block';
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+    }
     console.log('✅ Hatena Results表示完了');
 }
 

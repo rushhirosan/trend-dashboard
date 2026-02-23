@@ -53,6 +53,9 @@ function displayTwitchResults(data) {
         });
         
         showTwitchResults();
+        if (typeof applyCategoryAccordionForAllTables === 'function') {
+            setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+        }
     } else {
         showTwitchError('データが見つかりませんでした');
     }

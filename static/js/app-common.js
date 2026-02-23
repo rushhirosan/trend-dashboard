@@ -378,6 +378,10 @@ function createDropdownTrendsManager(config) {
                         if (allPaneSync && typeof syncToAllPane === 'function') {
                             setTimeout(() => syncToAllPane(allPaneSync.mainTableBodyId, allPaneSync.allTableBodyId, allPaneSync.limit || 5), 0);
                         }
+                        // 5行+アコーディオンを適用（はてな・Note等のドロップダウン型）
+                        if (typeof applyCategoryAccordionForAllTables === 'function') {
+                            setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+                        }
                         // displayFunction内でshowResults/showErrorが呼ばれるので、ここでは呼ばない
                     } else {
                         console.error(`display${serviceName.charAt(0).toUpperCase() + serviceName.slice(1)}Results関数が見つかりません`);
@@ -522,6 +526,10 @@ function loadTrendsFromCache(config) {
                 } else {
                     console.error(`display${serviceName.charAt(0).toUpperCase() + serviceName.slice(1)}Results関数が見つかりません`);
                 }
+                // カテゴリタブの5行+アコーディオンを適用（表示直後に確実に実行）
+                if (typeof applyCategoryAccordionForAllTables === 'function') {
+                    setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+                }
                 // 全部入り（All）タブ用: メイン表の先頭10行をAll用tbodyへ同期
                 const allPaneSync = config.allPaneSync;
                 if (allPaneSync && typeof syncToAllPane === 'function' && hasData) {
@@ -617,7 +625,8 @@ function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 5) {
     if (!table) return;
     const cardBody = table.closest('.card-body');
     const dataRows = Array.from(mainTbody.querySelectorAll('tr:not(.skeleton-row)'));
-    const toCopy = dataRows.slice(0, limit);
+    const isMobile = isMobileViewport();
+    const toCopy = isMobile ? dataRows.slice(0, limit) : dataRows;
     const topCount = 3;
     const visibleRows = toCopy.slice(0, topCount);
     const hiddenRows = toCopy.slice(topCount);
@@ -649,7 +658,7 @@ function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 5) {
         return cloned;
     };
 
-    if (!isMobileViewport()) {
+    if (!isMobile) {
         toCopy.forEach(tr => allTbody.appendChild(cloneWithWrapper(tr)));
         return;
     }
@@ -713,11 +722,6 @@ function applyCategoryRowAccordion(tbodyId, limit = 5) {
     const moreTbodyId = `more-${tbodyId}`;
     const existingMoreList = table.querySelectorAll(`tbody[data-more-for="${tbodyId}"]`);
     const existingToggleList = cardBody ? cardBody.querySelectorAll(`[data-more-toggle="${moreTbodyId}"]`) : [];
-    const wasOpen = (
-        table.dataset.moreOpen === 'true' ||
-        tbody.classList.contains('more-rows-open') ||
-        Array.from(existingToggleList).some(node => node.getAttribute('aria-expanded') === 'true')
-    );
 
     const mainRows = Array.from(tbody.querySelectorAll('tr:not(.skeleton-row)'));
     const moreRows = existingMoreList.length
@@ -730,7 +734,24 @@ function applyCategoryRowAccordion(tbodyId, limit = 5) {
     existingMoreList.forEach(node => node.remove());
     existingToggleList.forEach(node => node.remove());
 
-    if (!isMobileViewport() || allRows.length <= limit) {
+    // PC表示: 全件表示、アコーディオンなし
+    if (!isMobileViewport()) {
+        tbody.classList.remove('has-more', 'more-rows-open');
+        allRows.forEach(tr => {
+            tr.classList.remove('more-row', 'more-row-start', 'more-row-end');
+            tr.style.display = '';
+            tbody.appendChild(tr);
+        });
+        return;
+    }
+
+    const wasOpen = (
+        table.dataset.moreOpen === 'true' ||
+        tbody.classList.contains('more-rows-open') ||
+        Array.from(existingToggleList).some(node => node.getAttribute('aria-expanded') === 'true')
+    );
+
+    if (allRows.length <= limit) {
         tbody.classList.remove('has-more', 'more-rows-open');
         allRows.forEach(tr => {
             tr.classList.remove('more-row', 'more-row-start', 'more-row-end');
@@ -788,30 +809,72 @@ function applyCategoryRowAccordion(tbodyId, limit = 5) {
 }
 
 function applyCategoryAccordionForAllTables(limit = 5) {
-    const selector = '#trendCategoryTabContent .tab-pane:not(#pane-all) tbody[id$="TrendsTableBody"]:not([id^="more-"])';
-    document.querySelectorAll(selector).forEach((tbody) => {
-        if (tbody.id && !tbody.id.startsWith('all-')) {
-            applyCategoryRowAccordion(tbody.id, limit);
+    // 日本・US両方: 全トレンドテーブルに5行+アコーディオン適用
+    // 1) id付き: trendCategoryTabContent内（pane-all以外）の TrendsTableBody
+    let tbodys = document.querySelectorAll('#trendCategoryTabContent .tab-pane:not(#pane-all) tbody[id$="TrendsTableBody"]:not([id^="all-"]):not([id^="more-"])');
+    // 2) id付き: フォールバックで document 全体から検索
+    if (tbodys.length === 0) {
+        tbodys = document.querySelectorAll('tbody[id$="TrendsTableBody"]:not([id^="all-"]):not([id^="more-"])');
+    }
+    // 3) .trend-table tbody（Gov Data等の動的生成テーブル含む）を追加
+    const trendTableTbodys = document.querySelectorAll('#trends .trend-table tbody:not([id^="all-"]):not([id^="more-"])');
+    const allTbodys = new Set([].slice.call(tbodys));
+    trendTableTbodys.forEach(function(t) { allTbodys.add(t); });
+    allTbodys.forEach(function(tbody) {
+        if (tbody.closest('#pane-all')) return;
+        var id = tbody.id;
+        if (!id) {
+            id = 'accordion-tbody-' + (tbody.getAttribute('data-accordion-id') || Math.random().toString(36).slice(2, 10));
+            tbody.setAttribute('data-accordion-id', id);
+            tbody.id = id;
         }
+        applyCategoryRowAccordion(id, limit);
     });
 }
 
 function setupCategoryAccordionObserver(limit = 5) {
     const container = document.getElementById('trendCategoryTabContent');
-    if (!container) return;
     let timer = null;
     const schedule = () => {
         if (timer) clearTimeout(timer);
         timer = setTimeout(() => applyCategoryAccordionForAllTables(limit), 50);
     };
-    const observer = new MutationObserver((mutations) => {
-        if (mutations.some(m => m.type === 'childList')) {
-            schedule();
-        }
-    });
-    observer.observe(container, { childList: true, subtree: true });
+    if (container) {
+        const observer = new MutationObserver((mutations) => {
+            if (mutations.some(m => m.type === 'childList')) {
+                schedule();
+            }
+        });
+        observer.observe(container, { childList: true, subtree: true });
+    }
     schedule();
+    setTimeout(schedule, 100);
+    setTimeout(schedule, 500);
+    setTimeout(schedule, 1500);
+    setTimeout(schedule, 3000);
     window.addEventListener('resize', schedule);
+    window.addEventListener('load', schedule);
+
+    // 起動直後25秒間、1秒ごとにアコーディオンを適用（遅延読み込み・US Gov Data等の全テーブルを確実にカバー）
+    const pollInterval = 1000;
+    const pollDuration = (document.body && document.body.id === 'trends-us') ? 25000 : 15000;
+    let pollElapsed = 0;
+    const pollTimer = setInterval(function() {
+        pollElapsed += pollInterval;
+        applyCategoryAccordionForAllTables(limit);
+        if (pollElapsed >= pollDuration) {
+            clearInterval(pollTimer);
+        }
+    }, pollInterval);
+
+    // タブ切り替え時にも再適用（非表示タブでデータが後から読み込まれる場合に対応）
+    const tabNav = document.getElementById('trendCategoryTabs');
+    if (tabNav) {
+        tabNav.addEventListener('shown.bs.tab', function () {
+            schedule();
+            setTimeout(schedule, 300);
+        });
+    }
 }
 
 if (document.readyState === 'loading') {

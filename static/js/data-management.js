@@ -95,6 +95,9 @@ function loadGoogleTrendsFromCache() {
                 if (loadingElement) loadingElement.style.display = 'none';
                 if (data.data && data.data.length > 0 && typeof displayGoogleResults === 'function') {
                     displayGoogleResults(data);
+                    if (typeof applyCategoryAccordionForAllTables === 'function') {
+                        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+                    }
                 }
                 const resultsElement = document.getElementById('googleResults');
                 if (resultsElement) resultsElement.style.display = 'block';
@@ -384,6 +387,9 @@ function loadHatenaTrendsFromCache() {
                 if (typeof syncToAllPane === 'function') {
                     setTimeout(() => syncToAllPane('hatenaTrendsTableBody', 'all-hatenaTrendsTableBody', 5), 0);
                 }
+                if (typeof applyCategoryAccordionForAllTables === 'function') {
+                    setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+                }
             } else {
                 console.log('📊 Hatena データが見つかりません:', data);
                 // キャッシュにデータがない場合は、ローディングを非表示にして終了
@@ -448,6 +454,9 @@ function loadTwitchTrendsFromCache() {
                 }
                 if (typeof syncToAllPane === 'function') {
                     setTimeout(() => syncToAllPane('twitchTrendsTableBody', 'all-twitchTrendsTableBody', 5), 0);
+                }
+                if (typeof applyCategoryAccordionForAllTables === 'function') {
+                    setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
                 }
             } else {
                 console.log('📊 Twitch データが見つかりません:', data);
@@ -593,6 +602,9 @@ function displayHatenaTrendsFromCache(cachedData) {
                 status: 'cached'
             });
         }
+        if (typeof applyCategoryAccordionForAllTables === 'function') {
+            setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+        }
     }
 }
 
@@ -613,6 +625,9 @@ function displayTwitchTrendsFromCache(cachedData) {
                 data: twitchData,
                 status: 'cached'
             });
+        }
+        if (typeof applyCategoryAccordionForAllTables === 'function') {
+            setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
         }
     }
 }
@@ -708,6 +723,9 @@ function loadPRTimesHatenaTrendsFromCache() {
                 if (loadingElement) loadingElement.style.display = 'none';
                 if (data.data && data.data.length > 0 && typeof displayPRTimesHatenaResults === 'function') {
                     displayPRTimesHatenaResults(data);
+                    if (typeof applyCategoryAccordionForAllTables === 'function') {
+                        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+                    }
                 }
                 var resultsElement = document.getElementById('prtimesHatenaResults');
                 if (resultsElement) resultsElement.style.display = 'block';
@@ -751,6 +769,9 @@ function loadPRTimesTrendsFromCache() {
                 if (loadingElement) loadingElement.style.display = 'none';
                 if (data.data && data.data.length > 0 && typeof displayPRTimesResults === 'function') {
                     displayPRTimesResults(data);
+                    if (typeof applyCategoryAccordionForAllTables === 'function') {
+                        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+                    }
                 }
                 var resultsElement = document.getElementById('prtimesResults');
                 if (resultsElement) resultsElement.style.display = 'block';
@@ -1274,6 +1295,9 @@ function loadNoteTrendsFromCache() {
                 }
                 if (typeof syncToAllPane === 'function') {
                     setTimeout(() => syncToAllPane('noteTrendsTableBody', 'all-noteTrendsTableBody', 5), 0);
+                }
+                if (typeof applyCategoryAccordionForAllTables === 'function') {
+                    setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
                 }
             } else {
                 console.log('Note Trends データなしまたはエラー:', data);

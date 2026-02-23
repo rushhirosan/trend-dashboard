@@ -279,6 +279,9 @@ function displayGoogleResults(data) {
     // 結果を表示
     console.log('displayGoogleResults: 結果表示開始');
     showGoogleResults();
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+    }
     console.log('displayGoogleResults: 完了');
 }
 
@@ -302,15 +305,31 @@ function displayYouTubeResults(data) {
     }
 
     // テーブルを更新
-    console.log('displayYouTubeResults: テーブル更新開始', { dataLength: data.data.length });
-    tableBody.innerHTML = '';
+    console.log('displayYouTubeResults: テーブル更新開始', { dataLength: data.data ? data.data.length : 0 });
 
     // 視聴回数でソート（降順）
-    const sortedData = [...data.data].sort((a, b) => {
-        const viewCountA = a.view_count || 0;
-        const viewCountB = b.view_count || 0;
-        return viewCountB - viewCountA; // 降順ソート
-    });
+    const sortedData = (data.data && Array.isArray(data.data))
+        ? [...data.data].sort((a, b) => {
+            const viewCountA = a.view_count || 0;
+            const viewCountB = b.view_count || 0;
+            return viewCountB - viewCountA; // 降順ソート
+        })
+        : [];
+
+    if (sortedData.length === 0) {
+        // データが空のときはスケルトン（ダミー）を表示
+        tableBody.innerHTML = `
+            <tr class="skeleton-row"><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton skeleton-text skeleton-text-long"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text skeleton-text-short"></div></td></tr>
+            <tr class="skeleton-row"><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton skeleton-text skeleton-text-long"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text skeleton-text-short"></div></td></tr>
+            <tr class="skeleton-row"><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton skeleton-text skeleton-text-long"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text skeleton-text-short"></div></td></tr>
+            <tr class="skeleton-row"><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton skeleton-text skeleton-text-long"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text skeleton-text-short"></div></td></tr>
+            <tr class="skeleton-row"><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton skeleton-text skeleton-text-long"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text skeleton-text-short"></div></td></tr>
+        `;
+        showYouTubeResults();
+        return;
+    }
+
+    tableBody.innerHTML = '';
 
     sortedData.forEach((video, index) => {
         const row = document.createElement('tr');
@@ -355,6 +374,9 @@ function displayYouTubeResults(data) {
     // 結果を表示
     console.log('displayYouTubeResults: 結果表示開始');
     showYouTubeResults();
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+    }
     console.log('displayYouTubeResults: 完了');
 }
 
@@ -696,7 +718,7 @@ function showGoogleError(message) {
     resultsElement.style.display = 'none';
 }
 
-// YouTube Trendsローディング表示
+// YouTube Trendsローディング表示（スケルトン表示のため results は非表示にしない）
 function showYouTubeLoading() {
     const loadingElement = document.getElementById('youtubeLoading');
     const resultsElement = document.getElementById('youtubeResults');
@@ -712,7 +734,8 @@ function showYouTubeLoading() {
     }
 
     loadingElement.style.display = 'block';
-    resultsElement.style.display = 'none';
+    // ダミー/スケルトン表示のため results は表示したまま
+    resultsElement.style.display = 'block';
     errorElement.style.display = 'none';
 }
 
@@ -839,7 +862,8 @@ function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 5) {
     if (!table) return;
     const cardBody = table.closest('.card-body');
     const dataRows = Array.from(mainTbody.querySelectorAll('tr:not(.skeleton-row)'));
-    const toCopy = dataRows.slice(0, limit);
+    const isMobile = window.matchMedia && window.matchMedia('(max-width: 767.98px)').matches;
+    const toCopy = isMobile ? dataRows.slice(0, limit) : dataRows;
     const topCount = 3;
     const visibleRows = toCopy.slice(0, topCount);
     const hiddenRows = toCopy.slice(topCount);
@@ -870,7 +894,6 @@ function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 5) {
         return cloned;
     };
 
-    const isMobile = window.matchMedia && window.matchMedia('(max-width: 767.98px)').matches;
     if (!isMobile) {
         toCopy.forEach(tr => allTbody.appendChild(cloneWithWrapper(tr)));
         return;
@@ -1640,6 +1663,9 @@ function displayHatenaResults(data) {
 
         showHatenaResults();
         showHatenaStatusMessage(`✅ ${data.source} - ${data.total_count || data.data.length}件のエントリーを取得しました`, 'success');
+        if (typeof applyCategoryAccordionForAllTables === 'function') {
+            setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+        }
     } else {
         showHatenaError('データが見つかりませんでした');
     }

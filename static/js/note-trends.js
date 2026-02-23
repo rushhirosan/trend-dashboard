@@ -73,6 +73,9 @@ function displayNoteResults(data) {
         });
 
         showNoteResults();
+        if (typeof applyCategoryAccordionForAllTables === 'function') {
+            setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+        }
     } else {
         showNoteError('データが見つかりませんでした');
     }

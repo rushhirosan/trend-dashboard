@@ -199,16 +199,16 @@
             }).join('');
             trendCard = '<div class="card h-100">' +
                 '<div class="card-header bg-primary text-white py-2"><h5 class="h6 mb-0"><i class="fas fa-chart-area"></i> Annual Total Spending (FY-end)</h5></div>' +
-                '<div class="card-body"><div class="card trend-table category-card"><div class="card-body"><div class="trend-table-container"><div class="table-responsive"><table class="table table-hover trend-table mb-0"><thead class="table-dark"><tr><th>Fiscal Year</th><th class="text-end">Total (approx)</th></tr></thead><tbody>' + trendRows + '</tbody></table></div></div></div></div></div></div>';
+                '<div class="card-body"><div class="card trend-table category-card"><div class="card-body"><div class="trend-table-container"><div class="table-responsive"><table class="table table-hover trend-table mb-0"><thead class="table-dark"><tr><th>Fiscal Year</th><th class="text-end">Total (approx)</th></tr></thead><tbody id="usGovTrendTrendsTableBody">' + trendRows + '</tbody></table></div></div></div></div></div></div>';
         }
         if (agencies.length > 0) {
-            var agencyRows = agencies.slice(0, 10).map(function (a) {
+            var agencyRows = agencies.map(function (a) {
                 var amt = a.current_total_budget_authority_amount || a.obligation_total;
                 return '<tr><td>' + a.rank + '</td><td>' + escapeHtml(a.agency_name || a.abbreviation || '') + '</td><td class="text-end">' + formatNumber(amt) + '</td></tr>';
             }).join('');
             agencyCard = '<div class="card h-100">' +
                 '<div class="card-header bg-info text-white py-2"><h5 class="h6 mb-0"><i class="fas fa-building"></i> Agency Spending Rankings (FY2025)</h5></div>' +
-                '<div class="card-body"><div class="card trend-table category-card"><div class="card-body"><div class="trend-table-container"><div class="table-responsive"><table class="table table-hover trend-table mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Agency</th><th class="text-end">Budget (approx)</th></tr></thead><tbody>' + agencyRows + '</tbody></table></div></div></div></div></div></div>';
+                '<div class="card-body"><div class="card trend-table category-card"><div class="card-body"><div class="trend-table-container"><div class="table-responsive"><table class="table table-hover trend-table mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Agency</th><th class="text-end">Budget (approx)</th></tr></thead><tbody id="usGovAgencyTrendsTableBody">' + agencyRows + '</tbody></table></div></div></div></div></div></div>';
         }
         if (trendCard || agencyCard) {
             html.push('<div class="row g-3 mb-3 align-items-stretch"><div class="col-12 col-md-6">' + trendCard + '</div><div class="col-12 col-md-6">' + agencyCard + '</div></div>');
@@ -237,7 +237,7 @@
                 '<div class="card-header bg-dark text-white py-2"><h5 class="h6 mb-0"><i class="fas fa-file-contract"></i> Top 5 Awards by Category (PSC/NAICS)</h5></div>' +
                 '<div class="card-body pb-3">' +
                 '<div class="table-responsive" style="max-height: 380px; overflow-y: auto;">' +
-                '<table class="table table-hover trend-table mb-2"><thead class="table-dark sticky-top"><tr><th>Category</th><th class="text-end">Rank</th><th>Description</th><th>Agency</th><th>Date</th><th>State</th></tr></thead><tbody>' +
+                '<table class="table table-hover trend-table mb-2"><thead class="table-dark sticky-top"><tr><th>Category</th><th class="text-end">Rank</th><th>Description</th><th>Agency</th><th>Date</th><th>State</th></tr></thead><tbody id="usGovTopCasesTrendsTableBody">' +
                 caseRows.join('') + '</tbody></table></div>' +
                 '<p class="text-muted small mb-0">Source: USAspending.gov. AI: NAICS 541512/541511. DX: PSC Service/D. Cyber: PSC Service/D/DJ.</p></div></div>';
             html.push(caseTable);
@@ -330,6 +330,9 @@
                     usaspendingCards.innerHTML = usData
                         ? renderUsaspendingBody(usData)
                         : '<p class="text-muted small">' + escapeHtml(usaspending.error || 'Data unavailable') + '</p>';
+                    if (usData && typeof applyCategoryAccordionForAllTables === 'function') {
+                        setTimeout(function () { applyCategoryAccordionForAllTables(5); }, 50);
+                    }
                 }
                 if (usaCompact) {
                     usaCompact.innerHTML = usData

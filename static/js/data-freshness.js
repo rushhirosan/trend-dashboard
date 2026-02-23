@@ -257,13 +257,18 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                                     ? apiData.data.length 
                                     : fetchedCount;
                                 
-                                // 表示件数と取得件数を分けて表示（日英併記）
-                                if (displayCount === fetchedCount) {
-                                    // 表示件数と取得件数が同じ場合は取得件数のみ表示（日英併記）
-                                    dataCountElement.textContent = `${fetchedCount}件 / ${fetchedCount}`;
+                                const fullText = displayCount === fetchedCount
+                                    ? `${fetchedCount}件 / ${fetchedCount}`
+                                    : `表示件数${displayCount}件 (取得件数${fetchedCount}件) / Display: ${displayCount} (Fetched: ${fetchedCount})`;
+                                
+                                // モバイル: 縦長防止のため短縮表示（表示/取得）、titleで全文
+                                if (isMobile) {
+                                    dataCountElement.textContent = `${displayCount}/${fetchedCount}`;
+                                    dataCountElement.title = fullText;
                                 } else {
-                                    // 表示件数と取得件数が異なる場合は「表示件数25件 (取得件数60件) / Display: 25 (Fetched: 60)」の形式で表示
-                                    dataCountElement.textContent = `表示件数${displayCount}件 (取得件数${fetchedCount}件) / Display: ${displayCount} (Fetched: ${fetchedCount})`;
+                                    dataCountElement.textContent = displayCount === fetchedCount
+                                        ? `${fetchedCount}件 / ${fetchedCount}`
+                                        : fullText;
                                 }
                             })
                             .catch(error => {

@@ -1609,6 +1609,7 @@
                             }
                             const fetchedCount = cacheInfo.data_count || 0;
                             const status = fetchedCount > 0 ? 'Acquired' : 'Not acquired';
+                            const isMobile = window.innerWidth < 576;
                             
                             // DOM要素を更新
                             lastUpdateElement.textContent = lastUpdate;
@@ -1628,11 +1629,16 @@
                                             ? apiData.data.length 
                                             : fetchedCount;
                                         
-                                        // 表示件数と取得件数を分けて表示（日英併記）
-                                        if (displayCount === fetchedCount) {
-                                            dataCountElement.textContent = `${fetchedCount} / ${fetchedCount}`;
+                                        const fullText = displayCount === fetchedCount
+                                            ? `${fetchedCount} / ${fetchedCount}`
+                                            : `Display: ${displayCount} (Fetched: ${fetchedCount})`;
+                                        
+                                        // モバイル: 縦長防止のため短縮表示（表示/取得）、titleで全文
+                                        if (isMobile) {
+                                            dataCountElement.textContent = `${displayCount}/${fetchedCount}`;
+                                            dataCountElement.title = fullText;
                                         } else {
-                                            dataCountElement.textContent = `Display: ${displayCount} (Fetched: ${fetchedCount})`;
+                                            dataCountElement.textContent = fullText;
                                         }
                                         
                                         console.log(`✅ ${platformName} キャッシュデータ表示完了:`, {

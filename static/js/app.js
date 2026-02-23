@@ -1625,16 +1625,11 @@ function displayHatenaResults(data) {
             const articleUrl = item.url || '#';
             const articleTitle = item.title || 'N/A';
 
-            // リンクを追加（他のセクションと同じ形式）
-            const articleLink = articleUrl !== '#' ?
-                `<br><a href="${articleUrl}" target="_blank" class="btn btn-sm btn-outline-warning mt-1">
-                    <i class="fas fa-external-link-alt"></i> 記事を読む
-                </a>` : '';
-
+            // 行全体がリンク（makeTableRowClickable）のため「記事を読む」ボタンは不要
             row.innerHTML = `
                 <td><span class="badge bg-warning">${item.rank || index + 1}</span></td>
                 <td>
-                    <strong><a href="${articleUrl}" target="_blank">${articleTitle}</a></strong>${articleLink}
+                    <strong><a href="${articleUrl}" target="_blank">${articleTitle}</a></strong>
                 </td>
                 <td><strong>${bookmarkInfo}</strong></td>
             `;

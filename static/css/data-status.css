@@ -248,6 +248,12 @@ main .container-fluid,
         overflow-wrap: anywhere !important;
     }
     
+    /* 件数列：Display/Fetched短縮表示（25/50）が1行に収まるよう制御 */
+    #dataFreshnessContent .data-status-stats .col-4:nth-child(2) .fw-bold,
+    #dataFreshnessContent .data-status-stats .col-4:nth-child(2) > div {
+        white-space: nowrap !important;
+    }
+    
     /* 状態列バッジ：縦書き表示で横スペースを節約 */
     #dataFreshnessContent .data-status-stats .col-4:last-child .badge {
         font-size: 0.6rem !important;

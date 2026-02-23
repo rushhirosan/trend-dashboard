@@ -3651,7 +3651,54 @@ body.data-status-active #data-status .card-body {
     margin-bottom: 0.5rem;
 }
 
-/* ========== ヘッダー説明文（モバイルは2行でクランプ） ========== */
+/* ========== ヘッダー説明文（モダン：短縮表示 + ツールチップ） ========== */
+.header-description-modern {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem;
+    line-height: 1.4;
+}
+.header-desc-short {
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+.header-desc-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.header-desc-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.75rem;
+    padding: 0.2em 0.5em;
+    background: rgba(13, 110, 253, 0.08);
+    color: #0d6efd;
+    border-radius: 0.35rem;
+}
+.header-desc-info-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #6c757d;
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.15s ease;
+}
+.header-desc-info-btn:hover {
+    color: #0d6efd;
+}
+.header-desc-info-btn .fa-info-circle {
+    font-size: 0.9rem;
+}
+/* ツールチップをやや広く（長文説明用） */
+.header-desc-tooltip .tooltip-inner {
+    max-width: 320px;
+    text-align: left;
+}
+
+/* 旧スタイル（他ページで使用中の可能性があるため残す） */
 .header-description-wrapper {
     position: relative;
 }

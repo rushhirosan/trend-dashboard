@@ -226,6 +226,13 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
         }
     }, true);
+
+    // ヘッダー説明のツールチップ初期化
+    if (typeof bootstrap !== 'undefined') {
+        document.querySelectorAll('.header-desc-info-btn[data-bs-toggle="tooltip"]').forEach(function(el) {
+            new bootstrap.Tooltip(el, { container: 'body', customClass: 'header-desc-tooltip' });
+        });
+    }
 });
 
 // ============================================

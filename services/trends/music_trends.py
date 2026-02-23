@@ -47,8 +47,9 @@ class MusicTrendsManager(BaseTrendsManager):
             logger.error(f"Spotify API初期化エラー: {e}", exc_info=True)
     
     def _get_cache_key(self, *args, **kwargs):
-        """キャッシュキーを返す"""
-        return 'music_trends'
+        """キャッシュキーを返す（地域別: music_trends_JP / music_trends_US）"""
+        region = kwargs.get('region', 'JP')
+        return f'music_trends_{region}'
 
     def _get_from_cache(self, *args, **kwargs):
         """キャッシュからデータを取得"""

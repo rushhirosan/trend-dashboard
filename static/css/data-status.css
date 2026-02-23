@@ -193,3 +193,86 @@ main .container-fluid,
         font-size: 0.875rem;
     }
 }
+
+/* モバイル: データ鮮度カードのコンパクト表示 */
+@media (max-width: 575.98px) {
+    /* カードからのはみ出し防止 */
+    #dataFreshnessContent .card {
+        overflow: hidden !important;
+    }
+    
+    #dataFreshnessContent .card-body {
+        overflow: hidden !important;
+    }
+    
+    /* カード内の統計を横一列に compact 表示（ラベル短縮・値の切れ防止） */
+    #dataFreshnessContent .data-status-stats {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        gap: 0.35rem !important;
+        text-align: center !important;
+        overflow: hidden !important;
+    }
+    
+    #dataFreshnessContent .data-status-stats .col-4 {
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        padding: 0.25rem !important;
+        overflow: hidden !important;
+    }
+    
+    /* 状態列：縦書きのため狭い幅でOK（USはAcquiredでやや幅多め） */
+    #dataFreshnessContent .data-status-stats .col-4:last-child {
+        flex: 0 0 auto !important;
+        min-width: 1.8em !important;
+    }
+    #usDataSection .data-status-stats .col-4:last-child {
+        min-width: 2.2em !important;
+    }
+    
+    #dataFreshnessContent .data-status-stats .col-4 small {
+        display: block !important;
+        font-size: 0.65rem !important;
+        margin-bottom: 0.15rem !important;
+    }
+    
+    /* 更新・件数：折り返しは単語単位（文字バラバラ・三点リーダーを防ぐ） */
+    #dataFreshnessContent .data-status-stats .col-4:nth-child(1) .fw-bold,
+    #dataFreshnessContent .data-status-stats .col-4:nth-child(1) > div,
+    #dataFreshnessContent .data-status-stats .col-4:nth-child(2) .fw-bold,
+    #dataFreshnessContent .data-status-stats .col-4:nth-child(2) > div {
+        font-size: 0.7rem !important;
+        line-height: 1.2 !important;
+        word-break: keep-all !important;
+        overflow-wrap: anywhere !important;
+    }
+    
+    /* 状態列バッジ：縦書き表示で横スペースを節約 */
+    #dataFreshnessContent .data-status-stats .col-4:last-child .badge {
+        font-size: 0.6rem !important;
+        padding: 0.3em 0.2em !important;
+        writing-mode: vertical-rl !important;
+        text-orientation: upright !important;
+        letter-spacing: 0.1em !important;
+    }
+    
+    /* カードのパディングを縮小 */
+    #dataFreshnessContent .card-body {
+        padding: 0.6rem !important;
+    }
+    
+    #dataFreshnessContent .card-title {
+        font-size: 0.9rem !important;
+    }
+    
+    #dataFreshnessContent .fs-4 {
+        font-size: 1.2rem !important;
+    }
+    
+    /* 注意書きをコンパクトに */
+    .data-status-notice {
+        padding: 0.5rem 0.75rem !important;
+        font-size: 0.75rem !important;
+    }
+}

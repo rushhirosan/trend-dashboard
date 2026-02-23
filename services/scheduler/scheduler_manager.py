@@ -570,6 +570,9 @@ class TrendsScheduler:
                 elif key == 'wikipedia':
                     # Wikipediaは言語別: JP→ja, US→en（サービス側のcache_keyと一致させる）
                     return f'wikipedia_trends_{"ja" if region == "JP" else "en"}'
+                elif key == 'music':
+                    # Spotifyは地域別: music_trends_JP / music_trends_US
+                    return f'music_trends_{region}'
                 else:
                     # 通常のケース: {key}_trends
                     return f'{key}_trends'

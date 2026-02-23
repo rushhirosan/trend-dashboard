@@ -183,6 +183,13 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                 
                 if (cacheInfo) {
                     let lastUpdate = '不明';
+                    let fullDateStr = '';
+                    const isMobile = window.innerWidth < 576;
+                    const fullFormat = {
+                        year: 'numeric', month: '2-digit', day: '2-digit',
+                        hour: '2-digit', minute: '2-digit', second: '2-digit',
+                        timeZone: 'Asia/Tokyo'
+                    };
                        if (cacheInfo.last_updated && cacheInfo.last_updated !== 'None' && cacheInfo.last_updated !== null) {
                            try {
                                // データベースの時刻をUTCとして解釈（タイムゾーン情報がない場合はZを付与）
@@ -218,16 +225,11 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                                    throw new Error('Invalid date');
                                }
                                
-                               // JSTで表示
-                               lastUpdate = date.toLocaleString('ja-JP', {
-                                   year: 'numeric',
-                                   month: '2-digit',
-                                   day: '2-digit',
-                                   hour: '2-digit',
-                                   minute: '2-digit',
-                                   second: '2-digit',
-                                   timeZone: 'Asia/Tokyo'
-                               });
+                               // JSTで表示（モバイルは短縮形式、タップで全文表示）
+                               fullDateStr = date.toLocaleString('ja-JP', fullFormat);
+                               lastUpdate = isMobile
+                                   ? date.toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })
+                                   : fullDateStr;
                            } catch (e) {
                                console.error('Error parsing date:', cacheInfo.last_updated, e);
                                lastUpdate = '不明';
@@ -236,8 +238,9 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                     const fetchedCount = cacheInfo.data_count || 0; // 取得件数
                     const status = fetchedCount > 0 ? '取得済み' : '未取得';
                     
-                    // DOM要素を更新
+                    // DOM要素を更新（モバイルではtitleで全文表示）
                     lastUpdateElement.textContent = lastUpdate;
+                    lastUpdateElement.title = fullDateStr || lastUpdate;
                     statusElement.textContent = status;
                     statusElement.className = fetchedCount > 0 ? 'badge bg-success' : 'badge bg-secondary';
                     

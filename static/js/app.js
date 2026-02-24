@@ -923,8 +923,8 @@ function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 5) {
     }
 }
 
-// 前回開いていたタブを復元するための有効なタブID一覧
-var TREND_TAB_IDS = ['tab-all', 'tab-news', 'tab-search', 'tab-tech', 'tab-market', 'tab-entertainment'];
+// 前回開いていたタブを復元するための有効なタブID一覧（行政データ含む）
+var TREND_TAB_IDS = ['tab-all', 'tab-news', 'tab-search', 'tab-tech', 'tab-market', 'tab-entertainment', 'tab-admin'];
 
 // ページ読み込み時の初期化
 document.addEventListener('DOMContentLoaded', function() {
@@ -948,22 +948,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // 全部入り「もっと見る」: タブ切り替え後に対象ソースのアンカーへスクロール
+    // 全部入り「もっと見る」: タブ切り替え後に対象ソースのアンカーへスクロール（各要素に直接リスナー・body委譲はハイパーリンクを妨げるため使わない）
     var pendingMoreLinkAnchor = null;
-    document.querySelectorAll('.all-more-link').forEach(link => {
-        link.addEventListener('click', function(e) {
+    function bindMoreLink(el) {
+        el.addEventListener('click', function(e) {
             e.preventDefault();
-            const targetTabId = this.getAttribute('data-target-tab');
-            const targetAnchorId = this.getAttribute('data-target-anchor');
+            var targetTabId = this.getAttribute('data-target-tab');
+            var targetAnchorId = this.getAttribute('data-target-anchor');
             if (!targetTabId) return;
-            const tabEl = document.getElementById(targetTabId);
+            var tabEl = document.getElementById(targetTabId);
             if (tabEl && typeof bootstrap !== 'undefined') {
                 pendingMoreLinkAnchor = targetAnchorId || null;
-                const tab = new bootstrap.Tab(tabEl);
+                var tab = new bootstrap.Tab(tabEl);
                 tab.show();
             }
         });
-    });
+    }
+    document.querySelectorAll('.all-more-link').forEach(bindMoreLink);
+    document.querySelectorAll('.estat-goto-tab').forEach(bindMoreLink);
 
     // 全部入りタブ: カテゴリ選択ドロップダウン変更時
     document.querySelectorAll('.all-category-select').forEach(select => {

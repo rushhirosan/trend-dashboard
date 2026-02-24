@@ -6,6 +6,7 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
 import threading
+import time
 from services.trends.google_trends import GoogleTrendsManager
 from services.trends.youtube_trends import YouTubeTrendsManager
 from services.trends.music_trends import MusicTrendsManager
@@ -144,15 +145,25 @@ def initialize_managers():
     return managers
 
 
-def refresh_all_trends(managers, force_refresh=True):
+def _get_refresh_concurrency():
+    """OOM防止のため同時実行数を環境変数で制限（1:00/7:00/13:00/19:00の全スケジュールで有効）"""
+    try:
+        return max(1, min(20, int(os.getenv('TREND_REFRESH_MAX_CONCURRENT', '6'))))
+    except (ValueError, TypeError):
+        return 6
+
+
+def refresh_all_trends(managers, force_refresh=True, max_concurrent=None, batch_delay_seconds=None):
     """
     すべてのトレンドカテゴリを強制更新するユーティリティ関数
-    日本（JP）と米国（US）の両方のデータを更新します
-    並列実行により実行時間を短縮します。
+    日本（JP）と米国（US）の両方のデータを更新します。
+    バッチ実行で同時実行数を制限し、全スケジュール時刻（1:00/7:00/13:00/19:00 JST）でのOOM/CPUスパイクを軽減します。
 
     Args:
         managers (dict): initialize_managers で生成されたマネージャー辞書
         force_refresh (bool): キャッシュを無視して取得するかどうか
+        max_concurrent (int|None): 同時実行数。Noneの場合は環境変数 TREND_REFRESH_MAX_CONCURRENT（デフォルト6）
+        batch_delay_seconds (float|None): バッチ間の待機秒数。Noneの場合は環境変数 TREND_REFRESH_BATCH_DELAY_SECONDS（デフォルト2）
 
     Returns:
         dict: 各カテゴリの更新結果
@@ -273,34 +284,46 @@ def refresh_all_trends(managers, force_refresh=True):
     tasks.append(('bls', lambda m: m.get_trends(limit=10, force_refresh=force_refresh), 'US'))
     tasks.append(('usaspending', lambda m: m.get_trends(force_refresh=force_refresh), 'US'))
 
-    # 並列実行（最大20スレッド）
-    max_workers = min(20, len(tasks))
-    logger.info(f"🚀 {len(tasks)}件のタスクを{max_workers}スレッドで並列実行します")
+    # 同時実行数: 引数 > 環境変数 TREND_REFRESH_MAX_CONCURRENT > デフォルト6（OOM防止）
+    concurrency = max_concurrent if max_concurrent is not None else _get_refresh_concurrency()
+    delay_sec = batch_delay_seconds
+    if delay_sec is None:
+        try:
+            delay_sec = max(0.0, float(os.getenv('TREND_REFRESH_BATCH_DELAY_SECONDS', '2')))
+        except (ValueError, TypeError):
+            delay_sec = 2.0
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # すべてのタスクを実行
-        future_to_task = {
-            executor.submit(call_manager, key, handler, region): (key, region)
-            for key, handler, region in tasks
-        }
+    # バッチに分割（同時実行数を超えないようにする）
+    batch_size = min(concurrency, len(tasks))
+    batches = [tasks[i:i + batch_size] for i in range(0, len(tasks), batch_size)]
+    logger.info(f"🚀 {len(tasks)}件のタスクを{len(batches)}バッチで実行（同時実行数={batch_size}, バッチ間待機={delay_sec}秒）")
 
-        # 完了したタスクから結果を収集
-        completed_count = 0
-        for future in as_completed(future_to_task):
-            key, region = future_to_task[future]
-            completed_count += 1
-            try:
-                result_key, result_data = future.result()
-                with results_lock:
-                    results[result_key] = result_data
-                logger.debug(f"✅ [{completed_count}/{len(tasks)}] {result_key} 完了")
-            except Exception as exc:
-                logger.error(f"❌ タスク実行エラー ({key}_{region}): {exc}", exc_info=True)
-                with results_lock:
-                    results[f"{key}_{region}"] = {
-                        'success': False,
-                        'error': str(exc)
-                    }
+    completed_count = 0
+    for batch_idx, batch in enumerate(batches):
+        workers = min(len(batch), batch_size)
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            future_to_task = {
+                executor.submit(call_manager, key, handler, region): (key, region)
+                for key, handler, region in batch
+            }
+            for future in as_completed(future_to_task):
+                key, region = future_to_task[future]
+                completed_count += 1
+                try:
+                    result_key, result_data = future.result()
+                    with results_lock:
+                        results[result_key] = result_data
+                    logger.debug(f"✅ [{completed_count}/{len(tasks)}] {result_key} 完了")
+                except Exception as exc:
+                    logger.error(f"❌ タスク実行エラー ({key}_{region}): {exc}", exc_info=True)
+                    with results_lock:
+                        results[f"{key}_{region}"] = {
+                            'success': False,
+                            'error': str(exc)
+                        }
+        # バッチ間で少し待機しメモリ・接続を解放させる（最後のバッチでは待機しない）
+        if delay_sec > 0 and batch_idx < len(batches) - 1:
+            time.sleep(delay_sec)
 
     logger.info(f"✅ 並列実行完了: {len(results)}件の結果を取得しました")
 

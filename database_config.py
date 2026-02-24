@@ -1048,7 +1048,7 @@ class TrendsCache:
                             )
                         elif cache_key == 'worldnews_trends':
                             cursor.execute(
-                                "INSERT INTO worldnews_trends_cache (article_id, title, source, published_at, category, country, url, description, image_url) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                                "INSERT INTO worldnews_trends_cache (article_id, title, source, published_at, category, country, url, description, image_url, rank) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                                 (
                                     item.get('article_id', ''),
                                     item.get('title', ''),
@@ -1058,7 +1058,8 @@ class TrendsCache:
                                     item.get('country', ''),
                                     item.get('url', ''),
                                     item.get('description', ''),
-                                    item.get('image_url', '')
+                                    item.get('image_url', ''),
+                                    item.get('rank', 0)
                                 )
                             )
                         elif cache_key == 'rakuten_trends':
@@ -1881,8 +1882,8 @@ class TrendsCache:
         """World News Trendsデータをキャッシュから取得"""
         def query_func(conn):
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                # World News専用のクエリ（countryカラムで検索）
-                cursor.execute("SELECT * FROM worldnews_trends_cache WHERE country = %s ORDER BY created_at DESC", (country.lower(),))
+                # World News専用のクエリ（countryカラムで検索、順位でソート）
+                cursor.execute("SELECT * FROM worldnews_trends_cache WHERE country = %s ORDER BY rank ASC NULLS LAST, created_at DESC", (country.lower(),))
                 data = cursor.fetchall()
                 
                 # RealDictCursorの結果を辞書のリストに変換

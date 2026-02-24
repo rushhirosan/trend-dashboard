@@ -1,6 +1,7 @@
 import os
 import requests
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 from database_config import TrendsCache
 from utils.logger_config import get_logger
 from utils.dummy_data_generator import generate_dummy_worldnews_data
@@ -146,6 +147,16 @@ class WorldNewsTrendsManager(BaseTrendsManager):
             
             if cached_data:
                 logger.info(f"✅ World News: キャッシュデータを使用 ({len(cached_data)}件)")
+                # 古いキャッシュで source が空の場合は URL からドメインを補完
+                for item in cached_data:
+                    if not item.get('source') and item.get('url'):
+                        try:
+                            parsed = urlparse(item['url'])
+                            domain = parsed.netloc or (parsed.path.split('/')[0] if parsed.path else '')
+                            if domain:
+                                item['source'] = domain.replace('www.', '')
+                        except Exception:
+                            pass
                 return {
                     'data': cached_data,
                     'status': 'cached',
@@ -259,7 +270,18 @@ class WorldNewsTrendsManager(BaseTrendsManager):
                 else:
                     source_name = article.get('source_name') or article.get('source_title')
                 if not source_name:
-                    source_name = ''
+                    # World News API は source を返さないため、URL からドメインを抽出してフォールバック
+                    article_url = article.get('url') or article.get('link') or ''
+                    if article_url:
+                        try:
+                            parsed = urlparse(article_url)
+                            domain = parsed.netloc or parsed.path.split('/')[0] if parsed.path else ''
+                            if domain and domain != '':
+                                source_name = domain.replace('www.', '')
+                        except Exception:
+                            source_name = ''
+                    else:
+                        source_name = ''
 
                 publish_raw = article.get('publish_date') or article.get('published_at') or article.get('date')
                 if publish_raw:

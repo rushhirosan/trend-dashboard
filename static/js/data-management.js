@@ -28,8 +28,7 @@ async function fetchWithRetry(url, options = {}, maxRetries = 2) {
 function loadCachedDataExternal() {
     console.log('📦 キャッシュデータの読み込み処理開始');
     var allCategories = [
-        loadNHKTrendsFromCache,
-        loadNewsTrendsFromCache,
+        loadNewsBundleFromCache,
         loadWikipediaTrendsFromCache,
         loadGoogleTrendsFromCache,
         loadYouTubeTrendsFromCache,
@@ -210,7 +209,58 @@ function loadMusicTrendsFromCache() {
     }
 }
 
-// ニューストレンドキャッシュデータの読み込み（共通化）
+// NHK + World News を1リクエストで取得し同時表示（遅延のばらつき解消）
+function loadNewsBundleFromCache() {
+    console.log('📊 News Bundle (NHK + World News) キャッシュデータ読み込み');
+    var loadingEl = document.getElementById('nhkLoading');
+    if (loadingEl) loadingEl.style.display = 'block';
+
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function() { controller.abort(); }, 30000);
+    fetchWithRetry('/api/news-bundle?force_refresh=false', { signal: controller.signal })
+        .then(function(response) {
+            clearTimeout(timeoutId);
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        })
+        .then(function(bundle) {
+            if (loadingEl) loadingEl.style.display = 'none';
+            var nhk = bundle.nhk || { data: [], success: false };
+            var worldnews = bundle.worldnews || { data: [], success: false };
+
+            if (typeof displayNHKResults === 'function') {
+                displayNHKResults(nhk);
+            }
+            if (typeof displayWorldNewsResults === 'function') {
+                displayWorldNewsResults(worldnews);
+            }
+            if (typeof applyCategoryAccordionForAllTables === 'function') {
+                setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+            }
+            if (nhk.data && nhk.data.length > 0 && typeof syncToAllPane === 'function') {
+                setTimeout(function() { syncToAllPane('nhkTrendsTableBody', 'all-nhkTrendsTableBody', 5); }, 0);
+            }
+            if (worldnews.data && worldnews.data.length > 0 && typeof syncToAllPane === 'function') {
+                setTimeout(function() { syncToAllPane('newsTrendsTableBody', 'all-newsTrendsTableBody', 5); }, 0);
+            }
+
+            var nhkResultsEl = document.getElementById('nhkResults');
+            if (nhkResultsEl) nhkResultsEl.style.display = 'block';
+            var newsResultsEl = document.getElementById('newsResults');
+            if (newsResultsEl) newsResultsEl.style.display = 'block';
+        })
+        .catch(function(error) {
+            clearTimeout(timeoutId);
+            console.error('News Bundle キャッシュ読み込みエラー:', error);
+            if (loadingEl) loadingEl.style.display = 'none';
+            var nhkResultsEl = document.getElementById('nhkResults');
+            if (nhkResultsEl) nhkResultsEl.style.display = 'block';
+            var newsResultsEl = document.getElementById('newsResults');
+            if (newsResultsEl) newsResultsEl.style.display = 'block';
+        });
+}
+
+// ニューストレンドキャッシュデータの読み込み（共通化・単体用）
 function loadNewsTrendsFromCache() {
     if (typeof loadTrendsFromCache === 'function') {
         loadTrendsFromCache({

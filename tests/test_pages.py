@@ -140,6 +140,7 @@ def main():
         ("/api/youtube-trends?region=JP", "YouTube Trends API (JP)"),
         ("/api/music-trends?service=spotify&region=JP", "Spotify Trends API (JP)"),
         ("/api/worldnews-trends?country=jp", "World News API (JP)"),
+        ("/api/news-bundle", "News Bundle API (NHK + World News)"),
         ("/api/podcast-trends?trend_type=best_podcasts&region=jp", "Podcast Trends API (JP)"),
         ("/api/rakuten-trends", "楽天トレンドAPI"),
         ("/api/hatena-trends?category=all", "はてなブックマークAPI"),

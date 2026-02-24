@@ -440,6 +440,70 @@ def get_nhk_trends(manager):
         return handle_api_error('NHKニュース', e)
 
 
+@trend_bp.route('/news-bundle')
+def get_news_bundle():
+    """
+    NHK + World News を1リクエストでまとめて返す。
+    画面更新時に同時表示するため、遅延のばらつきを解消する。
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    try:
+        managers = get_managers()
+        nhk_mgr = managers.get('nhk')
+        worldnews_mgr = managers.get('worldnews')
+        force_refresh = get_force_refresh()
+
+        nhk_result = {'success': False, 'data': [], 'error': 'NHK Managerが初期化されていません'}
+        worldnews_result = {'success': False, 'data': [], 'error': 'World News Managerが初期化されていません'}
+
+        def fetch_nhk():
+            if nhk_mgr:
+                try:
+                    return nhk_mgr.get_trends(limit=25, force_refresh=force_refresh)
+                except Exception as e:
+                    logger.exception('NHK取得エラー: %s', e)
+                    return {'success': False, 'data': [], 'error': str(e)}
+            return nhk_result
+
+        def fetch_worldnews():
+            if worldnews_mgr:
+                try:
+                    return worldnews_mgr.get_trends(country='jp', category='general', force_refresh=force_refresh)
+                except Exception as e:
+                    logger.exception('World News取得エラー: %s', e)
+                    return {'success': False, 'data': [], 'error': str(e)}
+            return worldnews_result
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            fut_nhk = executor.submit(fetch_nhk)
+            fut_worldnews = executor.submit(fetch_worldnews)
+            nhk_result = fut_nhk.result()
+            worldnews_result = fut_worldnews.result()
+
+        # handle_trend_response形式に正規化（dataキーを確実に持つ）
+        def normalize(r):
+            if isinstance(r, dict) and 'data' in r:
+                return r
+            if isinstance(r, dict) and 'success' in r:
+                return r
+            if isinstance(r, list):
+                return {'success': True, 'data': r, 'status': 'cached'}
+            return {'success': False, 'data': [], 'error': '不正なレスポンス'}
+
+        return jsonify({
+            'success': True,
+            'nhk': normalize(nhk_result),
+            'worldnews': normalize(worldnews_result)
+        })
+    except Exception as e:
+        logger.exception('news-bundle エラー: %s', e)
+        return jsonify({
+            'success': False,
+            'nhk': {'success': False, 'data': [], 'error': str(e)},
+            'worldnews': {'success': False, 'data': [], 'error': str(e)}
+        }), 500
+
+
 @trend_bp.route('/prtimes-trends')
 @require_manager('prtimes')
 def get_prtimes_trends(manager):

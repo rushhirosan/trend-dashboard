@@ -911,16 +911,11 @@ function displayGoogleResults(data) {
         
         const googleSearchUrl = item.google_search_url || `https://www.google.com/search?q=${encodeURIComponent(keyword)}&geo=US`;
         
+        // キーワードを行リンク化（Searchボタンは不要、行クリックで検索へ）
         row.innerHTML = `
             <td><span class="badge bg-primary">${index + 1}</span></td>
             <td><a href="${googleSearchUrl}" target="_blank" class="text-decoration-none"><strong>${keyword}</strong></a></td>
             <td>${Math.round(popularity).toLocaleString()}</td>
-            <td>
-                <a href="${googleSearchUrl}" 
-                   target="_blank" class="btn btn-sm btn-outline-primary">
-                    <i class="fas fa-external-link-alt"></i> Search
-                </a>
-            </td>
         `;
         // 行全体をクリック可能にする（アクセシビリティ対応）
         makeTableRowClickable(row, googleSearchUrl, `Search ${keyword} on Google`);

@@ -234,31 +234,16 @@ function displayGoogleResults(data) {
         row.className = 'trend-card';
         row.style.minHeight = '100px';
 
-        // Google検索リンクを追加
-        console.log(`displayGoogleResults: 行${index + 1}の検索URL確認`, {
-            keyword: trend.keyword,
-            google_search_url: trend.google_search_url
-        });
-
-        const searchLink = trend.google_search_url ?
-            `<a href="${trend.google_search_url}" target="_blank" class="btn btn-sm btn-outline-primary">
-                <i class="fab fa-google"></i> 検索
-            </a>` :
-            `<button class="btn btn-sm btn-outline-secondary" disabled>
-                <i class="fas fa-search"></i> 検索URLなし
-            </button>`;
-
         const popularity = trend.score || trend.popularity || 0;
         const keyword = trend.keyword || trend.term || 'N/A';
         const googleSearchUrl = trend.google_search_url || '#';
 
+        // キーワードを行リンク化（G検索ボタンは不要、行クリックで検索へ）
         row.innerHTML = `
             <td><span class="badge bg-primary">${index + 1}</span></td>
             <td><strong><a href="${googleSearchUrl}" target="_blank">${keyword}</a></strong></td>
             <td><strong>${Math.round(popularity).toLocaleString()}</strong></td>
-            <td>${searchLink}</td>
         `;
-        // 行全体をクリック可能にする（アクセシビリティ対応）
         makeTableRowClickable(row, googleSearchUrl, `${keyword}をGoogleで検索`);
         tableBody.appendChild(row);
 
@@ -1151,32 +1136,40 @@ function displayWorldNewsResults(data) {
 
     // テーブルを更新
     tableBody.innerHTML = '';
-    data.data.forEach((news, index) => {
-        const row = document.createElement('tr');
-        row.className = 'trend-card';
-        row.style.minHeight = '100px';
+    if (data.data && data.data.length > 0) {
+        data.data.forEach((news, index) => {
+            const row = document.createElement('tr');
+            row.className = 'trend-card';
+            row.style.minHeight = '100px';
 
-        // ニュースリンクを追加（他のセクションと同じ形式）
-        const newsLink = news.url ?
-            `<br><a href="${news.url}" target="_blank" class="btn btn-sm btn-outline-info mt-1">
-                <i class="fas fa-external-link-alt"></i> 記事を読む
-            </a>` : '';
+            const titleText = news.title || 'N/A';
+            const titleLink = news.url
+                ? `<a href="${news.url}" target="_blank" class="text-decoration-none">${titleText}<i class="fas fa-external-link-alt ms-1"></i></a>`
+                : `<span>${titleText}</span>`;
 
-        // 公開日時をフォーマット
-        const publishedDate = news.published_date || news.source || '';
+            const publishedDateRaw = news.published_at || news.publish_date || news.publishedDate || news.published_date;
+            const publishedDate = typeof formatDate === 'function' ? formatDate(publishedDateRaw) : (publishedDateRaw || '');
+            const sourceName = news.source || '';
+            const metaInfoParts = [];
+            if (publishedDate && publishedDate !== '不明') metaInfoParts.push(publishedDate);
+            if (sourceName) metaInfoParts.push(sourceName);
+            const metaInfo = metaInfoParts.join(' / ') || '不明';
 
-        row.innerHTML = `
-            <td><span class="badge bg-info">${news.rank || index + 1}</span></td>
-            <td>
-                <strong>${news.title || 'N/A'}</strong>${newsLink}
-            </td>
-            <td><small class="text-muted">${publishedDate}</small></td>
-        `;
-        tableBody.appendChild(row);
-    });
+            const newsUrl = news.url || '#';
+            row.innerHTML = `
+                <td><span class="badge bg-info">${news.rank || index + 1}</span></td>
+                <td><strong>${titleLink}</strong></td>
+                <td><small class="text-muted">${metaInfo}</small></td>
+            `;
+            makeTableRowClickable(row, newsUrl, `${titleText}のニュース記事を開く`);
+            tableBody.appendChild(row);
+        });
+    }
 
     // グラフを更新
-    updateNewsChart(data.data);
+    if (typeof updateNewsChart === 'function' && data.data) {
+        updateNewsChart(data.data);
+    }
 
     // 結果を表示
     showNewsResults();
@@ -1663,7 +1656,10 @@ function displayHatenaResults(data) {
         });
 
         showHatenaResults();
-        showHatenaStatusMessage(`✅ ${data.source} - ${data.total_count || data.data.length}件のエントリーを取得しました`, 'success');
+        // database_cache 表示は不要（技術的な内部状態をユーザーに表示しない）
+        if (data.source !== 'database_cache') {
+            showHatenaStatusMessage(`✅ ${data.source} - ${data.total_count || data.data.length}件のエントリーを取得しました`, 'success');
+        }
         if (typeof applyCategoryAccordionForAllTables === 'function') {
             setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
         }

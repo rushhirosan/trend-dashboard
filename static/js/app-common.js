@@ -626,7 +626,8 @@ function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 5) {
     const cardBody = table.closest('.card-body');
     const dataRows = Array.from(mainTbody.querySelectorAll('tr:not(.skeleton-row)'));
     const isMobile = isMobileViewport();
-    const toCopy = isMobile ? dataRows.slice(0, limit) : dataRows;
+    // 全部入りタブは常にトップN件のみ表示（デスクトップでもlimitを適用）
+    const toCopy = dataRows.slice(0, limit);
     const topCount = 3;
     const visibleRows = toCopy.slice(0, topCount);
     const hiddenRows = toCopy.slice(topCount);
@@ -862,6 +863,7 @@ function setupCategoryAccordionObserver(limit = 5) {
     const pollTimer = setInterval(function() {
         pollElapsed += pollInterval;
         applyCategoryAccordionForAllTables(limit);
+        if (typeof reSyncAllPanes === 'function') reSyncAllPanes();
         if (pollElapsed >= pollDuration) {
             clearInterval(pollTimer);
         }
@@ -870,11 +872,32 @@ function setupCategoryAccordionObserver(limit = 5) {
     // タブ切り替え時にも再適用（非表示タブでデータが後から読み込まれる場合に対応）
     const tabNav = document.getElementById('trendCategoryTabs');
     if (tabNav) {
-        tabNav.addEventListener('shown.bs.tab', function () {
+        tabNav.addEventListener('shown.bs.tab', function (e) {
             schedule();
             setTimeout(schedule, 300);
+            // 全部入りタブ表示時: メインテーブル→All用tbodyへ再同期（非同期読み込みの競合で同期漏れした場合の救済）
+            if (e.target && (e.target.id === 'tab-all' || (e.target.getAttribute && e.target.getAttribute('data-bs-target') === '#pane-all'))) {
+                reSyncAllPanes();
+            }
         });
     }
+}
+
+/**
+ * 全部入りタブ用: 全メインテーブルからAll用tbodyへ再同期
+ * 非同期読み込みの競合でsyncToAllPaneが空の状態で実行された場合の救済
+ */
+function reSyncAllPanes() {
+    if (typeof syncToAllPane !== 'function') return;
+    const allTbodys = document.querySelectorAll('#pane-all tbody[id^="all-"][id$="TrendsTableBody"]');
+    allTbodys.forEach(function (allTbody) {
+        const allId = allTbody.id;
+        const mainId = allId.replace(/^all-/, '');
+        const mainTbody = document.getElementById(mainId);
+        if (mainTbody && mainTbody.querySelectorAll('tr:not(.skeleton-row)').length > 0) {
+            syncToAllPane(mainId, allId, 5);
+        }
+    });
 }
 
 if (document.readyState === 'loading') {

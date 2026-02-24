@@ -863,7 +863,8 @@ function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 5) {
     const cardBody = table.closest('.card-body');
     const dataRows = Array.from(mainTbody.querySelectorAll('tr:not(.skeleton-row)'));
     const isMobile = window.matchMedia && window.matchMedia('(max-width: 767.98px)').matches;
-    const toCopy = isMobile ? dataRows.slice(0, limit) : dataRows;
+    // 全部入りタブは常にトップN件のみ表示（デスクトップでもlimitを適用）
+    const toCopy = dataRows.slice(0, limit);
     const topCount = 3;
     const visibleRows = toCopy.slice(0, topCount);
     const hiddenRows = toCopy.slice(topCount);

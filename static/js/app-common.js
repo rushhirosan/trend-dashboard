@@ -1,8 +1,8 @@
 // 共通: テーブル行クリック（no-op。リンクのデフォルト動作を使用するため行に手を加えない）
 function makeTableRowClickable(row, linkUrl, ariaLabel) {
-    (void)row;
-    (void)linkUrl;
-    (void)ariaLabel;
+    void row;
+    void linkUrl;
+    void ariaLabel;
 }
 if (typeof window !== 'undefined') {
     window.makeTableRowClickable = makeTableRowClickable;

@@ -1185,7 +1185,8 @@ function displayWorldNewsResults(data) {
     }
 
     // 結果を表示
-    showNewsResults();
+    const newsResultsEl = document.getElementById('newsResults');
+    if (newsResultsEl) newsResultsEl.style.display = 'block';
 }
 
 // Podcast トレンドデータを取得

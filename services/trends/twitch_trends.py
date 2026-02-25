@@ -122,12 +122,13 @@ class TwitchTrendsManager(BaseTrendsManager):
     
     def get_trends(self, category='games', limit=25, force_refresh=False):
         """Twitchトレンドを取得（BaseTrendsManagerの共通処理を使用）"""
-        # BaseTrendsManagerの共通処理を使用
-        # auto_fetch_on_cache_miss=Trueで、キャッシュがない場合はAPIを呼び出してキャッシュを作成
+        # 視聴者数で降順ソート（games/streams: viewer_count, clips: view_count→viewer_count）
         result = super().get_trends(
             limit=limit,
             force_refresh=force_refresh,
-            auto_fetch_on_cache_miss=True,  # キャッシュがない場合はAPIを呼び出してキャッシュを作成
+            auto_fetch_on_cache_miss=True,
+            sort_key='viewer_count',
+            sort_reverse=True,  # 視聴者数の多い順
             category=category
         )
         

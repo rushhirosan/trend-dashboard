@@ -1,7 +1,4 @@
-// makeTableRowClickable が未定義の場合のフォールバック（app-common.js キャッシュ対策）
-if (typeof window.makeTableRowClickable === 'undefined') {
-    window.makeTableRowClickable = function() {};
-}
+// makeTableRowClickable は app-common.js で定義（必ず app-common.js を先に読み込むこと）
 
 // グローバル変数
 let currentGoogleChart = null;

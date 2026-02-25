@@ -1,9 +1,5 @@
 // 結果表示関数群に関するJavaScriptファイル
-
-// makeTableRowClickable が未定義の場合のフォールバック（app-common.js キャッシュ対策）
-if (typeof window.makeTableRowClickable === 'undefined') {
-    window.makeTableRowClickable = function() {};
-}
+// makeTableRowClickable は app-common.js で定義（必ず app-common.js を先に読み込むこと）
 
 // 共通の日時フォーマット関数（USトレンドページでも使用）
 function formatDate(dateString, locale = 'ja-JP') {

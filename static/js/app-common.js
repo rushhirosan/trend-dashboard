@@ -196,23 +196,11 @@ function isPlaceholderUrl(url) {
     } catch (_) { return true; }
 }
 // ダミー用 example.com リンクの直接クリックで遷移しない（キャッシュに古いダミーが残っている場合）
-// トレンド行クリック: リンク・ボタン以外のクリックで別タブを開く（全タブで一貫動作のためイベント委譲）
 document.addEventListener('DOMContentLoaded', function() {
     document.body.addEventListener('click', function(e) {
         var a = e.target && e.target.closest ? e.target.closest('a[href*="example.com"]') : null;
         if (a) {
             e.preventDefault();
-            return;
-        }
-        var row = e.target && e.target.closest ? e.target.closest('tr') : null;
-        var isTrendRow = row && row.closest && row.closest('tbody[id$="TrendsTableBody"]');
-        if (isTrendRow && !e.target.closest('a[href], button')) {
-            var link = row.querySelector('a[href]');
-            if (link && link.href && link.href !== '#' && link.href.indexOf('example.com') === -1) {
-                e.preventDefault();
-                e.stopPropagation();
-                window.open(link.href, '_blank', 'noopener,noreferrer');
-            }
         }
     }, true);
 
@@ -712,10 +700,23 @@ function isMobileViewport() {
     return window.matchMedia && window.matchMedia('(max-width: 767.98px)').matches;
 }
 
+// 行クリックでリンクを開くテーブル: アコーディオン処理をスキップ（DOM操作でリンクが壊れるため）
+const ACCORDION_EXCLUDED_TBODYS = new Set([
+    'nhkTrendsTableBody', 'newsTrendsTableBody', 'prtimesHatenaTrendsTableBody', 'prtimesTrendsTableBody',
+    'googleTrendsTableBody', 'youtubeTrendsTableBody', 'wikipediaTrendsTableBody',
+    'hatenaTrendsTableBody', 'qiitaTrendsTableBody', 'zennTrendsTableBody', 'noteTrendsTableBody',
+    'ipaTrendsTableBody', 'jpcertTrendsTableBody', 'githubTrendsTableBody', 'appstoreTrendsTableBody',
+    'stockTrendsTableBody', 'cryptoTrendsTableBody', 'movieTrendsTableBody', 'bookTrendsTableBody',
+    'musicTrendsTableBody', 'podcastTrendsTableBody', 'rakutenTrendsTableBody', 'twitchTrendsTableBody',
+    'cnnTrendsTableBody', 'worldnewsTrendsTableBody', 'hackernewsTrendsTableBody', 'producthuntTrendsTableBody',
+    'devtoTrendsTableBody', 'mediumTrendsTableBody', 'cisaKevTrendsTableBody', 'thehackernewsTrendsTableBody',
+    'globenewswireTrendsTableBody', 'spotifyTrendsTableBody', 'ebayTrendsTableBody'
+]);
+
 function applyCategoryRowAccordion(tbodyId, limit = 5) {
     const tbody = document.getElementById(tbodyId);
     if (!tbody || tbodyId.startsWith('all-') || tbodyId.startsWith('more-')) return;
-    if (tbodyId === 'nhkTrendsTableBody' || tbodyId === 'newsTrendsTableBody') return;
+    if (ACCORDION_EXCLUDED_TBODYS.has(tbodyId)) return;
     const table = tbody.closest('table');
     if (!table) return;
 

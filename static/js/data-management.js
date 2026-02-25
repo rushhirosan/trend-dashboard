@@ -271,6 +271,7 @@ function loadNewsTrendsFromCache() {
                 results: 'newsResults'
             },
             displayFunction: displayWorldNewsResults,
+            alwaysCallDisplay: true,
             allPaneSync: { mainTableBodyId: 'newsTrendsTableBody', allTableBodyId: 'all-newsTrendsTableBody', targetTabId: 'tab-news' }
         });
     } else {
@@ -711,9 +712,11 @@ function loadNHKTrendsFromCache() {
             apiEndpoint: '/api/nhk-trends',
             params: {},
             uiIds: {
-                loading: 'nhkLoading'
+                loading: 'nhkLoading',
+                results: 'nhkResults'
             },
             displayFunction: displayNHKResults,
+            alwaysCallDisplay: true,
             allPaneSync: { mainTableBodyId: 'nhkTrendsTableBody', allTableBodyId: 'all-nhkTrendsTableBody', targetTabId: 'tab-news' }
         });
     } else {

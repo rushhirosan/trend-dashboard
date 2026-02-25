@@ -36,7 +36,8 @@ function displayTwitchResults(data) {
     if (data.data && data.data.length > 0) {
         data.data.forEach(item => {
             const row = document.createElement('tr');
-            
+            row.className = 'trend-card';
+
             // Twitchリンクを作成
             const twitchUrl = `https://www.twitch.tv/${item.user_name || item.name || ''}`;
             const streamName = item.name || item.title || 'N/A';

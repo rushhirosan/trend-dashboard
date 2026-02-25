@@ -4,6 +4,7 @@ Wikipedia Featured content API (most read articles) を使用して
 """
 
 import os
+import time
 import requests
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
@@ -103,26 +104,52 @@ class WikipediaTrendsManager(BaseTrendsManager):
             })
         return result
 
+    # Connection reset by peer 等の一時的エラーでリトライする例外
+    _RETRIABLE_EXCEPTIONS = (
+        requests.exceptions.ConnectionError,
+        requests.exceptions.ChunkedEncodingError,
+    )
+
     def _fetch_one_day(self, lang: str, date: datetime, timeout_sec: int = 30) -> Dict[str, Any]:
-        """指定日1日分の API を叩き、articles リストを返す。失敗時は error を返す。"""
+        """指定日1日分の API を叩き、articles リストを返す。失敗時は error を返す。
+        一時的な接続エラー（Connection reset by peer 等）の場合は最大3回リトライする。
+        """
         yyyy = date.strftime("%Y")
         mm = date.strftime("%m")
         dd = date.strftime("%d")
         url = f"{self.BASE_URL}/{lang}/featured/{yyyy}/{mm}/{dd}"
-        try:
-            self.rate_limiter.wait_if_needed()
-            resp = self.session.get(url, timeout=timeout_sec)
-            resp.raise_for_status()
-            data = resp.json()
-        except requests.exceptions.Timeout:
-            return {"error": "timeout"}
-        except requests.exceptions.RequestException as e:
-            return {"error": str(e)}
-        except ValueError:
-            return {"error": "Invalid JSON response"}
-        mostread = data.get("mostread") or {}
-        articles = mostread.get("articles") or []
-        return {"articles": articles, "yyyy": yyyy, "mm": mm, "dd": dd}
+        max_retries = 3
+        last_error = None
+
+        for attempt in range(max_retries):
+            try:
+                self.rate_limiter.wait_if_needed()
+                resp = self.session.get(url, timeout=timeout_sec)
+                resp.raise_for_status()
+                data = resp.json()
+                mostread = data.get("mostread") or {}
+                articles = mostread.get("articles") or []
+                return {"articles": articles, "yyyy": yyyy, "mm": mm, "dd": dd}
+            except requests.exceptions.Timeout:
+                return {"error": "timeout"}
+            except self._RETRIABLE_EXCEPTIONS as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    wait_sec = 2 ** (attempt + 1)
+                    logger.warning(
+                        "Wikipedia API 接続エラー (attempt %d/%d): %s - %s秒後にリトライ",
+                        attempt + 1, max_retries, e, wait_sec,
+                    )
+                    time.sleep(wait_sec)
+                else:
+                    logger.error("Wikipedia API 接続エラー (全リトライ失敗): %s", e)
+                    return {"error": str(e)}
+            except requests.exceptions.RequestException as e:
+                return {"error": str(e)}
+            except ValueError:
+                return {"error": "Invalid JSON response"}
+
+        return {"error": str(last_error) if last_error else "Unknown error"}
 
     def _fetch_trends(
         self,

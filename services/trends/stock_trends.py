@@ -611,9 +611,11 @@ class StockTrendsManager(BaseTrendsManager):
             trends_data = []
             
             # 各銘柄を個別に取得（yfinanceは個別取得が安定）
-            # fly.io環境でのタイムアウト対策: 最大60銘柄までに制限（処理時間短縮）
-            # タイムアウトを8秒、リトライロジック追加、info取得削除により高速化
-            max_tickers = min(len(tickers), 60)
+            # 実行時間短縮: 最大45銘柄（60→45）、リトライ2回に制限
+            try:
+                max_tickers = min(len(tickers), max(20, int(os.getenv('STOCK_MAX_TICKERS', '45'))))
+            except (ValueError, TypeError):
+                max_tickers = min(len(tickers), 45)
             success_count = 0
             error_count = 0
             empty_count = 0
@@ -633,48 +635,33 @@ class StockTrendsManager(BaseTrendsManager):
                     # history取得（タイムアウト対策: エラーが発生した場合はスキップ）
                     # 週末や市場が閉まっている場合を考慮して、5日間のデータを取得（最後の取引日を特定するため）
                     hist = None
-                    max_retries = 5  # リトライ回数を5回に増加（yfinance APIの不安定性を考慮）
-                    retry_delay = 3  # 初期待機時間を3秒に延長（yfinance APIの復旧を待つ）
+                    max_retries = 2  # 実行時間短縮: 5→2（3回試行で十分）
+                    retry_delay = 2  # 初期待機2秒
                     
                     for retry in range(max_retries):
                         try:
-                            # タイムアウトを10秒に延長（Fly.io環境でのネットワーク遅延を考慮）
                             hist = ticker.history(period='5d', timeout=10)
                             if hist is not None and not hist.empty:
                                 break  # 成功したらループを抜ける
                             else:
-                                # データが空の場合はリトライ
+                                # データが空（市場休み等）: 1回だけリトライ
                                 if retry < max_retries - 1:
-                                    logger.warning(f"銘柄 {ticker_symbol}: データが空です (リトライ {retry + 1}/{max_retries})")
+                                    logger.debug(f"銘柄 {ticker_symbol}: データが空 (リトライ {retry + 1}/{max_retries})")
                                     time.sleep(retry_delay)
-                                    retry_delay *= 2  # 指数バックオフ
                                 else:
-                                    logger.warning(f"銘柄 {ticker_symbol}: データが空です（全リトライ失敗）")
                                     empty_count += 1
                                     hist = None
                                     break
                         except Exception as e:
                             error_msg = str(e)
-                            # JSONパースエラーの場合は、より長い待機時間を設定
-                            if 'Expecting value' in error_msg or 'JSON' in error_msg:
-                                if retry < max_retries - 1:
-                                    wait_time = retry_delay * (retry + 2)  # より長い待機時間
-                                    logger.warning(f"銘柄 {ticker_symbol} JSONパースエラー (リトライ {retry + 1}/{max_retries}, {wait_time}秒待機): {error_msg[:100]}")
-                                    time.sleep(wait_time)
-                                    retry_delay *= 2
-                                else:
-                                    logger.warning(f"銘柄 {ticker_symbol} JSONパースエラー (全リトライ失敗): {error_msg[:100]}")
-                                    error_count += 1
-                                    hist = None
+                            if retry < max_retries - 1:
+                                wait_sec = retry_delay * (2 ** retry)
+                                logger.debug(f"銘柄 {ticker_symbol} 取得エラー (リトライ {retry + 1}/{max_retries}): {error_msg[:80]}")
+                                time.sleep(wait_sec)
                             else:
-                                if retry < max_retries - 1:
-                                    logger.warning(f"銘柄 {ticker_symbol} history取得エラー (リトライ {retry + 1}/{max_retries}): {error_msg[:100]}")
-                                    time.sleep(retry_delay)
-                                    retry_delay *= 2  # 指数バックオフ
-                                else:
-                                    logger.warning(f"銘柄 {ticker_symbol} history取得エラー (全リトライ失敗): {error_msg[:100]}")
-                                    error_count += 1
-                                    hist = None
+                                logger.warning(f"銘柄 {ticker_symbol} 取得エラー（スキップ）: {error_msg[:80]}")
+                                error_count += 1
+                                hist = None
                     
                     if hist is None:
                         continue

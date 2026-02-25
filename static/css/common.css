@@ -5,6 +5,14 @@
     --header-height: 3.25rem;
 }
 
+/* モダンウェブフォント - ページ別（各ページでフォントを読み込む） */
+#trends-jp {
+    font-family: "Noto Sans JP", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+#trends-us {
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
 /* 基本フォントサイズを小さく */
 body {
     font-size: 0.875rem;

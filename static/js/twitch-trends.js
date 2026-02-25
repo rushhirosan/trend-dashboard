@@ -44,7 +44,7 @@ function displayTwitchResults(data) {
             
             row.innerHTML = `
                 <td><span class="badge bg-secondary">${item.rank}</span></td>
-                <td><strong><a href="${twitchUrl}" target="_blank">${streamName}</a></strong></td>
+                <td><strong><a href="${twitchUrl}" target="_blank" rel="noopener noreferrer">${streamName}</a></strong></td>
                 <td>${countCell}</td>
             `;
             // 行全体をクリック可能にする（アクセシビリティ対応）

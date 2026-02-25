@@ -73,7 +73,7 @@ function displayRakutenResults(data) {
             row.innerHTML = `
                 <td><span class="badge bg-danger">${item.rank}</span></td>
                 <td>
-                    <strong><a href="${rakutenUrl}" target="_blank" class="text-decoration-none" title="${item.title || ''}">${displayTitle || ''}</a></strong>
+                    <strong><a href="${rakutenUrl}" target="_blank" rel="noopener noreferrer" class="text-decoration-none" title="${item.title || ''}">${displayTitle || ''}</a></strong>
                 </td>
                 <td>${price}</td>
                 <td>${reviewInfo}</td>

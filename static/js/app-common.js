@@ -1,8 +1,28 @@
-// 共通: テーブル行クリック（no-op。リンクのデフォルト動作を使用するため行に手を加えない）
+// 共通: テーブル行クリックで別タブでURLを開く（ニュースタブと同様の動作を全タブに適用）
 function makeTableRowClickable(row, linkUrl, ariaLabel) {
-    void row;
-    void linkUrl;
-    void ariaLabel;
+    if (!row || !linkUrl || linkUrl === '#' || (typeof linkUrl === 'string' && linkUrl.trim() === '')) return;
+
+    row.setAttribute('role', 'button');
+    row.setAttribute('tabindex', '0');
+    if (ariaLabel) row.setAttribute('aria-label', ariaLabel);
+    row.style.cursor = 'pointer';
+
+    const openInNewTab = function () {
+        window.open(linkUrl, '_blank', 'noopener,noreferrer');
+    };
+
+    row.addEventListener('click', function (e) {
+        if (e.target.closest && e.target.closest('a[href], button')) return;
+        e.preventDefault();
+        openInNewTab();
+    });
+
+    row.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openInNewTab();
+        }
+    });
 }
 if (typeof window !== 'undefined') {
     window.makeTableRowClickable = makeTableRowClickable;
@@ -126,7 +146,7 @@ function createBadge(text, color = 'primary') {
 
 // 共通のリンク生成関数
 function createLink(url, text, className = 'btn btn-sm btn-outline-primary') {
-    return `<a href="${url}" target="_blank" class="${className}">
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="${className}">
         <i class="fas fa-external-link-alt"></i> ${text}
     </a>`;
 }
@@ -613,6 +633,16 @@ function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 5) {
             }
             td.appendChild(wrapper);
         });
+        // クローンはイベントリスナーを引き継がないため、行クリックで別タブ表示を再適用
+        const firstLink = cloned.querySelector('a[href]');
+        if (firstLink && firstLink.href && typeof makeTableRowClickable === 'function') {
+            const href = firstLink.href;
+            if (href !== '#' && href.indexOf('example.com') === -1) {
+                const isUsPage = document.body && document.body.id === 'trends-us';
+                const label = (firstLink.textContent || '').trim() + (isUsPage ? ' - Open' : 'を開く');
+                makeTableRowClickable(cloned, href, label || (isUsPage ? 'Open link' : 'リンクを開く'));
+            }
+        }
         return cloned;
     };
 

@@ -56,7 +56,7 @@ function displayHatenaResults(data) {
             row.innerHTML = `
                 <td><span class="badge bg-warning">${item.rank || index + 1}</span></td>
                 <td>
-                    <strong><a href="${articleUrl}" target="_blank">${articleTitle}</a></strong>
+                    <strong><a href="${articleUrl}" target="_blank" rel="noopener noreferrer">${articleTitle}</a></strong>
                 </td>
                 <td><strong>${bookmarkInfo}</strong></td>
             `;

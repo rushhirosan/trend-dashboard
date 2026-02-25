@@ -62,7 +62,7 @@ function displayHatenaResults(data) {
             row.innerHTML = `
                 <td><span class="badge bg-warning">${item.rank || index + 1}</span></td>
                 <td>
-                    <strong><a href="${articleUrl}" target="_blank">${articleTitle}</a></strong>
+                    <strong><a href="${articleUrl}" target="_blank" rel="noopener noreferrer">${articleTitle}</a></strong>
                 </td>
                 <td><strong>${bookmarkInfo}</strong></td>
             `;
@@ -118,7 +118,7 @@ function displayPodcastResults(data) {
         const podcastTitle = item.title || 'N/A';
         row.innerHTML = `
             <td>${index + 1}</td>
-            <td><a href="${podcastUrl}" target="_blank">${podcastTitle}</a></td>
+            <td><a href="${podcastUrl}" target="_blank" rel="noopener noreferrer">${podcastTitle}</a></td>
             <td>${item.publisher || 'N/A'}</td>
             <td>${item.score || item.total_episodes || 'N/A'}</td>
         `;
@@ -171,7 +171,7 @@ function displayMovieResults(data) {
 
             // Amazonリンクが存在する場合は「Amazonで見る」ボタンを追加
             const amazonButton = item.amazon_link
-                ? `<br><a href="${item.amazon_link}" target="_blank" class="btn btn-sm btn-warning mt-1" style="font-size: 0.75rem;">
+                ? `<br><a href="${item.amazon_link}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-warning mt-1" style="font-size: 0.75rem;">
                     <i class="fas fa-shopping-cart"></i> Amazonで見る
                    </a>`
                 : '';
@@ -181,7 +181,7 @@ function displayMovieResults(data) {
                 <td><span class="badge bg-primary">${item.rank || index + 1}</span></td>
                 <td>
                     ${posterUrl ? `<img src="${posterUrl}" alt="${movieTitle}" style="width: 50px; height: 75px; object-fit: cover; margin-right: 10px; float: left;">` : ''}
-                    <strong><a href="${tmdbLink}" target="_blank">${movieTitle}</a></strong>
+                    <strong><a href="${tmdbLink}" target="_blank" rel="noopener noreferrer">${movieTitle}</a></strong>
                     ${item.original_title && item.original_title !== item.title ? `<br><small class="text-muted">${item.original_title}</small>` : ''}
                     ${amazonButton}
                 </td>
@@ -236,7 +236,7 @@ function displayBookResults(data) {
                 <td><span class="badge bg-info">${item.rank || index + 1}</span></td>
                 <td>
                     ${imageUrl ? `<img src="${imageUrl}" alt="${bookTitle}" style="width: 40px; height: 60px; object-fit: cover; margin-right: 10px; float: left;">` : ''}
-                    <strong><a href="${bookLink}" target="_blank">${bookTitle}</a></strong>
+                    <strong><a href="${bookLink}" target="_blank" rel="noopener noreferrer">${bookTitle}</a></strong>
                 </td>
                 <td>${author}</td>
                 <td>${price}</td>
@@ -292,7 +292,7 @@ function displayGitHubResults(data) {
             row.innerHTML = `
                 <td><span class="badge bg-dark">${item.rank || index + 1}</span></td>
                 <td>
-                    <strong><a href="${repoUrl}" target="_blank">${repoName}</a></strong>
+                    <strong><a href="${repoUrl}" target="_blank" rel="noopener noreferrer">${repoName}</a></strong>
                     ${item.description ? `<br><small class="text-muted">${item.description}</small>` : ''}
                 </td>
                 <td>${language}</td>
@@ -350,7 +350,7 @@ function displayAppStoreResults(data) {
                 <td><span class="badge bg-success">${item.rank || index + 1}</span></td>
                 <td>
                     ${iconUrl ? `<img src="${iconUrl}" alt="${appName}" style="width: 50px; height: 50px; object-fit: cover; margin-right: 10px; float: left; border-radius: 10px;">` : ''}
-                    <strong><a href="${appUrl}" target="_blank">${appName}</a></strong>
+                    <strong><a href="${appUrl}" target="_blank" rel="noopener noreferrer">${appName}</a></strong>
                 </td>
                 <td>${developer}</td>
                 <td>${rating !== 'N/A' ? `⭐ ${rating}` : 'N/A'}</td>
@@ -406,7 +406,7 @@ function displayIPAResults(data) {
             row.innerHTML = `
                 <td><span class="badge bg-danger">${item.rank || index + 1}</span></td>
                 <td>
-                    <strong><a href="${url}" target="_blank">${title}</a></strong>
+                    <strong><a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a></strong>
                     ${item.description ? `<br><small class="text-muted">${truncateText(item.description, 100)}</small>` : ''}
                 </td>
                 <td>${publishedDate}</td>
@@ -452,7 +452,7 @@ function displayJPCERTResults(data) {
             row.innerHTML = `
                 <td><span class="badge bg-warning">${item.rank || index + 1}</span></td>
                 <td>
-                    <strong><a href="${url}" target="_blank">${title}</a></strong>
+                    <strong><a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a></strong>
                     ${item.description ? `<br><small class="text-muted">${truncateText(item.description, 100)}</small>` : ''}
                 </td>
                 <td>${publishedDate}</td>
@@ -498,7 +498,7 @@ function displayZennResults(data) {
             row.innerHTML = `
                 <td><span class="badge bg-primary">${item.rank || index + 1}</span></td>
                 <td>
-                    <strong><a href="${url}" target="_blank">${title}</a></strong>
+                    <strong><a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a></strong>
                     ${item.description ? `<br><small class="text-muted">${truncateText(item.description, 100)}</small>` : ''}
                 </td>
                 <td>${publishedDate}</td>
@@ -544,7 +544,7 @@ function displayNoteResults(data) {
             row.innerHTML = `
                 <td><span class="badge bg-secondary">${item.rank || index + 1}</span></td>
                 <td>
-                    <strong><a href="${url}" target="_blank">${title}</a></strong>
+                    <strong><a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a></strong>
                 </td>
                 <td>${publishedDate}</td>
             `;
@@ -589,7 +589,7 @@ function displayCISAKEVResults(data) {
 
             row.innerHTML = `
                 <td><span class="badge bg-danger">${item.rank || index + 1}</span></td>
-                <td><strong><a href="${cveUrl}" target="_blank">${cveId}</a></strong></td>
+                <td><strong><a href="${cveUrl}" target="_blank" rel="noopener noreferrer">${cveId}</a></strong></td>
                 <td>${product}</td>
                 <td>${dateAdded}</td>
             `;
@@ -637,7 +637,7 @@ function displayTheHackerNewsResults(data) {
             row.innerHTML = `
                 <td><span class="badge bg-info">${item.rank || index + 1}</span></td>
                 <td>
-                    <strong><a href="${url}" target="_blank">${title}</a></strong>
+                    <strong><a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a></strong>
                     ${item.description ? `<br><small class="text-muted">${truncateText(item.description, 100)}</small>` : ''}
                 </td>
                 <td>${publishedDate}</td>
@@ -687,7 +687,7 @@ function displayHackerNoonResults(data) {
             row.innerHTML = `
                 <td><span class="badge bg-primary">${item.rank || index + 1}</span></td>
                 <td>
-                    <strong><a href="${url}" target="_blank">${title}</a></strong>
+                    <strong><a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a></strong>
                     ${item.description ? `<br><small class="text-muted">${truncateText(item.description, 100)}</small>` : ''}
                 </td>
                 <td>${author}</td>
@@ -733,7 +733,7 @@ function displayWorldNewsResults(data) {
             // ニュースタイトルをリンク化
             const titleText = item.title || 'N/A';
             const titleLink = item.url
-                ? `<a href="${item.url}" target="_blank" class="text-decoration-none">
+                ? `<a href="${item.url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">
                         ${titleText}
                         <i class="fas fa-external-link-alt ms-1"></i>
                    </a>`
@@ -809,7 +809,7 @@ function displayTwitchResults(data) {
 
         row.innerHTML = `
             <td>${index + 1}</td>
-            <td><a href="${twitchUrl}" target="_blank" class="text-decoration-none">${streamName}</a></td>
+            <td><a href="${twitchUrl}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">${streamName}</a></td>
             <td>${item.viewer_count || item.score || 0}人</td>
         `;
         // 行全体をクリック可能にする（アクセシビリティ対応）

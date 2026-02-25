@@ -33,7 +33,7 @@ function displayPodcastResults(data) {
 
             row.innerHTML = `
                 <td><span class="badge bg-purple">${item.rank}</span></td>
-                <td><strong><a href="${podcastUrl}" target="_blank">${podcastTitle}</a></strong></td>
+                <td><strong><a href="${podcastUrl}" target="_blank" rel="noopener noreferrer">${podcastTitle}</a></strong></td>
                 <td>${item.description ? item.description.substring(0, 100) + '...' : '説明なし'}</td>
                 <td>${item.score || 'N/A'}</td>
             `;

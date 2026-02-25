@@ -381,7 +381,7 @@ function displayMovieResultsUS(data) {
             
             // Amazonリンクが存在する場合は「Amazonで見る」ボタンを追加
             const amazonButton = item.amazon_link 
-                ? `<br><a href="${item.amazon_link}" target="_blank" class="btn btn-sm btn-warning mt-1" style="font-size: 0.75rem;">
+                ? `<br><a href="${item.amazon_link}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-warning mt-1" style="font-size: 0.75rem;">
                     <i class="fas fa-shopping-cart"></i> View on Amazon
                    </a>`
                 : '';
@@ -390,7 +390,7 @@ function displayMovieResultsUS(data) {
                 <td>${item.rank || index + 1}</td>
                 <td>
                     ${posterUrl ? `<img src="${posterUrl}" alt="${item.title}" style="width: 50px; height: 75px; object-fit: cover; margin-right: 10px; float: left;">` : ''}
-                    <strong><a href="${tmdbLink}" target="_blank">${item.title || 'N/A'}</a></strong>
+                    <strong><a href="${tmdbLink}" target="_blank" rel="noopener noreferrer">${item.title || 'N/A'}</a></strong>
                     ${item.original_title && item.original_title !== item.title ? `<br><small class="text-muted">${item.original_title}</small>` : ''}
                     ${amazonButton}
                 </td>
@@ -523,7 +523,7 @@ function displayBookResultsUS(data) {
                 <td><span class="badge bg-info">${item.rank || index + 1}</span></td>
                 <td>
                     ${imageUrl ? `<img src="${imageUrl}" alt="${item.title}" style="width: 40px; height: 60px; object-fit: cover; margin-right: 10px; float: left;">` : ''}
-                    <strong><a href="${bookLink}" target="_blank">${item.title || 'N/A'}</a></strong>
+                    <strong><a href="${bookLink}" target="_blank" rel="noopener noreferrer">${item.title || 'N/A'}</a></strong>
                 </td>
                 <td>${author}</td>
                 <td>${price}</td>
@@ -914,7 +914,7 @@ function displayGoogleResults(data) {
         // キーワードを行リンク化（Searchボタンは不要、行クリックで検索へ）
         row.innerHTML = `
             <td><span class="badge bg-primary">${index + 1}</span></td>
-            <td><a href="${googleSearchUrl}" target="_blank" class="text-decoration-none"><strong>${keyword}</strong></a></td>
+            <td><a href="${googleSearchUrl}" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>${keyword}</strong></a></td>
             <td>${Math.round(popularity).toLocaleString()}</td>
         `;
         // 行全体をクリック可能にする（アクセシビリティ対応）
@@ -1000,7 +1000,7 @@ function displayYouTubeResults(data) {
         
         row.innerHTML = `
             <td><span class="badge bg-danger">${index + 1}</span></td>
-            <td><a href="${youtubeUrl}" target="_blank" class="text-decoration-none"><strong>${title}</strong></a></td>
+            <td><a href="${youtubeUrl}" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>${title}</strong></a></td>
             <td>${channel}</td>
             <td>${formatNumber(views)}</td>
         `;
@@ -1280,7 +1280,7 @@ function displayWorldNewsResults(data) {
         
         row.innerHTML = `
             <td><span class="badge bg-info">${index + 1}</span></td>
-            <td><a href="${url}" target="_blank" class="text-decoration-none"><strong>${title}</strong></a></td>
+            <td><a href="${url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>${title}</strong></a></td>
             <td>${published}</td>
         `;
         // 行全体をクリック可能にする（アクセシビリティ対応）
@@ -1506,7 +1506,7 @@ function displayRedditResults(data) {
         const redditUrl = permalink.startsWith('http') ? permalink : `https://www.reddit.com${permalink}`;
         row.innerHTML = `
             <td><span class="badge bg-warning text-dark">${index + 1}</span></td>
-            <td><a href="${redditUrl}" target="_blank"><strong>${title}</strong></a></td>
+            <td><a href="${redditUrl}" target="_blank" rel="noopener noreferrer"><strong>${title}</strong></a></td>
             <td><span class="badge bg-secondary">r/${subreddit}</span></td>
             <td>${formatNumber(score)}</td>
             <td>${formatNumber(comments)}</td>
@@ -1646,7 +1646,7 @@ function displayPodcastResults(data) {
         
         row.innerHTML = `
             <td><span class="badge" style="background-color: #8b5cf6; color: white;">${index + 1}</span></td>
-            <td><a href="${url}" target="_blank"><strong>${title}</strong></a></td>
+            <td><a href="${url}" target="_blank" rel="noopener noreferrer"><strong>${title}</strong></a></td>
             <td>${publisher}</td>
         `;
         // 行全体をクリック可能にする（アクセシビリティ対応）
@@ -1751,7 +1751,7 @@ function displayTwitchResults(data, type = 'games') {
             
             row.innerHTML = `
                 <td><span class="badge" style="background-color: #9146FF; color: white;">${index + 1}</span></td>
-                <td><a href="${url}" target="_blank" class="text-decoration-none"><strong>${gameName}</strong></a></td>
+                <td><a href="${url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>${gameName}</strong></a></td>
                 <td>${formatNumber(viewers)}</td>
             `;
             // 行全体をクリック可能にする（アクセシビリティ対応）
@@ -1764,7 +1764,7 @@ function displayTwitchResults(data, type = 'games') {
             
             row.innerHTML = `
                 <td><span class="badge" style="background-color: #9146FF; color: white;">${index + 1}</span></td>
-                <td><a href="${url}" target="_blank" class="text-decoration-none"><strong>${title}</strong><br><small>${userName}</small></a></td>
+                <td><a href="${url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>${title}</strong><br><small>${userName}</small></a></td>
                 <td>${formatNumber(viewers)}</td>
             `;
             // 行全体をクリック可能にする（アクセシビリティ対応）
@@ -1777,7 +1777,7 @@ function displayTwitchResults(data, type = 'games') {
             
             row.innerHTML = `
                 <td><span class="badge" style="background-color: #9146FF; color: white;">${index + 1}</span></td>
-                <td><a href="${url}" target="_blank" class="text-decoration-none"><strong>${title}</strong><br><small>${creatorName}</small></a></td>
+                <td><a href="${url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>${title}</strong><br><small>${creatorName}</small></a></td>
                 <td>${formatNumber(viewCount)}</td>
             `;
             // 行全体をクリック可能にする（アクセシビリティ対応）
@@ -1903,7 +1903,7 @@ function displayHackerNewsResults(data) {
         
         row.innerHTML = `
             <td><span class="badge" style="background-color: #ff6600; color: white;">${index + 1}</span></td>
-            <td><a href="${url}" target="_blank"><strong>${title}</strong></a></td>
+            <td><a href="${url}" target="_blank" rel="noopener noreferrer"><strong>${title}</strong></a></td>
             <td>${score}</td>
             <td>${comments}</td>
         `;
@@ -2175,7 +2175,7 @@ function displayCNNResults(data) {
         
         row.innerHTML = `
             <td><span class="badge bg-danger">${index + 1}</span></td>
-            <td><a href="${url}" target="_blank" class="text-decoration-none"><strong>${title}</strong></a></td>
+            <td><a href="${url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>${title}</strong></a></td>
             <td>${publishedDate}</td>
         `;
         // 行全体をクリック可能にする（アクセシビリティ対応）
@@ -2238,7 +2238,7 @@ function displayWikipediaResultsUS(data) {
         const views = item.views != null ? item.views.toLocaleString() : '-';
         row.innerHTML = `
             <td><span class="badge bg-secondary">${index + 1}</span></td>
-            <td><a href="${url}" target="_blank" class="text-decoration-none"><strong>${title}</strong></a></td>
+            <td><a href="${url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>${title}</strong></a></td>
             <td>${views}</td>
         `;
         if (typeof makeTableRowClickable === 'function') {
@@ -2368,7 +2368,7 @@ function displayProductHuntResults(data) {
         
         row.innerHTML = `
             <td><span class="badge" style="background-color: #da552f; color: white;">${index + 1}</span></td>
-            <td><a href="${url}" target="_blank" class="text-decoration-none"><strong>${name}</strong></a></td>
+            <td><a href="${url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>${name}</strong></a></td>
             <td>${tagline}</td>
             <td>${formatNumber(votes)}</td>
         `;
@@ -2850,7 +2850,7 @@ function displayDevToResults(data) {
         
         row.innerHTML = `
             <td><span class="badge" style="background-color: #0a0e27; color: white;">${rank}</span></td>
-            <td><a href="${url}" target="_blank" class="text-decoration-none"><strong>${title}</strong></a></td>
+            <td><a href="${url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>${title}</strong></a></td>
             <td>${author}</td>
             <td>${formatNumber(reactions)}</td>
         `;
@@ -2904,7 +2904,7 @@ function displayMediumResults(data) {
         
         row.innerHTML = `
             <td><span class="badge bg-dark">${rank}</span></td>
-            <td><a href="${url}" target="_blank" class="text-decoration-none"><strong>${title}</strong></a></td>
+            <td><a href="${url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>${title}</strong></a></td>
             <td>${author}</td>
             <td>${published}</td>
         `;
@@ -3023,7 +3023,7 @@ function displayEbayResults(data) {
         
         row.innerHTML = `
             <td><span class="badge" style="background-color: #0064D2; color: white;">${rank}</span></td>
-            <td><a href="${url}" target="_blank" class="text-decoration-none"><strong>${title}</strong></a></td>
+            <td><a href="${url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>${title}</strong></a></td>
             <td>${price}</td>
         `;
         // 行全体をクリック可能にする（アクセシビリティ対応）

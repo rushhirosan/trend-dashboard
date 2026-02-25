@@ -64,7 +64,7 @@ function displayNoteResults(data) {
             // はてな・Zennと同様にタイトルリンクのみ（余分な改行・ボタンなしで行高を揃える）
             row.innerHTML = `
                 <td><span class="badge bg-secondary">${item.rank || index + 1}</span></td>
-                <td><strong><a href="${articleUrl}" target="_blank">${articleTitle}</a></strong></td>
+                <td><strong><a href="${articleUrl}" target="_blank" rel="noopener noreferrer">${articleTitle}</a></strong></td>
                 <td>${publishedDate}</td>
             `;
             // 行全体をクリック可能にする（アクセシビリティ対応）

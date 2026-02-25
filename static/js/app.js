@@ -246,7 +246,7 @@ function displayGoogleResults(data) {
         // キーワードを行リンク化（G検索ボタンは不要、行クリックで検索へ）
         row.innerHTML = `
             <td><span class="badge bg-primary">${index + 1}</span></td>
-            <td><strong><a href="${googleSearchUrl}" target="_blank">${keyword}</a></strong></td>
+            <td><strong><a href="${googleSearchUrl}" target="_blank" rel="noopener noreferrer">${keyword}</a></strong></td>
             <td><strong>${Math.round(popularity).toLocaleString()}</strong></td>
         `;
         makeTableRowClickable(row, googleSearchUrl, `${keyword}をGoogleで検索`);
@@ -339,7 +339,7 @@ function displayYouTubeResults(data) {
 
         row.innerHTML = `
             <td><span class="badge bg-danger">${index + 1}</span></td>
-            <td><a href="${youtubeUrl}" target="_blank" class="text-decoration-none"><strong>${videoTitle}</strong></a>${additionalInfo}</td>
+            <td><a href="${youtubeUrl}" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>${videoTitle}</strong></a>${additionalInfo}</td>
             <td>${video.channel_title}</td>
             <td><strong>${formatViewCount(video.view_count)}</strong></td>
         `;
@@ -424,7 +424,7 @@ function displayMusicResults(data) {
 
         row.innerHTML = `
             <td><span class="badge bg-success">${item.rank}</span></td>
-            <td><a href="${spotifyUrl}" target="_blank" class="text-decoration-none"><strong>${musicTitle}</strong></a>${additionalInfo}</td>
+            <td><a href="${spotifyUrl}" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>${musicTitle}</strong></a>${additionalInfo}</td>
             <td>${item.artist}</td>
             <td><strong>${popularity}</strong></td>
         `;
@@ -888,6 +888,15 @@ function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 5) {
             }
             td.appendChild(wrapper);
         });
+        // クローンはイベントリスナーを引き継がないため、行クリックで別タブ表示を再適用
+        const firstLink = cloned.querySelector('a[href]');
+        if (firstLink && firstLink.href && typeof makeTableRowClickable === 'function') {
+            const href = firstLink.href;
+            if (href !== '#' && href.indexOf('example.com') === -1) {
+                const label = (firstLink.textContent || '').trim() + 'を開く';
+                makeTableRowClickable(cloned, href, label || 'リンクを開く');
+            }
+        }
         return cloned;
     };
 
@@ -1157,7 +1166,7 @@ function displayWorldNewsResults(data) {
 
             const titleText = news.title || 'N/A';
             const titleLink = news.url
-                ? `<a href="${news.url}" target="_blank" class="text-decoration-none">${titleText}<i class="fas fa-external-link-alt ms-1"></i></a>`
+                ? `<a href="${news.url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">${titleText}<i class="fas fa-external-link-alt ms-1"></i></a>`
                 : `<span>${titleText}</span>`;
 
             const publishedDateRaw = news.published_at || news.publish_date || news.publishedDate || news.published_date;
@@ -1527,7 +1536,7 @@ function displayRakutenResults(data) {
         row.innerHTML = `
             <td><span class="badge bg-danger">${index + 1}</span></td>
             <td>
-                <strong><a href="${rakutenUrl}" target="_blank">${productTitle}</a></strong>
+                <strong><a href="${rakutenUrl}" target="_blank" rel="noopener noreferrer">${productTitle}</a></strong>
             </td>
             <td>${price}</td>
             <td>${reviewInfo}</td>
@@ -1660,7 +1669,7 @@ function displayHatenaResults(data) {
             row.innerHTML = `
                 <td><span class="badge bg-warning">${item.rank || index + 1}</span></td>
                 <td>
-                    <strong><a href="${articleUrl}" target="_blank">${articleTitle}</a></strong>
+                    <strong><a href="${articleUrl}" target="_blank" rel="noopener noreferrer">${articleTitle}</a></strong>
                 </td>
                 <td><strong>${bookmarkInfo}</strong></td>
             `;

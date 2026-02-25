@@ -1,3 +1,8 @@
+// makeTableRowClickable が未定義の場合のフォールバック（app-common.js キャッシュ対策）
+if (typeof window.makeTableRowClickable === 'undefined') {
+    window.makeTableRowClickable = function() {};
+}
+
 // グローバル変数
 let currentGoogleChart = null;
 let currentYouTubeChart = null;
@@ -441,23 +446,29 @@ function displayMusicResults(data) {
 
 // 視聴回数をフォーマット
 function formatViewCount(count) {
-    if (count >= 1000000) {
-        return (count / 1000000).toFixed(1) + 'M';
-    } else if (count >= 1000) {
-        return (count / 1000).toFixed(1) + 'K';
+    if (count == null || count === undefined) return '0';
+    const n = Number(count);
+    if (isNaN(n)) return '0';
+    if (n >= 1000000) {
+        return (n / 1000000).toFixed(1) + 'M';
+    } else if (n >= 1000) {
+        return (n / 1000).toFixed(1) + 'K';
     } else {
-        return count.toString();
+        return n.toString();
     }
 }
 
 // 再生回数をフォーマット
 function formatPlayCount(count) {
-    if (count >= 1000000) {
-        return (count / 1000000).toFixed(1) + 'M';
-    } else if (count >= 1000) {
-        return (count / 1000).toFixed(1) + 'K';
+    if (count == null || count === undefined) return '0';
+    const n = Number(count);
+    if (isNaN(n)) return '0';
+    if (n >= 1000000) {
+        return (n / 1000000).toFixed(1) + 'M';
+    } else if (n >= 1000) {
+        return (n / 1000).toFixed(1) + 'K';
     } else {
-        return count.toString();
+        return n.toString();
     }
 }
 

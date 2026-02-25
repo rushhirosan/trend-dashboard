@@ -1,3 +1,13 @@
+// 共通: テーブル行クリック（no-op。リンクのデフォルト動作を使用するため行に手を加えない）
+function makeTableRowClickable(row, linkUrl, ariaLabel) {
+    (void)row;
+    (void)linkUrl;
+    (void)ariaLabel;
+}
+if (typeof window !== 'undefined') {
+    window.makeTableRowClickable = makeTableRowClickable;
+}
+
 // 共通のエラー表示関数
 function hideError() {
     const errorElement = document.getElementById('errorMessage');
@@ -165,59 +175,6 @@ function isPlaceholderUrl(url) {
         return u.indexOf('example.com') !== -1;
     } catch (_) { return true; }
 }
-function makeTableRowClickable(row, linkUrl, ariaLabel = null) {
-    if (!row || !linkUrl || linkUrl === '#' || isPlaceholderUrl(linkUrl)) {
-        return;
-    }
-
-    // クリック可能な行としてマーク
-    row.setAttribute('data-clickable', 'true');
-    row.setAttribute('tabindex', '0');
-    row.setAttribute('role', 'button');
-
-    // aria-labelを設定（指定がない場合は行内のリンクテキストを使用）
-    if (ariaLabel) {
-        row.setAttribute('aria-label', ariaLabel);
-    } else {
-        // 行内の最初のリンクのテキストを取得
-        const firstLink = row.querySelector('a');
-        if (firstLink) {
-            const linkText = firstLink.textContent.trim();
-            row.setAttribute('aria-label', `${linkText}を開く`);
-        }
-    }
-
-    // クリックイベント: 行全体をクリックしたときにリンクを開く
-    row.addEventListener('click', function(e) {
-        // リンクやボタンがクリックされた場合は、その要素の動作を優先
-        if (e.target.tagName === 'A' || e.target.tagName === 'BUTTON' || e.target.closest('a') || e.target.closest('button')) {
-            return;
-        }
-
-        // 行全体がクリックされた場合は、最初のリンクを開く（ダミーURLは開かない）
-        const firstLink = row.querySelector('a[href]');
-        if (firstLink && firstLink.href && firstLink.href !== '#' && !isPlaceholderUrl(firstLink.href)) {
-            window.open(firstLink.href, firstLink.target || '_blank');
-        }
-    });
-
-    // キーボードイベント: EnterキーまたはSpaceキーでリンクを開く
-    row.addEventListener('keydown', function(e) {
-        // リンクやボタンがフォーカスされている場合は、その要素の動作を優先
-        if (e.target.tagName === 'A' || e.target.tagName === 'BUTTON' || e.target.closest('a') || e.target.closest('button')) {
-            return;
-        }
-
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            const firstLink = row.querySelector('a[href]');
-            if (firstLink && firstLink.href && firstLink.href !== '#' && !isPlaceholderUrl(firstLink.href)) {
-                window.open(firstLink.href, firstLink.target || '_blank');
-            }
-        }
-    });
-}
-
 // ダミー用 example.com リンクの直接クリックで遷移しない（キャッシュに古いダミーが残っている場合）
 document.addEventListener('DOMContentLoaded', function() {
     document.body.addEventListener('click', function(e) {
@@ -706,6 +663,7 @@ function isMobileViewport() {
 function applyCategoryRowAccordion(tbodyId, limit = 5) {
     const tbody = document.getElementById(tbodyId);
     if (!tbody || tbodyId.startsWith('all-') || tbodyId.startsWith('more-')) return;
+    if (tbodyId === 'nhkTrendsTableBody' || tbodyId === 'newsTrendsTableBody') return;
     const table = tbody.closest('table');
     if (!table) return;
 

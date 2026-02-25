@@ -697,11 +697,11 @@ function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 5) {
 // ============================================
 
 function isMobileViewport() {
-    return window.matchMedia && window.matchMedia('(max-width: 767.98px)').matches;
+    return window.matchMedia && window.matchMedia('(max-width: 991.98px)').matches;
 }
 
-// 行クリックでリンクを開くテーブル: アコーディオン処理をスキップ（DOM操作でリンクが壊れるため）
-const ACCORDION_EXCLUDED_TBODYS = new Set([
+// 行クリックでリンクを開くテーブル: tbody.innerHTML のクリアを避け、CSSのみでアコーディオン（リンクが壊れない）
+const ACCORDION_CSS_ONLY_TBODYS = new Set([
     'nhkTrendsTableBody', 'newsTrendsTableBody', 'prtimesHatenaTrendsTableBody', 'prtimesTrendsTableBody',
     'googleTrendsTableBody', 'youtubeTrendsTableBody', 'wikipediaTrendsTableBody',
     'hatenaTrendsTableBody', 'qiitaTrendsTableBody', 'zennTrendsTableBody', 'noteTrendsTableBody',
@@ -717,7 +717,6 @@ const ACCORDION_EXCLUDED_TBODYS = new Set([
 function applyCategoryRowAccordion(tbodyId, limit = 5) {
     const tbody = document.getElementById(tbodyId);
     if (!tbody || tbodyId.startsWith('all-') || tbodyId.startsWith('more-')) return;
-    if (ACCORDION_EXCLUDED_TBODYS.has(tbodyId)) return;
     const table = tbody.closest('table');
     if (!table) return;
 
@@ -733,6 +732,72 @@ function applyCategoryRowAccordion(tbodyId, limit = 5) {
     const allRows = mainRows.concat(moreRows);
     if (allRows.length === 0) return;
 
+    const useCssOnlyAccordion = ACCORDION_CSS_ONLY_TBODYS.has(tbodyId);
+
+    if (useCssOnlyAccordion) {
+        // リンクテーブル: DOM操作せずCSSのみで5行+アコーディオン（リンクが壊れない）
+        const wasOpenCss = table.dataset.moreOpen === 'true' || tbody.classList.contains('more-rows-open') ||
+            Array.from(existingToggleList).some(node => node.getAttribute('aria-expanded') === 'true');
+        existingToggleList.forEach(node => node.remove());
+        if (!isMobileViewport()) {
+            tbody.classList.remove('has-more', 'more-rows-open');
+            allRows.forEach(tr => {
+                tr.classList.remove('more-row', 'more-row-start', 'more-row-end');
+                tr.style.display = '';
+            });
+            return;
+        }
+        if (allRows.length <= limit) {
+            tbody.classList.remove('has-more', 'more-rows-open');
+            allRows.forEach(tr => {
+                tr.classList.remove('more-row', 'more-row-start', 'more-row-end');
+                tr.style.display = '';
+            });
+            return;
+        }
+        tbody.classList.add('has-more');
+        if (wasOpenCss) {
+            tbody.classList.add('more-rows-open');
+            table.dataset.moreOpen = 'true';
+        } else {
+            tbody.classList.remove('more-rows-open');
+            table.dataset.moreOpen = 'false';
+        }
+        allRows.forEach(tr => tr.classList.remove('more-row', 'more-row-start', 'more-row-end'));
+        allRows.forEach(function (tr, index) {
+            if (index >= limit) {
+                tr.classList.add('more-row');
+                if (index === limit) tr.classList.add('more-row-start');
+                tr.style.display = wasOpenCss ? 'table-row' : 'none';
+            } else if (index === limit - 1) {
+                tr.classList.add('more-row-end');
+            }
+        });
+        if (cardBody) {
+            const isUsPage = document.body && document.body.id === 'trends-us';
+            const moreText = isUsPage ? 'Show more' : '続きを表示';
+            const lessText = isUsPage ? 'Show less' : '閉じる';
+            const toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.className = 'btn btn-sm btn-outline-secondary w-100 mt-2 category-more-toggle';
+            toggle.setAttribute('aria-expanded', wasOpenCss ? 'true' : 'false');
+            toggle.setAttribute('data-more-toggle', moreTbodyId);
+            toggle.textContent = wasOpenCss ? lessText : moreText;
+            toggle.addEventListener('click', function () {
+                const isOpen = tbody.classList.toggle('more-rows-open');
+                tbody.querySelectorAll('.more-row').forEach(row => {
+                    row.style.display = isOpen ? 'table-row' : 'none';
+                });
+                this.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                this.textContent = isOpen ? lessText : moreText;
+                table.dataset.moreOpen = isOpen ? 'true' : 'false';
+            });
+            cardBody.appendChild(toggle);
+        }
+        return;
+    }
+
+    // 通常テーブル: tbodyをクリアして再構築
     tbody.innerHTML = '';
     existingMoreList.forEach(node => node.remove());
     existingToggleList.forEach(node => node.remove());

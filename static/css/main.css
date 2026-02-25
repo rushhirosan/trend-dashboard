@@ -3814,7 +3814,7 @@ ul.trend-category-tabs li.nav-item button.nav-link.active {
     cursor: default;
     pointer-events: none;
 }
-@media (min-width: 768px) {
+@media (min-width: 992px) {
 #pane-all .all-more-tbody {
         display: table-row-group !important;
         height: auto !important;
@@ -3823,7 +3823,7 @@ ul.trend-category-tabs li.nav-item button.nav-link.active {
     #pane-all .all-more-toggle {
         display: none !important;
     }
-    /* PC: カテゴリタブは全件表示、続きを表示ボタンは非表示（モバイル時のみ5行+アコーディオン） */
+    /* PC: カテゴリタブは全件表示、続きを表示ボタンは非表示（タブレット・モバイル時は5行+アコーディオン） */
     .category-more-toggle {
         display: none !important;
     }

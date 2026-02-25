@@ -710,7 +710,8 @@ const ACCORDION_EXCLUDED_TBODYS = new Set([
     'musicTrendsTableBody', 'podcastTrendsTableBody', 'rakutenTrendsTableBody', 'twitchTrendsTableBody',
     'cnnTrendsTableBody', 'worldnewsTrendsTableBody', 'hackernewsTrendsTableBody', 'producthuntTrendsTableBody',
     'devtoTrendsTableBody', 'mediumTrendsTableBody', 'cisaKevTrendsTableBody', 'thehackernewsTrendsTableBody',
-    'globenewswireTrendsTableBody', 'spotifyTrendsTableBody', 'ebayTrendsTableBody'
+    'globenewswireTrendsTableBody', 'spotifyTrendsTableBody', 'ebayTrendsTableBody',
+    'kkjCasesTrendsTableBody'
 ]);
 
 function applyCategoryRowAccordion(tbodyId, limit = 5) {

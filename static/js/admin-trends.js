@@ -331,7 +331,7 @@
             var caseTableHeader = selectedKeyword === 'all'
                 ? '<tr><th>キーワード</th><th class="text-end">順位</th><th>案件名</th><th>機関</th><th>公告日</th><th>都道府県</th></tr>'
                 : '<tr><th class="text-end">順位</th><th>案件名</th><th>機関</th><th>公告日</th><th>都道府県</th></tr>';
-            parts.push('<table class="table table-hover trend-table mb-0" id="kkjCasesTrendsTable"><thead class="table-dark">' + caseTableHeader + '</thead><tbody>' + caseRows.join('') + '</tbody></table>');
+            parts.push('<table class="table table-hover trend-table mb-0" id="kkjCasesTrendsTable"><thead class="table-dark">' + caseTableHeader + '</thead><tbody id="kkjCasesTrendsTableBody">' + caseRows.join('') + '</tbody></table>');
         } else {
             parts.push('<table class="table table-hover trend-table mb-0"><tbody><tr><td class="text-muted">—</td></tr></tbody></table>');
         }
@@ -379,6 +379,17 @@
 
         parts.push('</div>');
         return parts.join('');
+    }
+
+    function applyMakeTableRowClickableToKkjCases() {
+        var tbody = document.getElementById('kkjCasesTrendsTableBody');
+        if (!tbody || typeof window.makeTableRowClickable !== 'function') return;
+        tbody.querySelectorAll('tr').forEach(function (row) {
+            var link = row.querySelector('a[href]');
+            if (link && link.href && link.href !== '#' && link.href.indexOf('example.com') === -1) {
+                window.makeTableRowClickable(row, link.href, (link.textContent || '').trim() + 'の案件を開く');
+            }
+        });
     }
 
     function bindGotoTab() {
@@ -448,11 +459,13 @@
                     kkjAdminBody.innerHTML = kkjData
                         ? renderKkjAdminTabBody(kkjData, 'all') || '<p class="text-muted small mb-0">データがありません</p>'
                         : '<p class="text-muted small mb-0">' + escapeHtml(kkj.error || '取得できませんでした') + '</p>';
+                    applyMakeTableRowClickableToKkjCases();
                     function bindKkjKeywordSelect() {
                         var sel = document.getElementById('kkjKeywordSelect');
                         if (sel && window.__lastKkjData) {
                             sel.onchange = function () {
                                 kkjAdminBody.innerHTML = renderKkjAdminTabBody(window.__lastKkjData, this.value);
+                                applyMakeTableRowClickableToKkjCases();
                                 bindKkjKeywordSelect();
                             };
                         }

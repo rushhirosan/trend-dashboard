@@ -30,10 +30,14 @@
     transition: background-color 0.2s ease;
 }
 
-/* クリック可能な行のスタイル */
+/* クリック可能な行のスタイル：行全体がタップ領域 */
 .trend-table tbody tr[data-clickable="true"],
 .trend-table tbody tr.row-clickable {
     cursor: pointer;
+}
+/* 行内のリンクはタップを親のtrに透過（行全体で1つのタップ領域にする） */
+.trend-table tbody tr.row-clickable a[href] {
+    pointer-events: none;
 }
 
 .trend-table tbody tr[data-clickable="true"]:hover,

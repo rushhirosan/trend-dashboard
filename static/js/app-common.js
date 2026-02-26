@@ -21,12 +21,11 @@ function makeTableRowClickable(row, linkUrl, ariaLabel) {
         if (t) { touchStartX = t.clientX; touchStartY = t.clientY; }
     }, { passive: true });
     row.addEventListener('touchend', function (e) {
-        if (e.target.closest && e.target.closest('a[href], button')) return;
         var t = e.changedTouches && e.changedTouches[0];
         if (!t) return;
         var dx = Math.abs(t.clientX - touchStartX);
         var dy = Math.abs(t.clientY - touchStartY);
-        if (dx > 12 || dy > 12) return;
+        if (dx > 20 || dy > 20) return;
         touchHandled = true;
         e.preventDefault();
         openInNewTab();
@@ -34,11 +33,11 @@ function makeTableRowClickable(row, linkUrl, ariaLabel) {
     }, { passive: false });
 
     row.addEventListener('click', function (e) {
-        if (e.target.closest && e.target.closest('a[href], button')) return;
-        if (touchHandled) { e.preventDefault(); return; }
+        if (touchHandled) { e.preventDefault(); e.stopPropagation(); return; }
         e.preventDefault();
+        e.stopPropagation();
         openInNewTab();
-    });
+    }, true);
 
     row.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' || e.key === ' ') {

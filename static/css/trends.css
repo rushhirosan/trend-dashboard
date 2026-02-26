@@ -14,7 +14,6 @@
 .trend-card:hover {
     background-color: #f8f9fa;
     border-left-color: #007bff;
-    transform: translateX(1px);
 }
 
 /* トレンドテーブル */

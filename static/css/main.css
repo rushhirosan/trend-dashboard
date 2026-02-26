@@ -2269,6 +2269,15 @@ body.data-status-active #data-status .card-body {
         -webkit-overflow-scrolling: touch;
     }
     
+    /* モバイル: 全トレンドテーブルのヘッダー（黒背景）の高さを抑える */
+    .trend-table thead th,
+    .trend-table thead.table-dark th {
+        padding: 0.15rem 0.35rem !important;
+        font-size: 0.65rem !important;
+        line-height: 1.2 !important;
+        white-space: nowrap;
+    }
+    
     /* モバイルでの楽天商品名カラム調整 */
     #rakutenTrendsTable td:nth-child(2) {
         max-width: none !important;

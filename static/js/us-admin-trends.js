@@ -165,7 +165,7 @@
             return '<tr><td>' + escapeHtml(formatPeriod(s.period)) + '</td><td>' + escapeHtml(s.value) + '</td><td class="text-muted small">' + escapeHtml(s.unit || '') + '</td></tr>';
         }).join('');
         var tableHtml = rows
-            ? '<div class="card trend-table category-card"><div class="card-body"><div class="trend-table-container"><div class="table-responsive"><table class="table table-hover trend-table mb-0"><thead class="table-dark"><tr><th>Period</th><th>Value</th><th>Unit</th></tr></thead><tbody>' + rows + '</tbody></table></div></div></div></div>'
+            ? '<div class="card trend-table category-card"><div class="card-body"><div class="trend-table-container"><div class="table-responsive"><table class="table trend-table mb-0"><thead class="table-dark"><tr><th>Period</th><th>Value</th><th>Unit</th></tr></thead><tbody>' + rows + '</tbody></table></div></div></div></div>'
             : '<p class="text-muted small mb-0">No data available.</p>';
         var style = BLS_CARD_STYLE[item.indicator_id] || { header: 'bg-secondary text-white', icon: 'fa-chart-bar' };
         var title = escapeHtml(item.name_en || item.indicator_id || '');
@@ -199,7 +199,7 @@
             }).join('');
             trendCard = '<div class="card h-100">' +
                 '<div class="card-header bg-primary text-white py-2"><h5 class="h6 mb-0"><i class="fas fa-chart-area"></i> Annual Total Spending (FY-end)</h5></div>' +
-                '<div class="card-body"><div class="card trend-table category-card"><div class="card-body"><div class="trend-table-container"><div class="table-responsive"><table class="table table-hover trend-table mb-0"><thead class="table-dark"><tr><th>Fiscal Year</th><th class="text-end">Total (approx)</th></tr></thead><tbody id="usGovTrendTrendsTableBody">' + trendRows + '</tbody></table></div></div></div></div></div></div>';
+                '<div class="card-body"><div class="card trend-table category-card"><div class="card-body"><div class="trend-table-container"><div class="table-responsive"><table class="table trend-table mb-0"><thead class="table-dark"><tr><th>Fiscal Year</th><th class="text-end">Total (approx)</th></tr></thead><tbody id="usGovTrendTrendsTableBody">' + trendRows + '</tbody></table></div></div></div></div></div></div>';
         }
         if (agencies.length > 0) {
             var agencyRows = agencies.map(function (a) {
@@ -208,7 +208,7 @@
             }).join('');
             agencyCard = '<div class="card h-100">' +
                 '<div class="card-header bg-info text-white py-2"><h5 class="h6 mb-0"><i class="fas fa-building"></i> Agency Spending Rankings (FY2025)</h5></div>' +
-                '<div class="card-body"><div class="card trend-table category-card"><div class="card-body"><div class="trend-table-container"><div class="table-responsive"><table class="table table-hover trend-table mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Agency</th><th class="text-end">Budget (approx)</th></tr></thead><tbody id="usGovAgencyTrendsTableBody">' + agencyRows + '</tbody></table></div></div></div></div></div></div>';
+                '<div class="card-body"><div class="card trend-table category-card"><div class="card-body"><div class="trend-table-container"><div class="table-responsive"><table class="table trend-table mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Agency</th><th class="text-end">Budget (approx)</th></tr></thead><tbody id="usGovAgencyTrendsTableBody">' + agencyRows + '</tbody></table></div></div></div></div></div></div>';
         }
         if (trendCard || agencyCard) {
             html.push('<div class="row g-3 mb-3 align-items-stretch"><div class="col-12 col-md-6">' + trendCard + '</div><div class="col-12 col-md-6">' + agencyCard + '</div></div>');
@@ -237,7 +237,7 @@
                 '<div class="card-header bg-dark text-white py-2"><h5 class="h6 mb-0"><i class="fas fa-file-contract"></i> Top 5 Awards by Category (PSC/NAICS)</h5></div>' +
                 '<div class="card-body pb-3">' +
                 '<div class="table-responsive" style="max-height: 380px; overflow-y: auto;">' +
-                '<table class="table table-hover trend-table mb-2"><thead class="table-dark sticky-top"><tr><th>Category</th><th class="text-end">Rank</th><th>Description</th><th>Agency</th><th>Date</th><th>State</th></tr></thead><tbody id="usGovTopCasesTrendsTableBody">' +
+                '<table class="table trend-table mb-2"><thead class="table-dark sticky-top"><tr><th>Category</th><th class="text-end">Rank</th><th>Description</th><th>Agency</th><th>Date</th><th>State</th></tr></thead><tbody id="usGovTopCasesTrendsTableBody">' +
                 caseRows.join('') + '</tbody></table></div>' +
                 '<p class="text-muted small mb-0">Source: USAspending.gov. AI: NAICS 541512/541511. DX: PSC Service/D. Cyber: PSC Service/D/DJ.</p></div></div>';
             html.push(caseTable);

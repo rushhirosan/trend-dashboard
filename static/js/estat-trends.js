@@ -76,7 +76,7 @@
                     return '<tr><td>' + escapeHtml(formatPeriod(s.period)) + '</td><td>' + pctStr + '</td><td class="text-muted small">' + escapeHtml(s.unit || '前年同月=100') + '</td></tr>';
                 }).join('');
                 body += '<p class="small text-muted mb-1">直近1年（その月から過去12ヶ月）</p>';
-                body += '<div class="table-responsive mt-2"><table class="table table-sm table-hover mb-0"><thead class="table-light"><tr><th>期間</th><th>前年比</th><th>単位</th></tr></thead><tbody>' + cpiRows + '</tbody></table></div>';
+                body += '<div class="table-responsive mt-2"><table class="table table-sm mb-0"><thead class="table-light"><tr><th>期間</th><th>前年比</th><th>単位</th></tr></thead><tbody>' + cpiRows + '</tbody></table></div>';
             }
         } else if (item.indicator_id === 'housing_starts') {
             // CPI・有効求人倍率と同様に月次テーブルをメインで表示
@@ -85,7 +85,7 @@
                     return '<tr><td>' + escapeHtml(formatPeriod(s.period)) + '</td><td>' + escapeHtml(s.value) + '</td><td class="text-muted small">' + escapeHtml(s.unit || '戸') + '</td></tr>';
                 }).join('');
                 body += '<p class="small text-muted mb-1">直近1年（その月から過去12ヶ月）</p>';
-                body += '<div class="table-responsive mt-2"><table class="table table-sm table-hover mb-0"><thead class="table-light"><tr><th>期間</th><th>戸数</th><th>単位</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+                body += '<div class="table-responsive mt-2"><table class="table table-sm mb-0"><thead class="table-light"><tr><th>期間</th><th>戸数</th><th>単位</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
                 var total12 = item.total_12m;
                 if (total12 == null && item.series && item.series.length > 0) {
                     total12 = 0;
@@ -104,7 +104,7 @@
                 return '<tr><td>' + escapeHtml(formatPeriod(s.period)) + '</td><td>' + escapeHtml(s.value) + '</td><td class="text-muted small">' + escapeHtml(s.unit || '') + '</td></tr>';
             }).join('');
             body = rows
-                ? '<div class="table-responsive"><table class="table table-sm table-hover mb-0"><thead class="table-light"><tr><th>期間</th><th>値</th><th>単位</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+                ? '<div class="table-responsive"><table class="table table-sm mb-0"><thead class="table-light"><tr><th>期間</th><th>値</th><th>単位</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
                 : '<p class="text-muted small mb-0">2026年以降のデータはまだありません。</p>';
         }
         return (

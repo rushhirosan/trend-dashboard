@@ -61,7 +61,7 @@
                     return '<tr><td>' + escapeHtml(formatPeriod(s.period)) + '</td><td>' + pctStr + '</td><td class="text-muted small">' + escapeHtml(s.unit || '前年同月=100') + '</td></tr>';
                 }).join('');
                 body += '<p class="small text-muted mb-1">直近1年（その月から過去12ヶ月）</p>';
-                body += '<div class="table-responsive mt-2"><table class="table table-sm table-hover trend-table mb-0"><thead class="table-dark"><tr><th>期間</th><th>前年比</th><th>単位</th></tr></thead><tbody>' + cpiRows + '</tbody></table></div>';
+                body += '<div class="table-responsive mt-2"><table class="table table-sm trend-table mb-0"><thead class="table-dark"><tr><th>期間</th><th>前年比</th><th>単位</th></tr></thead><tbody>' + cpiRows + '</tbody></table></div>';
                 if (item.series.length <= 1) {
                     body += '<p class="text-muted small mt-1 mb-0">※ この統計表で月次が取得できない場合は1行のみ表示されます。再取得で月次データが利用可能か確認できます。</p>';
                 }
@@ -72,7 +72,7 @@
                     return '<tr><td>' + escapeHtml(formatPeriod(s.period)) + '</td><td>' + escapeHtml(s.value) + '</td><td class="text-muted small">' + escapeHtml(s.unit || '戸') + '</td></tr>';
                 }).join('');
                 body += '<p class="small text-muted mb-1">直近1年（その月から過去12ヶ月）</p>';
-                body += '<div class="table-responsive mt-2"><table class="table table-sm table-hover trend-table mb-0"><thead class="table-dark"><tr><th>期間</th><th>戸数</th><th>単位</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+                body += '<div class="table-responsive mt-2"><table class="table table-sm trend-table mb-0"><thead class="table-dark"><tr><th>期間</th><th>戸数</th><th>単位</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
                 var total12 = item.total_12m;
                 if (total12 == null && item.series && item.series.length > 0) {
                     total12 = 0;
@@ -91,7 +91,7 @@
                 return '<tr><td>' + escapeHtml(formatPeriod(s.period)) + '</td><td>' + escapeHtml(s.value) + '</td><td class="text-muted small">' + escapeHtml(s.unit || '') + '</td></tr>';
             }).join('');
             body = rows
-                ? '<div class="table-responsive"><table class="table table-sm table-hover trend-table mb-0"><thead class="table-dark"><tr><th>期間</th><th>値</th><th>単位</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+                ? '<div class="table-responsive"><table class="table table-sm trend-table mb-0"><thead class="table-dark"><tr><th>期間</th><th>値</th><th>単位</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
                 : '<p class="text-muted small mb-0">2026年以降のデータはまだありません。</p>';
         }
         var style = ESTAT_CARD_STYLE[item.indicator_id] || { header: 'bg-secondary text-white', icon: 'fa-chart-bar' };
@@ -331,9 +331,9 @@
             var caseTableHeader = selectedKeyword === 'all'
                 ? '<tr><th>キーワード</th><th class="text-end">順位</th><th>案件名</th><th>機関</th><th>公告日</th><th>都道府県</th></tr>'
                 : '<tr><th class="text-end">順位</th><th>案件名</th><th>機関</th><th>公告日</th><th>都道府県</th></tr>';
-            parts.push('<table class="table table-hover trend-table mb-0" id="kkjCasesTrendsTable"><thead class="table-dark">' + caseTableHeader + '</thead><tbody id="kkjCasesTrendsTableBody">' + caseRows.join('') + '</tbody></table>');
+            parts.push('<table class="table trend-table mb-0" id="kkjCasesTrendsTable"><thead class="table-dark">' + caseTableHeader + '</thead><tbody id="kkjCasesTrendsTableBody">' + caseRows.join('') + '</tbody></table>');
         } else {
-            parts.push('<table class="table table-hover trend-table mb-0"><tbody><tr><td class="text-muted">—</td></tr></tbody></table>');
+            parts.push('<table class="table trend-table mb-0"><tbody><tr><td class="text-muted">—</td></tr></tbody></table>');
         }
         parts.push('</div></div></div></div>');
         if (hasTopCases) {
@@ -369,9 +369,9 @@
                 var cyVal = (signalsMonthly.cyber && signalsMonthly.cyber.find(function (x) { return x.period === p; })) ? (signalsMonthly.cyber.find(function (x) { return x.period === p; }).value) : '—';
                 return '<tr><td>' + escapeHtml(periodLabel) + '</td><td>' + aiVal + '</td><td>' + dxVal + '</td><td>' + cyVal + '</td></tr>';
             }).join('');
-            parts.push('<table class="table table-hover trend-table mb-0" id="kkjMonthlyTrendsTable"><thead class="table-dark">' + headers + '</thead><tbody>' + rows + '</tbody></table>');
+            parts.push('<table class="table trend-table mb-0" id="kkjMonthlyTrendsTable"><thead class="table-dark">' + headers + '</thead><tbody>' + rows + '</tbody></table>');
         } else {
-            parts.push('<table class="table table-hover trend-table mb-0"><tbody><tr><td class="text-muted">月次データはありません。</td></tr></tbody></table>');
+            parts.push('<table class="table trend-table mb-0"><tbody><tr><td class="text-muted">月次データはありません。</td></tr></tbody></table>');
         }
         parts.push('</div></div></div></div>');
         if (asOf) parts.push('<p class="small text-muted mt-2 mb-0">更新: ' + escapeHtml(asOf) + '</p>');

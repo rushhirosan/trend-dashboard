@@ -49,10 +49,7 @@
     background-color: #d1e7ff;
 }
 
-/* 従来のホバースタイル（後方互換性のため残す） */
-.trend-table tbody tr:hover {
-    background-color: #f1f3f5;
-}
+/* リンクのない行はホバーハイライトなし（チラつき防止）。クリック可能な行のみホバー有効 */
 
 /* カテゴリカード */
 .category-card {

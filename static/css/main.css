@@ -2270,12 +2270,19 @@ body.data-status-active #data-status .card-body {
     }
     
     /* モバイル: 全トレンドテーブルのヘッダー（黒背景）の高さを抑える */
+    .table.trend-table thead tr,
+    .trend-table thead tr {
+        line-height: 1 !important;
+    }
+    .table.trend-table thead th,
     .trend-table thead th,
+    .table.trend-table thead.table-dark th,
     .trend-table thead.table-dark th {
-        padding: 0.15rem 0.35rem !important;
-        font-size: 0.65rem !important;
-        line-height: 1.2 !important;
+        padding: 0.1rem 0.3rem !important;
+        font-size: 0.6rem !important;
+        line-height: 1 !important;
         white-space: nowrap;
+        vertical-align: middle !important;
     }
     
     /* モバイルでの楽天商品名カラム調整 */

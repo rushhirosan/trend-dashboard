@@ -31,12 +31,24 @@
 }
 
 /* クリック可能な行のスタイル */
-.trend-table tbody tr[data-clickable="true"] {
+.trend-table tbody tr[data-clickable="true"],
+.trend-table tbody tr.row-clickable {
     cursor: pointer;
 }
 
-.trend-table tbody tr[data-clickable="true"]:hover {
+.trend-table tbody tr[data-clickable="true"]:hover,
+.trend-table tbody tr.row-clickable:hover {
     background-color: #f1f3f5;
+}
+
+/* モバイル: フォーカス・アクティブのハイライトなし（1回タップで即開くため） */
+.trend-table tbody tr.row-clickable {
+    -webkit-tap-highlight-color: transparent;
+}
+.trend-table tbody tr.row-clickable:focus,
+.trend-table tbody tr.row-clickable:active {
+    outline: none;
+    background-color: transparent;
 }
 
 .trend-table tbody tr[data-clickable="true"]:focus {

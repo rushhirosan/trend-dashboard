@@ -1,18 +1,41 @@
 // 共通: テーブル行クリックで別タブでURLを開く（ニュースタブと同様の動作を全タブに適用）
+// モバイル: tabindex=-1 で1回タップで開く（フォーカス経由の2回タップを回避）、touch-action: manipulation でタップ遅延を解消
 function makeTableRowClickable(row, linkUrl, ariaLabel) {
     if (!row || !linkUrl || linkUrl === '#' || (typeof linkUrl === 'string' && linkUrl.trim() === '')) return;
 
     row.setAttribute('role', 'button');
-    row.setAttribute('tabindex', '0');
+    row.setAttribute('tabindex', '-1');
+    row.classList.add('row-clickable');
     if (ariaLabel) row.setAttribute('aria-label', ariaLabel);
     row.style.cursor = 'pointer';
+    row.style.touchAction = 'manipulation';
 
     const openInNewTab = function () {
         window.open(linkUrl, '_blank', 'noopener,noreferrer');
     };
 
+    var touchHandled = false;
+    var touchStartX = 0, touchStartY = 0;
+    row.addEventListener('touchstart', function (e) {
+        var t = e.touches && e.touches[0];
+        if (t) { touchStartX = t.clientX; touchStartY = t.clientY; }
+    }, { passive: true });
+    row.addEventListener('touchend', function (e) {
+        if (e.target.closest && e.target.closest('a[href], button')) return;
+        var t = e.changedTouches && e.changedTouches[0];
+        if (!t) return;
+        var dx = Math.abs(t.clientX - touchStartX);
+        var dy = Math.abs(t.clientY - touchStartY);
+        if (dx > 12 || dy > 12) return;
+        touchHandled = true;
+        e.preventDefault();
+        openInNewTab();
+        setTimeout(function () { touchHandled = false; }, 400);
+    }, { passive: false });
+
     row.addEventListener('click', function (e) {
         if (e.target.closest && e.target.closest('a[href], button')) return;
+        if (touchHandled) { e.preventDefault(); return; }
         e.preventDefault();
         openInNewTab();
     });

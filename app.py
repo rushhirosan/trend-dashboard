@@ -503,12 +503,30 @@ Sitemap: https://trends-dashboard.fly.dev/sitemap.xml
                 'error': str(e)
             }, False
     
+    @app.route('/healthz')
+    def healthz():
+        """軽量ヘルスチェック（ロードバランサー用）"""
+        from flask import jsonify
+        from datetime import datetime
+        return jsonify({
+            'status': 'ok',
+            'timestamp': datetime.now().isoformat()
+        }), 200
+
     @app.route('/health')
     def health():
         """ヘルスチェック用エンドポイント（詳細情報付き、エラーが発生しても必ずレスポンスを返す）"""
-        from flask import jsonify
+        from flask import jsonify, request
         from datetime import datetime
-        
+
+        full_checks = request.args.get('full', '').lower() in ('1', 'true', 'yes')
+        if not full_checks:
+            return jsonify({
+                'status': 'ok',
+                'mode': 'light',
+                'timestamp': datetime.now().isoformat()
+            }), 200
+
         try:
             health_status = {
                 'status': 'ok',

@@ -28,7 +28,7 @@ primary_region = "nrt"
     interval = "60s"
     method = "GET"
     timeout = "30s"
-    path = "/health"
+    path = "/healthz"
 
 [[vm]]
   cpu_kind = "shared"

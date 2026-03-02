@@ -9,15 +9,17 @@ primary_region = "nrt"
   DEBUG = "False"
   # スケジューラ二重実行防止: DB分散ロックを有効化（複数マシン・プロセスで1本のみ実行）
   TRENDS_SCHEDULER_USE_DB_LOCK = "true"
-  # デプロイ時の自動実行を無効化（UI/UX変更時など、データ更新が不要な場合を想定）
-  SKIP_STARTUP_EXECUTION = "true"
+  # 起動時の取り逃し補完を有効化
+  SKIP_STARTUP_EXECUTION = "false"
   # デプロイ時のメール送信を無効化（スケジューラー実行時のみメール送信）
   SKIP_EMAIL_ON_UPDATE = "false"
+  # トレンド取得の同時実行数（OOM対策）
+  TREND_REFRESH_MAX_CONCURRENT = "3"
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = true  # コスト削減のため、リクエストがないと停止
+  auto_stop_machines = false  # スケジューラーを止めないため常時稼働
   auto_start_machines = true  # 外部cronサービスからのリクエストで自動起動
   min_machines_running = 1
   max_machines_running = 1

@@ -131,6 +131,7 @@
     <script src="{{ url_for('static', filename='js/podcast-trends.js') }}"></script>
     <script src="{{ url_for('static', filename='js/twitch-trends.js') }}"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}?v=20260225"></script>
+    <script src="{{ url_for('static', filename='js/all-freshness.js') }}"></script>
     <!-- 行政データ統合: 外部APIは1回のみ呼び、キャッシュがあればそれを表示 -->
     <script src="{{ url_for('static', filename='js/admin-trends.js') }}"></script>
 </head>
@@ -281,7 +282,10 @@
                                         <h3 class="h6 mb-0"><i class="fas fa-newspaper"></i> NHK ニュース</h3>
                                         <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
                                     </div>
-                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-news" data-target-anchor="source-nhk" aria-label="ニュースタブへ">もっと見る</a>
+                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <span class="all-freshness small opacity-90" data-source="nhk">—</span>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-news" data-target-anchor="source-nhk" aria-label="ニュースタブへ">もっと見る</a>
+                                    </div>
                                 </div>
                                 <div id="all-collapse-nhk" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
@@ -299,7 +303,10 @@
                                         <h3 class="h6 mb-0"><i class="fas fa-globe"></i> World News</h3>
                                         <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
                                     </div>
-                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-news" data-target-anchor="source-news" aria-label="ニュースタブへ">もっと見る</a>
+                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <span class="all-freshness small opacity-90" data-source="news">—</span>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-news" data-target-anchor="source-news" aria-label="ニュースタブへ">もっと見る</a>
+                                    </div>
                                 </div>
                                 <div id="all-collapse-news" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
@@ -317,7 +324,10 @@
                                         <h3 class="h6 mb-0"><i class="fab fa-wikipedia-w"></i> Wikipedia 人気記事</h3>
                                         <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
                                     </div>
-                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" data-target-anchor="source-wikipedia" aria-label="検索・動画タブへ">もっと見る</a>
+                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <span class="all-freshness small opacity-90" data-source="wikipedia">—</span>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" data-target-anchor="source-wikipedia" aria-label="検索・動画タブへ">もっと見る</a>
+                                    </div>
                                 </div>
                                 <div id="all-collapse-wikipedia" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
@@ -335,7 +345,10 @@
                                         <h3 class="h6 mb-0"><i class="fab fa-google"></i> Google Trends</h3>
                                         <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
                                     </div>
-                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" data-target-anchor="source-google" aria-label="検索・動画タブへ">もっと見る</a>
+                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <span class="all-freshness small opacity-90" data-source="google">—</span>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" data-target-anchor="source-google" aria-label="検索・動画タブへ">もっと見る</a>
+                                    </div>
                                 </div>
                                 <div id="all-collapse-google" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
@@ -353,7 +366,10 @@
                                         <h3 class="h6 mb-0"><i class="fab fa-youtube"></i> YouTube</h3>
                                         <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
                                     </div>
-                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" data-target-anchor="source-youtube" aria-label="検索・動画タブへ">もっと見る</a>
+                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <span class="all-freshness small opacity-90" data-source="youtube">—</span>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" data-target-anchor="source-youtube" aria-label="検索・動画タブへ">もっと見る</a>
+                                    </div>
                                 </div>
                                 <div id="all-collapse-youtube" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
@@ -371,7 +387,10 @@
                                         <h3 class="h6 mb-0"><i class="fab fa-qiita"></i> Qiita</h3>
                                         <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
                                     </div>
-                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-qiita" aria-label="テック・開発タブへ">もっと見る</a>
+                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <span class="all-freshness small opacity-90" data-source="qiita">—</span>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-qiita" aria-label="テック・開発タブへ">もっと見る</a>
+                                    </div>
                                 </div>
                                 <div id="all-collapse-qiita" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
@@ -399,7 +418,10 @@
                                             <option value="knowledge">学び</option>
                                         </select>
                                     </div>
-                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-hatena" aria-label="テック・開発タブへ">もっと見る</a>
+                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <span class="all-freshness small opacity-90" data-source="hatena">—</span>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-hatena" aria-label="テック・開発タブへ">もっと見る</a>
+                                    </div>
                                 </div>
                                 <div id="all-collapse-hatena" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
@@ -417,7 +439,10 @@
                                         <h3 class="h6 mb-0">Zenn</h3>
                                         <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
                                     </div>
-                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-zenn" aria-label="テック・開発タブへ">もっと見る</a>
+                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <span class="all-freshness small opacity-90" data-source="zenn">—</span>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-zenn" aria-label="テック・開発タブへ">もっと見る</a>
+                                    </div>
                                 </div>
                                 <div id="all-collapse-zenn" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
@@ -444,7 +469,10 @@
                                             <option value="entertainment">エンタメ</option>
                                         </select>
                                     </div>
-                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-note" aria-label="テック・開発タブへ">もっと見る</a>
+                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <span class="all-freshness small opacity-90" data-source="note">—</span>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-note" aria-label="テック・開発タブへ">もっと見る</a>
+                                    </div>
                                 </div>
                                 <div id="all-collapse-note" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
@@ -462,7 +490,10 @@
                                         <h3 class="h6 mb-0"><i class="fab fa-github"></i> GitHub</h3>
                                         <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
                                     </div>
-                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-github" aria-label="テック・開発タブへ">もっと見る</a>
+                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <span class="all-freshness small opacity-90" data-source="github">—</span>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-github" aria-label="テック・開発タブへ">もっと見る</a>
+                                    </div>
                                 </div>
                                 <div id="all-collapse-github" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
@@ -480,7 +511,10 @@
                                         <h3 class="h6 mb-0"><i class="fas fa-shield-alt"></i> IPA注意喚起</h3>
                                         <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
                                     </div>
-                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-ipa" aria-label="テック・開発タブへ">もっと見る</a>
+                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <span class="all-freshness small opacity-90" data-source="ipa">—</span>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-ipa" aria-label="テック・開発タブへ">もっと見る</a>
+                                    </div>
                                 </div>
                                 <div id="all-collapse-ipa" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
@@ -498,7 +532,10 @@
                                         <h3 class="h6 mb-0"><i class="fas fa-exclamation-triangle"></i> JPCERT/CC</h3>
                                         <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
                                     </div>
-                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-jpcert" aria-label="テック・開発タブへ">もっと見る</a>
+                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <span class="all-freshness small opacity-90" data-source="jpcert">—</span>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-jpcert" aria-label="テック・開発タブへ">もっと見る</a>
+                                    </div>
                                 </div>
                                 <div id="all-collapse-jpcert" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
@@ -516,7 +553,10 @@
                                         <h3 class="h6 mb-0"><i class="fab fa-bitcoin"></i> 仮想通貨</h3>
                                         <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
                                     </div>
-                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-market" data-target-anchor="source-crypto" aria-label="マーケットタブへ">もっと見る</a>
+                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <span class="all-freshness small opacity-90" data-source="crypto">—</span>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-market" data-target-anchor="source-crypto" aria-label="マーケットタブへ">もっと見る</a>
+                                    </div>
                                 </div>
                                 <div id="all-collapse-crypto" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
@@ -534,7 +574,10 @@
                                         <h3 class="h6 mb-0"><i class="fas fa-chart-line"></i> 株価（日本）</h3>
                                         <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
                                     </div>
-                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-market" data-target-anchor="source-stock" aria-label="マーケットタブへ">もっと見る</a>
+                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <span class="all-freshness small opacity-90" data-source="stock">—</span>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-market" data-target-anchor="source-stock" aria-label="マーケットタブへ">もっと見る</a>
+                                    </div>
                                 </div>
                                 <div id="all-collapse-stock" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
@@ -552,7 +595,10 @@
                                         <h3 class="h6 mb-0"><i class="fas fa-bullhorn"></i> PR TIMES × はてブ</h3>
                                         <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
                                     </div>
-                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-news" data-target-anchor="source-prtimes-hatena" aria-label="ニュースタブへ">もっと見る</a>
+                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <span class="all-freshness small opacity-90" data-source="prtimes_hatena">—</span>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-news" data-target-anchor="source-prtimes-hatena" aria-label="ニュースタブへ">もっと見る</a>
+                                    </div>
                                 </div>
                                 <div id="all-collapse-prtimes_hatena" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
@@ -586,7 +632,10 @@
                                         <h3 class="h6 mb-0"><i class="fab fa-apple"></i> App Store</h3>
                                         <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
                                     </div>
-                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-appstore" aria-label="テック・開発タブへ">もっと見る</a>
+                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <span class="all-freshness small opacity-90" data-source="appstore">—</span>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-appstore" aria-label="テック・開発タブへ">もっと見る</a>
+                                    </div>
                                 </div>
                                 <div id="all-collapse-appstore" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
@@ -604,7 +653,10 @@
                                         <h3 class="h6 mb-0"><i class="fab fa-spotify"></i> Spotify</h3>
                                         <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
                                     </div>
-                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-music" aria-label="エンタメタブへ">もっと見る</a>
+                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <span class="all-freshness small opacity-90" data-source="music">—</span>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-music" aria-label="エンタメタブへ">もっと見る</a>
+                                    </div>
                                 </div>
                                 <div id="all-collapse-music" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
@@ -622,7 +674,10 @@
                                         <h3 class="h6 mb-0"><i class="fas fa-podcast"></i> Podcast</h3>
                                         <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
                                     </div>
-                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-podcast" aria-label="エンタメタブへ">もっと見る</a>
+                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <span class="all-freshness small opacity-90" data-source="podcast">—</span>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-podcast" aria-label="エンタメタブへ">もっと見る</a>
+                                    </div>
                                 </div>
                                 <div id="all-collapse-podcast" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
@@ -640,7 +695,10 @@
                                         <h3 class="h6 mb-0"><i class="fas fa-film"></i> 映画</h3>
                                         <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
                                     </div>
-                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-movie" aria-label="エンタメタブへ">もっと見る</a>
+                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <span class="all-freshness small opacity-90" data-source="movie">—</span>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-movie" aria-label="エンタメタブへ">もっと見る</a>
+                                    </div>
                                 </div>
                                 <div id="all-collapse-movie" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
@@ -667,7 +725,10 @@
                                             <option value="practical">実用・IT</option>
                                         </select>
                                     </div>
-                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-book" aria-label="エンタメタブへ">もっと見る</a>
+                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <span class="all-freshness small opacity-90" data-source="book">—</span>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-book" aria-label="エンタメタブへ">もっと見る</a>
+                                    </div>
                                 </div>
                                 <div id="all-collapse-book" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
@@ -695,7 +756,10 @@
                                             <option value="100901">学び</option>
                                         </select>
                                     </div>
-                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-rakuten" aria-label="エンタメタブへ">もっと見る</a>
+                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <span class="all-freshness small opacity-90" data-source="rakuten">—</span>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-rakuten" aria-label="エンタメタブへ">もっと見る</a>
+                                    </div>
                                 </div>
                                 <div id="all-collapse-rakuten" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
@@ -720,7 +784,10 @@
                                             <option value="clips">クリップ</option>
                                         </select>
                                     </div>
-                                    <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-twitch" aria-label="エンタメタブへ">もっと見る</a>
+                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <span class="all-freshness small opacity-90" data-source="twitch">—</span>
+                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-twitch" aria-label="エンタメタブへ">もっと見る</a>
+                                    </div>
                                 </div>
                                 <div id="all-collapse-twitch" class="collapse all-card-collapse">
                                 <div class="card-body p-2">

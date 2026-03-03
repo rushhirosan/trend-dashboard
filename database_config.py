@@ -2308,6 +2308,21 @@ class TrendsCache:
             logger.warning(f"⚠️ スケジューラーDBロック解放エラー: {e}", exc_info=True)
             return False
 
+    def has_slot_completed(self, slot_key: str) -> bool:
+        """指定スロットが「完了済み」として記録されているか（時間制限なし）。
+        起動時補完の二重実行防止: 他プロセスが既に完了していれば True（補完をスキップする）。
+        """
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT 1 FROM scheduler_slot_run WHERE slot_key = %s
+                    """, (slot_key,))
+                    return cursor.fetchone() is not None
+        except Exception as e:
+            logger.warning("⚠️ has_slot_completed エラー: %s", e)
+            return False  # fail-open: エラー時は「完了済みでない」とみなして補完を許可
+
     def has_slot_completed_recently(self, slot_key: str, window_minutes: int = 25) -> bool:
         """指定スロットが window_minutes 以内に「完了済み」として記録されているか。
         二重実行防止: 既に完了済みなら True（呼び出し側でスキップする）。

@@ -9,7 +9,7 @@ primary_region = "nrt"
   DEBUG = "False"
   # スケジューラ二重実行防止: DB分散ロックを有効化（複数マシン・プロセスで1本のみ実行）
   TRENDS_SCHEDULER_USE_DB_LOCK = "true"
-  # 起動時の取り逃し補完を有効化
+  # 起動時の取り逃し補完を有効化（DBのhas_slot_completedで二重実行を防止）
   SKIP_STARTUP_EXECUTION = "false"
   # デプロイ時のメール送信を無効化（スケジューラー実行時のみメール送信）
   SKIP_EMAIL_ON_UPDATE = "false"

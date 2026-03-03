@@ -59,6 +59,9 @@ Thumbs.db
 log.txt
 logs/
 
+# Personal notes (may contain secrets)
+todo.txt
+
 # Database
 *.db
 *.sqlite3

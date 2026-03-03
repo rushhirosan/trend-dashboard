@@ -297,12 +297,14 @@ class TrendsScheduler:
             should_execute_1pm = False
             should_execute_7pm = False
             
-            # 当日の1時を過ぎているかチェック
+            # 当日の1時を過ぎているかチェック（DBのscheduler_slot_runで他プロセスの完了済みも判定）
             if now_jst >= today_1am:
-                # 既に実行済みかどうかをチェック（1時間以内に実行されていればスキップ）
-                if self.last_night_execution_time:
+                slot_1am = self._slot_key_for_slot('1am', today)
+                if self.db and hasattr(self.db, 'has_slot_completed') and self.db.has_slot_completed(slot_1am):
+                    logger.info(f"⏰ 起動時チェック: 当日の1時のジョブは既に実行済みです（DB: {slot_1am}）（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
+                elif self.last_night_execution_time:
                     time_diff = (now_jst - self.last_night_execution_time).total_seconds()
-                    if time_diff < 3600:  # 1時間以内
+                    if time_diff < 3600:
                         logger.info(f"⏰ 起動時チェック: 当日の1時のジョブは既に実行済みです（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
                     else:
                         logger.info(f"⏰ 起動時チェック: 当日の1時を過ぎています（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
@@ -313,10 +315,12 @@ class TrendsScheduler:
             else:
                 logger.info(f"⏰ 起動時チェック: 当日の1時前です（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
             
-            # 当日の7時を過ぎているかチェック
+            # 当日の7時を過ぎているかチェック（DBのscheduler_slot_runで他プロセスの完了済みも判定）
             if now_jst >= today_7am:
-                # 既に実行済みかどうかをチェック
-                if self.last_daily_execution_date == today:
+                slot_7am = self._slot_key_for_slot('7am', today)
+                if self.db and hasattr(self.db, 'has_slot_completed') and self.db.has_slot_completed(slot_7am):
+                    logger.info(f"⏰ 起動時チェック: 当日の7時のジョブは既に実行済みです（DB: {slot_7am}）（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
+                elif self.last_daily_execution_date == today:
                     logger.info(f"⏰ 起動時チェック: 当日の7時のジョブは既に実行済みです（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
                 else:
                     logger.info(f"⏰ 起動時チェック: 当日の7時を過ぎています（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
@@ -324,12 +328,14 @@ class TrendsScheduler:
             else:
                 logger.info(f"⏰ 起動時チェック: 当日の7時前です（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
             
-            # 当日の13時を過ぎているかチェック
+            # 当日の13時を過ぎているかチェック（DBのscheduler_slot_runで他プロセスの完了済みも判定）
             if now_jst >= today_1pm:
-                # 既に実行済みかどうかをチェック（1時間以内に実行されていればスキップ）
-                if self.last_afternoon_execution_time:
+                slot_1pm = self._slot_key_for_slot('1pm', today)
+                if self.db and hasattr(self.db, 'has_slot_completed') and self.db.has_slot_completed(slot_1pm):
+                    logger.info(f"⏰ 起動時チェック: 当日の13時のジョブは既に実行済みです（DB: {slot_1pm}）（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
+                elif self.last_afternoon_execution_time:
                     time_diff = (now_jst - self.last_afternoon_execution_time).total_seconds()
-                    if time_diff < 3600:  # 1時間以内
+                    if time_diff < 3600:
                         logger.info(f"⏰ 起動時チェック: 当日の13時のジョブは既に実行済みです（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
                     else:
                         logger.info(f"⏰ 起動時チェック: 当日の13時を過ぎています（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
@@ -340,12 +346,14 @@ class TrendsScheduler:
             else:
                 logger.info(f"⏰ 起動時チェック: 当日の13時前です（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
             
-            # 当日の19時を過ぎているかチェック
+            # 当日の19時を過ぎているかチェック（DBのscheduler_slot_runで他プロセスの完了済みも判定）
             if now_jst >= today_7pm:
-                # 既に実行済みかどうかをチェック（1時間以内に実行されていればスキップ）
-                if self.last_evening_execution_time:
+                slot_7pm = self._slot_key_for_slot('7pm', today)
+                if self.db and hasattr(self.db, 'has_slot_completed') and self.db.has_slot_completed(slot_7pm):
+                    logger.info(f"⏰ 起動時チェック: 当日の19時のジョブは既に実行済みです（DB: {slot_7pm}）（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
+                elif self.last_evening_execution_time:
                     time_diff = (now_jst - self.last_evening_execution_time).total_seconds()
-                    if time_diff < 3600:  # 1時間以内
+                    if time_diff < 3600:
                         logger.info(f"⏰ 起動時チェック: 当日の19時のジョブは既に実行済みです（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
                     else:
                         logger.info(f"⏰ 起動時チェック: 当日の19時を過ぎています（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
@@ -881,6 +889,13 @@ class TrendsScheduler:
         if 18 <= h < 20:
             return f"7pm_{date_str}"
         return None
+
+    def _slot_key_for_slot(self, slot_name: str, date_obj) -> str:
+        """指定スロット・日付の slot_key を返す（例: 7am_2026-03-03）。
+        slot_name: '1am' | '7am' | '1pm' | '7pm'
+        """
+        date_str = date_obj.isoformat() if hasattr(date_obj, 'isoformat') else str(date_obj)
+        return f"{slot_name}_{date_str}"
 
     def _trigger_label(self, trigger_source: str) -> str:
         """トリガー元をDiscord表示用のラベルに変換"""

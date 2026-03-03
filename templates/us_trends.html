@@ -92,6 +92,7 @@
     <script src="{{ url_for('static', filename='js/app-common.js') }}?v=20260225-accordion"></script>
     <script src="{{ url_for('static', filename='js/display-functions.js') }}"></script>
     <script src="{{ url_for('static', filename='js/us-trends.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/all-freshness.js') }}"></script>
     <script src="{{ url_for('static', filename='js/us-admin-trends.js') }}"></script>
 </head>
 <body id="trends-us" class="bg-light">
@@ -185,7 +186,10 @@
                                 <div class="card h-100">
                                     <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center py-2">
                                         <h3 class="h6 mb-0"><i class="fas fa-newspaper"></i> CNN News</h3>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-news" data-target-anchor="source-cnn" aria-label="Go to News tab">More</a>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="cnn">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-news" data-target-anchor="source-cnn" aria-label="Go to News tab">More</a>
+                                        </div>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
@@ -198,7 +202,10 @@
                                 <div class="card h-100">
                                     <div class="card-header bg-info text-white d-flex justify-content-between align-items-center py-2">
                                         <h3 class="h6 mb-0"><i class="fas fa-globe-americas"></i> World News</h3>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-news" data-target-anchor="source-worldnews" aria-label="Go to News tab">More</a>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="worldnews">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-news" data-target-anchor="source-worldnews" aria-label="Go to News tab">More</a>
+                                        </div>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
@@ -211,7 +218,10 @@
                                 <div class="card h-100">
                                     <div class="card-header text-white d-flex justify-content-between align-items-center py-2" style="background:#636466;">
                                         <h3 class="h6 mb-0"><i class="fab fa-wikipedia-w"></i> Wikipedia Most Read</h3>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" data-target-anchor="source-wikipedia" aria-label="Go to Search tab">More</a>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="wikipedia">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" data-target-anchor="source-wikipedia" aria-label="Go to Search tab">More</a>
+                                        </div>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
@@ -224,7 +234,10 @@
                                 <div class="card h-100">
                                     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
                                         <h3 class="h6 mb-0"><i class="fab fa-google"></i> Google Trends</h3>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" data-target-anchor="source-google" aria-label="Go to Search tab">More</a>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="google">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" data-target-anchor="source-google" aria-label="Go to Search tab">More</a>
+                                        </div>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
@@ -237,7 +250,10 @@
                                 <div class="card h-100">
                                     <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center py-2">
                                         <h3 class="h6 mb-0"><i class="fab fa-youtube"></i> YouTube</h3>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" data-target-anchor="source-youtube" aria-label="Go to Search tab">More</a>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="youtube">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-search" data-target-anchor="source-youtube" aria-label="Go to Search tab">More</a>
+                                        </div>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
@@ -250,7 +266,10 @@
                                 <div class="card h-100">
                                     <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#ff6600;color:#fff;">
                                         <h3 class="h6 mb-0"><i class="fab fa-hacker-news"></i> Hacker News</h3>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-hackernews" aria-label="Go to Tech tab">More</a>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="hackernews">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-hackernews" aria-label="Go to Tech tab">More</a>
+                                        </div>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
@@ -263,7 +282,10 @@
                                 <div class="card h-100">
                                     <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#da552f;color:#fff;">
                                         <h3 class="h6 mb-0"><i class="fab fa-product-hunt"></i> Product Hunt</h3>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-producthunt" aria-label="Go to Tech tab">More</a>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="producthunt">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-producthunt" aria-label="Go to Tech tab">More</a>
+                                        </div>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
@@ -276,7 +298,10 @@
                                 <div class="card h-100">
                                     <div class="card-header d-flex justify-content-between align-items-center py-2" style="background-color: #0a0e27; color: white;">
                                         <h3 class="h6 mb-0"><i class="fab fa-dev"></i> DEV.to</h3>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-devto" aria-label="Go to Tech tab">More</a>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="devto">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-devto" aria-label="Go to Tech tab">More</a>
+                                        </div>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
@@ -289,7 +314,10 @@
                                 <div class="card h-100">
                                     <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-2">
                                         <h3 class="h6 mb-0"><i class="fab fa-medium"></i> Medium</h3>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-medium" aria-label="Go to Tech tab">More</a>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="medium">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-medium" aria-label="Go to Tech tab">More</a>
+                                        </div>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
@@ -302,7 +330,10 @@
                                 <div class="card h-100">
                                     <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-2">
                                         <h3 class="h6 mb-0"><i class="fab fa-github"></i> GitHub Trends</h3>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-github" aria-label="Go to Tech tab">More</a>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="github">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-github" aria-label="Go to Tech tab">More</a>
+                                        </div>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
@@ -315,7 +346,10 @@
                                 <div class="card h-100">
                                     <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center py-2">
                                         <h3 class="h6 mb-0"><i class="fas fa-shield-alt"></i> CISA KEV</h3>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-cisakev" aria-label="Go to Tech tab">More</a>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="cisakev">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-cisakev" aria-label="Go to Tech tab">More</a>
+                                        </div>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
@@ -328,7 +362,10 @@
                                 <div class="card h-100">
                                     <div class="card-header bg-info text-white d-flex justify-content-between align-items-center py-2">
                                         <h3 class="h6 mb-0"><i class="fas fa-newspaper"></i> The Hacker News</h3>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-thehackernews" aria-label="Go to Tech tab">More</a>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="thehackernews">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-thehackernews" aria-label="Go to Tech tab">More</a>
+                                        </div>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
@@ -341,7 +378,10 @@
                                 <div class="card h-100">
                                     <div class="card-header bg-info text-white d-flex justify-content-between align-items-center py-2">
                                         <h3 class="h6 mb-0"><i class="fas fa-chart-line"></i> Stock (US)</h3>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-market" data-target-anchor="source-stock" aria-label="Go to Market tab">More</a>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="stock">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-market" data-target-anchor="source-stock" aria-label="Go to Market tab">More</a>
+                                        </div>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
@@ -354,7 +394,10 @@
                                 <div class="card h-100">
                                     <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center py-2">
                                         <h3 class="h6 mb-0"><i class="fab fa-bitcoin"></i> Cryptocurrency</h3>
-                                        <a href="#" class="btn btn-sm btn-dark all-more-link" data-target-tab="tab-market" data-target-anchor="source-crypto" aria-label="Go to Market tab">More</a>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="crypto">—</span>
+                                            <a href="#" class="btn btn-sm btn-dark all-more-link" data-target-tab="tab-market" data-target-anchor="source-crypto" aria-label="Go to Market tab">More</a>
+                                        </div>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
@@ -367,7 +410,10 @@
                                 <div class="card h-100">
                                     <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center py-2">
                                         <h3 class="h6 mb-0"><i class="fas fa-bullhorn"></i> GlobeNewswire</h3>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-globenewswire" aria-label="Go to Tech tab">More</a>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="globenewswire">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-globenewswire" aria-label="Go to Tech tab">More</a>
+                                        </div>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
@@ -380,7 +426,10 @@
                                 <div class="card h-100">
                                     <div class="card-header bg-success text-white d-flex justify-content-between align-items-center py-2">
                                         <h3 class="h6 mb-0"><i class="fab fa-apple"></i> App Store Trends</h3>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-appstore" aria-label="Go to Tech tab">More</a>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="appstore">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-tech" data-target-anchor="source-appstore" aria-label="Go to Tech tab">More</a>
+                                        </div>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
@@ -393,7 +442,10 @@
                                 <div class="card h-100">
                                     <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#1DB954;color:#fff;">
                                         <h3 class="h6 mb-0"><i class="fab fa-spotify"></i> Spotify</h3>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-spotify" aria-label="Go to Entertainment tab">More</a>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="spotify">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-spotify" aria-label="Go to Entertainment tab">More</a>
+                                        </div>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
@@ -406,7 +458,10 @@
                                 <div class="card h-100">
                                     <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#8b5cf6;color:#fff;">
                                         <h3 class="h6 mb-0"><i class="fas fa-podcast"></i> Podcast</h3>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-podcast" aria-label="Go to Entertainment tab">More</a>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="podcast">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-podcast" aria-label="Go to Entertainment tab">More</a>
+                                        </div>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
@@ -419,7 +474,10 @@
                                 <div class="card h-100">
                                     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
                                         <h3 class="h6 mb-0"><i class="fas fa-film"></i> Movies</h3>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-movie" aria-label="Go to Entertainment tab">More</a>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="movie">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-movie" aria-label="Go to Entertainment tab">More</a>
+                                        </div>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
@@ -441,7 +499,10 @@
                                                 <option value="science">Science &amp; Tech</option>
                                             </select>
                                         </div>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-book" aria-label="Go to Entertainment tab">More</a>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="book">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-book" aria-label="Go to Entertainment tab">More</a>
+                                        </div>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
@@ -467,7 +528,10 @@
                                                 <option value="automotive">Automotive</option>
                                             </select>
                                         </div>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-ebay" aria-label="Go to Entertainment tab">More</a>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="ebay">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-ebay" aria-label="Go to Entertainment tab">More</a>
+                                        </div>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
@@ -487,7 +551,10 @@
                                                 <option value="clips">Clips</option>
                                             </select>
                                         </div>
-                                        <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-twitch" aria-label="Go to Entertainment tab">More</a>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="twitch">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-twitch" aria-label="Go to Entertainment tab">More</a>
+                                        </div>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="table-responsive">

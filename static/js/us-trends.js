@@ -3177,7 +3177,9 @@ function setupAllTabAccordionUS() {
                 } else {
                     const moreLink = header.querySelector('.all-more-link');
                     if (moreLink) {
-                        header.insertBefore(trigger, moreLink);
+                        // moreLink がラッパーdiv内にある場合、その親を参照（insertBeforeは直接の子を要求）
+                        const ref = moreLink.parentElement === header ? moreLink : moreLink.parentElement;
+                        header.insertBefore(trigger, ref);
                     } else {
                         header.insertBefore(trigger, header.firstChild);
                     }

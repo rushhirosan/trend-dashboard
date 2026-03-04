@@ -4,6 +4,7 @@
 """
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import gc
 import os
 import threading
 import time
@@ -323,6 +324,7 @@ def refresh_all_trends(managers, force_refresh=True, max_concurrent=None, batch_
                         }
         # バッチ間で少し待機しメモリ・接続を解放させる（最後のバッチでは待機しない）
         if delay_sec > 0 and batch_idx < len(batches) - 1:
+            gc.collect()  # OOM対策: 明示的にGCを実行してメモリを解放
             time.sleep(delay_sec)
 
     logger.info(f"✅ 並列実行完了: {len(results)}件の結果を取得しました")

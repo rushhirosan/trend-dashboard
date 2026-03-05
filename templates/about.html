@@ -7,8 +7,26 @@
     <!-- SEO Meta Tags -->
     <title>このサイトについて / About - トレンドダッシュボード</title>
     <meta name="description" content="日本と米国の最新トレンド情報を表示するシンプルなトレンドダッシュボード。NHK、CNN、Google Trends、YouTube、Wikipedia、GitHub、はてなブックマーク、Qiita、Zenn、Note、Hacker News、Product Hunt、セキュリティ注意喚起（CISA、IPA、JPCERT/CC）、株価・仮想通貨、映画・本、Spotify、Podcast、楽天、eBay、Twitchなどの公開データを集約。1日4回更新処理を開始（1時、7時、13時、19時 JST、更新完了まで20〜30分かかる場合があります）。A simple trends dashboard showing popular trends in Japan and US. Update processing starts four times daily (1 AM, 7 AM, 1 PM, and 7 PM JST, may take 20-30 minutes to complete).">
+    <meta name="keywords" content="トレンドダッシュボード, About, 使い方, このサイトについて, Google Trends, YouTube, はてなブックマーク, Qiita, Zenn, NHK, 株価, 仮想通貨, トレンド分析">
+    <meta name="author" content="Trends Dashboard">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://trends-dashboard.fly.dev/about">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://trends-dashboard.fly.dev/about">
+    <meta property="og:title" content="このサイトについて / About - トレンドダッシュボード">
+    <meta property="og:description" content="日本と米国の最新トレンド情報を表示するトレンドダッシュボード。NHK、CNN、Google Trends、YouTube、はてなブックマーク、Qiita、Zenn、株価・仮想通貨などを集約。1日4回更新（1・7・13・19時 JST）。">
+    <meta property="og:image" content="https://trends-dashboard.fly.dev/static/images/og-image.png">
+    <meta property="og:locale" content="ja_JP">
+    <meta property="og:site_name" content="トレンドダッシュボード">
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://trends-dashboard.fly.dev/about">
+    <meta name="twitter:title" content="このサイトについて / About - トレンドダッシュボード">
+    <meta name="twitter:description" content="日本と米国の最新トレンド情報を表示するトレンドダッシュボード。NHK、CNN、Google Trends、YouTube、はてなブックマーク、Qiita、Zenn、株価・仮想通貨などを集約。1日4回更新（1・7・13・19時 JST）。">
+    <meta name="twitter:image" content="https://trends-dashboard.fly.dev/static/images/og-image.png">
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
@@ -17,6 +35,18 @@
     <!-- Performance Optimization: Preconnect -->
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin>
+    
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "name": "このサイトについて / About - トレンドダッシュボード",
+      "description": "日本と米国の最新トレンド情報を表示するシンプルなトレンドダッシュボード。NHK、CNN、Google Trends、YouTube、Wikipedia、はてなブックマーク、Qiita、Zenn、Note、Hacker News、株価・仮想通貨、Spotify、Podcast、楽天、eBay、Twitchなどの公開データを集約。1日4回更新（1・7・13・19時 JST）。",
+      "url": "https://trends-dashboard.fly.dev/about",
+      "isPartOf": { "@id": "https://trends-dashboard.fly.dev/#website" }
+    }
+    </script>
     
     <!-- Google Analytics (GA4) -->
     {% if config.get('GOOGLE_ANALYTICS_ID') %}

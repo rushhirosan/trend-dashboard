@@ -55,7 +55,7 @@ class YouTubeTrendsManager(BaseTrendsManager):
             logger.error(f"❌ YouTube キャッシュクリアエラー: {e}", exc_info=True)
             return False
     
-    def _update_cache_status(self, cache_key, data_count):
+    def _update_cache_status(self, cache_key, data_count, *args, **kwargs):
         """cache_statusテーブルを更新"""
         try:
             return self.db.update_cache_status(cache_key, data_count)

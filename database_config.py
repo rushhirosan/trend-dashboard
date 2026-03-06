@@ -1343,7 +1343,12 @@ class TrendsCache:
                     
                     if attempt < max_retries - 1:
                         wait_time = base_retry_delay * (2 ** attempt)
-                        logger.warning(f"⚠️ 接続検証失敗（再接続します）: {verify_error}")
+                        error_str = str(verify_error).lower()
+                        if "server terminated abnormally" in error_str or "server closed the connection" in error_str:
+                            wait_time = wait_time * 3
+                            logger.warning(f"⚠️ 接続検証失敗（再接続します）: {verify_error} → {wait_time:.1f}秒待機")
+                        else:
+                            logger.warning(f"⚠️ 接続検証失敗（再接続します）: {verify_error}")
                         time.sleep(wait_time)
                         continue
                     else:
@@ -1381,7 +1386,10 @@ class TrendsCache:
                 if attempt < max_retries - 1:
                     wait_time = base_retry_delay * (2 ** attempt)
                     error_str = str(e).lower()
-                    if "server closed" in error_str or "connection" in error_str:
+                    if "server terminated abnormally" in error_str or "server closed the connection" in error_str:
+                        wait_time = wait_time * 3
+                        logger.warning(f"⚠️ データベース接続エラー（再試行します）: {e} → {wait_time:.1f}秒待機")
+                    elif "server closed" in error_str or "connection" in error_str:
                         logger.warning(f"⚠️ データベース接続エラー（再試行します）: {e}")
                     time.sleep(wait_time)
                     continue

@@ -409,7 +409,7 @@ class BaseTrendsManager(ABC):
                     logger.warning(f"⚠️ {self.service_name}: キャッシュ保存中にエラーが発生しました: {e}", exc_info=True)
                     cache_save_error = f"キャッシュ保存中にエラーが発生しました: {error_msg}"
 
-                # キャッシュ保存失敗時にDiscordにアラートを送信（エラー内容とソースデータを含める）
+                # キャッシュ保存失敗時／0件取得時にDiscordにアラートを送信
                 if cache_save_error:
                     alert_service = _get_alert_service()
                     if alert_service:
@@ -419,15 +419,20 @@ class BaseTrendsManager(ABC):
                             # ソースデータの詳細を準備（最初の3件のサンプルと、問題のあるデータの詳細）
                             source_data_info = self._format_source_data_for_alert(trends_data, error_exception)
 
-                            # エラーの詳細情報を準備
+                            # 詳細情報を準備
+                            is_zero_data = len(trends_data) == 0
                             error_details = {
                                 "サービス名": self.service_name,
                                 "キャッシュキー": cache_key,
                                 "データ件数": str(len(trends_data)),
-                                "エラーメッセージ": cache_save_error[:1000],  # 長すぎる場合は切り詰め
+                                "エラーメッセージ": (
+                                    "データが0件のためキャッシュ保存をスキップしました（既存キャッシュを保護する仕様）"
+                                    if is_zero_data
+                                    else cache_save_error[:1000]
+                                ),
                             }
 
-                            # エラーの種類とスタックトレース
+                            # エラーの種類とスタックトレース（例外発生時のみ）
                             if error_exception:
                                 import traceback
                                 error_details["エラータイプ"] = type(error_exception).__name__
@@ -436,17 +441,27 @@ class BaseTrendsManager(ABC):
                                         type(error_exception), error_exception, error_exception.__traceback__
                                     )
                                 )
-                                error_details["スタックトレース"] = tb_str[:2000]  # 長すぎる場合は切り詰め
+                                error_details["スタックトレース"] = tb_str[:2000]
 
                             # ソースデータの情報を追加
                             error_details.update(source_data_info)
 
-                            alert_service.send_alert(
-                                "error",
-                                f"キャッシュ保存エラー: {self.service_name}",
-                                f"{self.service_name}のデータ取得は成功しましたが、キャッシュ保存に失敗しました。",
-                                error_details,
-                            )
+                            if is_zero_data:
+                                # 0件取得: warning（RSS不調・一時的な問題の可能性）
+                                alert_service.send_alert(
+                                    "warning",
+                                    f"データ0件: {self.service_name}",
+                                    f"{self.service_name}のデータ取得は成功しましたが、取得件数が0件でした。RSS不調または一時的な問題の可能性があります。",
+                                    error_details,
+                                )
+                            else:
+                                # データありでキャッシュ保存失敗: error
+                                alert_service.send_alert(
+                                    "error",
+                                    f"キャッシュ保存エラー: {self.service_name}",
+                                    f"{self.service_name}のデータ取得は成功しましたが、キャッシュ保存に失敗しました。",
+                                    error_details,
+                                )
                         except Exception as alert_error:
                             logger.warning(f"⚠️ Discordアラート送信エラー: {alert_error}")
 

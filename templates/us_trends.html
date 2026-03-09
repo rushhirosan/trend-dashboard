@@ -131,44 +131,45 @@
                         </div>
                     </div>
                     <div class="col-12">
-                        <div id="header-admin-unified" class="rounded border bg-light p-2 position-relative">
-                            <span class="position-absolute top-0 end-0 mt-1 me-1" style="font-size: 0.7rem;">
-                                <a href="#" class="btn btn-sm btn-outline-primary py-0 px-1 estat-goto-tab ms-1" data-target-tab="tab-govdata" aria-label="Go to Gov Data tab">More</a>
-                            </span>
-                            <div class="row g-2 mb-0 header-admin-cols">
-                                <div class="col-12 col-md-6 header-admin-col-left">
+                        <div class="row g-2 mb-0 align-items-stretch">
+                            <div class="col-12 col-lg-6 d-flex">
+                                <div id="header-admin-unified" class="rounded border bg-light p-2 position-relative w-100 h-100">
+                                    <span class="position-absolute top-0 end-0 mt-1 me-1" style="font-size: 0.7rem;">
+                                        <a href="#" class="btn btn-sm btn-outline-primary py-0 px-1 estat-goto-tab ms-1" data-target-tab="tab-govdata" aria-label="Go to Gov Data tab">More</a>
+                                    </span>
                                     <div class="header-admin-section-title">
                                         <i class="fas fa-chart-line me-1"></i>US Economy (BLS)
                                         <span id="header-estat-latest-period" class="text-muted ms-1"></span>
                                     </div>
-                                    <div id="header-estat-compact-body" class="header-admin-latest" aria-live="polite">
+                                    <div id="header-estat-compact-body" class="header-admin-latest mb-2" aria-live="polite">
                                         <span class="text-muted">Loading...</span>
                                     </div>
-                                </div>
-                                <div class="col-12 col-md-6 header-admin-col-right">
+
                                     <div class="header-admin-section-title">US Government Spending (USAspending)</div>
                                     <div id="header-kkj-compact-body" class="header-kkj-body">
                                         <span class="text-muted">Loading...</span>
                                     </div>
                                 </div>
                             </div>
+                            <div class="col-12 col-lg-6 d-flex">
+                                <section class="rounded border bg-light p-2 w-100 h-100" aria-label="About this page">
+                                    <h2 class="h6 fw-bold mb-2">What this page covers</h2>
+                                    <p class="small mb-2">
+                                        This page summarizes U.S. trend signals across search, video, news, tech, market, and public data.
+                                        Data refresh starts 4 times daily (1/7/13/19 JST), and each tab focuses on a different category.
+                                    </p>
+                                    <p class="small mb-0">
+                                        For details, see
+                                        <a href="/about" class="me-2">About</a>
+                                        <a href="/data-status" class="me-2">Data Status</a>
+                                        <a href="/">Japan Trends</a>.
+                                    </p>
+                                </section>
+                            </div>
                         </div>
                     </div>
                 </div>
             </header>
-            <section class="alert alert-light border py-2 px-3 mb-3" aria-label="About this page">
-                <h2 class="h6 fw-bold mb-2">What this page covers</h2>
-                <p class="small mb-2">
-                    This page summarizes U.S. trend signals across search, video, news, tech, market, and public data.
-                    Data refresh starts 4 times daily (1/7/13/19 JST), and each tab focuses on a different category.
-                </p>
-                <p class="small mb-0">
-                    For details, see
-                    <a href="/about" class="me-2">About</a>
-                    <a href="/data-status" class="me-2">Data Status</a>
-                    <a href="/">Japan Trends</a>.
-                </p>
-            </section>
             <section id="trends" aria-label="Trend information">
                 <!-- Category tabs (horizontal scroll on mobile) -->
                 <div class="trend-tabs-wrapper trend-tabs-compact">

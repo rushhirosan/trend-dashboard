@@ -160,7 +160,7 @@ def create_app():
             'ENABLE_SUBSCRIPTION_UI': AppConfig.ENABLE_SUBSCRIPTION_UI,
             'BUY_ME_A_COFFEE_USERNAME': AppConfig.BUY_ME_A_COFFEE_USERNAME
         }
-    
+
     # ルートを定義（エラーが発生しても続行）
     # パフォーマンス最適化: キャッシュヘッダーの設定
     @app.after_request

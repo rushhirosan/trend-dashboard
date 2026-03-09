@@ -223,26 +223,42 @@
                         </div>
                     </div>
                     <div class="col-12">
-                        <div id="header-admin-unified" class="rounded border bg-light p-2 position-relative">
-                            <span class="position-absolute top-0 end-0 mt-1 me-1" style="font-size: 0.7rem;">
-                                <a href="#" class="btn btn-sm btn-outline-primary py-0 px-1 estat-goto-tab ms-1" data-target-tab="tab-admin" aria-label="行政データタブへ">もっと見る</a>
-                            </span>
-                            <div class="row g-2 mb-0 header-admin-cols">
-                                <div class="col-12 col-md-6 header-admin-col-left">
+                        <div class="row g-2 mb-0 align-items-stretch">
+                            <div class="col-12 col-lg-6 d-flex">
+                                <div id="header-admin-unified" class="rounded border bg-light p-2 position-relative w-100 h-100">
+                                    <span class="position-absolute top-0 end-0 mt-1 me-1" style="font-size: 0.7rem;">
+                                        <a href="#" class="btn btn-sm btn-outline-primary py-0 px-1 estat-goto-tab ms-1" data-target-tab="tab-admin" aria-label="行政データタブへ">もっと見る</a>
+                                    </span>
                                     <div class="header-admin-section-title">
                                         <i class="fas fa-chart-line me-1"></i>景気・行政データ
                                         <span id="header-estat-latest-period" class="text-muted ms-1"></span>
                                     </div>
-                                    <div id="header-estat-compact-body" class="header-admin-latest" aria-live="polite">
+                                    <div id="header-estat-compact-body" class="header-admin-latest mb-2" aria-live="polite">
                                         <span class="text-muted">取得中…</span>
                                     </div>
-                                </div>
-                                <div class="col-12 col-md-6 header-admin-col-right">
+
                                     <div class="header-admin-section-title">🇯🇵 政府調達シグナル（今月）</div>
                                     <div id="header-kkj-compact-body" class="header-kkj-body">
                                         <span class="text-muted">取得中…</span>
                                     </div>
                                 </div>
+                            </div>
+                            <div class="col-12 col-lg-6 d-flex">
+                                <section class="rounded border bg-light p-2 w-100 h-100" aria-label="このページの説明">
+                                    <h2 class="h6 fw-bold mb-2">このページで分かること</h2>
+                                    <p class="small mb-2">
+                                        トレンドダッシュボードは、日本向けのトレンド情報を横断して比較できる無料ダッシュボードです。
+                                        ニュース、検索、動画、テック、マーケット、行政データを毎日4回（1時/7時/13時/19時 JST）更新し、
+                                        タブでカテゴリごとに確認できます。
+                                    </p>
+                                    <p class="small mb-0">
+                                        詳細は
+                                        <a href="/about" class="me-2">このサイトについて</a>
+                                        <a href="/data-status" class="me-2">データ更新状況</a>
+                                        <a href="/us">USトレンド</a>
+                                        を参照してください。
+                                    </p>
+                                </section>
                             </div>
                         </div>
                     </div>

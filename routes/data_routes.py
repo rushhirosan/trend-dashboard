@@ -68,7 +68,7 @@ def get_data_freshness():
         cache_key_map = {
             'google_trends': 'Google Trends',
             'youtube_trends': 'YouTube',
-            'music_trends': 'Spotify',
+            'music_trends': 'Apple Music',
             'worldnews_trends': 'World News',
             'podcast_trends': 'Podcast',
             'movie_trends': '映画トレンド',

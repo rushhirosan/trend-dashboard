@@ -167,7 +167,7 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
                     '仮想通貨トレンド': '仮想通貨トレンド',
                     '映画トレンド': '映画トレンド',
                     '本トレンド': '本トレンド',
-                    'Spotify': 'Spotify',
+                    'Spotify': 'Apple Music',
                     'Podcast': 'Podcast',
                     '楽天': '楽天',
                     'Twitch': 'Twitch',
@@ -413,7 +413,7 @@ function refreshDataFreshnessExternal() {
     updatePlatformStatusExternal('jpcert', 'JPCERT/CC');
     updatePlatformStatusExternal('stock', '株価トレンド');
     updatePlatformStatusExternal('crypto', '仮想通貨トレンド');
-    updatePlatformStatusExternal('spotify', 'Spotify');
+    updatePlatformStatusExternal('spotify', 'Apple Music');
     updatePlatformStatusExternal('podcast', 'Podcast');
     updatePlatformStatusExternal('movie', '映画トレンド');
     updatePlatformStatusExternal('book', '本トレンド');

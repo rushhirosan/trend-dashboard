@@ -24,7 +24,7 @@
         stock: '株価トレンド',
         prtimes_hatena: 'PR TIMES × はてブ',
         appstore: 'App Store',
-        music: 'Spotify',
+        music: 'Apple Music',
         podcast: 'Podcast',
         movie: '映画トレンド',
         book: '本トレンド',
@@ -40,7 +40,7 @@
         cisakev: 'CISA KEV',
         thehackernews: 'The Hacker News',
         globenewswire: 'GlobeNewswire',
-        spotify: 'Spotify',
+        spotify: 'Apple Music',
         ebay: 'eBay Popular/Trending'
     };
 

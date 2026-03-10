@@ -146,7 +146,7 @@ class EmailService:
         platform_names = {
             'google': 'Google Trends',
             'youtube': 'YouTube',
-            'spotify': 'Spotify',
+            'spotify': 'Apple Music',  # 音楽トレンドはApple Music RSSを使用
             'news': 'World News',
             'podcast': 'Podcast',
             'rakuten': '楽天',

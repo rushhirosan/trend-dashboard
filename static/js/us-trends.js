@@ -1332,7 +1332,7 @@ function displaySpotifyResults(data) {
         const title = item.title || 'N/A';
         const artist = item.artist || 'N/A';
         const album = item.album || 'N/A';
-        const spotifyUrl = item.spotify_url || '#';
+        const spotifyUrl = item.spotify_url || `https://music.apple.com/us/search?term=${encodeURIComponent((item.title || '') + ' ' + (item.artist || ''))}`;
         
         row.innerHTML = `
             <td><span class="badge bg-success">${index + 1}</span></td>
@@ -1341,7 +1341,7 @@ function displaySpotifyResults(data) {
             <td>${album}</td>
         `;
         // 行全体をクリック可能にする（アクセシビリティ対応）
-        makeTableRowClickable(row, spotifyUrl, `Open ${title} by ${artist} on Spotify`);
+        makeTableRowClickable(row, spotifyUrl, `Open ${title} by ${artist} on Apple Music`);
         tableBody.appendChild(row);
     });
     

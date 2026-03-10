@@ -415,8 +415,8 @@ function displayMusicResults(data) {
             additionalInfo = `<br><small class="text-muted">投稿: ${daysText}</small>`;
         }
 
-        // Spotifyリンクを作成
-        const spotifyUrl = item.spotify_url || `https://open.spotify.com/search/${encodeURIComponent(item.title + ' ' + item.artist)}`;
+        // 楽曲リンク（Apple Music）
+        const spotifyUrl = item.spotify_url || `https://music.apple.com/us/search?term=${encodeURIComponent(item.title + ' ' + item.artist)}`;
         const musicTitle = item.title || 'N/A';
 
         row.innerHTML = `

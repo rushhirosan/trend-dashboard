@@ -1331,7 +1331,6 @@ function displaySpotifyResults(data) {
         const row = document.createElement('tr');
         const title = item.title || 'N/A';
         const artist = item.artist || 'N/A';
-        const album = item.album || 'N/A';
         const popularity = item.popularity ?? 0;
         const spotifyUrl = item.spotify_url || `https://music.apple.com/us/search?term=${encodeURIComponent((item.title || '') + ' ' + (item.artist || ''))}`;
         
@@ -1339,7 +1338,6 @@ function displaySpotifyResults(data) {
             <td><span class="badge bg-success">${index + 1}</span></td>
             <td><a href="${spotifyUrl}" target="_blank" class="text-decoration-none"><strong>${title}</strong></a></td>
             <td>${artist}</td>
-            <td>${album}</td>
             <td><strong>${popularity}</strong></td>
         `;
         // 行全体をクリック可能にする（アクセシビリティ対応）
@@ -1348,7 +1346,7 @@ function displaySpotifyResults(data) {
     });
     
     if (typeof syncToAllPane === 'function') {
-        setTimeout(() => syncToAllPane('spotifyTrendsTableBody', 'all-spotifyTrendsTableBody', 5), 0);
+        setTimeout(() => syncToAllPane('spotifyTrendsTableBody', 'all-spotifyTrendsTableBody', 4), 0);
     }
     if (typeof applyCategoryAccordionForAllTables === 'function') {
         setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);

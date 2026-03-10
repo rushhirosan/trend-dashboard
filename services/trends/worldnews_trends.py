@@ -1,4 +1,5 @@
 import os
+import re
 import requests
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
@@ -72,7 +73,50 @@ class WorldNewsTrendsManager(BaseTrendsManager):
         except Exception as e:
             logger.warning(f"⚠️ WorldNews: cache_status更新エラー: {e}")
             return False
-    
+
+    def _remove_duplicates(self, items):
+        """重複を排除するヘルパーメソッド（URL・タイトルで判定）"""
+        def normalize_title(title):
+            """タイトルを正規化（重複チェック用）"""
+            if not title:
+                return ''
+            normalized = str(title).strip()
+            normalized = re.sub(r'\s+', ' ', normalized)
+            return normalized
+
+        seen_urls = set()
+        seen_titles = set()
+        unique_items = []
+        duplicate_count = 0
+
+        for item in items:
+            url = str(item.get('url', '')).strip()
+            title = str(item.get('title', '')).strip()
+            normalized_title = normalize_title(title)
+
+            # URLまたは正規化されたタイトルが既に存在する場合はスキップ
+            if url in seen_urls or normalized_title in seen_titles:
+                duplicate_count += 1
+                continue
+
+            # 空のタイトルやURLはスキップ
+            if not normalized_title or not url:
+                duplicate_count += 1
+                continue
+
+            seen_urls.add(url)
+            seen_titles.add(normalized_title)
+            unique_items.append(item)
+
+        if duplicate_count > 0:
+            logger.info(f"🔄 World News: {duplicate_count}件の重複を排除しました（残り: {len(unique_items)}件）")
+
+        # rank を連番で再採番
+        for i, item in enumerate(unique_items, 1):
+            item['rank'] = i
+
+        return unique_items
+
     def _fetch_trends(self, country='jp', category=None, page_size=25, *args, **kwargs):
         """外部APIからWorld Newsデータを取得"""
         result = self._get_worldnews_trends(country, category, page_size)
@@ -157,6 +201,8 @@ class WorldNewsTrendsManager(BaseTrendsManager):
                                 item['source'] = domain.replace('www.', '')
                         except Exception:
                             pass
+                # 重複排除を適用
+                cached_data = self._remove_duplicates(cached_data)
                 return {
                     'data': cached_data,
                     'status': 'cached',
@@ -180,7 +226,8 @@ class WorldNewsTrendsManager(BaseTrendsManager):
             logger.warning(f"⚠️ World News: キャッシュ未使用のため外部APIを呼び出します")
             trends_data = self._get_worldnews_trends(country, category, page_size)
             if trends_data:
-                # キャッシュに保存
+                # 重複排除を適用してからキャッシュに保存
+                trends_data = self._remove_duplicates(trends_data)
                 self.save_to_cache(trends_data, cache_key, country)
                 logger.info(f"✅ World News: 外部APIから{len(trends_data)}件のデータを取得し、キャッシュに保存しました")
                 return {

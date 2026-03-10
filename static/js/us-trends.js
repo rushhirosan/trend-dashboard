@@ -1332,6 +1332,7 @@ function displaySpotifyResults(data) {
         const title = item.title || 'N/A';
         const artist = item.artist || 'N/A';
         const album = item.album || 'N/A';
+        const popularity = item.popularity ?? 0;
         const spotifyUrl = item.spotify_url || `https://music.apple.com/us/search?term=${encodeURIComponent((item.title || '') + ' ' + (item.artist || ''))}`;
         
         row.innerHTML = `
@@ -1339,6 +1340,7 @@ function displaySpotifyResults(data) {
             <td><a href="${spotifyUrl}" target="_blank" class="text-decoration-none"><strong>${title}</strong></a></td>
             <td>${artist}</td>
             <td>${album}</td>
+            <td><strong>${popularity}</strong></td>
         `;
         // 行全体をクリック可能にする（アクセシビリティ対応）
         makeTableRowClickable(row, spotifyUrl, `Open ${title} by ${artist} on Apple Music`);

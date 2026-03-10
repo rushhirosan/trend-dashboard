@@ -3,6 +3,7 @@
 Apple Music RSS（認証・課金不要）を利用。
 https://rss.applemarketingtools.com/api/v2/{storefront}/music/most-played/25/songs.json
 """
+import re
 import requests
 from datetime import datetime
 from database_config import TrendsCache
@@ -115,6 +116,21 @@ class MusicTrendsManager(BaseTrendsManager):
                 'data': []
             }
 
+    @staticmethod
+    def _extract_album_from_url(url: str) -> str | None:
+        """
+        Apple Music URL からアルバム名を抽出。
+        https://music.apple.com/us/album/choosin-texas/1844932149?i=... の slug をタイトルに変換。
+        """
+        if not url:
+            return None
+        match = re.search(r'/album/([^/]+)/\d+', url)
+        if not match:
+            return None
+        slug = match.group(1)
+        # ハイフンをスペースに変換してタイトルケース化
+        return slug.replace('-', ' ').title()
+
     def _get_apple_music_rss(self, region, service='spotify'):
         """
         Apple Music RSS から人気曲を取得。
@@ -145,8 +161,7 @@ class MusicTrendsManager(BaseTrendsManager):
                 title = song.get('name', '').strip()
                 artist = (song.get('artistName') or 'Unknown').strip()
                 url_link = song.get('url', '')
-                # album は results に含まれない場合がある
-                album = 'Unknown'
+                album = self._extract_album_from_url(url_link) or 'Unknown'
 
                 if not title:
                     continue

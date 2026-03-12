@@ -17,6 +17,17 @@ def health_fallback():
         'message': 'Check logs for details'
     }), 200  # 200を返してアプリが動作していることを示す
 
+
+@fallback_app.route('/healthz')
+def healthz_fallback():
+    """Fly.io ヘルスチェック用（フォールバック時も 200 を返してポート応答を維持）"""
+    return jsonify({
+        'status': 'degraded',
+        'error': 'Application failed to initialize',
+        'message': 'Check logs for details'
+    }), 200
+
+
 @fallback_app.route('/')
 def index_fallback():
     return jsonify({

@@ -18,6 +18,15 @@ SSR_SOURCES = [
     {'key': 'youtube', 'manager_key': 'youtube', 'fetcher': lambda m: m.get_trends(region='JP', force_refresh=False)},
 ]
 
+# US全部入りタブでSSRするソース一覧
+SSR_SOURCES_US = [
+    {'key': 'cnn', 'manager_key': 'cnn', 'fetcher': lambda m: m.get_trends(limit=5, force_refresh=False)},
+    {'key': 'worldnews', 'manager_key': 'worldnews', 'fetcher': lambda m: m.get_trends(country='us', category=None, page_size=5, force_refresh=False)},
+    {'key': 'wikipedia', 'manager_key': 'wikipedia', 'fetcher': lambda m: m.get_trends(lang='en', limit=5, force_refresh=False)},
+    {'key': 'google', 'manager_key': 'google', 'fetcher': lambda m: m.get_trends(region='US', force_refresh=False)},
+    {'key': 'youtube', 'manager_key': 'youtube', 'fetcher': lambda m: m.get_trends(region_code='US', max_results=5, force_refresh=False)},
+]
+
 
 def _fetch_one(managers: dict, config: dict) -> tuple:
     """1ソースのデータを取得（キャッシュ優先）"""
@@ -75,5 +84,34 @@ def fetch_ssr_trends(managers: dict) -> Dict[str, List[dict]]:
                     out[key] = _sort_and_limit(key, data)
             except Exception as e:
                 logger.debug(f"SSR future error: {e}")
+    
+    return out
+
+
+def fetch_ssr_trends_us(managers: dict) -> Dict[str, List[dict]]:
+    """
+    US全部入りタブ用のトレンドデータを並列取得（キャッシュのみ、外部APIは呼ばない）
+    
+    Args:
+        managers: app.config['TREND_MANAGERS']
+    
+    Returns:
+        { 'cnn': [...], 'worldnews': [...], 'wikipedia': [...], 'google': [...], 'youtube': [...] }
+        各リストは最大5件
+    """
+    out = {}
+    if not managers:
+        return out
+    
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(_fetch_one, managers, cfg): cfg for cfg in SSR_SOURCES_US}
+        for future in as_completed(futures):
+            try:
+                key, result = future.result()
+                if result and result.get('data'):
+                    data = result['data'] if isinstance(result['data'], list) else []
+                    out[key] = _sort_and_limit(key, data)
+            except Exception as e:
+                logger.debug(f"SSR US future error: {e}")
     
     return out

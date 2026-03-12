@@ -224,7 +224,15 @@ def create_app():
             try:
                 # Google Analytics IDをテンプレートに渡す
                 ga_id = app.config.get('GOOGLE_ANALYTICS_ID')
-                return render_template('us_trends.html', config={'GOOGLE_ANALYTICS_ID': ga_id})
+                # SSR用トレンドデータ（キャッシュから取得、初回表示・SEO向け）
+                ssr_trends = {}
+                try:
+                    from services.ssr_data import fetch_ssr_trends_us
+                    managers = app.config.get('TREND_MANAGERS') or {}
+                    ssr_trends = fetch_ssr_trends_us(managers)
+                except Exception as ssr_err:
+                    logger.debug(f"SSR USデータ取得スキップ: {ssr_err}")
+                return render_template('us_trends.html', config={'GOOGLE_ANALYTICS_ID': ga_id}, ssr_trends=ssr_trends)
             except Exception as e:
                 logger.error(f"❌ USトレンドページレンダリングエラー: {e}", exc_info=True)
                 return f"Error rendering US trends page: {e}", 500

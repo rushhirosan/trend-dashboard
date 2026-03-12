@@ -12,7 +12,7 @@
   <tr class="trend-card">
     <td>{{ loop.index }}</td>
     <td><a href="{{ item.url|default('#') }}" target="_blank" rel="noopener noreferrer">{{ (item.title or 'No title')|e }}</a></td>
-    <td>{% if item.published_date %}{{ item.published_date[:10] }}{% else %}—{% endif %}</td>
+    <td>{% if item.published_date %}{{ (item.published_date|string)[:10] }}{% else %}—{% endif %}</td>
   </tr>
   {%- endfor -%}
 {% endmacro %}
@@ -22,7 +22,7 @@
   <tr class="trend-card">
     <td><span class="badge bg-info">{{ item.rank|default(loop.index) }}</span></td>
     <td><strong><a href="{{ item.url|default('#') }}" target="_blank" rel="noopener noreferrer">{{ (item.title or 'N/A')|e }}</a></strong></td>
-    <td><small class="text-muted">{% if item.published_at %}{{ item.published_at[:10] }}{% elif item.source %}{{ (item.source)|e }}{% else %}—{% endif %}</small></td>
+    <td><small class="text-muted">{% if item.published_at %}{{ (item.published_at|string)[:10] }}{% elif item.source %}{{ (item.source)|e }}{% else %}—{% endif %}</small></td>
   </tr>
   {%- endfor -%}
 {% endmacro %}

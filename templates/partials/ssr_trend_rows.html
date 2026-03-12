@@ -12,7 +12,7 @@
   <tr class="trend-card">
     <td>{{ loop.index }}</td>
     <td><a href="{{ item.url|default('#') }}" target="_blank" rel="noopener noreferrer">{{ (item.title or 'タイトルなし')|e }}</a></td>
-    <td>{% if item.published_date %}{{ item.published_date[:10] }}{% else %}—{% endif %}</td>
+    <td>{% if item.published_date %}{{ (item.published_date|string)[:10] }}{% else %}—{% endif %}</td>
   </tr>
   {%- endfor -%}
 {% endmacro %}

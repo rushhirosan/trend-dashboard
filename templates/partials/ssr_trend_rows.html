@@ -1,0 +1,59 @@
+{# SSR用: 全部入りタブのトレンド行マクロ（SEO・初回表示用） #}
+{% macro format_view_count(n) %}
+  {%- if n is none or n is undefined -%}0
+  {%- elif n >= 1000000 -%}{{ "%.1f"|format(n / 1000000) }}M
+  {%- elif n >= 1000 -%}{{ "%.1f"|format(n / 1000) }}K
+  {%- else -%}{{ n|int }}
+  {%- endif -%}
+{% endmacro %}
+
+{% macro nhk_rows(items) %}
+  {%- for item in items -%}
+  <tr class="trend-card">
+    <td>{{ loop.index }}</td>
+    <td><a href="{{ item.url|default('#') }}" target="_blank" rel="noopener noreferrer">{{ (item.title or 'タイトルなし')|e }}</a></td>
+    <td>{% if item.published_date %}{{ item.published_date[:10] }}{% else %}—{% endif %}</td>
+  </tr>
+  {%- endfor -%}
+{% endmacro %}
+
+{% macro news_rows(items) %}
+  {%- for item in items -%}
+  <tr class="trend-card">
+    <td><span class="badge bg-info">{{ item.rank|default(loop.index) }}</span></td>
+    <td><strong><a href="{{ item.url|default('#') }}" target="_blank" rel="noopener noreferrer">{{ (item.title or 'N/A')|e }}</a></strong></td>
+    <td><small class="text-muted">{{ (item.source or item.published_at or '—')|e }}</small></td>
+  </tr>
+  {%- endfor -%}
+{% endmacro %}
+
+{% macro wikipedia_rows(items) %}
+  {%- for item in items -%}
+  <tr class="trend-card">
+    <td>{{ loop.index }}</td>
+    <td><a href="{{ item.url|default('#') }}" target="_blank" rel="noopener noreferrer">{{ (item.title or 'タイトルなし')|e }}</a></td>
+    <td>{{ item.views|default('-') }}</td>
+  </tr>
+  {%- endfor -%}
+{% endmacro %}
+
+{% macro google_rows(items) %}
+  {%- for item in items -%}
+  <tr class="trend-card">
+    <td><span class="badge bg-primary">{{ loop.index }}</span></td>
+    <td><strong><a href="{{ item.google_search_url|default('#') }}" target="_blank" rel="noopener noreferrer">{{ (item.keyword or item.term or 'N/A')|e }}</a></strong></td>
+    <td><strong>{{ (item.score or item.popularity or 0)|int }}</strong></td>
+  </tr>
+  {%- endfor -%}
+{% endmacro %}
+
+{% macro youtube_rows(items) %}
+  {%- for item in items -%}
+  <tr class="trend-card">
+    <td><span class="badge bg-danger">{{ loop.index }}</span></td>
+    <td><a href="https://www.youtube.com/watch?v={{ item.video_id|default('') }}" target="_blank" rel="noopener noreferrer"><strong>{{ (item.title or 'N/A')|e }}</strong></a></td>
+    <td>{{ (item.channel_title or '—')|e }}</td>
+    <td><strong>{{ format_view_count(item.view_count) }}</strong></td>
+  </tr>
+  {%- endfor -%}
+{% endmacro %}

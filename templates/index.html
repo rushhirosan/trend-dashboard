@@ -293,6 +293,7 @@
                 </div>
                 <div class="tab-content" id="trendCategoryTabContent">
                 <!-- 全部入り（All）: 各ジャンルのトップ5のみ表示。景気・行政はタブ上（ヘッダー）のみ。もっと見るでジャンルタブへ -->
+                {% from 'partials/ssr_trend_rows.html' import nhk_rows, news_rows, wikipedia_rows, google_rows, youtube_rows %}
                 <div class="tab-pane fade show active" id="pane-all" role="tabpanel" aria-labelledby="tab-all">
                     <p class="text-muted small mb-3">各ジャンルのトップ5件を表示しています。詳しく見る場合は「もっと見る」またはタブでジャンルを選んでください。</p>
                     <div id="all-trends-container" class="row g-3">
@@ -312,7 +313,7 @@
                                 <div id="all-collapse-nhk" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
-                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>公開日</th></tr></thead><tbody id="all-nhkTrendsTableBody"></tbody></table>
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>公開日</th></tr></thead><tbody id="all-nhkTrendsTableBody">{% if (ssr_trends or {}).get('nhk') %}{{ nhk_rows(ssr_trends.nhk) }}{% endif %}</tbody></table>
                                     </div>
                                 </div>
                                 </div>
@@ -333,7 +334,7 @@
                                 <div id="all-collapse-news" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
-                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>ソース</th></tr></thead><tbody id="all-newsTrendsTableBody"></tbody></table>
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>ソース</th></tr></thead><tbody id="all-newsTrendsTableBody">{% if (ssr_trends or {}).get('news') %}{{ news_rows(ssr_trends.news) }}{% endif %}</tbody></table>
                                     </div>
                                 </div>
                                 </div>
@@ -354,7 +355,7 @@
                                 <div id="all-collapse-wikipedia" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
-                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>閲覧数</th></tr></thead><tbody id="all-wikipediaTrendsTableBody"></tbody></table>
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>閲覧数</th></tr></thead><tbody id="all-wikipediaTrendsTableBody">{% if (ssr_trends or {}).get('wikipedia') %}{{ wikipedia_rows(ssr_trends.wikipedia) }}{% endif %}</tbody></table>
                                     </div>
                                 </div>
                                 </div>
@@ -375,7 +376,7 @@
                                 <div id="all-collapse-google" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
-                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>キーワード</th><th>人気度</th></tr></thead><tbody id="all-googleTrendsTableBody"></tbody></table>
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>キーワード</th><th>人気度</th></tr></thead><tbody id="all-googleTrendsTableBody">{% if (ssr_trends or {}).get('google') %}{{ google_rows(ssr_trends.google) }}{% endif %}</tbody></table>
                                     </div>
                                 </div>
                                 </div>
@@ -396,7 +397,7 @@
                                 <div id="all-collapse-youtube" class="collapse all-card-collapse">
                                 <div class="card-body p-2">
                                     <div class="table-responsive">
-                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>チャンネル</th><th>視聴回数</th></tr></thead><tbody id="all-youtubeTrendsTableBody"></tbody></table>
+                                        <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>順位</th><th>タイトル</th><th>チャンネル</th><th>視聴回数</th></tr></thead><tbody id="all-youtubeTrendsTableBody">{% if (ssr_trends or {}).get('youtube') %}{{ youtube_rows(ssr_trends.youtube) }}{% endif %}</tbody></table>
                                     </div>
                                 </div>
                                 </div>

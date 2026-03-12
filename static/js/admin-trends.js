@@ -228,17 +228,9 @@
         if (periodEl) {
             periodEl.textContent = periodText;
         }
-        var firstLine = summary;
-        var secondLine = '';
-        if (parts.length > 3) {
-            var splitIndex = Math.ceil(parts.length / 2);
-            firstLine = parts.slice(0, splitIndex).join(' / ');
-            secondLine = parts.slice(splitIndex).join(' / ');
-        }
         return (
             '<div class="header-admin-latest-title">' +
-            '<span class="header-admin-latest-line">' + firstLine + '</span>' +
-            (secondLine ? '<span class="header-admin-latest-line">' + secondLine + '</span>' : '') +
+            '<span class="header-admin-latest-line">' + summary + '</span>' +
             '</div>'
         );
     }

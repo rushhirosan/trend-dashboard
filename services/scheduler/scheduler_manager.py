@@ -1,6 +1,7 @@
 import os
 import logging
 import socket
+import threading
 import time
 import signal
 from datetime import datetime
@@ -364,7 +365,8 @@ class TrendsScheduler:
             else:
                 logger.info(f"⏰ 起動時チェック: 当日の19時前です（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
             
-            # 1時、7時、13時、または19時のジョブが必要な場合、1回だけ実行
+            # 1時、7時、13時、または19時のジョブが必要な場合、遅延後に1回だけ実行
+            # OOM防止: 起動直後はメモリ逼迫のため、2〜3分待ってから低負荷モードで補完
             if should_execute_1am or should_execute_7am or should_execute_1pm or should_execute_7pm:
                 missed_times = []
                 if should_execute_1am:
@@ -375,8 +377,15 @@ class TrendsScheduler:
                     missed_times.append("13時")
                 if should_execute_7pm:
                     missed_times.append("19時")
-                logger.info(f"🔄 当日の{', '.join(missed_times)}の処理を自動実行します（マシン停止による実行漏れを補完）")
-                self._fetch_all_trends()
+                delay_sec = int(os.getenv('TREND_STARTUP_CATCHUP_DELAY_SECONDS', '120'))
+                logger.info(f"🔄 当日の{', '.join(missed_times)}の処理を{delay_sec}秒後に実行します（低負荷モード・OOM対策）")
+                def _run_catchup():
+                    try:
+                        logger.info("🔄 起動時補完: 遅延実行を開始します")
+                        self._fetch_all_trends(force=True, low_memory_mode=True)
+                    except Exception as e:
+                        logger.error(f"❌ 起動時補完エラー: {e}", exc_info=True)
+                threading.Timer(delay_sec, _run_catchup).start()
         except Exception as e:
             logger.error(f"❌ 起動時チェックエラー: {e}", exc_info=True)
             # エラーが発生してもスケジューラーの起動は継続
@@ -391,13 +400,14 @@ class TrendsScheduler:
             except Exception as e:
                 logger.error(f"❌ スケジューラー停止エラー: {e}")
     
-    def _fetch_all_trends(self, force=False, trigger_source='scheduler'):
+    def _fetch_all_trends(self, force=False, trigger_source='scheduler', low_memory_mode=False):
         """全プラットフォームのトレンドを取得（既存のrefresh_all_trends()を使用）
         
         Args:
             force: Trueの場合、既に実行済みでも強制的に実行する
                    Falseの場合、スケジューラー実行時（通常の定期実行）
             trigger_source: 呼び出し元の識別子。'scheduler'=定期実行、'api'=API（手動/外部）
+            low_memory_mode: Trueの場合、max_concurrent=1, batch_delay=5で実行（OOM対策・起動時補完用）
         """
         # 同時実行防止: 既に実行中の場合はスキップ（同一プロセス内）
         if self._fetching_in_progress:
@@ -489,8 +499,15 @@ class TrendsScheduler:
                 # スケジューラー実行時（7時・13時）は強制更新（force_refresh=True）で実行
                 # これにより、既存のキャッシュがあっても最新データを取得する
                 from managers.trend_managers import refresh_all_trends
-                logger.info("🔄 refresh_all_trends実行開始 (force_refresh=True)")
-                result = refresh_all_trends(managers, force_refresh=True)
+                if low_memory_mode:
+                    logger.info("🔄 refresh_all_trends実行開始 (force_refresh=True, low_memory: max_concurrent=1, batch_delay=5)")
+                    result = refresh_all_trends(
+                        managers, force_refresh=True,
+                        max_concurrent=1, batch_delay_seconds=5
+                    )
+                else:
+                    logger.info("🔄 refresh_all_trends実行開始 (force_refresh=True)")
+                    result = refresh_all_trends(managers, force_refresh=True)
                 logger.info(f"🔄 refresh_all_trends実行完了: success={result.get('success')}")
             
             # 結果をログ出力

@@ -13,8 +13,8 @@ primary_region = "nrt"
   SKIP_STARTUP_EXECUTION = "false"
   # デプロイ時のメール送信を無効化（スケジューラー実行時のみメール送信）
   SKIP_EMAIL_ON_UPDATE = "false"
-  # トレンド取得の同時実行数（OOM対策）
-  TREND_REFRESH_MAX_CONCURRENT = "3"
+  # トレンド取得の同時実行数（OOM対策。512MB VMでは2を推奨）
+  TREND_REFRESH_MAX_CONCURRENT = "2"
   # バッチ間待機秒数（メモリ・接続の解放を待つ、OOM対策）
   TREND_REFRESH_BATCH_DELAY_SECONDS = "3"
 

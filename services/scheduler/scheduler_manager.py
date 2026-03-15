@@ -900,8 +900,8 @@ class TrendsScheduler:
             )
             has_anomaly = True
 
-        # 実行時間 30 分以上
-        if duration >= 1800:
+        # 実行時間 40 分以上
+        if duration >= 2400:
             details = {
                 "実行ID": execution_id,
                 "実行時間": f"{duration / 60:.1f}分 ({duration:.2f}秒)",
@@ -913,7 +913,7 @@ class TrendsScheduler:
             self._send_alert(
                 "warning",
                 "実行時間が異常に長い",
-                f"トレンド取得の実行時間が {duration / 60:.1f} 分です（閾値: 30 分）。",
+                f"トレンド取得の実行時間が {duration / 60:.1f} 分です（閾値: 40 分）。",
                 details,
             )
             has_anomaly = True

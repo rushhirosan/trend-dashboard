@@ -25,15 +25,18 @@ class MovieTrendsManager(BaseTrendsManager):
         self.base_url = "https://api.themoviedb.org/3"
         self.api_key = os.getenv('TMDB_API_KEY')
         
-        # AmazonアソシエイトID設定
-        self.amazon_affiliate_id = os.getenv('AMAZON_AFFILIATE_ID', '').strip()
+        # AmazonアソシエイトID設定（.env で管理、ハードコード禁止）
+        self.amazon_affiliate_id = (os.getenv('AMAZON_AFFILIATE_ID') or '').strip()
         
         if not self.api_key:
             logger.warning("⚠️ TMDB_API_KEYが設定されていません。TMDB APIは使用できません。")
         else:
             logger.info("Movie Trends Manager初期化完了")
             logger.info(f"  Base URL: {self.base_url}")
-            logger.info(f"  Amazon Affiliate ID: {'設定済み' if self.amazon_affiliate_id else '未設定'}")
+        if self.amazon_affiliate_id:
+            logger.info(f"  Amazon Affiliate ID: 設定済み")
+        else:
+            logger.warning(f"  Amazon Affiliate ID: 未設定（.env の AMAZON_AFFILIATE_ID を設定すると映画リンクがアフィリエイトになります）")
     
     def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""

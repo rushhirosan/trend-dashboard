@@ -1,73 +1,60 @@
-# テストスクリプト
+# テスト
 
-## test_pages.py
+## テスト方針
 
-各ページとAPIエンドポイントの基本動作をテストするスクリプトです。
+| 種別 | 目的 | ツール |
+|------|------|--------|
+| ユニットテスト | 個別関数・ロジックの検証 | pytest |
+| 統合テスト | ページ・APIの基本動作 | test_pages.py |
+| E2Eテスト | ブラウザでのUI確認 | test_ui.py (Selenium) |
 
-## test_ui.py
-
-ブラウザを使用してUIの動作をテストするスクリプトです（Selenium使用）。
-
-### 必要な準備
+## セットアップ
 
 ```bash
-# Seleniumをインストール
-pip install selenium
-
-# ChromeDriverをインストール（macOSの場合）
-brew install chromedriver
-
-# または、ChromeDriverを手動でダウンロード
-# https://chromedriver.chromium.org/downloads
+# 開発用依存関係をインストール
+pip install -r requirements-dev.txt
 ```
 
-### 使い方
+## 実行方法
 
 ```bash
-# UIテストを実行
+# 全テスト実行（pytest）
+pytest tests/ -v
+
+# カバレッジ付き
+pytest tests/ -v --cov=. --cov-report=term-missing
+
+# 特定テストのみ
+pytest tests/test_ebay_affiliate.py -v
+
+# 本番環境のページ/APIテスト
+python tests/test_pages.py
+
+# UIテスト（Selenium要）
 python tests/test_ui.py
 ```
 
-### テスト内容
+## テスト一覧
 
-- 各ページが正しく読み込まれるか
-- 必要なUI要素（ボタン、フォーム、メニューなど）が存在するか
-- ページの基本構造が正しいか
+### test_ebay_affiliate.py（ユニット）
+- eBay EPN アフィリエイトURL生成（campid/mkrid）
+- 後方互換（EBAY_AFFILIATE_ID）
+- 未設定時のフォールバック
 
-### 使い方
+### test_pages.py（統合）
+本番URLへHTTPリクエストし、ステータス・コンテンツを検証。
 
-```bash
-# 本番環境をテスト
-python tests/test_pages.py
+- **ページ**: `/`, `/us`, `/data-status`, `/subscription/`
+- **API**: 各種トレンドAPI
 
-# ローカル環境をテストする場合
-# tests/test_pages.py の BASE_URL を "http://localhost:5000" に変更してから実行
-```
+### test_ui.py（E2E）
+Seleniumでブラウザを起動し、UI要素の存在を確認。
 
-### テスト内容
+### test_scheduler_email.py
+スケジューラーのメール送信（要確認プロンプト）。
 
-- **ページテスト**:
-  - `/` - 日本トレンドページ
-  - `/us` - USトレンドページ
-  - `/data-status` - データ鮮度情報ページ
-  - `/subscription/` - サブスクリプションページ
+## カバレッジ目標
 
-- **APIエンドポイントテスト**:
-  - `/api/cache/data-freshness` - データ鮮度情報API
-  - `/api/google-trends?region=JP` - Google Trends API
-  - `/api/youtube-trends?region=JP` - YouTube Trends API
-  - `/api/music-trends?service=spotify&region=JP` - Spotify Trends API
-  - `/api/worldnews-trends?country=jp` - World News API
-  - `/api/podcast-trends?trend_type=best_podcasts&region=jp` - Podcast Trends API
-  - `/api/rakuten-trends` - 楽天トレンドAPI
-  - `/api/hatena-trends?category=all` - はてなブックマークAPI
-  - `/api/twitch-trends?category=games` - Twitch Trends API
-
-### チェック項目
-
-- ステータスコード（200を期待）
-- コンテンツサイズ
-- HTMLタグの存在
-- エラーメッセージの有無
-- JSON形式のレスポンス（APIの場合）
+- 現状: 部分的（trends関連の主要ロジックを優先）
+- 方針: 新規・変更時に該当テストを追加し、段階的に拡充
 

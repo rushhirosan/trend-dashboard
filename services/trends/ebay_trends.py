@@ -53,12 +53,20 @@ class eBayTrendsManager(BaseTrendsManager):
         self.access_token = None
         self.token_expires_at = None
         
-        # eBayアフィリエイトID設定
-        self.ebay_affiliate_id = os.getenv('EBAY_AFFILIATE_ID', '').strip()
-        if self.ebay_affiliate_id:
-            logger.info(f"  eBay Affiliate ID: 設定済み")
+        # eBayアフィリエイト設定（.env で管理、ハードコード禁止）
+        # campid: パートナー固有のキャンペーンID（10桁、EPN必須）
+        # mkrid: マーケットプレイス別ローテーションID（US: 711-53200-19255-0）
+        self.ebay_campaign_id = (os.getenv('EBAY_CAMPAIGN_ID') or '').strip()
+        affiliate_val = (os.getenv('EBAY_AFFILIATE_ID') or '').strip()
+        rotation_val = (os.getenv('EBAY_ROTATION_ID') or '').strip()
+        if not self.ebay_campaign_id and affiliate_val and '-' not in affiliate_val:
+            # 後方互換: EBAY_AFFILIATE_ID を campid として使用（10桁キャンペーンID想定。ハイフンありは mkrid）
+            self.ebay_campaign_id = affiliate_val
+        self.ebay_rotation_id = rotation_val or (affiliate_val if (affiliate_val and '-' in affiliate_val) else '711-53200-19255-0')
+        if self.ebay_campaign_id:
+            logger.info(f"  eBay Campaign ID: 設定済み")
         else:
-            logger.info(f"  eBay Affiliate ID: 未設定")
+            logger.warning(f"  eBay Campaign ID: 未設定（.env の EBAY_CAMPAIGN_ID または EBAY_AFFILIATE_ID を設定）")
         
         # カテゴリ定義（カテゴリID、表示名、キーワード）
         self.categories = {
@@ -205,21 +213,23 @@ class eBayTrendsManager(BaseTrendsManager):
         return result
     
     def _add_affiliate_params(self, url):
-        """eBay URLにアフィリエイトパラメータを追加
+        """eBay URLにアフィリエイトパラメータを追加（EPN形式）
+        
+        EPN必須パラメータ: mkevt(1=Click), mkcid(1=EPN), mkrid(ローテーションID), campid(キャンペーンID), toolid(10001)
+        参考: https://developer.ebay.com/api-docs/buy/static/ref-epn-link.html
         
         Args:
             url: eBay商品URL
         
         Returns:
-            str: アフィリエイトパラメータが追加されたURL、または元のURL（アフィリエイトID未設定時）
+            str: アフィリエイトパラメータが追加されたURL、または元のURL（campid未設定時）
         """
-        if not self.ebay_affiliate_id or not url:
+        if not self.ebay_campaign_id or not url:
             return url
         
-        # URLに既にパラメータがあるかチェック
         separator = '&' if '?' in url else '?'
-        affiliate_url = f"{url}{separator}mkevt=1&mkcid=1&mkrid={self.ebay_affiliate_id}"
-        return affiliate_url
+        params = f"mkevt=1&mkcid=1&mkrid={self.ebay_rotation_id}&campid={self.ebay_campaign_id}&toolid=10001"
+        return f"{url}{separator}{params}"
     
     def _fetch_trends(self, category='fashion', limit=25, *args, **kwargs):
         """eBay Browse APIから人気商品を取得

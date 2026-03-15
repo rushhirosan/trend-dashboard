@@ -58,16 +58,22 @@ class BookTrendsManager(BaseTrendsManager):
         self.google_books_base_url = "https://www.googleapis.com/books/v1"
         self.google_books_api_key = os.getenv('GOOGLE_BOOKS_API_KEY')
         
-        # AmazonアソシエイトID設定
-        self.amazon_affiliate_id = os.getenv('AMAZON_AFFILIATE_ID', '').strip()
+        # AmazonアソシエイトID設定（.env で管理、ハードコード禁止）
+        self.amazon_affiliate_id = (os.getenv('AMAZON_AFFILIATE_ID') or '').strip()
         # 楽天アフィリエイトID設定（楽天ブックス用）
-        self.rakuten_affiliate_id = os.getenv('RAKUTEN_AFFILIATE_ID', '').strip()
+        self.rakuten_affiliate_id = (os.getenv('RAKUTEN_AFFILIATE_ID') or '').strip()
         
         logger.info("Book Trends Manager初期化完了")
         logger.info(f"  楽天ブックス App ID: {'設定済み' if self.rakuten_app_id else '未設定'}")
         logger.info(f"  Google Books API Key: {'設定済み' if self.google_books_api_key else '未設定'}")
-        logger.info(f"  Amazon Affiliate ID: {'設定済み' if self.amazon_affiliate_id else '未設定'}")
-        logger.info(f"  Rakuten Affiliate ID: {'設定済み' if self.rakuten_affiliate_id else '未設定'}")
+        if self.amazon_affiliate_id:
+            logger.info(f"  Amazon Affiliate ID: 設定済み")
+        else:
+            logger.warning(f"  Amazon Affiliate ID: 未設定（.env の AMAZON_AFFILIATE_ID を設定するとAmazonリンクがアフィリエイトになります）")
+        if self.rakuten_affiliate_id:
+            logger.info(f"  Rakuten Affiliate ID: 設定済み")
+        else:
+            logger.warning(f"  Rakuten Affiliate ID: 未設定（.env の RAKUTEN_AFFILIATE_ID を設定すると楽天リンクがアフィリエイトになります）")
     
     def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""

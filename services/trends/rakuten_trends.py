@@ -47,11 +47,14 @@ class RakutenTrendsManager(BaseTrendsManager):
         self.rate_limiter = get_rakuten_api_rate_limiter()
         
         self.rakuten_app_id = os.getenv('RAKUTEN_APP_ID')
-        self.rakuten_affiliate_id = os.getenv('RAKUTEN_AFFILIATE_ID')
+        self.rakuten_affiliate_id = (os.getenv('RAKUTEN_AFFILIATE_ID') or '').strip()
         
         logger.info(f"Rakuten Trends Manager初期化:")
         logger.info(f"  App ID: {'設定済み' if self.rakuten_app_id else '未設定'}")
-        logger.info(f"  Affiliate ID: {'設定済み' if self.rakuten_affiliate_id else '未設定'}")
+        if self.rakuten_affiliate_id:
+            logger.info(f"  Affiliate ID: 設定済み")
+        else:
+            logger.warning(f"  Affiliate ID: 未設定（.env の RAKUTEN_AFFILIATE_ID を設定するとアフィリエイトリンクが有効になります）")
     
     def _add_affiliate_params(self, url: str) -> str:
         """楽天アイテムURLにaffiliateIdを付与（既に付与済みなら何もしない）"""

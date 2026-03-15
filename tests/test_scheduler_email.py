@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 スケジューラーのメール自動送信機能をテストするスクリプト
+対話式のため pytest ではスキップ。手動実行: python tests/test_scheduler_email.py
 """
 
 import sys
@@ -9,8 +10,9 @@ import os
 # プロジェクトルートをパスに追加
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app import create_app
+import pytest
 
+@pytest.mark.skip(reason="Interactive test with input(). Run manually: python tests/test_scheduler_email.py")
 def test_scheduler_email():
     """スケジューラーのメール自動送信機能をテスト"""
     print("=" * 60)

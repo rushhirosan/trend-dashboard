@@ -11,7 +11,7 @@ BASE_URL = "https://trends-dashboard.fly.dev"
 # ローカルテスト用
 # BASE_URL = "http://localhost:5000"
 
-def test_page(url, description):
+def _check_page(url, description):
     """ページの基本動作をテスト"""
     try:
         print(f"\n{'='*60}")
@@ -69,7 +69,7 @@ def test_page(url, description):
         print(f"❌ エラー: {str(e)}")
         return False
 
-def test_api_endpoint(url, description):
+def _check_api_endpoint(url, description):
     """APIエンドポイントをテスト"""
     try:
         print(f"\n{'='*60}")
@@ -130,7 +130,7 @@ def main():
     
     for path, description in pages:
         url = f"{BASE_URL}{path}"
-        result = test_page(url, description)
+        result = _check_page(url, description)
         results.append(("ページ", description, result))
     
     # APIエンドポイントテスト
@@ -149,7 +149,7 @@ def main():
     
     for path, description in api_endpoints:
         url = f"{BASE_URL}{path}"
-        result = test_api_endpoint(url, description)
+        result = _check_api_endpoint(url, description)
         results.append(("API", description, result))
     
     # 結果サマリー

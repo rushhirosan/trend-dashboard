@@ -37,7 +37,8 @@ AMAZON_AFFILIATE_ID="your-amazon-affiliate-id"
 # eBay API（eBayトレンド）
 EBAY_CLIENT_ID="your-ebay-client-id"
 EBAY_CLIENT_SECRET="your-ebay-client-secret"
-EBAY_AFFILIATE_ID="your-ebay-affiliate-id"
+EBAY_CAMPAIGN_ID="your-ebay-campaign-id"   # キャンペーンID（10桁、EPN必須）
+# EBAY_AFFILIATE_ID は後方互換用。EBAY_ROTATION_ID は省略時 US デフォルト
 
 # Twitch API（Twitchトレンド）
 TWITCH_CLIENT_ID="your-twitch-client-id"
@@ -95,7 +96,7 @@ fly secrets set \
   AMAZON_AFFILIATE_ID="your-amazon-affiliate-id" \
   EBAY_CLIENT_ID="your-ebay-client-id" \
   EBAY_CLIENT_SECRET="your-ebay-client-secret" \
-  EBAY_AFFILIATE_ID="your-ebay-affiliate-id" \
+  EBAY_CAMPAIGN_ID="your-ebay-campaign-id" \
   TWITCH_CLIENT_ID="your-twitch-client-id" \
   TWITCH_CLIENT_SECRET="your-twitch-client-secret" \
   YOUTUBE_API_KEY="your-youtube-api-key" \

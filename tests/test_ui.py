@@ -57,7 +57,7 @@ def setup_driver():
         print("または、ChromeDriverがインストールされているか確認してください")
         return None
 
-def test_page_ui(driver, url, description, checks):
+def _check_page_ui(driver, url, description, checks):
     """ページのUIをテスト"""
     try:
         print(f"\n{'='*60}")
@@ -118,7 +118,7 @@ def main():
             }
             return all(check(driver) for check in checks.values())
         
-        result = test_page_ui(
+        result = _check_page_ui(
             driver,
             f"{BASE_URL}/",
             "日本トレンドページ",
@@ -131,7 +131,7 @@ def main():
         results.append(("日本トレンドページ", result))
         
         # USトレンドページのテスト
-        result = test_page_ui(
+        result = _check_page_ui(
             driver,
             f"{BASE_URL}/us",
             "USトレンドページ",
@@ -144,7 +144,7 @@ def main():
         results.append(("USトレンドページ", result))
         
         # データ鮮度情報ページのテスト
-        result = test_page_ui(
+        result = _check_page_ui(
             driver,
             f"{BASE_URL}/data-status",
             "データ鮮度情報ページ",
@@ -157,7 +157,7 @@ def main():
         results.append(("データ鮮度情報ページ", result))
         
         # サブスクリプションページのテスト
-        result = test_page_ui(
+        result = _check_page_ui(
             driver,
             f"{BASE_URL}/subscription/",
             "サブスクリプションページ",

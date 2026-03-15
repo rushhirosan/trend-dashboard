@@ -85,7 +85,7 @@ fly secrets set \
   AMAZON_AFFILIATE_ID="your-amazon-affiliate-id" \
   EBAY_CLIENT_ID="your-ebay-client-id" \
   EBAY_CLIENT_SECRET="your-ebay-client-secret" \
-  EBAY_AFFILIATE_ID="your-ebay-affiliate-id" \
+  EBAY_CAMPAIGN_ID="your-ebay-campaign-id" \
   TWITCH_CLIENT_ID="your-twitch-client-id" \
   TWITCH_CLIENT_SECRET="your-twitch-client-secret" \
   SENDER_EMAIL="your-email@gmail.com" \

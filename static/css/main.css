@@ -316,6 +316,10 @@ body {
 #pane-all .all-category-select {
     flex-shrink: 0;
 }
+/* ドロップダウンと更新時刻が重ならないよう右ブロックに余白（Twitch等） */
+#pane-all .card-header:has(.all-category-select) > div.flex-shrink-0 {
+    margin-left: 0.5rem;
+}
 #pane-all .card-header h3,
 #pane-all .card-header .h6 {
     overflow: hidden;

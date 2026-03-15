@@ -711,8 +711,9 @@ class TrendsScheduler:
             )
 
             # スロットを「完了済み」として記録（二重実行防止。成功時のみ記録するため、クラッシュした場合は別プロセスが再実行可能）
-            now_jst = datetime.now(jst)
-            completed_slot = self._slot_key_for_now(now_jst)
+            # 重要: トリガー時刻のスロットを記録する。完了時刻で判定すると、7:00開始のジョブが12:04に終わった場合に
+            # 1pm が記録され、13:00の本来の実行が「既に完了済み」と誤判定されてスキップされる不具合を防ぐ。
+            completed_slot = slot_key  # 開始時に判定したスロット（トリガー時刻ベース）
             if completed_slot and self.db and hasattr(self.db, 'mark_slot_completed'):
                 self.db.mark_slot_completed(completed_slot)
 

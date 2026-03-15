@@ -432,6 +432,9 @@ class TrendsScheduler:
             trigger_source: 呼び出し元の識別子。'scheduler'=定期実行、'api'=API（手動/外部）
             low_memory_mode: Trueの場合、max_concurrent=1, batch_delay=5で実行（OOM対策・起動時補完用）
         """
+        # 定時実行（1/7/13/19時）は低負荷モードでOOM対策（API手動実行は従来どおり）
+        if trigger_source == 'scheduler' and not force:
+            low_memory_mode = True
         # 同時実行防止: 既に実行中の場合はスキップ（同一プロセス内）
         if self._fetching_in_progress:
             logger.warning("⚠️ データ取得処理が既に実行中です。重複実行をスキップします")

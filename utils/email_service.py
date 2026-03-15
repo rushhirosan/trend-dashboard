@@ -12,12 +12,12 @@ logger = get_logger(__name__)
 
 class EmailService:
     def __init__(self):
-        # 環境変数からメール設定を読み込む（本番環境用）
-        # 環境変数が設定されていない場合はデフォルト値を使用（ローカル環境用）
-        self.sender_email = os.getenv('SENDER_EMAIL', 'rushhirosan@gmail.com')
-        self.sender_password = os.getenv('SENDER_PASSWORD', 'xoniafqiuwnoirce')
-        self.smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
-        self.smtp_port = int(os.getenv('SMTP_PORT', '587'))
+        # 環境変数からメール設定を読み込む（機密情報は .env で管理）
+        # 未設定時は空文字。メール送信が必要な場合は SENDER_EMAIL, SENDER_PASSWORD 等を設定すること
+        self.sender_email = (os.getenv('SENDER_EMAIL') or '').strip()
+        self.sender_password = (os.getenv('SENDER_PASSWORD') or '').strip()
+        self.smtp_server = (os.getenv('SMTP_SERVER') or '').strip()
+        self.smtp_port = int((os.getenv('SMTP_PORT') or '587').strip())
         
         # デバッグ情報を出力
         logger.info(f"🔍 メール設定確認:")

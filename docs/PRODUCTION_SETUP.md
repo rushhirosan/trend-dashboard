@@ -34,6 +34,11 @@ RAKUTEN_AFFILIATE_ID="your-rakuten-affiliate-id"
 # Amazonアソシエイト（書籍・映画トレンド）
 AMAZON_AFFILIATE_ID="your-amazon-affiliate-id"
 
+# eBay API（eBayトレンド）
+EBAY_CLIENT_ID="your-ebay-client-id"
+EBAY_CLIENT_SECRET="your-ebay-client-secret"
+EBAY_AFFILIATE_ID="your-ebay-affiliate-id"
+
 # Twitch API（Twitchトレンド）
 TWITCH_CLIENT_ID="your-twitch-client-id"
 TWITCH_CLIENT_SECRET="your-twitch-client-secret"
@@ -88,6 +93,9 @@ fly secrets set \
   RAKUTEN_APP_ID="your-rakuten-app-id" \
   RAKUTEN_AFFILIATE_ID="your-rakuten-affiliate-id" \
   AMAZON_AFFILIATE_ID="your-amazon-affiliate-id" \
+  EBAY_CLIENT_ID="your-ebay-client-id" \
+  EBAY_CLIENT_SECRET="your-ebay-client-secret" \
+  EBAY_AFFILIATE_ID="your-ebay-affiliate-id" \
   TWITCH_CLIENT_ID="your-twitch-client-id" \
   TWITCH_CLIENT_SECRET="your-twitch-client-secret" \
   YOUTUBE_API_KEY="your-youtube-api-key" \

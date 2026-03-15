@@ -4,7 +4,7 @@ import socket
 import threading
 import time
 import signal
-from datetime import datetime
+from datetime import datetime, timezone
 try:
     import fcntl
 except ImportError:
@@ -228,15 +228,19 @@ class TrendsScheduler:
                 logger.info("✅ スケジューラー開始完了")
                 logger.info("📅 毎日深夜1:00、朝7:00、昼13:00、夜19:00（日本時間）に全トレンドを自動取得します")
                 
-                # 起動時の自動実行は無効化（デプロイ時の不要なAPI呼び出しとメール送信を防ぐ）
-                # 環境変数SKIP_STARTUP_EXECUTION=trueの場合はスキップ
-                # マシンが停止していた場合の補完は、次回のスケジュール実行時に自動的に処理される
+                # 起動時の自動実行: SKIP_STARTUP_EXECUTION=false のときのみ補完を検討
+                # デプロイ直後（deploy_marker が直近）の場合は補完スキップ＝クラッシュ時のみ補完
                 skip_startup = os.getenv('SKIP_STARTUP_EXECUTION', 'true').lower() == 'true'
                 if not skip_startup:
-                    logger.info("🔄 起動時の自動実行を実行します（SKIP_STARTUP_EXECUTION=false）")
-                    self._check_and_execute_missed_job(jst)
+                    if self._is_recent_deploy():
+                        logger.info(
+                            "⏭️ 起動時補完をスキップします（直近にデプロイされたため。クラッシュ再起動時のみ補完します）"
+                        )
+                    else:
+                        logger.info("🔄 起動時の自動実行を実行します（デプロイ以外の再起動と判定）")
+                        self._check_and_execute_missed_job(jst)
                 else:
-                    logger.info("⏭️ 起動時の自動実行をスキップします（デプロイ時の不要なAPI呼び出しを防ぐため）")
+                    logger.info("⏭️ 起動時の自動実行をスキップします（SKIP_STARTUP_EXECUTION=true）")
                 
             except Exception as e:
                 logger.error(f"❌ スケジューラー開始エラー: {e}", exc_info=True)
@@ -276,6 +280,25 @@ class TrendsScheduler:
         except Exception as e:
             logger.error(f"❌ eBay Popular/Trending 取得エラー: {e}", exc_info=True)
     
+    def _is_recent_deploy(self) -> bool:
+        """
+        直近にデプロイされたかどうかを判定する（deploy_marker の last_deploy_at を使用）。
+        True の場合は起動時補完をスキップ（デプロイによる起動とみなす）。
+        """
+        try:
+            window_sec = int(os.getenv("DEPLOY_CATCHUP_SKIP_WINDOW_SECONDS", "300"))
+            window_sec = max(60, min(600, window_sec))  # 1分〜10分にクランプ
+        except (ValueError, TypeError):
+            window_sec = 300
+        last_deploy = self.db.get_last_deploy_timestamp() if self.db else None
+        if last_deploy is None:
+            return False
+        now_utc = datetime.now(timezone.utc)
+        if last_deploy.tzinfo is None:
+            last_deploy = last_deploy.replace(tzinfo=timezone.utc)
+        elapsed = (now_utc - last_deploy).total_seconds()
+        return elapsed <= window_sec
+
     def _check_and_execute_missed_job(self, jst):
         """
         起動時に当日の1時、7時、13時、または19時を過ぎている場合は自動実行

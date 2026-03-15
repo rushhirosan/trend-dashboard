@@ -760,6 +760,13 @@ class TrendsCache:
                     slot_key VARCHAR(64) PRIMARY KEY,
                     started_at TIMESTAMPTZ NOT NULL
                 );
+                -- デプロイ直後判定用（起動時補完をスキップするため）
+                CREATE TABLE IF NOT EXISTS deploy_marker (
+                    id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+                    last_deploy_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                INSERT INTO deploy_marker (id, last_deploy_at) VALUES (1, NOW())
+                ON CONFLICT (id) DO NOTHING;
                 
                 CREATE TABLE IF NOT EXISTS subscriptions (
                     id SERIAL PRIMARY KEY,
@@ -2236,6 +2243,47 @@ class TrendsCache:
                     started_at TIMESTAMPTZ NOT NULL
                 )
             """)
+            # デプロイ直後判定用（起動時補完をスキップするため）
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS deploy_marker (
+                    id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+                    last_deploy_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+            cursor.execute("""
+                INSERT INTO deploy_marker (id, last_deploy_at) VALUES (1, NOW())
+                ON CONFLICT (id) DO NOTHING
+            """)
+
+    def record_deploy_timestamp(self) -> bool:
+        """デプロイ時刻を記録する。release_command から呼ぶ。"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        INSERT INTO deploy_marker (id, last_deploy_at) VALUES (1, NOW())
+                        ON CONFLICT (id) DO UPDATE SET last_deploy_at = NOW()
+                    """, ())
+                    conn.commit()
+                    logger.info("✅ deploy_marker を更新しました（last_deploy_at=NOW()）")
+                    return True
+        except Exception as e:
+            logger.warning("⚠️ record_deploy_timestamp エラー: %s", e)
+            return False
+
+    def get_last_deploy_timestamp(self):
+        """最終デプロイ時刻を返す（datetime UTC、なければ None）。"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT last_deploy_at FROM deploy_marker WHERE id = 1")
+                    row = cursor.fetchone()
+                    if row:
+                        return row[0]
+                    return None
+        except Exception as e:
+            logger.warning("⚠️ get_last_deploy_timestamp エラー: %s", e)
+            return None
 
     def try_acquire_scheduler_lock_db(self, holder_id: str, lock_minutes: int = 30) -> bool:
         """スケジューラー分散ロックを取得（DBベース、複数マシン・プロセス間で共有）

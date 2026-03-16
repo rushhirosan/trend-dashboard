@@ -376,6 +376,33 @@ class StockTrendsManager(BaseTrendsManager):
         item['volume'] = int(item.get('volume', 0) or 0)
         item['market_cap'] = int(item.get('market_cap', 0) or 0)
         return item
+
+    def _compute_change_from_close_series(self, close_series: pd.Series):
+        """
+        終値のSeriesから現在値・前日終値・変動額・変動率を安全に計算する。
+        - NaN行は除外し、最後の有効な2営業日を使用する
+        - 有効データが1日だけなら横ばい（変動率0%）として扱う
+        """
+        if close_series is None or close_series.empty:
+            return None
+
+        # NaNを除外して有効な終値だけを使う
+        valid = close_series.dropna()
+        if valid.empty:
+            return None
+
+        if len(valid) == 1:
+            current_price = float(valid.iloc[-1])
+            previous_price = current_price
+            change = 0.0
+            change_percent = 0.0
+        else:
+            current_price = float(valid.iloc[-1])
+            previous_price = float(valid.iloc[-2])
+            change = current_price - previous_price
+            change_percent = (change / previous_price) * 100.0 if previous_price > 0 else 0.0
+
+        return current_price, previous_price, change, change_percent, valid.index[-1]
     
     def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
@@ -594,21 +621,22 @@ class StockTrendsManager(BaseTrendsManager):
                         if ticker_data.empty or len(ticker_data) < 1:
                             error_count += 1
                             continue
-                        
-                        # データが1日分しかない場合
-                        if len(ticker_data) < 2:
-                            current_price = float(ticker_data['close'].iloc[-1])
-                            previous_price = current_price
-                            change = 0
-                            change_percent = 0
-                        else:
-                            # 通常通り、最新と前日のデータを使用
-                            current_price = float(ticker_data['close'].iloc[-1])
-                            previous_price = float(ticker_data['close'].iloc[-2])
-                            change = current_price - previous_price
-                            change_percent = (change / previous_price) * 100 if previous_price > 0 else 0
-                        
-                        volume = int(ticker_data['volume'].iloc[-1]) if 'volume' in ticker_data.columns else 0
+
+                        # 終値Seriesから現在値・前日終値・変動率を計算（NaN行は除外）
+                        result = self._compute_change_from_close_series(ticker_data.get('close'))
+                        if result is None:
+                            error_count += 1
+                            continue
+
+                        current_price, previous_price, change, change_percent, last_valid_index = result
+
+                        # 出来高は終値の最終有効日と合わせる（なければ最後の行を使用）
+                        volume = 0
+                        if 'volume' in ticker_data.columns:
+                            try:
+                                volume = int(ticker_data['volume'].loc[last_valid_index])
+                            except Exception:
+                                volume = int(ticker_data['volume'].iloc[-1])
                         
                         # 会社名を取得
                         if market == 'JP':
@@ -762,23 +790,22 @@ class StockTrendsManager(BaseTrendsManager):
                     
                     logger.debug(f"銘柄 {ticker_symbol}: {len(hist)}日分のデータを取得しました")
                     success_count += 1
-                    
-                    # データが1日分しかない場合（週末や市場が閉まっている場合）
-                    if len(hist) < 2:
-                        # 最後の取引日のデータを使用（変動率は0として扱う）
-                        current_price = hist['Close'].iloc[-1]
-                        previous_price = current_price  # 同じ価格として扱う
-                        change = 0
-                        change_percent = 0
-                        logger.info(f"銘柄 {ticker_symbol}: データが1日分のみ（市場が閉まっている可能性があります）- 最後の取引日データを使用")
-                    else:
-                        # 通常通り、最新と前日のデータを使用
-                        current_price = hist['Close'].iloc[-1]
-                        previous_price = hist['Close'].iloc[-2]
-                        change = current_price - previous_price
-                        change_percent = (change / previous_price) * 100 if previous_price > 0 else 0
-                    
-                    volume = hist['Volume'].iloc[-1] if 'Volume' in hist.columns else 0
+
+                    # 終値Seriesから現在値・前日終値・変動率を計算（NaN行は除外）
+                    result = self._compute_change_from_close_series(hist.get('Close'))
+                    if result is None:
+                        empty_count += 1
+                        continue
+
+                    current_price, previous_price, change, change_percent, last_valid_index = result
+
+                    # 出来高は終値の最終有効日と合わせる（なければ最後の行を使用）
+                    volume = 0
+                    if 'Volume' in hist.columns:
+                        try:
+                            volume = hist['Volume'].loc[last_valid_index]
+                        except Exception:
+                            volume = hist['Volume'].iloc[-1]
                     
                     # 銘柄情報を取得（マッピング辞書から会社名を取得）
                     # API呼び出しを避けるため、マッピング辞書を使用

@@ -4,6 +4,7 @@ yfinanceを使用して急騰・急落銘柄を取得
 """
 
 import os
+from decimal import Decimal, InvalidOperation
 import yfinance as yf
 from yahooquery import Ticker as YahooTicker
 import requests
@@ -292,6 +293,36 @@ class StockTrendsManager(BaseTrendsManager):
         }
         
         logger.info("Stock Trends Manager初期化完了")
+
+    def _get_change_percent_for_sort(self, item: dict) -> float:
+        """
+        ソート用のchange_percent値を安全に取得するヘルパー。
+        DecimalやNaN、文字列などの値を許容し、異常値は0として扱う。
+        """
+        value = item.get("change_percent", 0)
+
+        try:
+            # int / float はそのまま
+            if isinstance(value, (int, float)):
+                return float(value)
+
+            # Decimal の場合はNaNや無限大を0扱いにする
+            if isinstance(value, Decimal):
+                if not value.is_finite():
+                    return 0.0
+                return float(value)
+
+            # 文字列の場合（"1.23" や "1.23%" など）を float に変換
+            if isinstance(value, str):
+                cleaned = value.strip().replace("%", "")
+                if cleaned == "":
+                    return 0.0
+                return float(cleaned)
+        except (InvalidOperation, ValueError, TypeError):
+            return 0.0
+
+        # それ以外の型は0扱い
+        return 0.0
     
     def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
@@ -362,7 +393,7 @@ class StockTrendsManager(BaseTrendsManager):
                         logger.info(f"✅ stock: ダミーデータ {len(dummy_data)} 件をキャッシュに保存しました (market: {market})")
                 except Exception as e:
                     logger.warning(f"⚠️ stock: ダミーデータキャッシュ保存中にエラー: {e}")
-                dummy_data.sort(key=lambda x: abs(x.get('change_percent', 0)), reverse=True)
+                dummy_data.sort(key=lambda x: abs(self._get_change_percent_for_sort(x)), reverse=True)
                 for i, item in enumerate(dummy_data, 1):
                     item['rank'] = i
                 return {
@@ -381,7 +412,7 @@ class StockTrendsManager(BaseTrendsManager):
             # force_refresh=Falseの場合、キャッシュがあればそれを返す
             if not force_refresh and cached_data:
                 # 変動率でソート（降順）
-                cached_data.sort(key=lambda x: abs(x.get('change_percent', 0)), reverse=True)
+                cached_data.sort(key=lambda x: abs(self._get_change_percent_for_sort(x)), reverse=True)
                 
                 # ランキングを再設定
                 for i, item in enumerate(cached_data, 1):
@@ -413,7 +444,7 @@ class StockTrendsManager(BaseTrendsManager):
                 elif cached_data:
                     # API取得失敗時、既存のキャッシュがあればそれを返す（キャッシュは削除しない）
                     logger.info(f"⚠️ Stock: 外部APIからデータが取得できませんでしたが、既存のキャッシュデータを使用します (market: {market}, {len(cached_data)}件)")
-                    cached_data.sort(key=lambda x: abs(x.get('change_percent', 0)), reverse=True)
+                    cached_data.sort(key=lambda x: abs(self._get_change_percent_for_sort(x)), reverse=True)
                     for i, item in enumerate(cached_data, 1):
                         item['rank'] = i
                     return_data = cached_data[:limit]
@@ -560,7 +591,7 @@ class StockTrendsManager(BaseTrendsManager):
                     }
                 
                 # 変動率の絶対値でソート（急騰・急落順）
-                trends_data.sort(key=lambda x: abs(x.get('change_percent', 0)), reverse=True)
+                trends_data.sort(key=lambda x: abs(self._get_change_percent_for_sort(x)), reverse=True)
                 
                 # ランキングを設定
                 for i, item in enumerate(trends_data, 1):
@@ -736,7 +767,7 @@ class StockTrendsManager(BaseTrendsManager):
                 }
             
             # 変動率の絶対値でソート（急騰・急落順）
-            trends_data.sort(key=lambda x: abs(x.get('change_percent', 0)), reverse=True)
+            trends_data.sort(key=lambda x: abs(self._get_change_percent_for_sort(x)), reverse=True)
             
             # ランキングを設定
             for i, item in enumerate(trends_data, 1):

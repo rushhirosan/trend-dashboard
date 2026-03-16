@@ -333,7 +333,7 @@ class StockTrendsManager(BaseTrendsManager):
     def _sanitize_stock_item(self, item: dict) -> dict:
         """
         APIレスポンス/キャッシュから取得した株価データの数値フィールドを安全な値に正規化する。
-        NaN / Inf / 非数値は 0 として扱う。
+        NaN / Inf / 非数値は 0 として扱うが、可能な限り current/previous から変動率を再計算する。
         """
         def _safe_number(val, default=0.0):
             try:
@@ -355,10 +355,24 @@ class StockTrendsManager(BaseTrendsManager):
             return default
 
         item = dict(item)  # 破壊的変更を避ける
-        item['current_price'] = _safe_number(item.get('current_price', 0.0), 0.0)
-        item['previous_price'] = _safe_number(item.get('previous_price', 0.0), item.get('current_price', 0.0))
-        item['change'] = _safe_number(item.get('change', 0.0), 0.0)
-        item['change_percent'] = _safe_number(item.get('change_percent', 0.0), 0.0)
+
+        # まず現在値と前日終値を安全に取得
+        safe_current = _safe_number(item.get('current_price', 0.0), 0.0)
+        safe_previous = _safe_number(item.get('previous_price', 0.0), safe_current)
+
+        # current / previous を優先して再計算する
+        if safe_previous > 0:
+            safe_change = safe_current - safe_previous
+            safe_change_percent = (safe_change / safe_previous) * 100.0
+        else:
+            # 前日終値が0や不正な場合は、既存値をベースにフォールバック
+            safe_change = _safe_number(item.get('change', 0.0), 0.0)
+            safe_change_percent = _safe_number(item.get('change_percent', 0.0), 0.0)
+
+        item['current_price'] = safe_current
+        item['previous_price'] = safe_previous
+        item['change'] = safe_change
+        item['change_percent'] = safe_change_percent
         item['volume'] = int(item.get('volume', 0) or 0)
         item['market_cap'] = int(item.get('market_cap', 0) or 0)
         return item

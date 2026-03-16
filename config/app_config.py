@@ -32,8 +32,13 @@ class AppConfig:
     CACHE_VALIDITY_HOURS = int(os.getenv('CACHE_VALIDITY_HOURS', 24))
     MAX_RESULTS = int(os.getenv('MAX_RESULTS', 25))
     
-    # スケジューラー設定（デフォルトは有効）
-    ENABLE_SCHEDULER = os.getenv('ENABLE_SCHEDULER', 'true').lower() == 'true'
+    # スケジューラー設定: ローカルでは無効・Fly.ioでは有効（明示指定時はその値を使用）
+    _enable_scheduler_env = os.getenv('ENABLE_SCHEDULER')
+    if _enable_scheduler_env is not None and _enable_scheduler_env.strip() != '':
+        ENABLE_SCHEDULER = _enable_scheduler_env.strip().lower() == 'true'
+    else:
+        # Fly.io では FLY_APP_NAME が設定される。未設定＝ローカルではスケジューラを動かさない
+        ENABLE_SCHEDULER = (os.getenv('FLY_APP_NAME') or '').strip() != ''
     
     # サブスクリプション機能の表示設定（デフォルトは非表示）
     # 今後使う可能性があるため、コードは残すがUIからは非表示

@@ -4,6 +4,7 @@ yfinanceを使用して急騰・急落銘柄を取得
 """
 
 import os
+import math
 from decimal import Decimal, InvalidOperation
 import yfinance as yf
 from yahooquery import Ticker as YahooTicker
@@ -302,8 +303,10 @@ class StockTrendsManager(BaseTrendsManager):
         value = item.get("change_percent", 0)
 
         try:
-            # int / float はそのまま
+            # int / float はそのまま（NaN/Infは0扱い）
             if isinstance(value, (int, float)):
+                if not math.isfinite(float(value)):
+                    return 0.0
                 return float(value)
 
             # Decimal の場合はNaNや無限大を0扱いにする
@@ -317,12 +320,48 @@ class StockTrendsManager(BaseTrendsManager):
                 cleaned = value.strip().replace("%", "")
                 if cleaned == "":
                     return 0.0
-                return float(cleaned)
+                v = float(cleaned)
+                if not math.isfinite(v):
+                    return 0.0
+                return v
         except (InvalidOperation, ValueError, TypeError):
             return 0.0
 
         # それ以外の型は0扱い
         return 0.0
+
+    def _sanitize_stock_item(self, item: dict) -> dict:
+        """
+        APIレスポンス/キャッシュから取得した株価データの数値フィールドを安全な値に正規化する。
+        NaN / Inf / 非数値は 0 として扱う。
+        """
+        def _safe_number(val, default=0.0):
+            try:
+                if isinstance(val, Decimal):
+                    if not val.is_finite():
+                        return default
+                    return float(val)
+                if isinstance(val, (int, float)):
+                    v = float(val)
+                    return v if math.isfinite(v) else default
+                if isinstance(val, str):
+                    cleaned = val.strip().replace(",", "")
+                    if cleaned == "":
+                        return default
+                    v = float(cleaned)
+                    return v if math.isfinite(v) else default
+            except (InvalidOperation, ValueError, TypeError):
+                return default
+            return default
+
+        item = dict(item)  # 破壊的変更を避ける
+        item['current_price'] = _safe_number(item.get('current_price', 0.0), 0.0)
+        item['previous_price'] = _safe_number(item.get('previous_price', 0.0), item.get('current_price', 0.0))
+        item['change'] = _safe_number(item.get('change', 0.0), 0.0)
+        item['change_percent'] = _safe_number(item.get('change_percent', 0.0), 0.0)
+        item['volume'] = int(item.get('volume', 0) or 0)
+        item['market_cap'] = int(item.get('market_cap', 0) or 0)
+        return item
     
     def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
@@ -411,6 +450,8 @@ class StockTrendsManager(BaseTrendsManager):
             
             # force_refresh=Falseの場合、キャッシュがあればそれを返す
             if not force_refresh and cached_data:
+                # NaN/Inf などを含む数値フィールドを正規化
+                cached_data = [self._sanitize_stock_item(item) for item in cached_data]
                 # 変動率でソート（降順）
                 cached_data.sort(key=lambda x: abs(self._get_change_percent_for_sort(x)), reverse=True)
                 
@@ -444,6 +485,7 @@ class StockTrendsManager(BaseTrendsManager):
                 elif cached_data:
                     # API取得失敗時、既存のキャッシュがあればそれを返す（キャッシュは削除しない）
                     logger.info(f"⚠️ Stock: 外部APIからデータが取得できませんでしたが、既存のキャッシュデータを使用します (market: {market}, {len(cached_data)}件)")
+                    cached_data = [self._sanitize_stock_item(item) for item in cached_data]
                     cached_data.sort(key=lambda x: abs(self._get_change_percent_for_sort(x)), reverse=True)
                     for i, item in enumerate(cached_data, 1):
                         item['rank'] = i
@@ -560,7 +602,7 @@ class StockTrendsManager(BaseTrendsManager):
                         else:
                             company_name = self.us_ticker_names.get(ticker_symbol, ticker_symbol)
                         
-                        trends_data.append({
+                        raw_item = {
                             'symbol': ticker_symbol,
                             'name': company_name,
                             'current_price': current_price,
@@ -571,7 +613,9 @@ class StockTrendsManager(BaseTrendsManager):
                             'market_cap': 0,
                             'market': market,
                             'updated_at': datetime.now().isoformat()
-                        })
+                        }
+                        item = self._sanitize_stock_item(raw_item)
+                        trends_data.append(item)
                         success_count += 1
                         
                     except Exception as e:
@@ -730,7 +774,7 @@ class StockTrendsManager(BaseTrendsManager):
                         company_name = self.us_ticker_names.get(ticker_symbol, ticker_symbol)
                     market_cap = 0
                     
-                    trends_data.append({
+                    raw_item = {
                         'symbol': ticker_symbol,
                         'name': company_name,
                         'current_price': float(current_price),
@@ -741,7 +785,9 @@ class StockTrendsManager(BaseTrendsManager):
                         'market_cap': market_cap,
                         'market': market,
                         'updated_at': datetime.now().isoformat()
-                    })
+                    }
+                    item = self._sanitize_stock_item(raw_item)
+                    trends_data.append(item)
                     
                 except Exception as e:
                     logger.debug(f"銘柄 {ticker_symbol} 取得エラー: {e}")

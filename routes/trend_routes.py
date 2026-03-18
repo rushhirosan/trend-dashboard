@@ -254,6 +254,20 @@ def get_podcast_trends(manager):
         return handle_api_error('ポッドキャストトレンド', e)
 
 
+@trend_bp.route('/podcast-genres')
+@require_manager('podcast')
+def get_podcast_genres(manager):
+    """ポッドキャストのジャンル一覧を返す API エンドポイント（Listen Notes genres）"""
+    try:
+        genres = manager.get_genres() or []
+        return jsonify({
+            'success': True,
+            'data': genres
+        })
+    except Exception as e:
+        return handle_api_error('ポッドキャストジャンル', e)
+
+
 @trend_bp.route('/rakuten-trends')
 @require_manager('rakuten')
 def get_rakuten_trends(manager):

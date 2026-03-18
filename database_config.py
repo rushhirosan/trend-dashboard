@@ -731,6 +731,29 @@ class TrendsCache:
                     cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
+                CREATE TABLE IF NOT EXISTS openalex_trends_cache (
+                    id SERIAL PRIMARY KEY,
+                    category VARCHAR(50) NOT NULL DEFAULT 'trending',
+                    work_id VARCHAR(255),
+                    title TEXT NOT NULL,
+                    doi VARCHAR(500),
+                    url TEXT,
+                    publication_date DATE,
+                    cited_by_count INTEGER DEFAULT 0,
+                    authors TEXT,
+                    authors_display VARCHAR(500),
+                    institutions TEXT,
+                    institution_display VARCHAR(500),
+                    concepts TEXT,
+                    concepts_display VARCHAR(500),
+                    is_open_access BOOLEAN DEFAULT FALSE,
+                    open_access_url TEXT,
+                    work_type VARCHAR(100),
+                    rank INTEGER DEFAULT 0,
+                    cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_openalex_trends_category ON openalex_trends_cache(category);
+                
                 CREATE TABLE IF NOT EXISTS cache_status (
                     id SERIAL PRIMARY KEY,
                     cache_key VARCHAR(255) NOT NULL UNIQUE,
@@ -5635,6 +5658,151 @@ class TrendsCache:
     def is_note_cache_valid(self, category='all'):
         """Note Trendsキャッシュが有効かどうかを確認"""
         return self.is_cache_valid('note_trends', category, 24)
+
+    # OpenAlex Trends キャッシュメソッド
+    def save_openalex_trends_to_cache(self, data, category='trending'):
+        """OpenAlex Trendsデータをキャッシュに保存（カテゴリ別）"""
+        if not data:
+            return False
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # 同じカテゴリの既存データを削除
+                    cursor.execute("DELETE FROM openalex_trends_cache WHERE category = %s", (category,))
+                    
+                    for item in data:
+                        # リストを文字列に変換
+                        authors = ', '.join(item.get('authors', [])) if isinstance(item.get('authors'), list) else str(item.get('authors', ''))
+                        institutions = ', '.join(item.get('institutions', [])) if isinstance(item.get('institutions'), list) else str(item.get('institutions', ''))
+                        concepts = ', '.join(item.get('concepts', [])) if isinstance(item.get('concepts'), list) else str(item.get('concepts', ''))
+                        
+                        cursor.execute("""
+                            INSERT INTO openalex_trends_cache 
+                            (category, work_id, title, doi, url, publication_date, cited_by_count,
+                             authors, authors_display, institutions, institution_display,
+                             concepts, concepts_display, is_open_access, open_access_url, work_type, rank)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            category,
+                            item.get('work_id', ''),
+                            item.get('title', '')[:1000],
+                            item.get('doi', '')[:500] if item.get('doi') else None,
+                            item.get('url', ''),
+                            item.get('publication_date'),
+                            item.get('cited_by_count', 0),
+                            authors[:1000] if authors else '',
+                            item.get('authors_display', '')[:500],
+                            institutions[:1000] if institutions else '',
+                            item.get('institution_display', '')[:500],
+                            concepts[:1000] if concepts else '',
+                            item.get('concepts_display', '')[:500],
+                            item.get('is_open_access', False),
+                            item.get('open_access_url', ''),
+                            item.get('type', ''),
+                            item.get('rank', 0)
+                        ))
+                    
+                    # キャッシュステータスを更新
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cache_key = f'openalex_trends_{category}'
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        (cache_key, now_jst, len(data), now_jst, len(data))
+                    )
+                    
+                    conn.commit()
+                    logger.info(f"✅ openalex_trends ({category}) キャッシュを保存しました ({len(data)}件)")
+                    return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ openalex_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ openalex_trendsキャッシュ保存エラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
+            return False
+
+    def get_openalex_trends_from_cache(self, category='trending'):
+        """OpenAlex Trendsデータをキャッシュから取得（カテゴリ別）"""
+        def query_func(conn):
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT work_id, title, doi, url, publication_date, cited_by_count,
+                           authors, authors_display, institutions, institution_display,
+                           concepts, concepts_display, is_open_access, open_access_url, 
+                           work_type as type, rank, cached_at
+                    FROM openalex_trends_cache 
+                    WHERE category = %s
+                    ORDER BY rank
+                    LIMIT 50
+                """, (category,))
+                data = cursor.fetchall()
+                result = []
+                for row in data:
+                    row_dict = dict(row)
+                    # publication_dateをISO形式の文字列に変換
+                    if row_dict.get('publication_date'):
+                        if isinstance(row_dict['publication_date'], datetime):
+                            row_dict['publication_date'] = row_dict['publication_date'].strftime('%Y-%m-%d')
+                        elif hasattr(row_dict['publication_date'], 'isoformat'):
+                            row_dict['publication_date'] = row_dict['publication_date'].isoformat()
+                    # authorsをリストに変換
+                    if row_dict.get('authors'):
+                        if isinstance(row_dict['authors'], str):
+                            row_dict['authors'] = [a.strip() for a in row_dict['authors'].split(',') if a.strip()]
+                        else:
+                            row_dict['authors'] = []
+                    else:
+                        row_dict['authors'] = []
+                    # institutionsをリストに変換
+                    if row_dict.get('institutions'):
+                        if isinstance(row_dict['institutions'], str):
+                            row_dict['institutions'] = [i.strip() for i in row_dict['institutions'].split(',') if i.strip()]
+                        else:
+                            row_dict['institutions'] = []
+                    else:
+                        row_dict['institutions'] = []
+                    # conceptsをリストに変換
+                    if row_dict.get('concepts'):
+                        if isinstance(row_dict['concepts'], str):
+                            row_dict['concepts'] = [c.strip() for c in row_dict['concepts'].split(',') if c.strip()]
+                        else:
+                            row_dict['concepts'] = []
+                    else:
+                        row_dict['concepts'] = []
+                    row_dict['source'] = 'OpenAlex'
+                    result.append(row_dict)
+                return result
+        return self._execute_with_retry(query_func)
+
+    def clear_openalex_trends_cache(self, category='trending'):
+        """OpenAlex Trendsキャッシュをクリア（カテゴリ別）"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    if category == 'all':
+                        cursor.execute("DELETE FROM openalex_trends_cache")
+                    else:
+                        cursor.execute("DELETE FROM openalex_trends_cache WHERE category = %s", (category,))
+                    conn.commit()
+                logger.info(f"✅ openalex_trends ({category}) のキャッシュをクリアしました")
+                return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ openalex_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ openalex_trendsキャッシュクリアエラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
+            return False
 
     def close(self):
         """データベース接続を閉じる"""

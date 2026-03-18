@@ -48,6 +48,7 @@ from services.trends.estat_trends import EstatTrendsManager
 from services.trends.kkj_trends import KKJTrendsManager
 from services.trends.bls_trends import BlsTrendsManager
 from services.trends.usaspending_trends import UsaspendingTrendsManager
+from services.trends.openalex_trends import OpenAlexTrendsManager
 from utils.logger_config import get_logger
 
 # ロガーの初期化
@@ -95,6 +96,7 @@ MANAGER_CONFIGS = [
     ('kkj', KKJTrendsManager, '政府調達'),
     ('bls', BlsTrendsManager, 'BLS'),
     ('usaspending', UsaspendingTrendsManager, 'USAspending'),
+    ('openalex', OpenAlexTrendsManager, 'OpenAlex'),
 ]
 
 

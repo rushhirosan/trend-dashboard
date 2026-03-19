@@ -240,6 +240,62 @@ document.addEventListener('DOMContentLoaded', function() {
 
 var TREND_PREF_PREFIX = 'trend_pref_';
 
+// ============================================
+// Safe JSON fetch (SEO/UX: avoid noisy errors)
+// ============================================
+
+function _normalizeUserFacingFetchErrorMessage(message) {
+    var m = (message || '').toString();
+    if (!m) return '一時的に取得できませんでした';
+    // Hide low-level browser/engine errors from UI (esp. Google Live Test)
+    if (m.indexOf('Unexpected end of JSON input') !== -1) return '一時的に取得できませんでした';
+    if (m.indexOf('Failed to execute') !== -1 && m.indexOf('json') !== -1) return '一時的に取得できませんでした';
+    if (m.indexOf('HTTP 499') !== -1 || m.indexOf('Client Closed Request') !== -1) return '一時的に取得できませんでした';
+    return m;
+}
+
+async function safeFetchJson(url, options) {
+    options = options || {};
+    var timeoutMs = typeof options.timeoutMs === 'number' ? options.timeoutMs : 6000;
+    var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var timer = null;
+    if (controller) {
+        timer = setTimeout(function () { try { controller.abort(); } catch (_) {} }, timeoutMs);
+    }
+    try {
+        var fetchOpts = Object.assign({}, options.fetchOptions || {});
+        if (controller) fetchOpts.signal = controller.signal;
+        var res = await fetch(url, fetchOpts);
+        var contentType = (res.headers && res.headers.get) ? (res.headers.get('content-type') || '') : '';
+        var text = await res.text();
+        if (!res.ok) {
+            var errMsg = 'HTTP ' + res.status;
+            try {
+                if (contentType.indexOf('application/json') !== -1 && text) {
+                    var j = JSON.parse(text);
+                    if (j && (j.error || j.message)) errMsg = j.error || j.message;
+                }
+            } catch (_) {}
+            throw new Error(errMsg);
+        }
+        if (contentType.indexOf('application/json') === -1) {
+            // Sometimes proxies return HTML error pages with 200; treat as failure.
+            throw new Error('non_json_response');
+        }
+        if (!text || !text.trim()) {
+            throw new Error('empty_response');
+        }
+        return JSON.parse(text);
+    } finally {
+        if (timer) clearTimeout(timer);
+    }
+}
+
+if (typeof window !== 'undefined') {
+    window.safeFetchJson = safeFetchJson;
+    window._normalizeUserFacingFetchErrorMessage = _normalizeUserFacingFetchErrorMessage;
+}
+
 /**
  * 指定ソースの前回選択値を取得する
  * @param {string} serviceName - サービス名（例: 'hatena', 'rakuten', 'page'）

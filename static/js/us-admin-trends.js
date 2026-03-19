@@ -298,8 +298,11 @@
         if (forceRefresh && loading) loading.style.display = 'block';
         if (forceRefresh && body) body.style.display = 'none';
 
-        fetch(url)
-            .then(function (res) { return res.json(); })
+        var fetchJson = (typeof window !== 'undefined' && typeof window.safeFetchJson === 'function')
+            ? window.safeFetchJson
+            : function (u) { return fetch(u).then(function (r) { return r.json(); }); };
+
+        fetchJson(url, { timeoutMs: forceRefresh ? 12000 : 6000 })
             .then(function (json) {
                 if (loading) loading.style.display = 'none';
                 if (body) body.style.display = 'block';
@@ -315,7 +318,7 @@
                 if (blsCompact) {
                     blsCompact.innerHTML = blsData
                         ? renderBlsCompactLatest(blsData)
-                        : '<span class="text-muted">' + escapeHtml(bls.error || 'Data unavailable') + '</span>';
+                        : '<span class="text-muted">' + escapeHtml('Temporarily unavailable') + '</span>';
                     var periodEl = document.getElementById('header-estat-latest-period');
                     if (periodEl) {
                         var latestPeriod = blsData ? getBlsLatestPeriod(blsData) : '';
@@ -329,7 +332,7 @@
                 if (usaspendingCards) {
                     usaspendingCards.innerHTML = usData
                         ? renderUsaspendingBody(usData)
-                        : '<p class="text-muted small">' + escapeHtml(usaspending.error || 'Data unavailable') + '</p>';
+                        : '<p class="text-muted small">' + escapeHtml('Temporarily unavailable') + '</p>';
                     if (usData && typeof applyCategoryAccordionForAllTables === 'function') {
                         setTimeout(function () { applyCategoryAccordionForAllTables(5); }, 50);
                     }
@@ -337,12 +340,20 @@
                 if (usaCompact) {
                     usaCompact.innerHTML = usData
                         ? renderUsaspendingCompactBody(usData)
-                        : '<span class="text-muted">' + escapeHtml(usaspending.error || 'Data unavailable') + '</span>';
+                        : '<span class="text-muted">' + escapeHtml('Temporarily unavailable') + '</span>';
                 }
                 bindGotoTab();
             })
             .catch(function (err) {
-                var msg = err && err.message ? err.message : 'Network error';
+                var raw = err && err.message ? err.message : 'Network error';
+                var msg = raw;
+                if (typeof window !== 'undefined' && typeof window._normalizeUserFacingFetchErrorMessage === 'function') {
+                    msg = window._normalizeUserFacingFetchErrorMessage(raw);
+                } else if (raw.indexOf('Unexpected end of JSON input') !== -1) {
+                    msg = 'Temporarily unavailable';
+                }
+                // US page uses English UI
+                if (msg === '一時的に取得できませんでした') msg = 'Temporarily unavailable';
                 if (loading) loading.style.display = 'none';
                 if (body) body.style.display = 'block';
                 if (blsCards) blsCards.innerHTML = '<div class="col-12"><div class="alert alert-danger mb-0">' + escapeHtml(msg) + '</div></div>';
@@ -356,14 +367,28 @@
     }
 
     function init() {
-        fetchAndRender(false);
-        // Lazy load: only fetch when Gov Data tab is shown
+        // Lazy load: fetch only when Gov Data tab is shown (avoid burst fetch on initial render)
         var tabEl = document.getElementById('tab-govdata');
+        var hasFetchedOnce = false;
         if (tabEl) {
             tabEl.addEventListener('shown.bs.tab', function () {
+                if (hasFetchedOnce) return;
+                hasFetchedOnce = true;
                 fetchAndRender(false);
             });
         }
+        // Prefetch on idle (best-effort) for humans; safeFetchJson handles timeouts and hides noisy errors.
+        var idle = (typeof requestIdleCallback === 'function')
+            ? requestIdleCallback
+            : function (cb) { return setTimeout(cb, 1500); };
+        idle(function () {
+            try {
+                // If user never opens Gov Data, keep it lightweight; prefetch only compact/header data.
+                if (hasFetchedOnce) return;
+                hasFetchedOnce = true;
+                fetchAndRender(false);
+            } catch (_) {}
+        });
     }
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);

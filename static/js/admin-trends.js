@@ -411,8 +411,11 @@
         if (forceRefresh && loading) loading.style.display = 'block';
         if (forceRefresh && fullBody) fullBody.style.display = 'none';
 
-        fetch(url)
-            .then(function (res) { return res.json(); })
+        var fetchJson = (typeof window !== 'undefined' && typeof window.safeFetchJson === 'function')
+            ? window.safeFetchJson
+            : function (u) { return fetch(u).then(function (r) { return r.json(); }); };
+
+        fetchJson(url, { timeoutMs: forceRefresh ? 12000 : 6000 })
             .then(function (json) {
                 // e-Stat
                 var estat = json.estat || {};
@@ -421,7 +424,7 @@
                 if (estatCompact) {
                     estatCompact.innerHTML = estatData
                         ? renderEstatCompactLatest(estatData)
-                        : '<span class="text-muted">' + escapeHtml(estat.error || '取得できませんでした') + '</span>';
+                        : '<span class="text-muted">' + escapeHtml('一時的に取得できませんでした') + '</span>';
                     var periodEl = document.getElementById('header-estat-latest-period');
                     if (periodEl && !estatData) periodEl.textContent = '';
                 }
@@ -444,13 +447,13 @@
                 if (kkjCompact) {
                     kkjCompact.innerHTML = kkjData
                         ? renderKkjCompactBody(kkjData)
-                        : '<span class="text-muted">' + escapeHtml(kkj.error || '取得できませんでした') + '</span>';
+                        : '<span class="text-muted">' + escapeHtml('一時的に取得できませんでした') + '</span>';
                 }
                 if (kkjAdminBody) {
                     window.__lastKkjData = kkjData;
                     kkjAdminBody.innerHTML = kkjData
                         ? renderKkjAdminTabBody(kkjData, 'all') || '<p class="text-muted small mb-0">データがありません</p>'
-                        : '<p class="text-muted small mb-0">' + escapeHtml(kkj.error || '取得できませんでした') + '</p>';
+                        : '<p class="text-muted small mb-0">' + escapeHtml('一時的に取得できませんでした') + '</p>';
                     applyMakeTableRowClickableToKkjCases();
                     function bindKkjKeywordSelect() {
                         var sel = document.getElementById('kkjKeywordSelect');
@@ -468,7 +471,13 @@
                 bindGotoTab();
             })
             .catch(function (err) {
-                var msg = err && err.message ? err.message : '通信エラー';
+                var raw = err && err.message ? err.message : '通信エラー';
+                var msg = raw;
+                if (typeof window !== 'undefined' && typeof window._normalizeUserFacingFetchErrorMessage === 'function') {
+                    msg = window._normalizeUserFacingFetchErrorMessage(raw);
+                } else if (raw.indexOf('Unexpected end of JSON input') !== -1) {
+                    msg = '一時的に取得できませんでした';
+                }
                 if (loading) loading.style.display = 'none';
                 if (fullBody) {
                     fullBody.style.display = 'block';
@@ -485,7 +494,19 @@
     }
 
     function init() {
-        fetchAndRender(false);
+        var hasFetchedOnce = false;
+        // 初回はユーザーの操作を邪魔しない（Live Testのような短時間レンダリングでもエラーを露出させない）
+        // ただし体感を落とさないため、アイドル時にベストエフォートで事前取得する
+        var idle = (typeof requestIdleCallback === 'function')
+            ? requestIdleCallback
+            : function (cb) { return setTimeout(cb, 1200); };
+        idle(function () {
+            try {
+                if (hasFetchedOnce) return;
+                hasFetchedOnce = true;
+                fetchAndRender(false);
+            } catch (_) {}
+        });
         function onRefreshClick() {
             var btns = document.querySelectorAll('#admin-refresh-btn, #admin-refresh-btn-header');
             btns.forEach(function (b) { b.disabled = true; });

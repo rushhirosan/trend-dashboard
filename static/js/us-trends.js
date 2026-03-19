@@ -1090,34 +1090,130 @@ function loadEbayFromCacheUSWrapper() {
 // Load cached data for US trends（日本と同一のバッチ方式で統一・Allタブの表示順に合わせる）
 function loadCachedDataUS() {
     console.log('📦 Loading cached data for US trends');
-    var allCategoriesUS = [
-        loadCNNFromCacheUS,
-        loadWorldNewsFromCacheUS,
-        loadWikipediaFromCacheUS,
-        loadGoogleTrendsFromCacheUS,
-        loadYouTubeTrendsFromCacheUS,
-        loadHackerNewsFromCacheUS,
-        loadProductHuntFromCacheUS,
-        loadDevToFromCacheUS,
-        loadMediumFromCacheUS,
-        loadGitHubTrendsFromCacheUS,
-        loadCISAKEVTrendsFromCacheUS,
-        loadTheHackerNewsTrendsFromCacheUS,
-        loadStockTrendsFromCacheUS,
-        loadCryptoTrendsFromCacheUS,
-        loadGlobeNewswireFromCacheUS,
-        loadAppStoreTrendsFromCacheUS,
-        loadSpotifyFromCacheUS,
-        loadPodcastFromCacheUS,
-        loadMovieTrendsFromCacheUS,
-        loadBookTrendsFromCacheUS,
-        loadEbayFromCacheUSWrapper,
-        loadTwitchFromCacheUS
-    ];
-    if (typeof runBatchLoad === 'function') {
-        runBatchLoad(allCategoriesUS, { batchSize: 4, delayMs: 200 });
-    } else {
-        allCategoriesUS.forEach(function(fn) { fn(); });
+    // UX/SEO: avoid burst-fetching many APIs on initial render (Google Live Test often aborts early -> 499).
+    // Load only what the user is currently viewing; other tabs load on-demand.
+
+    var _usLoaded = window.__usLoadedFlags || (window.__usLoadedFlags = {});
+
+    function markLoaded(key) { _usLoaded[key] = true; }
+    function alreadyLoaded(key) { return !!_usLoaded[key]; }
+
+    function tbodyHasRows(tbodyId) {
+        try {
+            var el = document.getElementById(tbodyId);
+            if (!el) return false;
+            // If SSR already filled rows, skip API call.
+            return !!(el.querySelector && el.querySelector('tr'));
+        } catch (_) { return false; }
+    }
+
+    function once(key, fn) {
+        if (alreadyLoaded(key)) return;
+        markLoaded(key);
+        try { fn(); } catch (e) { /* ignore */ }
+    }
+
+    function getActiveTabId() {
+        var active = document.querySelector('#trendCategoryTabs .nav-link.active');
+        return active && active.id ? active.id : 'tab-all';
+    }
+
+    function loadForTab(tabId) {
+        if (!tabId) tabId = 'tab-all';
+        if (tabId === 'tab-news') {
+            once('cnn', loadCNNFromCacheUS);
+            once('worldnews', loadWorldNewsFromCacheUS);
+            return;
+        }
+        if (tabId === 'tab-search') {
+            once('google', loadGoogleTrendsFromCacheUS);
+            once('youtube', loadYouTubeTrendsFromCacheUS);
+            once('wikipedia', loadWikipediaFromCacheUS);
+            return;
+        }
+        if (tabId === 'tab-tech') {
+            once('hackernews', loadHackerNewsFromCacheUS);
+            once('producthunt', loadProductHuntFromCacheUS);
+            once('devto', loadDevToFromCacheUS);
+            once('medium', loadMediumFromCacheUS);
+            once('github', loadGitHubTrendsFromCacheUS);
+            once('cisakev', loadCISAKEVTrendsFromCacheUS);
+            once('thehackernews', loadTheHackerNewsTrendsFromCacheUS);
+            once('globenewswire', loadGlobeNewswireFromCacheUS);
+            once('appstore', loadAppStoreTrendsFromCacheUS);
+            return;
+        }
+        if (tabId === 'tab-market') {
+            once('stock', loadStockTrendsFromCacheUS);
+            once('crypto', loadCryptoTrendsFromCacheUS);
+            return;
+        }
+        if (tabId === 'tab-entertainment') {
+            once('spotify', loadSpotifyFromCacheUS);
+            once('podcast', loadPodcastFromCacheUS);
+            once('movie', loadMovieTrendsFromCacheUS);
+            once('book', loadBookTrendsFromCacheUS);
+            once('ebay', loadEbayFromCacheUSWrapper);
+            once('twitch', loadTwitchFromCacheUS);
+            return;
+        }
+        // All tab: prioritize above-the-fold sources; skip ones already SSR-filled.
+        if (tabId === 'tab-all') {
+            if (!tbodyHasRows('all-cnnTrendsTableBody')) once('cnn', loadCNNFromCacheUS);
+            if (!tbodyHasRows('all-worldnewsTrendsTableBody')) once('worldnews', loadWorldNewsFromCacheUS);
+            if (!tbodyHasRows('all-wikipediaTrendsTableBody')) once('wikipedia', loadWikipediaFromCacheUS);
+            if (!tbodyHasRows('all-googleTrendsTableBody')) once('google', loadGoogleTrendsFromCacheUS);
+            if (!tbodyHasRows('all-youtubeTrendsTableBody')) once('youtube', loadYouTubeTrendsFromCacheUS);
+            // Defer the rest to idle.
+            var idle = (typeof requestIdleCallback === 'function')
+                ? requestIdleCallback
+                : function (cb) { return setTimeout(cb, 1200); };
+            idle(function () {
+                // Low concurrency: 1-by-1 to avoid 499 in constrained crawlers.
+                var rest = [
+                    ['hackernews', loadHackerNewsFromCacheUS],
+                    ['producthunt', loadProductHuntFromCacheUS],
+                    ['devto', loadDevToFromCacheUS],
+                    ['medium', loadMediumFromCacheUS],
+                    ['github', loadGitHubTrendsFromCacheUS],
+                    ['cisakev', loadCISAKEVTrendsFromCacheUS],
+                    ['thehackernews', loadTheHackerNewsTrendsFromCacheUS],
+                    ['stock', loadStockTrendsFromCacheUS],
+                    ['crypto', loadCryptoTrendsFromCacheUS],
+                    ['globenewswire', loadGlobeNewswireFromCacheUS],
+                    ['appstore', loadAppStoreTrendsFromCacheUS],
+                    ['spotify', loadSpotifyFromCacheUS],
+                    ['podcast', loadPodcastFromCacheUS],
+                    ['movie', loadMovieTrendsFromCacheUS],
+                    ['book', loadBookTrendsFromCacheUS],
+                    ['ebay', loadEbayFromCacheUSWrapper],
+                    ['twitch', loadTwitchFromCacheUS]
+                ];
+                var i = 0;
+                (function next() {
+                    if (i >= rest.length) return;
+                    var pair = rest[i++];
+                    if (!alreadyLoaded(pair[0])) {
+                        markLoaded(pair[0]);
+                        try { pair[1](); } catch (_) {}
+                    }
+                    setTimeout(next, 180);
+                })();
+            });
+            return;
+        }
+    }
+
+    // Initial load: active tab only.
+    loadForTab(getActiveTabId());
+
+    // On tab shown: load that tab only (once).
+    var tabsEl = document.getElementById('trendCategoryTabs');
+    if (tabsEl) {
+        tabsEl.addEventListener('shown.bs.tab', function (e) {
+            var tabId = e && e.target && e.target.id ? e.target.id : null;
+            loadForTab(tabId);
+        });
     }
 }
 

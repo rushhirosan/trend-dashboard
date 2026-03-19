@@ -377,11 +377,92 @@ class StockTrendsManager(BaseTrendsManager):
         item['market_cap'] = int(item.get('market_cap', 0) or 0)
         return item
 
+    def _extract_quote_price(self, price_data, symbol: str = None) -> tuple | None:
+        """
+        Yahoo Finance の price/summary_detail レスポンスから現在値・前日終値・変動率を抽出する。
+        ウェブサイト表示と同じリアルな値（regularMarketPrice / regularMarketPreviousClose）を優先。
+        
+        Returns:
+            (current_price, previous_price, change, change_percent) or None
+        """
+        if price_data is None:
+            return None
+        try:
+            # 複数シンボル時: price_data[symbol]、単一時: price_data そのまま
+            data = price_data.get(symbol, price_data) if symbol and isinstance(price_data, dict) else price_data
+            if not isinstance(data, dict):
+                return None
+            # get_modules(['price']) は price キーでネストされている場合あり
+            if 'price' in data and isinstance(data['price'], dict):
+                data = data['price']
+
+            def _get_raw(val):
+                if val is None:
+                    return None
+                if isinstance(val, dict) and 'raw' in val:
+                    return val['raw']
+                if isinstance(val, (int, float)) and math.isfinite(val):
+                    return float(val)
+                return None
+
+            current = _get_raw(data.get('regularMarketPrice'))
+            previous = _get_raw(data.get('regularMarketPreviousClose'))
+
+            # summary_detail は previousClose というキーも使う場合がある
+            if previous is None:
+                previous = _get_raw(data.get('previousClose'))
+
+            if current is not None and previous is not None and previous > 0:
+                change = current - previous
+                change_percent = (change / previous) * 100.0
+                return (float(current), float(previous), float(change), float(change_percent))
+
+            # APIが regularMarketChange を返している場合はそれを使用
+            api_change = _get_raw(data.get('regularMarketChange'))
+            api_change_pct = _get_raw(data.get('regularMarketChangePercent'))
+            if current is not None and previous is not None and api_change is not None:
+                return (float(current), float(previous), float(api_change), float(api_change_pct or 0))
+
+            return None
+        except (TypeError, KeyError, ValueError):
+            return None
+
+    def _get_yfinance_quote_prices(self, ticker) -> tuple | None:
+        """
+        yfinance の fast_info / info から現在値・前日終値を取得。
+        Yahoo ウェブ表示と一致する regularMarketPrice / regularMarketPreviousClose を優先。
+        """
+        try:
+            current, previous = None, None
+            # fast_info が軽量で速い（last_price, previous_close）
+            try:
+                fi = getattr(ticker, 'fast_info', None)
+                if fi is not None:
+                    current = getattr(fi, 'last_price', None) or getattr(fi, 'lastPrice', None)
+                    previous = getattr(fi, 'previous_close', None) or getattr(fi, 'previousClose', None)
+            except Exception:
+                pass
+            # なければ info から取得
+            if current is None or previous is None:
+                info = getattr(ticker, 'info', None) or {}
+                if callable(info):
+                    info = info() if callable(info) else {}
+                current = current or info.get('regularMarketPrice') or info.get('currentPrice')
+                previous = previous or info.get('regularMarketPreviousClose') or info.get('previousClose')
+            if current is not None and previous is not None and previous > 0:
+                change = float(current) - float(previous)
+                change_percent = (change / float(previous)) * 100.0
+                return (float(current), float(previous), change, change_percent)
+        except (TypeError, KeyError, ValueError, AttributeError):
+            pass
+        return None
+
     def _compute_change_from_close_series(self, close_series: pd.Series):
         """
         終値のSeriesから現在値・前日終値・変動額・変動率を安全に計算する。
         - NaN行は除外し、最後の有効な2営業日を使用する
         - 有効データが1日だけなら横ばい（変動率0%）として扱う
+        - 注意: タイムゾーン・更新遅延で「今日 vs 昨日」にならない場合あり。quote優先を推奨。
         """
         if close_series is None or close_series.empty:
             return None
@@ -585,9 +666,17 @@ class StockTrendsManager(BaseTrendsManager):
             # yahooqueryで一括取得（効率的）
             try:
                 yahoo_ticker = YahooTicker(ticker_symbols)
-                hist = yahoo_ticker.history(period='5d')
-                
-                if hist.empty:
+                # リアルな現在値・前日終値を取得（Yahooウェブ表示と一致）
+                quote_price_data = None
+                try:
+                    quote_price_data = yahoo_ticker.get_modules(['price'])
+                except Exception as e:
+                    logger.debug(f"Stock: price module取得スキップ ({e})")
+                hist = yahoo_ticker.history(period='5d', adj_timezone=True)
+                if hist is None:
+                    hist = pd.DataFrame()
+
+                if hist.empty and not quote_price_data:
                     logger.warning(f"⚠️ Stock: データが取得できませんでした (market: {market})")
                     return {
                         'success': True,
@@ -597,46 +686,64 @@ class StockTrendsManager(BaseTrendsManager):
                         'market': market,
                         'message': '株価データが取得できませんでした'
                     }
-                
+
                 trends_data = []
                 success_count = 0
                 error_count = 0
-                
+
+                def _get_ticker_hist(symbol):
+                    if hist.empty:
+                        return pd.DataFrame()
+                    if isinstance(hist.index, pd.MultiIndex):
+                        try:
+                            return hist.xs(symbol, level='symbol')
+                        except KeyError:
+                            return pd.DataFrame()
+                    return hist
+
                 # 各銘柄のデータを処理
                 for ticker_symbol in ticker_symbols:
                     try:
-                        # MultiIndexから該当銘柄のデータを抽出
-                        if isinstance(hist.index, pd.MultiIndex):
-                            try:
-                                ticker_data = hist.xs(ticker_symbol, level='symbol')
-                            except KeyError:
-                                # 銘柄がyahooqueryの結果に含まれていない場合（休場・銘柄コード差などで発生しうる）
-                                logger.debug(f"銘柄 {ticker_symbol}: データが見つかりません")
+                        ticker_data = _get_ticker_hist(ticker_symbol)
+                        
+                        # 1) 優先: quote (price) からリアルな現在値・前日終値を取得（Yahooウェブ表示と一致）
+                        quote_result = self._extract_quote_price(quote_price_data, ticker_symbol) if quote_price_data else None
+                        if quote_result is not None:
+                            current_price, previous_price, change, change_percent = quote_result
+                            last_valid_index = None
+                        else:
+                            # 2) フォールバック: 終値Seriesから計算（タイムゾーン等でずれうる）
+                            if ticker_data.empty or len(ticker_data) < 1:
                                 error_count += 1
                                 continue
-                        else:
-                            # 単一銘柄の場合はそのまま使用
-                            ticker_data = hist
-                        
-                        if ticker_data.empty or len(ticker_data) < 1:
-                            error_count += 1
-                            continue
+                            hist_result = self._compute_change_from_close_series(ticker_data.get('close'))
+                            if hist_result is None:
+                                error_count += 1
+                                continue
+                            current_price, previous_price, change, change_percent, last_valid_index = hist_result
 
-                        # 終値Seriesから現在値・前日終値・変動率を計算（NaN行は除外）
-                        result = self._compute_change_from_close_series(ticker_data.get('close'))
-                        if result is None:
-                            error_count += 1
-                            continue
-
-                        current_price, previous_price, change, change_percent, last_valid_index = result
-
-                        # 出来高は終値の最終有効日と合わせる（なければ最後の行を使用）
+                        # 出来高（quoteにあれば使用、なければ履歴から）
                         volume = 0
-                        if 'volume' in ticker_data.columns:
+                        if quote_price_data and quote_result is not None:
                             try:
-                                volume = int(ticker_data['volume'].loc[last_valid_index])
+                                pdata = quote_price_data.get(ticker_symbol, quote_price_data)
+                                if isinstance(pdata, dict):
+                                    p = pdata.get('price', pdata) if 'price' in pdata else pdata
+                                    v = p.get('regularMarketVolume')
+                                    if v is not None:
+                                        vol = v.get('raw', v) if isinstance(v, dict) else v
+                                        volume = int(vol) if vol is not None else 0
                             except Exception:
-                                volume = int(ticker_data['volume'].iloc[-1])
+                                pass
+                        if volume == 0 and not ticker_data.empty and 'volume' in ticker_data.columns:
+                            try:
+                                idx = last_valid_index if last_valid_index is not None else ticker_data.index[-1]
+                                volume = int(ticker_data['volume'].loc[idx])
+                            except Exception:
+                                try:
+                                    volume = int(ticker_data['volume'].iloc[-1])
+                                except Exception:
+                                    volume = 0
                         
                         # 会社名を取得
                         if market == 'JP':
@@ -780,32 +887,43 @@ class StockTrendsManager(BaseTrendsManager):
                                 error_count += 1
                                 hist = None
                     
-                    if hist is None:
-                        continue
-                    
-                    if hist.empty:
-                        logger.warning(f"銘柄 {ticker_symbol}: データが空です（市場が閉まっている可能性があります）")
-                        empty_count += 1
-                        continue
-                    
-                    logger.debug(f"銘柄 {ticker_symbol}: {len(hist)}日分のデータを取得しました")
-                    success_count += 1
+                    # 1) 優先: fast_info/info からリアルな現在値・前日終値を取得（履歴が空でも試行）
+                    quote_result = self._get_yfinance_quote_prices(ticker)
 
-                    # 終値Seriesから現在値・前日終値・変動率を計算（NaN行は除外）
-                    result = self._compute_change_from_close_series(hist.get('Close'))
-                    if result is None:
-                        empty_count += 1
-                        continue
+                    if hist is None or hist.empty:
+                        if quote_result is not None:
+                            current_price, previous_price, change, change_percent = quote_result
+                            volume = 0
+                            last_valid_index = None
+                            success_count += 1
+                        else:
+                            if hist is not None and hist.empty:
+                                empty_count += 1
+                            continue
+                    else:
+                        if quote_result is not None:
+                            current_price, previous_price, change, change_percent = quote_result
+                            last_valid_index = hist.index[-1]
+                        else:
+                            result = self._compute_change_from_close_series(hist.get('Close'))
+                            if result is None:
+                                empty_count += 1
+                                continue
+                            current_price, previous_price, change, change_percent, last_valid_index = result
 
-                    current_price, previous_price, change, change_percent, last_valid_index = result
+                        success_count += 1
+                        logger.debug(f"銘柄 {ticker_symbol}: データ取得完了")
 
-                    # 出来高は終値の最終有効日と合わせる（なければ最後の行を使用）
+                    # 出来高（履歴がある場合のみ。quoteのみの場合は0）
                     volume = 0
-                    if 'Volume' in hist.columns:
+                    if last_valid_index is not None and hist is not None and not hist.empty and 'Volume' in hist.columns:
                         try:
-                            volume = hist['Volume'].loc[last_valid_index]
+                            volume = int(hist['Volume'].loc[last_valid_index])
                         except Exception:
-                            volume = hist['Volume'].iloc[-1]
+                            try:
+                                volume = int(hist['Volume'].iloc[-1])
+                            except Exception:
+                                volume = 0
                     
                     # 銘柄情報を取得（マッピング辞書から会社名を取得）
                     # API呼び出しを避けるため、マッピング辞書を使用

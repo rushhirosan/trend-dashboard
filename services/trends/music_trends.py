@@ -3,6 +3,7 @@
 Apple Music RSS（認証・課金不要）を利用。
 https://rss.applemarketingtools.com/api/v2/{storefront}/music/most-played/25/songs.json
 """
+import time
 import requests
 from datetime import datetime
 from database_config import TrendsCache
@@ -13,6 +14,11 @@ from services.trends.base_trends_manager import BaseTrendsManager
 load_dotenv()
 
 logger = get_logger(__name__)
+
+# Apple Music RSS: タイムアウト（秒）、最大リトライ回数、リトライ間隔（秒）
+MUSIC_RSS_TIMEOUT = 30
+MUSIC_RSS_MAX_RETRIES = 3
+MUSIC_RSS_RETRY_DELAY = 2
 
 
 class MusicTrendsManager(BaseTrendsManager):
@@ -90,10 +96,11 @@ class MusicTrendsManager(BaseTrendsManager):
 
             trends = self._get_apple_music_rss(region, service)
             if not trends:
-                logger.warning("楽曲が見つかりません")
+                error_msg = "楽曲が見つかりません（resultsが空です）"
+                logger.warning(error_msg)
                 return {
                     'success': False,
-                    'error': '楽曲が見つかりません',
+                    'error': error_msg,
                     'data': []
                 }
 
@@ -107,6 +114,14 @@ class MusicTrendsManager(BaseTrendsManager):
                 'region_code': region
             }
 
+        except (requests.RequestException, ValueError) as e:
+            error_msg = f"Apple Music RSS 取得失敗: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return {
+                'success': False,
+                'error': error_msg,
+                'data': []
+            }
         except Exception as e:
             logger.error(f"Apple Music RSS エラー: {e}", exc_info=True)
             return {
@@ -119,18 +134,29 @@ class MusicTrendsManager(BaseTrendsManager):
         """
         Apple Music RSS から人気曲を取得。
         https://rss.applemarketingtools.com/api/v2/{storefront}/music/most-played/25/songs.json
+        タイムアウト・ネットワークエラー時はリトライする（最大3回）。
         """
         storefront = self._STOREFRONT_MAP.get(region.upper(), region.lower())
         url = f"https://rss.applemarketingtools.com/api/v2/{storefront}/music/most-played/25/songs.json"
 
-        try:
-            logger.info(f"Apple Music RSS 取得: {url}")
-            response = requests.get(url, timeout=15)
-            response.raise_for_status()
-            data = response.json()
-        except (requests.RequestException, ValueError) as e:
-            logger.error(f"Apple Music RSS 取得失敗: {e}")
-            return None
+        last_error = None
+        for attempt in range(1, MUSIC_RSS_MAX_RETRIES + 1):
+            try:
+                logger.info(f"Apple Music RSS 取得: {url} (試行 {attempt}/{MUSIC_RSS_MAX_RETRIES})")
+                response = requests.get(url, timeout=MUSIC_RSS_TIMEOUT)
+                response.raise_for_status()
+                data = response.json()
+                break
+            except (requests.RequestException, ValueError) as e:
+                last_error = e
+                logger.warning(
+                    "Apple Music RSS 取得失敗 (試行 %d/%d): %s",
+                    attempt, MUSIC_RSS_MAX_RETRIES, e
+                )
+                if attempt < MUSIC_RSS_MAX_RETRIES:
+                    time.sleep(MUSIC_RSS_RETRY_DELAY)
+                else:
+                    raise last_error
 
         feed = data.get('feed', {}) or {}
         results = feed.get('results', [])

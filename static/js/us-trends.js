@@ -1154,6 +1154,8 @@ function loadCachedDataUS() {
             once('movie', loadMovieTrendsFromCacheUS);
             once('book', loadBookTrendsFromCacheUS);
             once('ebay', loadEbayFromCacheUSWrapper);
+            once('bluesky', loadBlueskyFromCacheUS);
+            once('openalex', loadOpenAlexFromCacheUS);
             once('twitch', loadTwitchFromCacheUS);
             return;
         }
@@ -1187,6 +1189,8 @@ function loadCachedDataUS() {
                     ['movie', loadMovieTrendsFromCacheUS],
                     ['book', loadBookTrendsFromCacheUS],
                     ['ebay', loadEbayFromCacheUSWrapper],
+                    ['bluesky', loadBlueskyFromCacheUS],
+                    ['openalex', loadOpenAlexFromCacheUS],
                     ['twitch', loadTwitchFromCacheUS]
                 ];
                 var i = 0;
@@ -1783,6 +1787,103 @@ function showPodcastError(message) {
         errorElement.style.display = 'block';
     }
     if (resultsElement) resultsElement.style.display = 'none';
+}
+
+// OpenAlex cache data loading for US
+function loadOpenAlexFromCacheUS(category = 'trending') {
+    const selectEl = document.getElementById('openalexCategorySelectUS');
+    if (selectEl) category = selectEl.value;
+
+    const loadingEl = document.getElementById('openalexLoading');
+    if (loadingEl) loadingEl.style.display = 'block';
+
+    fetch(`/api/openalex-trends?category=${encodeURIComponent(category)}&limit=25&force_refresh=false`)
+        .then(response => response.json())
+        .then(data => {
+            if (loadingEl) loadingEl.style.display = 'none';
+            const resultsEl = document.getElementById('openalexResults');
+            if (resultsEl) resultsEl.style.display = 'block';
+            if (data.success && data.data && data.data.length > 0) {
+                displayOpenAlexResultsUS(data);
+            } else {
+                showOpenAlexErrorUS(data.error || 'No data available');
+            }
+        })
+        .catch(error => {
+            if (loadingEl) loadingEl.style.display = 'none';
+            const resultsEl = document.getElementById('openalexResults');
+            if (resultsEl) resultsEl.style.display = 'block';
+            showOpenAlexErrorUS(error.message || 'Failed to load');
+        });
+}
+
+function displayOpenAlexResultsUS(data) {
+    const tableBody = document.getElementById('openalexTrendsTableBody');
+    const statusMsg = document.getElementById('openalexStatusMessage');
+    if (!tableBody) return;
+    tableBody.innerHTML = '';
+    if (statusMsg) statusMsg.style.display = 'none';
+
+    const items = (data && data.data && Array.isArray(data.data)) ? data.data : [];
+    items.forEach(item => {
+        const row = document.createElement('tr');
+        const url = item.url || (item.doi ? `https://doi.org/${(item.doi || '').replace('https://doi.org/', '')}` : `https://openalex.org/${item.work_id || ''}`);
+        const title = item.title || 'N/A';
+        const citedBy = item.cited_by_count != null ? item.cited_by_count.toLocaleString() : 'N/A';
+        row.innerHTML = `
+            <td><span class="badge" style="background-color: #6c5ce7; color: white;">${item.rank || '-'}</span></td>
+            <td><a href="${url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>${escapeHtmlUS(title)}</strong></a></td>
+            <td>${citedBy}</td>
+        `;
+        if (typeof makeTableRowClickable === 'function') makeTableRowClickable(row, url, `Open ${title}`);
+        tableBody.appendChild(row);
+    });
+    if (typeof syncToAllPane === 'function') {
+        setTimeout(() => syncToAllPane('openalexTrendsTableBody', 'all-openalexTrendsTableBody', 5), 0);
+    }
+}
+
+function showOpenAlexErrorUS(message) {
+    const statusMsg = document.getElementById('openalexStatusMessage');
+    if (statusMsg) {
+        statusMsg.textContent = message;
+        statusMsg.className = 'alert alert-danger';
+        statusMsg.style.display = 'block';
+    }
+}
+
+function escapeHtmlUS(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Bluesky cache data loading for US
+function loadBlueskyFromCacheUS() {
+    const loadingEl = document.getElementById('blueskyLoading');
+    if (loadingEl) loadingEl.style.display = 'block';
+
+    fetch('/api/bluesky-trends?limit=25&force_refresh=false')
+        .then(response => response.json())
+        .then(data => {
+            if (loadingEl) loadingEl.style.display = 'none';
+            const resultsEl = document.getElementById('blueskyResults');
+            if (resultsEl) resultsEl.style.display = 'block';
+            if (data.success && data.data && data.data.length > 0 && typeof displayBlueskyResults === 'function') {
+                displayBlueskyResults(data);
+                if (typeof syncToAllPane === 'function') {
+                    setTimeout(() => syncToAllPane('blueskyTrendsTableBody', 'all-blueskyTrendsTableBody', 5), 0);
+                }
+            } else {
+                if (typeof showBlueskyError === 'function') showBlueskyError(data.error || 'No data available');
+            }
+        })
+        .catch(error => {
+            if (loadingEl) loadingEl.style.display = 'none';
+            const resultsEl = document.getElementById('blueskyResults');
+            if (resultsEl) resultsEl.style.display = 'block';
+            if (typeof showBlueskyError === 'function') showBlueskyError(error.message || 'Failed to load');
+        });
 }
 
 // Twitch cache data loading for US
@@ -3377,6 +3478,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // YouTube急上昇機能は削除されたため、ラジオボタンの監視は不要
     
+    // OpenAlex category selector event listener
+    const openalexCategorySelect = document.getElementById('openalexCategorySelectUS');
+    if (openalexCategorySelect) {
+        openalexCategorySelect.addEventListener('change', function() {
+            loadOpenAlexFromCacheUS(this.value);
+        });
+    }
+
     // Twitch type selector event listener
     const twitchTypeSelect = document.getElementById('twitchTypeSelectUS');
     if (twitchTypeSelect) {
@@ -3415,6 +3524,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 mainSelect.value = this.value;
                 if (service === 'ebay') {
                     loadEbayFromCacheUS(this.value);
+                } else if (service === 'openalex') {
+                    loadOpenAlexFromCacheUS(this.value);
                 } else if (service === 'twitch') {
                     loadTwitchFromCacheUS(this.value);
                 } else if (service === 'book') {
@@ -3426,6 +3537,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Sync main select -> All dropdown (bidirectional)
     const usSyncPairs = [
         { main: 'ebayCategorySelectUS', all: 'all-ebayCategorySelectUS' },
+        { main: 'openalexCategorySelectUS', all: 'all-openalexCategorySelectUS' },
         { main: 'twitchTypeSelectUS', all: 'all-twitchTypeSelectUS' },
         { main: 'bookCategorySelectUS', all: 'all-bookCategorySelectUS' }
     ];

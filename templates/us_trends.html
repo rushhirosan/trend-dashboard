@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
     <!-- SEO Meta Tags -->
-    <title>US Trends Dashboard - Latest Trends in America | Google Trends, YouTube, Spotify</title>
-    <meta name="description" content="U.S. trends in one dashboard: Google Trends, YouTube, Spotify, Hacker News, S&P 500, cryptocurrency. America-focused trends updated 4 times daily (JST).">
-    <meta name="keywords" content="trends, Google Trends, YouTube, Spotify, Hacker News, Twitch, Podcast, US trends, America trends, Stock, Cryptocurrency, Bitcoin, Investment, Market trends, S&P 500, NASDAQ">
+    <title>US Trends Dashboard - Latest Trends in America | Google Trends, YouTube, Spotify, OpenAlex, Bluesky</title>
+    <meta name="description" content="U.S. trends in one dashboard: Google Trends, YouTube, Spotify, Hacker News, OpenAlex, Bluesky, S&P 500, cryptocurrency. America-focused trends updated 4 times daily (JST).">
+    <meta name="keywords" content="trends, Google Trends, YouTube, Spotify, Hacker News, OpenAlex, Bluesky, Twitch, Podcast, US trends, America trends, Stock, Cryptocurrency, Bitcoin, Investment, Market trends, S&P 500, NASDAQ">
     <meta name="author" content="Trends Dashboard">
     <meta name="robots" content="index, follow">
     
@@ -15,7 +15,7 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://trends-dashboard.fly.dev/us">
     <meta property="og:title" content="US Trends Dashboard - Latest Trends in America">
-    <meta property="og:description" content="U.S. trends in one dashboard: Google Trends, YouTube, Hacker News, S&P 500, cryptocurrency. America-focused trends updated 4 times daily.">
+    <meta property="og:description" content="U.S. trends in one dashboard: Google Trends, YouTube, Hacker News, OpenAlex, Bluesky, S&P 500, cryptocurrency. America-focused trends updated 4 times daily.">
     <meta property="og:image" content="https://trends-dashboard.fly.dev/static/images/og-image.png">
     <meta property="og:locale" content="en_US">
     <meta property="og:site_name" content="Trends Dashboard">
@@ -24,7 +24,7 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:url" content="https://trends-dashboard.fly.dev/us">
     <meta name="twitter:title" content="US Trends Dashboard - Latest Trends in America">
-    <meta name="twitter:description" content="U.S. trends in one dashboard: Google Trends, YouTube, Hacker News, S&P 500, cryptocurrency. America-focused trends updated 4 times daily.">
+    <meta name="twitter:description" content="U.S. trends in one dashboard: Google Trends, YouTube, Hacker News, OpenAlex, Bluesky, S&P 500, cryptocurrency. America-focused trends updated 4 times daily.">
     <meta name="twitter:image" content="https://trends-dashboard.fly.dev/static/images/og-image.png">
     
     <!-- Canonical URL -->
@@ -62,7 +62,7 @@
       "@context": "https://schema.org",
       "@type": "WebApplication",
       "name": "US Trends Dashboard",
-      "description": "U.S. trends in one dashboard: Google Trends, YouTube, Hacker News, S&P 500, cryptocurrency. America-focused trends updated 4 times daily.",
+      "description": "U.S. trends in one dashboard: Google Trends, YouTube, Hacker News, OpenAlex, Bluesky, S&P 500, cryptocurrency. America-focused trends updated 4 times daily.",
       "url": "https://trends-dashboard.fly.dev/us",
       "applicationCategory": "InformationApplication",
       "operatingSystem": "Web",
@@ -97,6 +97,7 @@
     <script src="{{ url_for('static', filename='js/app-common.js') }}?v=20260225-accordion"></script>
     <script src="{{ url_for('static', filename='js/display-functions.js') }}"></script>
     <script src="{{ url_for('static', filename='js/us-trends.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/bluesky-trends.js') }}"></script>
     <script src="{{ url_for('static', filename='js/all-freshness.js') }}"></script>
     <script src="{{ url_for('static', filename='js/us-admin-trends.js') }}"></script>
 </head>
@@ -110,21 +111,21 @@
 
     <noscript>
         <div class="alert alert-info mx-3 mt-3 mb-0" role="alert">
-            To view the trends dashboard, please enable JavaScript. Track U.S. trends from Google Trends, YouTube, Hacker News, Spotify, and more.
+            To view the trends dashboard, please enable JavaScript. Track U.S. trends from Google Trends, YouTube, Hacker News, OpenAlex, Bluesky, Spotify, and more.
         </div>
     </noscript>
     <main class="container-fluid main-content-compact">
         <div id="mainContent">
             <header class="page-header-compact">
                 <h1 class="h3 fw-bold mb-1">US Trends - Latest Trends in America</h1>
-                <p class="visually-hidden">Trends Dashboard displays U.S. trends in one place. Google Trends, YouTube, Spotify, Hacker News, S&amp;P 500, cryptocurrency, and more. America-focused trends updated 4 times daily (JST).</p>
+                <p class="visually-hidden">Trends Dashboard displays U.S. trends in one place. Google Trends, YouTube, Spotify, Hacker News, OpenAlex, Bluesky, S&amp;P 500, cryptocurrency, and more. America-focused trends updated 4 times daily (JST).</p>
                 <div class="row align-items-start g-2 header-row">
                     <div class="col-12 col-lg-6 header-desc-col d-none">
                         <div class="header-description-modern">
-                            <span class="header-desc-short">Google Trends, YouTube, Spotify, Hacker News, Stock, Crypto, Twitch, Podcasts — all in one place.</span>
+                            <span class="header-desc-short">Google Trends, YouTube, Spotify, Hacker News, OpenAlex, Bluesky, Stock, Crypto, Twitch, Podcasts — all in one place.</span>
                             <span class="header-desc-meta">
                                 <span class="header-desc-badge" aria-hidden="true"><i class="fas fa-sync-alt me-1"></i>4x daily (1/7/13/19 JST)</span>
-                                <button type="button" class="header-desc-info-btn" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Displaying latest trend data from Google Trends, YouTube, Stock markets, Spotify, Hacker News, Twitch, and Podcasts. Track cryptocurrency and stock market movements. Data update processing starts daily at 1 AM, 7 AM, 1 PM, and 7 PM (JST) (may take approximately 25-45 minutes to complete)." aria-label="Show details">
+                                <button type="button" class="header-desc-info-btn" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Displaying latest trend data from Google Trends, YouTube, Stock markets, Spotify, Hacker News, OpenAlex, Bluesky, Twitch, and Podcasts. Track cryptocurrency and stock market movements. Data update processing starts daily at 1 AM, 7 AM, 1 PM, and 7 PM (JST) (may take approximately 25-45 minutes to complete)." aria-label="Show details">
                                     <i class="fas fa-info-circle"></i>
                                 </button>
                             </span>
@@ -532,6 +533,27 @@
                                     </div>
                                 </div>
                             </div>
+                            <div class="col-12 col-md-6 col-lg-4" data-all-card="bluesky">
+                                <div class="card h-100">
+                                    <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#0085FF;color:#fff;">
+                                        <div class="all-accordion-trigger d-flex align-items-center flex-grow-1 min-width-0" data-bs-toggle="collapse" data-bs-target="#all-collapse-bluesky" aria-expanded="false" aria-controls="all-collapse-bluesky">
+                                            <h3 class="h6 mb-0"><i class="fas fa-feather" aria-hidden="true"></i> Bluesky</h3>
+                                            <i class="fas fa-chevron-down all-accordion-chevron ms-1 flex-shrink-0" aria-hidden="true"></i>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="bluesky">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-bluesky" aria-label="Go to Entertainment tab">More</a>
+                                        </div>
+                                    </div>
+                                    <div id="all-collapse-bluesky" class="collapse all-card-collapse">
+                                    <div class="card-body p-2">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Post</th><th>User</th><th>Likes</th></tr></thead><tbody id="all-blueskyTrendsTableBody"></tbody></table>
+                                        </div>
+                                    </div>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="col-12 col-md-6 col-lg-4" data-all-card="ebay">
                                 <div class="card h-100">
                                     <div class="card-header d-flex justify-content-between align-items-center py-2 flex-wrap gap-1" style="background:#0064D2;color:#fff;">
@@ -557,6 +579,33 @@
                                     <div class="card-body p-2">
                                         <div class="table-responsive">
                                             <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Title</th><th>Price</th></tr></thead><tbody id="all-ebayTrendsTableBody"></tbody></table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4" data-all-card="openalex">
+                                <div class="card h-100">
+                                    <div class="card-header d-flex justify-content-between align-items-center py-2 flex-wrap gap-1" style="background:#6c5ce7;color:#fff;">
+                                        <div class="d-flex align-items-center gap-2 flex-grow-1 min-width-0">
+                                            <h3 class="h6 mb-0"><i class="fas fa-graduation-cap"></i> OpenAlex</h3>
+                                            <select class="form-select form-select-sm all-category-select" id="all-openalexCategorySelectUS" data-main-select="openalexCategorySelectUS" data-service="openalex" style="max-width: 8rem;">
+                                                <option value="trending">Trending</option>
+                                                <option value="ai">AI &amp; ML</option>
+                                                <option value="nlp">NLP</option>
+                                                <option value="climate">Climate</option>
+                                                <option value="biotech">Biotech</option>
+                                                <option value="quantum">Quantum</option>
+                                                <option value="medical">Medical</option>
+                                            </select>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                            <span class="all-freshness small opacity-90" data-source="openalex">—</span>
+                                            <a href="#" class="btn btn-sm btn-light all-more-link" data-target-tab="tab-entertainment" data-target-anchor="source-openalex" aria-label="Go to Entertainment tab">More</a>
+                                        </div>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-hover mb-0"><thead class="table-dark"><tr><th>Rank</th><th>Title</th><th>Citations</th></tr></thead><tbody id="all-openalexTrendsTableBody"></tbody></table>
                                         </div>
                                     </div>
                                 </div>
@@ -1807,7 +1856,7 @@
                     <div class="tab-pane fade" id="pane-entertainment" role="tabpanel" aria-labelledby="tab-entertainment">
         <div class="row g-3 mb-3">
             <!-- Left: Movie Trends -->
-            <div class="col-12 col-md-6" id="source-movie">
+            <div class="col-12 col-md-4" id="source-movie">
                 <div class="card h-100">
                     <div class="card-header bg-primary text-white">
                         <h5><i class="fas fa-film"></i> Movie Trends</h5>
@@ -1878,8 +1927,8 @@
                     </div>
                 </div>
             </div>
-            <!-- Right: Book Trends -->
-            <div class="col-12 col-md-6" id="source-book">
+            <!-- Center: Book Trends -->
+            <div class="col-12 col-md-4" id="source-book">
                 <div class="card h-100">
                     <div class="card-header bg-info text-white d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <h5 class="mb-0"><i class="fas fa-book"></i> Book Trends</h5>
@@ -1954,6 +2003,62 @@
                                             </table>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Right: Bluesky -->
+            <div class="col-12 col-md-4" id="source-bluesky">
+                <div class="card h-100">
+                    <div class="card-header" style="background-color: #0085FF; color: white;">
+                        <h5><i class="fas fa-feather"></i> Bluesky</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small">
+                            Bluesky What's Hot feed - trending posts.
+                        </p>
+                        <div class="loading text-center py-5" id="blueskyLoading" style="display: none;">
+                            <div class="spinner-border" style="color: #0085FF;" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Loading Bluesky trends...</p>
+                        </div>
+                        <div id="blueskyResults">
+                            <div class="alert alert-success status-message" id="blueskyStatusMessage" style="display: none;"></div>
+                            <div class="trend-table-container">
+                                <div class="table-responsive">
+                                    <table class="table table-hover trend-table" id="blueskyTrendsTable">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>Rank</th>
+                                                <th>Post</th>
+                                                <th>User</th>
+                                                <th>Likes</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="blueskyTrendsTableBody">
+                                            <tr class="skeleton-row">
+                                                <td><div class="skeleton skeleton-badge"></div></td>
+                                                <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
+                                                <td><div class="skeleton skeleton-text"></div></td>
+                                                <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                            </tr>
+                                            <tr class="skeleton-row">
+                                                <td><div class="skeleton skeleton-badge"></div></td>
+                                                <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
+                                                <td><div class="skeleton skeleton-text"></div></td>
+                                                <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                            </tr>
+                                            <tr class="skeleton-row">
+                                                <td><div class="skeleton skeleton-badge"></div></td>
+                                                <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
+                                                <td><div class="skeleton skeleton-text"></div></td>
+                                                <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
@@ -2129,10 +2234,10 @@
             </div>
         </div>
 
-        <!-- Row 10: eBay Popular/Trending + Twitch Trends -->
+        <!-- Row 10: eBay Popular/Trending + OpenAlex + Twitch Trends -->
         <div class="row g-3 mb-3">
             <!-- Left: eBay Popular/Trending -->
-            <div class="col-12 col-md-6" id="source-ebay">
+            <div class="col-12 col-md-4" id="source-ebay">
                 <div class="card h-100">
                     <div class="card-header" style="background-color: #0064D2; color: white;">
                         <h5><i class="fab fa-ebay"></i> eBay Popular/Trending</h5>
@@ -2230,8 +2335,85 @@
                 </div>
             </div>
             
+            <!-- Center: OpenAlex Academic Papers -->
+            <div class="col-12 col-md-4" id="source-openalex">
+                <div class="card h-100">
+                    <div class="card-header" style="background-color: #6c5ce7; color: white;">
+                        <h5><i class="fas fa-graduation-cap"></i> OpenAlex Academic</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">Academic paper trends from OpenAlex.</p>
+                        <div class="mb-3">
+                            <label for="openalexCategorySelectUS" class="form-label text-white" style="background-color: #6c5ce7; padding: 5px 10px; border-radius: 5px;">Select Category:</label>
+                            <select class="form-select" id="openalexCategorySelectUS">
+                                <option value="trending">Trending</option>
+                                <option value="ai">AI & Machine Learning</option>
+                                <option value="nlp">Natural Language Processing</option>
+                                <option value="climate">Climate & Environment</option>
+                                <option value="biotech">Biotechnology</option>
+                                <option value="quantum">Quantum Tech</option>
+                                <option value="medical">Medical & Healthcare</option>
+                            </select>
+                        </div>
+                        <div class="loading text-center py-5" id="openalexLoading" style="display: none;">
+                            <div class="spinner-border" style="color: #6c5ce7;" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Loading OpenAlex data...</p>
+                        </div>
+                        <div id="openalexResults" style="display: none;">
+                            <div class="alert alert-success status-message" id="openalexStatusMessage" style="display: none;"></div>
+                            <div class="card trend-table category-card">
+                                <div class="card-body">
+                                    <div class="trend-table-container">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover trend-table" id="openalexTrendsTable">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>Rank</th>
+                                                        <th>Title</th>
+                                                        <th>Citations</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="openalexTrendsTableBody">
+                                                    <tr class="skeleton-row">
+                                                        <td><div class="skeleton skeleton-badge"></div></td>
+                                                        <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
+                                                        <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                                    </tr>
+                                                    <tr class="skeleton-row">
+                                                        <td><div class="skeleton skeleton-badge"></div></td>
+                                                        <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
+                                                        <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                                    </tr>
+                                                    <tr class="skeleton-row">
+                                                        <td><div class="skeleton skeleton-badge"></div></td>
+                                                        <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
+                                                        <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                                    </tr>
+                                                    <tr class="skeleton-row">
+                                                        <td><div class="skeleton skeleton-badge"></div></td>
+                                                        <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
+                                                        <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                                    </tr>
+                                                    <tr class="skeleton-row">
+                                                        <td><div class="skeleton skeleton-badge"></div></td>
+                                                        <td><div class="skeleton skeleton-text skeleton-text-long"></div></td>
+                                                        <td><div class="skeleton skeleton-text skeleton-text-short"></div></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Right: Twitch Trends -->
-            <div class="col-12 col-md-6" id="source-twitch">
+            <div class="col-12 col-md-4" id="source-twitch">
                 <div class="card h-100">
                     <div class="card-header" style="background-color: #9146FF; color: white;">
                         <h5><i class="fab fa-twitch"></i> Twitch Trends</h5>
@@ -2398,7 +2580,7 @@
             <div class="row">
                 <div class="col-md-6">
                     <h5 class="h6 mb-3">US Trends Dashboard</h5>
-                    <p class="text-muted small mb-2">Displaying trend data from Google Trends, YouTube, Stock, Spotify, Hacker News, Twitch, and Podcasts. Data update processing starts daily at 1 AM, 7 AM, 1 PM, and 7 PM (JST) (may take approximately 25-45 minutes to complete).</p>
+                    <p class="text-muted small mb-2">Displaying trend data from Google Trends, YouTube, Stock, Spotify, Hacker News, OpenAlex, Bluesky, Twitch, and Podcasts. Data update processing starts daily at 1 AM, 7 AM, 1 PM, and 7 PM (JST) (may take approximately 25-45 minutes to complete).</p>
                 </div>
                 <div class="col-md-6">
                     <h6 class="h6 mb-3">Main Pages</h6>

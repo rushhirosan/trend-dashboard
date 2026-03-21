@@ -34,6 +34,8 @@
 - Podcast トレンド
 - 楽天商品トレンド
 - Twitch ゲームトレンド
+- OpenAlex 学術論文トレンド
+- Bluesky トレンド
 
 **USトレンド:**
 - CNN News
@@ -56,6 +58,8 @@
 - Podcast トレンド
 - eBay Popular/Trending
 - Twitch ゲームトレンド
+- OpenAlex 学術論文トレンド
+- Bluesky トレンド
 
 ### 主な機能
 

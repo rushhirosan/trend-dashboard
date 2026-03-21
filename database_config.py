@@ -754,6 +754,22 @@ class TrendsCache:
                 );
                 CREATE INDEX IF NOT EXISTS idx_openalex_trends_category ON openalex_trends_cache(category);
                 
+                CREATE TABLE IF NOT EXISTS bluesky_trends_cache (
+                    id SERIAL PRIMARY KEY,
+                    post_uri VARCHAR(500),
+                    post_id VARCHAR(255),
+                    title TEXT,
+                    user_handle VARCHAR(255),
+                    user_display_name VARCHAR(500),
+                    like_count INTEGER DEFAULT 0,
+                    reply_count INTEGER DEFAULT 0,
+                    repost_count INTEGER DEFAULT 0,
+                    url TEXT,
+                    created_at VARCHAR(100),
+                    rank INTEGER DEFAULT 0,
+                    cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                
                 CREATE TABLE IF NOT EXISTS cache_status (
                     id SERIAL PRIMARY KEY,
                     cache_key VARCHAR(255) NOT NULL UNIQUE,
@@ -5798,6 +5814,97 @@ class TrendsCache:
             return False
         except Exception as e:
             logger.error(f"❌ openalex_trendsキャッシュクリアエラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
+            return False
+
+    # Bluesky Trends キャッシュメソッド
+    def save_bluesky_trends_to_cache(self, data):
+        """Bluesky Trendsデータをキャッシュに保存"""
+        if not data:
+            return False
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM bluesky_trends_cache")
+                    for item in data:
+                        cursor.execute("""
+                            INSERT INTO bluesky_trends_cache
+                            (post_uri, post_id, title, user_handle, user_display_name,
+                             like_count, reply_count, repost_count, url, created_at, rank)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            item.get('post_uri', ''),
+                            item.get('post_id', ''),
+                            (item.get('title', '') or '')[:2000],
+                            item.get('user_handle', ''),
+                            (item.get('user_display_name', '') or '')[:500],
+                            item.get('like_count', 0),
+                            item.get('reply_count', 0),
+                            item.get('repost_count', 0),
+                            item.get('url', ''),
+                            item.get('created_at', ''),
+                            item.get('rank', 0)
+                        ))
+                    import pytz
+                    jst = pytz.timezone('Asia/Tokyo')
+                    now_jst = datetime.now(jst)
+                    cursor.execute(
+                        "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
+                        ('bluesky_trends', now_jst, len(data), now_jst, len(data))
+                    )
+                    conn.commit()
+                    logger.info(f"✅ bluesky_trends キャッシュを保存しました ({len(data)}件)")
+                    return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ bluesky_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ bluesky_trendsキャッシュ保存エラー: {e}", exc_info=True)
+            try:
+                conn.rollback()
+            except:
+                pass
+            return False
+
+    def get_bluesky_trends_from_cache(self):
+        """Bluesky Trendsデータをキャッシュから取得"""
+        def query_func(conn):
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT post_uri, post_id, title, user_handle, user_display_name,
+                           like_count, reply_count, repost_count, url, created_at, rank, cached_at
+                    FROM bluesky_trends_cache
+                    ORDER BY rank
+                    LIMIT 50
+                """)
+                data = cursor.fetchall()
+                result = []
+                for row in data:
+                    row_dict = dict(row)
+                    row_dict['source'] = 'Bluesky'
+                    result.append(row_dict)
+                return result
+        return self._execute_with_retry(query_func)
+
+    def clear_bluesky_trends_cache(self):
+        """Bluesky Trendsキャッシュをクリア"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM bluesky_trends_cache")
+                    conn.commit()
+                logger.info("✅ bluesky_trends のキャッシュをクリアしました")
+                return True
+        except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+            logger.warning(f"⚠️ bluesky_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)
+            self.connection = None
+            return False
+        except Exception as e:
+            logger.error(f"❌ bluesky_trendsキャッシュクリアエラー: {e}", exc_info=True)
             try:
                 conn.rollback()
             except:

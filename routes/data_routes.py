@@ -76,6 +76,8 @@ def get_data_freshness():
             'rakuten_trends': '楽天',
             'hatena_trends': 'はてなブックマーク',
             'twitch_trends': 'Twitch',
+            'openalex_trends_trending': 'OpenAlex',
+            'bluesky_trends': 'Bluesky',
             'nhk_trends': 'NHK ニュース',
             'qiita_trends': 'Qiita トレンド',
             'stock_trends': '株価トレンド',

@@ -336,6 +336,37 @@ def get_hatena_trends():
         }), 200
 
 
+@trend_bp.route('/openalex-trends')
+@require_manager('openalex')
+def get_openalex_trends(manager):
+    """OpenAlex学術論文トレンド APIエンドポイント"""
+    try:
+        category = request.args.get('category', 'trending')
+        limit = int(request.args.get('limit', 25))
+        force_refresh = get_force_refresh()
+
+        result = manager.get_trends(category=category, limit=limit, force_refresh=force_refresh)
+        return handle_trend_response(result, 'OpenAlexトレンド', 'OpenAlex API', category=category)
+
+    except Exception as e:
+        return handle_api_error('OpenAlexトレンド', e)
+
+
+@trend_bp.route('/bluesky-trends')
+@require_manager('bluesky')
+def get_bluesky_trends(manager):
+    """Blueskyトレンド APIエンドポイント"""
+    try:
+        limit = int(request.args.get('limit', 25))
+        force_refresh = get_force_refresh()
+
+        result = manager.get_trends(limit=limit, force_refresh=force_refresh)
+        return handle_trend_response(result, 'Blueskyトレンド', 'Bluesky API')
+
+    except Exception as e:
+        return handle_api_error('Blueskyトレンド', e)
+
+
 @trend_bp.route('/twitch-trends')
 @require_manager('twitch')
 def get_twitch_trends(manager):

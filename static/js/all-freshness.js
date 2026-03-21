@@ -28,7 +28,9 @@
         podcast: 'Podcast',
         movie: '映画トレンド',
         book: '本トレンド',
+        bluesky: 'Bluesky',
         rakuten: '楽天',
+        openalex: 'OpenAlex',
         twitch: 'Twitch',
         // USトレンド
         cnn: 'CNN News',

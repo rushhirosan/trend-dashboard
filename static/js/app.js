@@ -998,6 +998,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     noteManager.fetchTrends();
                 } else if (service === 'twitch' && typeof twitchManager !== 'undefined' && twitchManager) {
                     twitchManager.fetchTrends();
+                } else if (service === 'openalex' && typeof fetchOpenAlexTrends === 'function') {
+                    fetchOpenAlexTrends();
                 } else if (service === 'rakuten' && typeof fetchRakutenTrends === 'function') {
                     fetchRakutenTrends();
                 } else if (service === 'book' && typeof loadBookTrendsFromCache === 'function') {
@@ -1011,6 +1013,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { main: 'hatenaCategorySelect', all: 'all-hatenaCategorySelect' },
         { main: 'noteCategorySelect', all: 'all-noteCategorySelect' },
         { main: 'twitchTypeSelect', all: 'all-twitchTypeSelect' },
+        { main: 'openalexCategorySelect', all: 'all-openalexCategorySelect' },
         { main: 'rakutenGenreSelect', all: 'all-rakutenGenreSelect' },
         { main: 'bookCategorySelect', all: 'all-bookCategorySelect' }
     ];
@@ -1676,8 +1679,8 @@ function displayHatenaResults(data) {
         });
 
         showHatenaResults();
-        // database_cache 表示は不要（技術的な内部状態をユーザーに表示しない）
-        if (data.source !== 'database_cache') {
+        // database_cache, generated_dummy_data 表示は不要（技術的な内部状態をユーザーに表示しない）
+        if (data.source !== 'database_cache' && data.source !== 'generated_dummy_data') {
             showHatenaStatusMessage(`✅ ${data.source} - ${data.total_count || data.data.length}件のエントリーを取得しました`, 'success');
         }
         if (typeof applyCategoryAccordionForAllTables === 'function') {

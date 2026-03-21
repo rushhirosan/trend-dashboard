@@ -39,6 +39,14 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
             apiEndpoint = '/api/twitch-trends';
             params = '?type=games';
             break;
+        case 'openalex':
+            apiEndpoint = '/api/openalex-trends';
+            params = '?category=trending';
+            break;
+        case 'bluesky':
+            apiEndpoint = '/api/bluesky-trends';
+            params = '?limit=25';
+            break;
         case 'nhk':
             apiEndpoint = '/api/nhk-trends';
             params = '';
@@ -418,12 +426,14 @@ function refreshDataFreshnessExternal() {
     updatePlatformStatusExternal('movie', '映画トレンド');
     updatePlatformStatusExternal('book', '本トレンド');
     updatePlatformStatusExternal('rakuten', '楽天');
+    updatePlatformStatusExternal('bluesky', 'Bluesky');
+    updatePlatformStatusExternal('openalex', 'OpenAlex');
     updatePlatformStatusExternal('twitch', 'Twitch');
     
     // テキスト要素を強制的に表示
     setTimeout(() => {
         // 日本トレンドページの順序に合わせる
-        const platforms = ['nhk', 'news', 'wikipedia', 'google', 'youtube', 'prtimes_hatena', 'qiita', 'hatena', 'zenn', 'note', 'github', 'appstore', 'estat', 'kkj', 'ipa', 'jpcert', 'stock', 'crypto', 'spotify', 'podcast', 'movie', 'book', 'rakuten', 'twitch'];
+        const platforms = ['nhk', 'news', 'wikipedia', 'google', 'youtube', 'prtimes_hatena', 'qiita', 'hatena', 'zenn', 'note', 'github', 'appstore', 'estat', 'kkj', 'ipa', 'jpcert', 'stock', 'crypto', 'spotify', 'podcast', 'movie', 'book', 'rakuten', 'bluesky', 'openalex', 'twitch'];
         platforms.forEach(platform => {
             const lastUpdateElement = document.getElementById(`${platform}LastUpdate`);
             const dataCountElement = document.getElementById(`${platform}DataCount`);
@@ -499,7 +509,7 @@ function refreshDataFreshnessExternal() {
 
 // テスト用のシンプルなデータ表示関数（開発用、本番では使用しない）
 function testDataFreshnessDisplay() {
-    const platforms = ['google', 'youtube', 'spotify', 'news', 'podcast', 'rakuten', 'hatena', 'twitch'];
+    const platforms = ['google', 'youtube', 'spotify', 'news', 'podcast', 'rakuten', 'hatena', 'bluesky', 'openalex', 'twitch'];
     
     platforms.forEach(platform => {
         const lastUpdateElement = document.getElementById(`${platform}LastUpdate`);

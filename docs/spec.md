@@ -9,11 +9,13 @@
 - YouTube
 - ワールドニュース
 - Spotify(USの場合はGlobal trend)
-- はてなブックマーク天(日本のみ)
+- はてなブックマーク(日本のみ)
 - Reddit(USのみ)
 - Podcast
 - 楽天(日本のみ)
 - Twitch
+- OpenAlex（学術論文トレンド）
+- Bluesky（SNSトレンド）
 
 ## クイックスタート
 

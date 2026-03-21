@@ -48,6 +48,8 @@ function loadCachedDataExternal() {
         loadMovieTrendsFromCache,
         loadBookTrendsFromCache,
         loadRakutenTrendsFromCache,
+        loadOpenAlexTrendsFromCache,
+        loadBlueskyTrendsFromCache,
         loadTwitchTrendsFromCache
     ];
     console.log('🚀 全カテゴリのバッチ読み込み開始（並列数: 4）');
@@ -458,6 +460,83 @@ function loadHatenaTrendsFromCache() {
             if (loadingElement) {
                 loadingElement.style.display = 'none';
             }
+        });
+}
+
+// OpenAlex学術論文トレンドキャッシュデータの読み込み
+function loadOpenAlexTrendsFromCache() {
+    const categorySelect = document.getElementById('openalexCategorySelect');
+    const selectedCategory = categorySelect ? categorySelect.value : (typeof getTrendPreference === 'function' ? getTrendPreference('openalex') : null) || 'trending';
+
+    const loadingElement = document.getElementById('openalexLoading');
+    if (loadingElement) loadingElement.style.display = 'block';
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    fetchWithRetry(`/api/openalex-trends?category=${encodeURIComponent(selectedCategory)}&limit=25&force_refresh=false`, { signal: controller.signal })
+        .then(response => {
+            clearTimeout(timeoutId);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.json();
+        })
+        .then(data => {
+            if (loadingElement) loadingElement.style.display = 'none';
+            if (data.success && data.data && data.data.length > 0 && typeof displayOpenAlexResults === 'function') {
+                displayOpenAlexResults(data);
+                if (typeof syncToAllPane === 'function') {
+                    setTimeout(() => syncToAllPane('openalexTrendsTableBody', 'all-openalexTrendsTableBody', 5), 0);
+                }
+                if (typeof applyCategoryAccordionForAllTables === 'function') {
+                    setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+                }
+            }
+            const resultsElement = document.getElementById('openalexResults');
+            if (resultsElement) resultsElement.style.display = 'block';
+        })
+        .catch(error => {
+            clearTimeout(timeoutId);
+            if (loadingElement) loadingElement.style.display = 'none';
+            const resultsElement = document.getElementById('openalexResults');
+            if (resultsElement) resultsElement.style.display = 'block';
+            if (typeof showOpenAlexError === 'function') showOpenAlexError(error.message || '読み込みに失敗しました');
+        });
+}
+
+// Blueskyトレンドキャッシュデータの読み込み
+function loadBlueskyTrendsFromCache() {
+    const loadingElement = document.getElementById('blueskyLoading');
+    if (loadingElement) loadingElement.style.display = 'block';
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    fetchWithRetry('/api/bluesky-trends?limit=25&force_refresh=false', { signal: controller.signal })
+        .then(response => {
+            clearTimeout(timeoutId);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.json();
+        })
+        .then(data => {
+            if (loadingElement) loadingElement.style.display = 'none';
+            if (data.success && data.data && data.data.length > 0 && typeof displayBlueskyResults === 'function') {
+                displayBlueskyResults(data);
+                if (typeof syncToAllPane === 'function') {
+                    setTimeout(() => syncToAllPane('blueskyTrendsTableBody', 'all-blueskyTrendsTableBody', 5), 0);
+                }
+                if (typeof applyCategoryAccordionForAllTables === 'function') {
+                    setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+                }
+            }
+            const resultsElement = document.getElementById('blueskyResults');
+            if (resultsElement) resultsElement.style.display = 'block';
+        })
+        .catch(error => {
+            clearTimeout(timeoutId);
+            if (loadingElement) loadingElement.style.display = 'none';
+            const resultsElement = document.getElementById('blueskyResults');
+            if (resultsElement) resultsElement.style.display = 'block';
+            if (typeof showBlueskyError === 'function') showBlueskyError(error.message || '読み込みに失敗しました');
         });
 }
 

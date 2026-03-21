@@ -216,7 +216,7 @@ class BaseTrendsManager(ABC):
             numeric_keys = ['stars', 'stars_count', 'forks', 'forks_count', 'average_user_rating',
                           'user_rating_count', 'votes_count', 'reactions_count', 'sales_count',
                           'review_count', 'price', 'change_percent', 'bookmark_count', 'score',
-                          'viewer_count', 'view_count']
+                          'viewer_count', 'view_count', 'like_count', 'reply_count', 'repost_count']
 
             # 数値キーの場合は数値として比較、それ以外は文字列として比較
             def get_sort_value(x):

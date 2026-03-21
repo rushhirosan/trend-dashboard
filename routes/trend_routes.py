@@ -362,8 +362,8 @@ def get_openalex_trends(manager):
 @require_manager('bluesky')
 def get_bluesky_trends(manager):
     """Blueskyトレンド APIエンドポイント
-    region=jp: 日本語投稿を優先（Accept-Language: ja）
-    region未指定: 言語制限なし（USトレンド用）
+    region=jp: Japanese Super Hot（100いいね以上の日本語投稿）
+    region=us/未指定: What's Hot（グローバルトレンド）
     """
     try:
         limit = int(request.args.get('limit', 25))

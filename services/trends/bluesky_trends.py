@@ -2,7 +2,8 @@
 Bluesky トレンドマネージャー
 
 Bluesky AT Protocol の公開API（認証不要）を使用
-- What's Hot フィード: ネットワーク全体のトレンド投稿
+- What's Hot フィード: ネットワーク全体のトレンド投稿（US向け）
+- Japanese Super Hot: 100いいね以上の日本語投稿（日本向け）
 - ドキュメント: https://docs.bsky.app/docs/api/app-bsky-feed-get-feed
 """
 
@@ -15,8 +16,10 @@ from services.trends.base_trends_manager import BaseTrendsManager
 
 logger = get_logger(__name__)
 
-# Bluesky What's Hot フィードのURI
+# Bluesky フィードURI
 WHATS_HOT_FEED_URI = "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.generator/whats-hot"
+# 日本語向け: 100いいね以上の日本語投稿（Japanese Super Hot by コミュニティ）
+JAPANESE_SUPER_HOT_URI = "at://did:plc:ilxxgyz7oz7mysber4omeqrg/app.bsky.feed.generator/aaahn3ic3dtyi"
 BASE_URL = "https://public.api.bsky.app/xrpc/app.bsky.feed.getFeed"
 
 
@@ -132,20 +135,24 @@ class BlueskyTrendsManager(BaseTrendsManager):
             return None
 
     def _fetch_trends(self, limit: int = 25, *args, **kwargs) -> Dict[str, Any]:
-        """Bluesky What's Hot APIからトレンドデータを取得
-        region=jp のとき Accept-Language: ja で日本語投稿を優先
+        """Bluesky APIからトレンドデータを取得
+        region=jp: Japanese Super Hot（100いいね以上の日本語投稿）
+        region=us/未指定: What's Hot（グローバルトレンド）
         """
         try:
             self.rate_limiter.wait_if_needed()
 
+            region = kwargs.get("region")
+            feed_uri = JAPANESE_SUPER_HOT_URI if region == "jp" else WHATS_HOT_FEED_URI
+            if region == "jp":
+                logger.info("Bluesky: Japanese Super Hot フィードを使用（日本語投稿）")
+
             params = {
-                "feed": WHATS_HOT_FEED_URI,
+                "feed": feed_uri,
                 "limit": min(limit, 100),
             }
 
             headers = {"Accept": "application/json"}
-            if kwargs.get("region") == "jp":
-                headers["Accept-Language"] = "ja"
             response = requests.get(BASE_URL, params=params, headers=headers, timeout=15)
             response.raise_for_status()
 
@@ -195,8 +202,8 @@ class BlueskyTrendsManager(BaseTrendsManager):
         **kwargs,
     ) -> Dict[str, Any]:
         """Blueskyトレンドを取得（キャッシュ優先）
-        region=jp: 日本語投稿を優先（Accept-Language: ja）
-        region未指定: 言語制限なし（US向け）
+        region=jp: Japanese Super Hot（100いいね以上の日本語投稿）
+        region=us/未指定: What's Hot（グローバルトレンド）
         """
         return super().get_trends(
             limit=limit,

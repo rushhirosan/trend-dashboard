@@ -474,7 +474,7 @@ function loadOpenAlexTrendsFromCache() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    fetchWithRetry(`/api/openalex-trends?category=${encodeURIComponent(selectedCategory)}&limit=25&force_refresh=false`, { signal: controller.signal })
+    fetchWithRetry(`/api/openalex-trends?category=${encodeURIComponent(selectedCategory)}&limit=25&force_refresh=false&region=jp`, { signal: controller.signal })
         .then(response => {
             clearTimeout(timeoutId);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -511,7 +511,7 @@ function loadBlueskyTrendsFromCache() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    fetchWithRetry('/api/bluesky-trends?limit=25&force_refresh=false', { signal: controller.signal })
+    fetchWithRetry('/api/bluesky-trends?limit=25&force_refresh=false&region=jp', { signal: controller.signal })
         .then(response => {
             clearTimeout(timeoutId);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);

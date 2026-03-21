@@ -246,7 +246,12 @@ def refresh_all_trends(managers, force_refresh=True, max_concurrent=None, batch_
     # 行政データ（e-Stat）/ 政府調達（KKJ）も定期取得（JPのみ）
     tasks.append(('estat', lambda m: m.get_trends(limit=6, force_refresh=force_refresh), 'JP'))
     tasks.append(('kkj', lambda m: m.get_public_sector_signals(force_refresh=force_refresh, cache_only=False), 'JP'))
-    tasks.append(('bluesky', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('bluesky', lambda m: m.get_trends(limit=25, force_refresh=force_refresh, region='jp'), 'JP'))
+    # OpenAlex: 日本向け（日本語論文のみ）
+    for cat in ('trending', 'ai', 'nlp', 'climate', 'biotech', 'quantum', 'medical'):
+        def _openalex_jp(m, c=cat):
+            return m.get_trends(category=c, limit=25, force_refresh=force_refresh, region='jp')
+        tasks.append(('openalex', _openalex_jp, 'JP'))
 
     # USのデータを更新するタスク
     logger.info("🇺🇸 USのデータを更新中（並列実行）...")
@@ -289,7 +294,12 @@ def refresh_all_trends(managers, force_refresh=True, max_concurrent=None, batch_
     tasks.append(('wikipedia', lambda m: m.get_trends(lang='en', limit=25, force_refresh=force_refresh), 'US'))
     tasks.append(('bls', lambda m: m.get_trends(limit=10, force_refresh=force_refresh), 'US'))
     tasks.append(('usaspending', lambda m: m.get_trends(force_refresh=force_refresh), 'US'))
-    tasks.append(('bluesky', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('bluesky', lambda m: m.get_trends(limit=25, force_refresh=force_refresh, region='us'), 'US'))
+    # OpenAlex: US向け（言語制限なし）
+    for cat in ('trending', 'ai', 'nlp', 'climate', 'biotech', 'quantum', 'medical'):
+        def _openalex_us(m, c=cat):
+            return m.get_trends(category=c, limit=25, force_refresh=force_refresh, region='us')
+        tasks.append(('openalex', _openalex_us, 'US'))
 
     # 同時実行数: 引数 > 環境変数 TREND_REFRESH_MAX_CONCURRENT > デフォルト6（OOM防止）
     concurrency = max_concurrent if max_concurrent is not None else _get_refresh_concurrency()

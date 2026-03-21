@@ -122,7 +122,15 @@ def get_data_freshness():
                 cache_info = None
                 
                 # 国別のキャッシュキーを処理
-                if cache_key in ['movie_trends', 'book_trends', 'appstore_trends', 'stock_trends', 'music_trends']:
+                if cache_key == 'bluesky_trends':
+                    # Bluesky: JP=日本語投稿(bluesky_trends_jp)、US=言語制限なし(bluesky_trends)
+                    bluesky_key = 'bluesky_trends_jp' if country == 'JP' else 'bluesky_trends'
+                    cache_info = all_cache_status.get(bluesky_key)
+                elif cache_key == 'openalex_trends_trending':
+                    # OpenAlex: JP=日本語論文(trending_jp)、US=言語制限なし(trending)
+                    openalex_key = 'openalex_trends_trending_jp' if country == 'JP' else 'openalex_trends_trending'
+                    cache_info = all_cache_status.get(openalex_key)
+                elif cache_key in ['movie_trends', 'book_trends', 'appstore_trends', 'stock_trends', 'music_trends']:
                     cache_key_with_country = f'{cache_key}_{country}'
                     cache_info = all_cache_status.get(cache_key_with_country)
                     if not cache_info:

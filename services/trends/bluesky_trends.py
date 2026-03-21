@@ -31,13 +31,15 @@ class BlueskyTrendsManager(BaseTrendsManager):
         logger.info("  認証: 不要（公開API）")
 
     def _get_cache_key(self, *args, **kwargs) -> str:
-        """キャッシュキーを返す"""
-        return "bluesky_trends"
+        """キャッシュキーを返す（region=jpの場合は別キャッシュ）"""
+        region = kwargs.get("region")
+        return "bluesky_trends_jp" if region == "jp" else "bluesky_trends"
 
     def _get_from_cache(self, *args, **kwargs) -> Optional[List[Dict[str, Any]]]:
         """キャッシュからデータを取得"""
+        region = kwargs.get("region")
         try:
-            cached_data = self.db.get_bluesky_trends_from_cache()
+            cached_data = self.db.get_bluesky_trends_from_cache(region=region)
             if cached_data and len(cached_data) > 0:
                 logger.info(f"✅ Bluesky: キャッシュから{len(cached_data)}件のデータを取得")
                 return cached_data
@@ -48,8 +50,9 @@ class BlueskyTrendsManager(BaseTrendsManager):
 
     def _save_to_cache(self, data: List[Dict[str, Any]], *args, **kwargs) -> bool:
         """キャッシュにデータを保存"""
+        region = kwargs.get("region")
         try:
-            success = self.db.save_bluesky_trends_to_cache(data)
+            success = self.db.save_bluesky_trends_to_cache(data, region=region)
             if success:
                 logger.info(f"✅ Bluesky: キャッシュに保存完了 ({len(data)}件)")
             return success
@@ -59,8 +62,9 @@ class BlueskyTrendsManager(BaseTrendsManager):
 
     def _clear_cache(self, *args, **kwargs) -> bool:
         """キャッシュをクリア"""
+        region = kwargs.get("region")
         try:
-            return self.db.clear_bluesky_trends_cache()
+            return self.db.clear_bluesky_trends_cache(region=region)
         except Exception as e:
             logger.error(f"❌ Bluesky キャッシュクリアエラー: {e}", exc_info=True)
             return False
@@ -128,7 +132,9 @@ class BlueskyTrendsManager(BaseTrendsManager):
             return None
 
     def _fetch_trends(self, limit: int = 25, *args, **kwargs) -> Dict[str, Any]:
-        """Bluesky What's Hot APIからトレンドデータを取得"""
+        """Bluesky What's Hot APIからトレンドデータを取得
+        region=jp のとき Accept-Language: ja で日本語投稿を優先
+        """
         try:
             self.rate_limiter.wait_if_needed()
 
@@ -138,6 +144,8 @@ class BlueskyTrendsManager(BaseTrendsManager):
             }
 
             headers = {"Accept": "application/json"}
+            if kwargs.get("region") == "jp":
+                headers["Accept-Language"] = "ja"
             response = requests.get(BASE_URL, params=params, headers=headers, timeout=15)
             response.raise_for_status()
 
@@ -182,14 +190,19 @@ class BlueskyTrendsManager(BaseTrendsManager):
         self,
         limit: int = 25,
         force_refresh: bool = False,
+        region: str = None,
         *args,
         **kwargs,
     ) -> Dict[str, Any]:
-        """Blueskyトレンドを取得（キャッシュ優先）"""
+        """Blueskyトレンドを取得（キャッシュ優先）
+        region=jp: 日本語投稿を優先（Accept-Language: ja）
+        region未指定: 言語制限なし（US向け）
+        """
         return super().get_trends(
             limit=limit,
             force_refresh=force_refresh,
             auto_fetch_on_cache_miss=True,
             sort_key="like_count",
             sort_reverse=True,
+            region=region,
         )

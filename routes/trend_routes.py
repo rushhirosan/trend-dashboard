@@ -339,13 +339,19 @@ def get_hatena_trends():
 @trend_bp.route('/openalex-trends')
 @require_manager('openalex')
 def get_openalex_trends(manager):
-    """OpenAlex学術論文トレンド APIエンドポイント"""
+    """OpenAlex学術論文トレンド APIエンドポイント
+    region=jp: 日本語論文のみ（日本トレンド用）
+    region未指定: 言語制限なし（USトレンド用）
+    """
     try:
         category = request.args.get('category', 'trending')
         limit = int(request.args.get('limit', 25))
         force_refresh = get_force_refresh()
+        region = request.args.get('region')  # 'jp' で日本語論文のみ
 
-        result = manager.get_trends(category=category, limit=limit, force_refresh=force_refresh)
+        result = manager.get_trends(
+            category=category, limit=limit, force_refresh=force_refresh, region=region
+        )
         return handle_trend_response(result, 'OpenAlexトレンド', 'OpenAlex API', category=category)
 
     except Exception as e:
@@ -355,12 +361,18 @@ def get_openalex_trends(manager):
 @trend_bp.route('/bluesky-trends')
 @require_manager('bluesky')
 def get_bluesky_trends(manager):
-    """Blueskyトレンド APIエンドポイント"""
+    """Blueskyトレンド APIエンドポイント
+    region=jp: 日本語投稿を優先（Accept-Language: ja）
+    region未指定: 言語制限なし（USトレンド用）
+    """
     try:
         limit = int(request.args.get('limit', 25))
         force_refresh = get_force_refresh()
+        region = request.args.get('region')
 
-        result = manager.get_trends(limit=limit, force_refresh=force_refresh)
+        result = manager.get_trends(
+            limit=limit, force_refresh=force_refresh, region=region
+        )
         return handle_trend_response(result, 'Blueskyトレンド', 'Bluesky API')
 
     except Exception as e:

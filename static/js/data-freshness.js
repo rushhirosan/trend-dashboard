@@ -41,11 +41,12 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
             break;
         case 'openalex':
             apiEndpoint = '/api/openalex-trends';
-            params = '?category=trending';
+            // data-freshnessは日本トレンドページで使用→日本語論文
+            params = '?category=trending&region=jp';
             break;
         case 'bluesky':
             apiEndpoint = '/api/bluesky-trends';
-            params = '?limit=25';
+            params = '?limit=25&region=jp';
             break;
         case 'nhk':
             apiEndpoint = '/api/nhk-trends';

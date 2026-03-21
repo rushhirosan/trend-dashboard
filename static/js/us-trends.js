@@ -1797,7 +1797,7 @@ function loadOpenAlexFromCacheUS(category = 'trending') {
     const loadingEl = document.getElementById('openalexLoading');
     if (loadingEl) loadingEl.style.display = 'block';
 
-    fetch(`/api/openalex-trends?category=${encodeURIComponent(category)}&limit=25&force_refresh=false`)
+    fetch(`/api/openalex-trends?category=${encodeURIComponent(category)}&limit=25&force_refresh=false&region=us`)
         .then(response => response.json())
         .then(data => {
             if (loadingEl) loadingEl.style.display = 'none';
@@ -1863,7 +1863,7 @@ function loadBlueskyFromCacheUS() {
     const loadingEl = document.getElementById('blueskyLoading');
     if (loadingEl) loadingEl.style.display = 'block';
 
-    fetch('/api/bluesky-trends?limit=25&force_refresh=false')
+    fetch('/api/bluesky-trends?limit=25&force_refresh=false&region=us')
         .then(response => response.json())
         .then(data => {
             if (loadingEl) loadingEl.style.display = 'none';

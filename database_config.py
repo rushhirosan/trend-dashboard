@@ -847,6 +847,7 @@ class TrendsCache:
                 CREATE INDEX IF NOT EXISTS idx_subscriptions_token ON subscriptions(unsubscribe_token);
                 
                 -- 既存テーブルにrankカラムがない場合のマイグレーション（CREATE TABLE IF NOT EXISTSでは更新されないため）
+                ALTER TABLE bluesky_trends_cache ADD COLUMN IF NOT EXISTS region VARCHAR(10) DEFAULT 'us';
                 ALTER TABLE google_trends_cache ADD COLUMN IF NOT EXISTS rank INTEGER DEFAULT 0;
                 ALTER TABLE music_trends_cache ADD COLUMN IF NOT EXISTS rank INTEGER DEFAULT 0;
                 ALTER TABLE news_trends_cache ADD COLUMN IF NOT EXISTS rank INTEGER DEFAULT 0;
@@ -5821,20 +5822,24 @@ class TrendsCache:
             return False
 
     # Bluesky Trends キャッシュメソッド
-    def save_bluesky_trends_to_cache(self, data):
-        """Bluesky Trendsデータをキャッシュに保存"""
+    def save_bluesky_trends_to_cache(self, data, region='us'):
+        """Bluesky Trendsデータをキャッシュに保存
+        region: 'jp'=日本語投稿, 'us'=言語制限なし
+        """
         if not data:
             return False
+        cache_region = 'jp' if region == 'jp' else 'us'
+        cache_key = 'bluesky_trends_jp' if cache_region == 'jp' else 'bluesky_trends'
         try:
             with self.get_connection() as conn:
                 with conn.cursor() as cursor:
-                    cursor.execute("DELETE FROM bluesky_trends_cache")
+                    cursor.execute("DELETE FROM bluesky_trends_cache WHERE region = %s", (cache_region,))
                     for item in data:
                         cursor.execute("""
                             INSERT INTO bluesky_trends_cache
                             (post_uri, post_id, title, user_handle, user_display_name,
-                             like_count, reply_count, repost_count, url, created_at, rank)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                             like_count, reply_count, repost_count, url, created_at, rank, region)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """, (
                             item.get('post_uri', ''),
                             item.get('post_id', ''),
@@ -5846,17 +5851,18 @@ class TrendsCache:
                             item.get('repost_count', 0),
                             item.get('url', ''),
                             item.get('created_at', ''),
-                            item.get('rank', 0)
+                            item.get('rank', 0),
+                            cache_region
                         ))
                     import pytz
                     jst = pytz.timezone('Asia/Tokyo')
                     now_jst = datetime.now(jst)
                     cursor.execute(
                         "INSERT INTO cache_status (cache_key, last_updated, data_count) VALUES (%s, %s, %s) ON CONFLICT (cache_key) DO UPDATE SET last_updated = %s, data_count = %s",
-                        ('bluesky_trends', now_jst, len(data), now_jst, len(data))
+                        (cache_key, now_jst, len(data), now_jst, len(data))
                     )
                     conn.commit()
-                    logger.info(f"✅ bluesky_trends キャッシュを保存しました ({len(data)}件)")
+                    logger.info(f"✅ bluesky_trends ({cache_region}) キャッシュを保存しました ({len(data)}件)")
                     return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ bluesky_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
@@ -5870,17 +5876,21 @@ class TrendsCache:
                 pass
             return False
 
-    def get_bluesky_trends_from_cache(self):
-        """Bluesky Trendsデータをキャッシュから取得"""
+    def get_bluesky_trends_from_cache(self, region='us'):
+        """Bluesky Trendsデータをキャッシュから取得
+        region: 'jp'=日本語投稿, 'us'=言語制限なし
+        """
+        cache_region = 'jp' if region == 'jp' else 'us'
         def query_func(conn):
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute("""
                     SELECT post_uri, post_id, title, user_handle, user_display_name,
                            like_count, reply_count, repost_count, url, created_at, rank, cached_at
                     FROM bluesky_trends_cache
+                    WHERE region = %s
                     ORDER BY rank
                     LIMIT 50
-                """)
+                """, (cache_region,))
                 data = cursor.fetchall()
                 result = []
                 for row in data:
@@ -5890,14 +5900,23 @@ class TrendsCache:
                 return result
         return self._execute_with_retry(query_func)
 
-    def clear_bluesky_trends_cache(self):
-        """Bluesky Trendsキャッシュをクリア"""
+    def clear_bluesky_trends_cache(self, region=None):
+        """Bluesky Trendsキャッシュをクリア
+        region: 'jp' or 'us' で特定リージョンのみ、Noneで全削除
+        """
         try:
             with self.get_connection() as conn:
                 with conn.cursor() as cursor:
-                    cursor.execute("DELETE FROM bluesky_trends_cache")
+                    if region == 'jp':
+                        cursor.execute("DELETE FROM bluesky_trends_cache WHERE region = 'jp'")
+                        logger.info("✅ bluesky_trends (jp) のキャッシュをクリアしました")
+                    elif region == 'us':
+                        cursor.execute("DELETE FROM bluesky_trends_cache WHERE region = 'us'")
+                        logger.info("✅ bluesky_trends (us) のキャッシュをクリアしました")
+                    else:
+                        cursor.execute("DELETE FROM bluesky_trends_cache")
+                        logger.info("✅ bluesky_trends のキャッシュをクリアしました")
                     conn.commit()
-                logger.info("✅ bluesky_trends のキャッシュをクリアしました")
                 return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ bluesky_trendsキャッシュクリア中に接続エラーが発生: {e}", exc_info=True)

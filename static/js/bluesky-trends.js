@@ -1,8 +1,14 @@
 // Bluesky トレンド（What's Hot フィード、カテゴリ選択なし）
+// 日本ページ(/): region=jp で日本語投稿、USページ(/us): region=us
+function getBlueskyRegion() {
+    const path = (window.location.pathname || '').toLowerCase();
+    return path.includes('/us') ? 'us' : 'jp';
+}
 function fetchBlueskyTrends() {
     const loadingEl = document.getElementById('blueskyLoading');
     if (loadingEl) loadingEl.style.display = 'block';
-    fetch('/api/bluesky-trends?limit=25&force_refresh=true')
+    const region = getBlueskyRegion();
+    fetch(`/api/bluesky-trends?limit=25&force_refresh=true&region=${region}`)
         .then(r => r.json())
         .then(data => {
             if (loadingEl) loadingEl.style.display = 'none';

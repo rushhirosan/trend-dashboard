@@ -91,26 +91,34 @@ class OpenAlexTrendsManager(BaseTrendsManager):
         logger.info(f"  mailto: {'設定済み' if self.mailto else '未設定（10req/秒制限）'}")
 
     def _get_cache_key(self, category: str = "trending", *args, **kwargs) -> str:
-        """キャッシュキーを返す"""
-        return f"openalex_trends_{category}"
+        """キャッシュキーを返す（region=jpの場合は別キャッシュ）"""
+        region = kwargs.get("region")
+        cache_category = f"{category}_jp" if region == "jp" else category
+        return f"openalex_trends_{cache_category}"
 
     def _get_from_cache(self, category: str = "trending", *args, **kwargs) -> Optional[List[Dict[str, Any]]]:
         """キャッシュからデータを取得"""
-        cached_data = self.db.get_openalex_trends_from_cache(category=category)
+        region = kwargs.get("region")
+        cache_category = f"{category}_jp" if region == "jp" else category
+        cached_data = self.db.get_openalex_trends_from_cache(category=cache_category)
         return cached_data
 
     def _save_to_cache(self, data: List[Dict[str, Any]], category: str = "trending", *args, **kwargs) -> bool:
         """キャッシュにデータを保存"""
+        region = kwargs.get("region")
+        cache_category = f"{category}_jp" if region == "jp" else category
         try:
-            return self.db.save_openalex_trends_to_cache(data, category=category)
+            return self.db.save_openalex_trends_to_cache(data, category=cache_category)
         except Exception as e:
             logger.error(f"❌ OpenAlex キャッシュ保存エラー: {e}", exc_info=True)
             return False
 
     def _clear_cache(self, category: str = "trending", *args, **kwargs) -> bool:
         """キャッシュをクリア"""
+        region = kwargs.get("region")
+        cache_category = f"{category}_jp" if region == "jp" else category
         try:
-            return self.db.clear_openalex_trends_cache(category=category)
+            return self.db.clear_openalex_trends_cache(category=cache_category)
         except Exception as e:
             logger.error(f"❌ OpenAlex キャッシュクリアエラー: {e}", exc_info=True)
             return False
@@ -211,6 +219,7 @@ class OpenAlexTrendsManager(BaseTrendsManager):
             category: カテゴリ（trending, ai, nlp, climate, biotech, quantum, medical）
             limit: 取得件数
             days: 過去何日間の論文を対象にするか
+            region (kwargs): リージョン（jp=日本語論文のみ、それ以外=言語制限なし）
 
         Returns:
             Dict: 取得結果
@@ -221,9 +230,15 @@ class OpenAlexTrendsManager(BaseTrendsManager):
             # 日付フィルター
             from_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
 
+            # フィルタ構築（日本向けは language:ja を追加）
+            region = kwargs.get("region")
+            filter_parts = [f"from_publication_date:{from_date}"]
+            if region == "jp":
+                filter_parts.append("language:ja")
+
             # パラメータ構築
             params = {
-                "filter": f"from_publication_date:{from_date}",
+                "filter": ",".join(filter_parts),
                 "sort": "cited_by_count:desc",
                 "per_page": min(limit, 100),
             }
@@ -287,6 +302,7 @@ class OpenAlexTrendsManager(BaseTrendsManager):
         limit: int = 25,
         days: int = 30,
         force_refresh: bool = False,
+        region: str = None,
         *args,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -297,6 +313,7 @@ class OpenAlexTrendsManager(BaseTrendsManager):
             limit: 取得件数
             days: 過去何日間の論文を対象にするか
             force_refresh: 強制更新フラグ
+            region: リージョン（jp=日本語論文、それ以外=言語制限なし）
 
         Returns:
             Dict: トレンドデータ
@@ -309,6 +326,7 @@ class OpenAlexTrendsManager(BaseTrendsManager):
             sort_reverse=True,
             category=category,
             days=days,
+            region=region,
         )
 
         # カテゴリ名を追加

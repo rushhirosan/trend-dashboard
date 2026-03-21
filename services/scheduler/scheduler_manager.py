@@ -624,6 +624,15 @@ class TrendsScheduler:
                 elif key == 'music':
                     # Spotifyは地域別: music_trends_JP / music_trends_US
                     return f'music_trends_{region}'
+                elif key == 'bluesky':
+                    # Bluesky: JP=日本語投稿(bluesky_trends_jp)、US=言語制限なし(bluesky_trends)
+                    return 'bluesky_trends_jp' if region == 'JP' else 'bluesky_trends'
+                elif key == 'openalex':
+                    # OpenAlexはカテゴリ別×地域別: trending_jp, ai_jp, ... (JP) / trending, ai, ... (US)
+                    cats = ('trending', 'ai', 'nlp', 'climate', 'biotech', 'quantum', 'medical')
+                    if region == 'JP':
+                        return [f'openalex_trends_{c}_jp' for c in cats]
+                    return [f'openalex_trends_{c}' for c in cats]
                 else:
                     # 通常のケース: {key}_trends
                     return f'{key}_trends'

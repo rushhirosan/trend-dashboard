@@ -786,6 +786,7 @@ const ACCORDION_CSS_ONLY_TBODYS = new Set([
     'ipaTrendsTableBody', 'jpcertTrendsTableBody', 'githubTrendsTableBody', 'appstoreTrendsTableBody',
     'stockTrendsTableBody', 'cryptoTrendsTableBody', 'movieTrendsTableBody', 'bookTrendsTableBody',
     'musicTrendsTableBody', 'podcastTrendsTableBody', 'rakutenTrendsTableBody', 'openalexTrendsTableBody', 'twitchTrendsTableBody',
+    'blueskyTrendsTableBody',
     'cnnTrendsTableBody', 'worldnewsTrendsTableBody', 'hackernewsTrendsTableBody', 'producthuntTrendsTableBody',
     'devtoTrendsTableBody', 'mediumTrendsTableBody', 'cisaKevTrendsTableBody', 'thehackernewsTrendsTableBody',
     'globenewswireTrendsTableBody', 'spotifyTrendsTableBody', 'ebayTrendsTableBody',

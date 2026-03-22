@@ -1,4 +1,5 @@
 import os
+import time
 import requests
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -163,7 +164,7 @@ class RakutenTrendsManager(BaseTrendsManager):
         # 全カテゴリを取得する場合（スケジューラー用、はてな同様）
         if fetch_all_categories:
             logger.info("🔄 楽天商品: 全カテゴリのデータを取得します")
-            all_data = self._fetch_and_cache_all_categories(limit)
+            all_data, last_error = self._fetch_and_cache_all_categories(limit)
             if all_data:
                 self._save_all_categories_to_cache(all_data)
                 all_category_data = [item for item in all_data if item.get('genre_id') == 'all']
@@ -175,11 +176,13 @@ class RakutenTrendsManager(BaseTrendsManager):
                     'success': True
                 }
             else:
+                # 実際のエラー内容をDiscord/ログに表示するため last_error を使用
+                error_msg = last_error or '全カテゴリのデータ取得に失敗しました'
                 return {
                     'data': [],
                     'status': 'api_error',
                     'genre_id': 'all',
-                    'error': '全カテゴリのデータ取得に失敗しました',
+                    'error': error_msg,
                     'success': False
                 }
 
@@ -208,13 +211,19 @@ class RakutenTrendsManager(BaseTrendsManager):
         ]
 
     def _fetch_and_cache_all_categories(self, limit=25):
-        """全カテゴリのデータを一度に取得（楽天APIは1秒1回制限のため順次取得）"""
+        """全カテゴリのデータを一度に取得（楽天APIは1秒1回制限のため順次取得）
+
+        Returns:
+            tuple: (all_data: list, last_error: str|None)
+                   all_dataが空の場合はlast_errorに最後の失敗理由を入れる
+        """
         if not self.rakuten_app_id:
             logger.warning("楽天ランキングAPI: RAKUTEN_APP_ID が未設定です")
-            return []
+            return [], 'RAKUTEN_APP_ID が未設定です'
         try:
             logger.info("🔄 楽天商品: 全カテゴリのデータを取得開始")
             all_data = []
+            last_error = None
             categories = self.get_available_categories()
 
             for cat in categories:
@@ -228,16 +237,19 @@ class RakutenTrendsManager(BaseTrendsManager):
                     all_data.extend(result['data'])
                     logger.info(f"✅ ジャンル '{genre_id}': {len(result['data'])}件取得")
                 else:
-                    logger.warning(f"❌ ジャンル '{genre_id}': データ取得失敗 - {result}")
+                    err = (result.get('error') if isinstance(result, dict) else None) or str(result)
+                    last_error = err
+                    logger.warning(f"❌ ジャンル '{genre_id}': データ取得失敗 - {err}")
 
             if all_data:
                 logger.info(f"✅ 楽天商品: 全カテゴリのデータ取得完了 ({len(all_data)}件)")
             else:
-                logger.warning("❌ 楽天商品: 取得したデータがありません")
-            return all_data
+                logger.warning(f"❌ 楽天商品: 取得したデータがありません (最終エラー: {last_error})")
+            return all_data, last_error
         except Exception as e:
+            err_msg = str(e)
             logger.error(f"❌ 楽天商品: 全カテゴリ取得エラー: {e}", exc_info=True)
-            return []
+            return [], err_msg
 
     def _save_all_categories_to_cache(self, all_data):
         """全カテゴリのデータをキャッシュに保存"""
@@ -259,8 +271,11 @@ class RakutenTrendsManager(BaseTrendsManager):
             logger.error(f"❌ 楽天商品: 全カテゴリキャッシュ保存エラー: {e}", exc_info=True)
             return 0
 
-    def _get_rakuten_ranking(self, genre_id=None, limit=25):
-        """楽天商品ランキングAPIを使用"""
+    def _get_rakuten_ranking(self, genre_id=None, limit=25, _retry_count=0):
+        """楽天商品ランキングAPIを使用（429/503時はリトライ）"""
+        max_retries = 2
+        retry_delay = 30  # 秒（楽天APIのレート制限緩和待ち）
+
         if not self.rakuten_app_id:
             logger.warning("楽天ランキングAPI: RAKUTEN_APP_ID が未設定です")
             return {'data': [], 'error': 'RAKUTEN_APP_ID が未設定です'}
@@ -286,16 +301,39 @@ class RakutenTrendsManager(BaseTrendsManager):
             # レート制限をチェック
             self.rate_limiter.wait_if_needed()
             
-            response = requests.get(url, params=params, timeout=10)
+            response = requests.get(url, params=params, timeout=15)
             logger.debug(f"楽天ランキングAPIレスポンスステータス: {response.status_code}")
+            
+            # 429(レート制限) / 503(メンテ) の場合はリトライ
+            if response.status_code in (429, 503) and _retry_count < max_retries:
+                try:
+                    err_body = response.json()
+                    err_desc = err_body.get('error_description', err_body.get('error', ''))
+                except Exception:
+                    err_desc = response.text[:200] if response.text else ''
+                logger.warning(
+                    f"楽天API {response.status_code} (試行{_retry_count + 1}/{max_retries + 1}): "
+                    f"{err_desc} - {retry_delay}秒後にリトライします"
+                )
+                time.sleep(retry_delay)
+                return self._get_rakuten_ranking(genre_id, limit, _retry_count=_retry_count + 1)
             
             if response.status_code == 200:
                 data = response.json()
-                items = data.get('Items', [])
+                # 200でもerrorが含まれる場合がある（一部エラーケース）
+                if isinstance(data, dict) and data.get('error'):
+                    err_desc = data.get('error_description', data.get('error', ''))
+                    return {'data': [], 'error': f'楽天API エラー: {err_desc}'}
+                # Items（旧形式）または items（formatVersion=2）の両方に対応
+                items = data.get('Items') or data.get('items', [])
                 
                 trends_data = []
                 for item in items:
-                    item_info = item.get('Item', {})
+                    # Item（PascalCase）または item（小文字）のネスト、あるいは直接フィールド
+                    item_info = (
+                        item.get('Item') or item.get('item') or item
+                        if isinstance(item, dict) else {}
+                    )
                     # sales_countを数値に変換（'N/A'の場合は0）
                     sales_count = item_info.get('salesCount', 'N/A')
                     if isinstance(sales_count, str) and sales_count != 'N/A':

@@ -88,6 +88,10 @@
                             <p class="lead">
                                 このサイトは、現在 <strong>日本と米国</strong> で人気のトレンド情報を表示するシンプルな<strong>トレンドダッシュボード</strong>です。
                             </p>
+                            <p class="mb-0">
+                                個人の<strong>話題チェック</strong>や<strong>リサーチの入口</strong>として使うことを想定しています。
+                                <strong>投資助言</strong>や<strong>公式統計・各サービスの正規の一次情報の代替</strong>ではありません。重要な判断は必ず元データ・各公式サイトでご確認ください。
+                            </p>
                         </section>
 
                         <!-- 2. 何を表示しているか -->
@@ -183,8 +187,15 @@
                                     </div>
                                 </div>
                             </div>
-                            <p class="mb-0">
+                            <p class="mb-2">
                                 データは <strong>1日4回更新処理を開始</strong> します（1時、7時、13時、19時 JST、完了までおおむね25〜45分かかることがあります）。
+                            </p>
+                            <p class="mb-2 small text-muted">
+                                ソースごとに<strong>最終更新時刻</strong>や取得状況が異なる場合があります。トレンド一覧の「全部入り」（USページでは <strong>All</strong>）タブでは、各カードに更新時刻の目安が表示されます。詳細は
+                                <a href="{{ url_for('data_status') }}">データ鮮度情報</a>ページを参照してください。
+                            </p>
+                            <p class="mb-0 small text-muted">
+                                表示内容は各ソースの公開API・公開データを<strong>キャッシュ経由</strong>で集約したものです。遅延・欠損・仕様変更により実際のランキングと差が出ることがあります。
                             </p>
                         </section>
 
@@ -194,9 +205,12 @@
                                 <i class="fas fa-lightbulb text-warning me-2"></i>
                                 どう使えばいいか
                             </h3>
-                            <p>
+                            <p class="mb-2">
                                 この<strong>トレンドダッシュボード</strong>は、素早い発見と概要把握を目的としています。
                                 網羅的またはリアルタイムのデータ提供を目指すものではありません。
+                            </p>
+                            <p class="mb-0">
+                                カテゴリタブで興味のある分野に絞り、気になる項目から各サービスへリンクして深掘りする使い方を想定しています。
                             </p>
                         </section>
 
@@ -232,6 +246,10 @@
                             </h3>
                             <p class="lead">
                                 This site is a simple <strong>trends dashboard</strong> that shows what is currently popular in <strong>Japan and the US</strong>.
+                            </p>
+                            <p class="mb-0">
+                                It is aimed at personal <strong>topic scanning</strong> and as a starting point for <strong>light research</strong>.
+                                It is <strong>not</strong> investment advice or a substitute for official statistics or each provider’s authoritative data. For important decisions, always verify on the original sources.
                             </p>
                         </section>
 
@@ -271,6 +289,7 @@
                                                 <li class="mb-1"><i class="fas fa-check text-success me-2"></i> PR TIMES × Hatena</li>
                                                 <li class="mb-1"><i class="fas fa-check text-success me-2"></i> GitHub Trends</li>
                                                 <li class="mb-1"><i class="fas fa-check text-success me-2"></i> App Store Trends</li>
+                                                <li class="mb-1"><i class="fas fa-check text-success me-2"></i> Government statistics &amp; procurement (e-Stat / KKJ)</li>
                                                 <li class="mb-1"><i class="fas fa-check text-success me-2"></i> Stock Trends (Japan)</li>
                                                 <li class="mb-1"><i class="fas fa-check text-success me-2"></i> Cryptocurrency Trends</li>
                                                 <li class="mb-1"><i class="fas fa-check text-success me-2"></i> Movie Trends</li>
@@ -311,6 +330,7 @@
                                                 <li class="mb-1"><i class="fas fa-check text-success me-2"></i> Gov Data (BLS / USAspending)</li>
                                                 <li class="mb-1"><i class="fas fa-check text-success me-2"></i> GitHub Trends</li>
                                                 <li class="mb-1"><i class="fas fa-check text-success me-2"></i> App Store Trends</li>
+                                                <li class="mb-1"><i class="fas fa-check text-success me-2"></i> Gov Data (e-Stat / Public Sector Signals)</li>
                                                 <li class="mb-1"><i class="fas fa-check text-success me-2"></i> Stock Trends (US)</li>
                                                 <li class="mb-1"><i class="fas fa-check text-success me-2"></i> Cryptocurrency Trends</li>
                                                 <li class="mb-1"><i class="fas fa-check text-success me-2"></i> Movie Trends</li>
@@ -326,8 +346,15 @@
                                     </div>
                                 </div>
                             </div>
-                            <p class="mb-0">
-                                The data is <strong>updated four times a day</strong> (1 AM, 7 AM, 1 PM, and 7 PM JST).
+                            <p class="mb-2">
+                                Update jobs start <strong>four times a day</strong> (1 AM, 7 AM, 1 PM, and 7 PM JST; completion may take about 25–45 minutes).
+                            </p>
+                            <p class="mb-2 small text-muted">
+                                <strong>Last updated</strong> times can differ by source. On the Japan/US trends pages, the <strong>All</strong> tab shows a freshness hint on each card. See the
+                                <a href="{{ url_for('data_status') }}">Data Status</a> page for details.
+                            </p>
+                            <p class="mb-0 small text-muted">
+                                Content is aggregated from public APIs and feeds via <strong>cached</strong> snapshots. Delays, gaps, or upstream changes may make it differ from live rankings.
                             </p>
                         </section>
 
@@ -337,9 +364,12 @@
                                 <i class="fas fa-lightbulb text-warning me-2"></i>
                                 How should I use it?
                             </h3>
-                            <p>
+                            <p class="mb-2">
                                 This <strong>trends dashboard</strong> is intended for quick discovery and overview.
                                 It does not aim to provide exhaustive or up-to-the-minute data.
+                            </p>
+                            <p class="mb-0">
+                                Use category tabs to focus on a topic, then follow links to each provider for depth.
                             </p>
                         </section>
 
@@ -379,9 +409,6 @@
                         <li class="mb-2"><a href="/" class="text-decoration-none text-muted">🇯🇵 日本トレンド / Japan Trends</a></li>
                         <li class="mb-2"><a href="/us" class="text-decoration-none text-muted">🇺🇸 USトレンド / US Trends</a></li>
                         <li class="mb-2"><a href="/data-status" class="text-decoration-none text-muted">📊 データ鮮度情報 / Data Status</a></li>
-                        {% if ENABLE_SUBSCRIPTION_UI %}
-                        <li class="mb-2"><a href="/subscription" class="text-decoration-none text-muted">📧 メールサブスクリプション / Email Subscription</a></li>
-                        {% endif %}
                         <li class="mb-2"><a href="/about" class="text-decoration-none text-muted">ℹ️ このサイトについて / About</a></li>
                     </ul>
                 </div>

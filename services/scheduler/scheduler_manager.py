@@ -1,4 +1,5 @@
 import os
+import json
 import logging
 import socket
 import threading
@@ -559,6 +560,22 @@ class TrendsScheduler:
                         status = 'unknown'
                         data_count = 0
                     logger.warning(f"❌ 失敗: {key} - error={error}, status={status}, data_count={data_count}")
+
+                    # ログ検索・再発分析用にレスポンス主要キーを JSON で1行記録（全文・切り詰めなし）
+                    if isinstance(response, dict):
+                        log_excerpt = {
+                            k: response[k]
+                            for k in ("error", "status", "source", "message", "detail")
+                            if k in response and response[k] is not None
+                        }
+                        try:
+                            logger.warning(
+                                "❌ 失敗(レスポンス抜粋JSON): %s %s",
+                                key,
+                                json.dumps(log_excerpt, ensure_ascii=False, default=str),
+                            )
+                        except Exception:
+                            logger.warning("❌ 失敗(レスポンス抜粋JSON): %s シリアライズ不可", key)
                     
                     # エラー詳細情報を収集
                     error_detail = {
@@ -963,7 +980,7 @@ class TrendsScheduler:
         if not failed_trends_details:
             return ""
         
-        # Discordのフィールド値の最大長（1024文字）を考慮して、最初の10件まで表示
+        # 件数が多い実行向けに先頭のみ列挙（各行の error は切り詰めない。Discord 側でフィールド分割する）
         max_items = 10
         details_lines = []
         for i, detail in enumerate(failed_trends_details[:max_items]):
@@ -973,7 +990,7 @@ class TrendsScheduler:
             # 汎用メッセージの場合は status を前面に出す（原因切り分けのため）
             if str(error).strip().lower() in ('unknown', 'unknown error'):
                 error = f"エラー詳細なし (status: {status})"
-            details_lines.append(f"• {source}: {error} (status: {status})")
+            details_lines.append(f"• {source}\n  status: {status}\n  error: {error}")
         
         if len(failed_trends_details) > max_items:
             details_lines.append(f"... 他 {len(failed_trends_details) - max_items}件")

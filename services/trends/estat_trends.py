@@ -819,7 +819,7 @@ class EstatTrendsManager(BaseTrendsManager):
         self,
         limit: int = 6,
         force_refresh: bool = False,
-        cache_only: bool = False,
+        cache_only: bool = True,
         auto_fetch_on_cache_miss: bool = True,
         sort_key: Optional[str] = None,
         sort_reverse: bool = True,

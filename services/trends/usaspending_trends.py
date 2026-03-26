@@ -311,7 +311,7 @@ class UsaspendingTrendsManager(BaseTrendsManager):
         self,
         limit: int = 1,
         force_refresh: bool = False,
-        cache_only: bool = False,
+        cache_only: bool = True,
         auto_fetch_on_cache_miss: bool = True,
         *args,
         **kwargs,

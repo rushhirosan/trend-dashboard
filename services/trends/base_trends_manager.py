@@ -245,7 +245,7 @@ class BaseTrendsManager(ABC):
         self,
         limit: int = 25,
         force_refresh: bool = False,
-        cache_only: bool = False,  # True のときはキャッシュのみ、外部APIは呼ばない
+        cache_only: bool = True,  # True のときはキャッシュのみ、外部APIは呼ばない
         auto_fetch_on_cache_miss: bool = True,  # キャッシュがない場合に自動的にAPIを呼び出すかどうか
         sort_key: Optional[str] = None,  # ソートキー（Noneの場合はrankでソート）
         sort_reverse: bool = True,  # 降順かどうか

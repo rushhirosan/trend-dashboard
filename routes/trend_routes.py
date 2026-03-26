@@ -369,9 +369,10 @@ def get_bluesky_trends(manager):
         limit = int(request.args.get('limit', 25))
         force_refresh = get_force_refresh()
         region = request.args.get('region')
+        cache_only = not force_refresh
 
         result = manager.get_trends(
-            limit=limit, force_refresh=force_refresh, region=region
+            limit=limit, force_refresh=force_refresh, cache_only=cache_only, region=region
         )
         return handle_trend_response(result, 'Blueskyトレンド', 'Bluesky API')
 

@@ -494,7 +494,7 @@ class KKJTrendsManager(BaseTrendsManager):
         return any((s.get("count") or 0) > 0 for s in signals)
 
     def get_public_sector_signals(
-        self, force_refresh: bool = False, cache_only: bool = False
+        self, force_refresh: bool = False, cache_only: bool = True
     ) -> Dict[str, Any]:
         """
         Public Sector Signals と都道府県ランキングを返す。

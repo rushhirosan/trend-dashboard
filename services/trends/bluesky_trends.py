@@ -198,6 +198,7 @@ class BlueskyTrendsManager(BaseTrendsManager):
         self,
         limit: int = 25,
         force_refresh: bool = False,
+        cache_only: bool = True,
         region: str = None,
         *args,
         **kwargs,
@@ -209,8 +210,11 @@ class BlueskyTrendsManager(BaseTrendsManager):
         return super().get_trends(
             limit=limit,
             force_refresh=force_refresh,
+            cache_only=cache_only,
             auto_fetch_on_cache_miss=True,
             sort_key="like_count",
             sort_reverse=True,
             region=region,
+            *args,
+            **kwargs,
         )

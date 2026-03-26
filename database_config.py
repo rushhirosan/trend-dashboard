@@ -5833,27 +5833,54 @@ class TrendsCache:
         try:
             with self.get_connection() as conn:
                 with conn.cursor() as cursor:
-                    cursor.execute("DELETE FROM bluesky_trends_cache WHERE region = %s", (cache_region,))
+                    # 旧スキーマ（region列なし）環境でも保存できるようフォールバックする
+                    region_column_supported = True
+                    try:
+                        cursor.execute("DELETE FROM bluesky_trends_cache WHERE region = %s", (cache_region,))
+                    except Exception as schema_err:
+                        err_lower = str(schema_err).lower()
+                        if "column" in err_lower and "region" in err_lower and "does not exist" in err_lower:
+                            logger.warning(
+                                "⚠️ bluesky_trends_cache に region 列がないため旧スキーマ互換モードで保存します"
+                            )
+                            region_column_supported = False
+                            cursor.execute("DELETE FROM bluesky_trends_cache")
+                        else:
+                            raise
+
                     for item in data:
-                        cursor.execute("""
-                            INSERT INTO bluesky_trends_cache
-                            (post_uri, post_id, title, user_handle, user_display_name,
-                             like_count, reply_count, repost_count, url, created_at, rank, region)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        """, (
-                            item.get('post_uri', ''),
-                            item.get('post_id', ''),
-                            (item.get('title', '') or '')[:2000],
-                            item.get('user_handle', ''),
-                            (item.get('user_display_name', '') or '')[:500],
-                            item.get('like_count', 0),
-                            item.get('reply_count', 0),
-                            item.get('repost_count', 0),
-                            item.get('url', ''),
-                            item.get('created_at', ''),
-                            item.get('rank', 0),
-                            cache_region
-                        ))
+                        post_uri = (item.get('post_uri', '') or '')[:500]
+                        post_id = (item.get('post_id', '') or '')[:255]
+                        title = (item.get('title', '') or '')[:2000]
+                        user_handle = (item.get('user_handle', '') or '')[:255]
+                        user_display_name = (item.get('user_display_name', '') or '')[:500]
+                        url = (item.get('url', '') or '')[:2000]
+                        created_at = (item.get('created_at', '') or '')[:100]
+                        like_count = item.get('like_count', 0)
+                        reply_count = item.get('reply_count', 0)
+                        repost_count = item.get('repost_count', 0)
+                        rank = item.get('rank', 0)
+
+                        if region_column_supported:
+                            cursor.execute("""
+                                INSERT INTO bluesky_trends_cache
+                                (post_uri, post_id, title, user_handle, user_display_name,
+                                 like_count, reply_count, repost_count, url, created_at, rank, region)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            """, (
+                                post_uri, post_id, title, user_handle, user_display_name,
+                                like_count, reply_count, repost_count, url, created_at, rank, cache_region
+                            ))
+                        else:
+                            cursor.execute("""
+                                INSERT INTO bluesky_trends_cache
+                                (post_uri, post_id, title, user_handle, user_display_name,
+                                 like_count, reply_count, repost_count, url, created_at, rank)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            """, (
+                                post_uri, post_id, title, user_handle, user_display_name,
+                                like_count, reply_count, repost_count, url, created_at, rank
+                            ))
                     import pytz
                     jst = pytz.timezone('Asia/Tokyo')
                     now_jst = datetime.now(jst)
@@ -5867,14 +5894,14 @@ class TrendsCache:
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
             logger.warning(f"⚠️ bluesky_trendsキャッシュ保存中に接続エラーが発生: {e}", exc_info=True)
             self.connection = None
-            return False
+            raise RuntimeError(f"bluesky cache save connection error: {e}") from e
         except Exception as e:
             logger.error(f"❌ bluesky_trendsキャッシュ保存エラー: {e}", exc_info=True)
             try:
                 conn.rollback()
             except:
                 pass
-            return False
+            raise RuntimeError(f"bluesky cache save failed: {e}") from e
 
     def get_bluesky_trends_from_cache(self, region='us'):
         """Bluesky Trendsデータをキャッシュから取得
@@ -5883,14 +5910,30 @@ class TrendsCache:
         cache_region = 'jp' if region == 'jp' else 'us'
         def query_func(conn):
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("""
-                    SELECT post_uri, post_id, title, user_handle, user_display_name,
-                           like_count, reply_count, repost_count, url, created_at, rank, cached_at
-                    FROM bluesky_trends_cache
-                    WHERE region = %s
-                    ORDER BY rank
-                    LIMIT 50
-                """, (cache_region,))
+                try:
+                    cursor.execute("""
+                        SELECT post_uri, post_id, title, user_handle, user_display_name,
+                               like_count, reply_count, repost_count, url, created_at, rank, cached_at
+                        FROM bluesky_trends_cache
+                        WHERE region = %s
+                        ORDER BY rank
+                        LIMIT 50
+                    """, (cache_region,))
+                except Exception as schema_err:
+                    err_lower = str(schema_err).lower()
+                    if "column" in err_lower and "region" in err_lower and "does not exist" in err_lower:
+                        logger.warning(
+                            "⚠️ bluesky_trends_cache に region 列がないため旧スキーマ互換モードで取得します"
+                        )
+                        cursor.execute("""
+                            SELECT post_uri, post_id, title, user_handle, user_display_name,
+                                   like_count, reply_count, repost_count, url, created_at, rank, cached_at
+                            FROM bluesky_trends_cache
+                            ORDER BY rank
+                            LIMIT 50
+                        """)
+                    else:
+                        raise
                 data = cursor.fetchall()
                 result = []
                 for row in data:
@@ -5907,15 +5950,25 @@ class TrendsCache:
         try:
             with self.get_connection() as conn:
                 with conn.cursor() as cursor:
-                    if region == 'jp':
-                        cursor.execute("DELETE FROM bluesky_trends_cache WHERE region = 'jp'")
-                        logger.info("✅ bluesky_trends (jp) のキャッシュをクリアしました")
-                    elif region == 'us':
-                        cursor.execute("DELETE FROM bluesky_trends_cache WHERE region = 'us'")
-                        logger.info("✅ bluesky_trends (us) のキャッシュをクリアしました")
-                    else:
-                        cursor.execute("DELETE FROM bluesky_trends_cache")
-                        logger.info("✅ bluesky_trends のキャッシュをクリアしました")
+                    try:
+                        if region == 'jp':
+                            cursor.execute("DELETE FROM bluesky_trends_cache WHERE region = 'jp'")
+                            logger.info("✅ bluesky_trends (jp) のキャッシュをクリアしました")
+                        elif region == 'us':
+                            cursor.execute("DELETE FROM bluesky_trends_cache WHERE region = 'us'")
+                            logger.info("✅ bluesky_trends (us) のキャッシュをクリアしました")
+                        else:
+                            cursor.execute("DELETE FROM bluesky_trends_cache")
+                            logger.info("✅ bluesky_trends のキャッシュをクリアしました")
+                    except Exception as schema_err:
+                        err_lower = str(schema_err).lower()
+                        if "column" in err_lower and "region" in err_lower and "does not exist" in err_lower:
+                            cursor.execute("DELETE FROM bluesky_trends_cache")
+                            logger.warning(
+                                "⚠️ bluesky_trends_cache に region 列がないため全件クリア（旧スキーマ互換）"
+                            )
+                        else:
+                            raise
                     conn.commit()
                 return True
         except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:

@@ -54,14 +54,15 @@ class BlueskyTrendsManager(BaseTrendsManager):
     def _save_to_cache(self, data: List[Dict[str, Any]], *args, **kwargs) -> bool:
         """キャッシュにデータを保存"""
         region = kwargs.get("region")
-        try:
-            success = self.db.save_bluesky_trends_to_cache(data, region=region)
-            if success:
-                logger.info(f"✅ Bluesky: キャッシュに保存完了 ({len(data)}件)")
-            return success
-        except Exception as e:
-            logger.error(f"❌ Bluesky キャッシュ保存エラー: {e}", exc_info=True)
-            return False
+        success = self.db.save_bluesky_trends_to_cache(data, region=region)
+        if success:
+            logger.info(f"✅ Bluesky: キャッシュに保存完了 ({len(data)}件)")
+            return True
+        # ここに来る場合はDB層が False を返したケース。詳細付きで例外化して Base 側アラートに載せる。
+        raise RuntimeError(
+            f"bluesky cache save returned False (region={region or 'us'}). "
+            "See database_config save_bluesky_trends_to_cache logs for root cause."
+        )
 
     def _clear_cache(self, *args, **kwargs) -> bool:
         """キャッシュをクリア"""

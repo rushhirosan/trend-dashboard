@@ -1,0 +1,241 @@
+---
+description: Trend Dashboard — product principles, stack, architecture, and development conventions
+alwaysApply: true
+---
+
+# Project: Trend Dashboard
+
+## Project Overview
+- Web application for quickly understanding what is happening now
+- Aggregates trend signals from multiple sources in one place
+- Stateless product: do not store history unless clearly required
+- Focus on Japan and US trend visibility
+- The experience should be fast, simple, and easy to scan
+
+---
+
+## Product Principles
+- This is a stateless trend dashboard
+- The goal is to quickly grasp the current mood, signals, and movement across sources
+- Prioritize clarity over completeness
+- Prioritize usefulness over feature count
+- Avoid feature creep
+- Do not turn this into a heavy analytics product unless explicitly requested
+- Prefer one-screen understanding whenever possible
+- Focus on lightweight insight, not deep analysis
+
+---
+
+## Tech Stack
+- Language: Python 3.11
+- Backend: Flask
+- Server: Gunicorn
+- Scheduler: APScheduler
+- Database: PostgreSQL
+- Frontend: HTML, CSS, JavaScript
+- UI: Bootstrap 5.1.3
+- Icons: Font Awesome
+- Deployment: Fly.io
+
+---
+
+## UI / UX Rules
+- Keep the UI minimal, clean, and fast to scan
+- Prefer one-screen information architecture when possible
+- Prioritize readability and information hierarchy
+- Make it easy to understand the current state at a glance
+- Do not overload the page with too many competing visual elements
+- Prefer practical UI improvements over flashy redesigns
+- Keep regional switching simple and understandable
+- Preserve the product’s lightweight feel
+- Insight cards, summaries, and highlights should help users grasp the current situation faster
+- Avoid unnecessary interaction cost
+
+### Design Priorities
+- Clear section hierarchy
+- Strong scanability
+- Minimal clutter
+- Fast loading
+- Useful summaries
+- Mobile-friendly behavior, but desktop readability is also important
+
+### Components / Styling
+- Prefer Bootstrap components and utilities before introducing custom UI systems
+- Reuse existing patterns where possible
+- Custom components should remain visually simple and consistent
+- Avoid introducing large front-end frameworks unless clearly justified
+
+---
+
+## Architecture
+
+### High-Level Structure
+- Keep backend responsibilities clear and separated
+- Data fetching, normalization, persistence, and presentation should remain understandable
+- Prefer simple service boundaries over complex abstractions
+- Do not introduce unnecessary architecture layers
+
+### Typical Responsibilities
+- Data collection / external integrations
+- Data normalization / transformation
+- Persistence / database access
+- Scheduled refresh / aggregation
+- Rendering / API response
+
+### File Structure
+- `app/` or main Flask app entry for routes and app setup
+- `templates/` for HTML templates
+- `static/` for CSS, JS, and frontend assets
+- `services/` for integrations, fetching, transformation, and business logic
+- `models/` for database or domain models if applicable
+- `utils/` for utility helpers
+- `jobs/` or scheduler-related modules for APScheduler tasks
+
+> Adjust names to the actual repository structure, but preserve separation of responsibilities.
+
+---
+
+## Data / Source Strategy
+- Prefer official APIs over scraping whenever possible
+- Avoid brittle scraping unless there is no reasonable alternative
+- Treat external sources as unreliable and subject to failure
+- Handle missing, stale, or partial data gracefully
+- Make update frequency appropriate to the source’s actual refresh cycle
+- Do not over-fetch slow-moving sources
+- Preserve the stateless philosophy unless persistence is clearly needed for the product
+
+---
+
+## State / Persistence Policy
+- Stateless is the default product philosophy
+- Do not add history-saving features by default
+- Use persistence only when necessary for current display, cache efficiency, reliability, or operational needs
+- If history is introduced, document the reason and scope clearly
+
+---
+
+## Platform Strategy
+- Desktop is important because the dashboard is designed for quick visual scanning
+- Mobile should remain usable and readable
+- Avoid building separate product experiences for each platform unless necessary
+- Responsive adjustments are preferred over product-level divergence
+
+---
+
+## Coding Conventions
+
+### Naming
+- Python files: `snake_case.py`
+- Classes: `PascalCase`
+- Variables and functions: `snake_case`
+- Constants: `UPPER_SNAKE_CASE`
+
+### Code Quality
+- Keep code simple, readable, and maintainable
+- Prefer explicitness over cleverness
+- Remove unused code and dead branches
+- Keep functions focused and reasonably small
+- Avoid unnecessary abstraction
+- Refactor when complexity grows too much
+- Preserve clear boundaries between fetching, transformation, and presentation logic
+
+### Comments
+- Comments should explain why, not what
+- Japanese comments are acceptable when they improve clarity
+- Add comments for tricky business rules, source-specific caveats, or operational constraints
+- Do not leave commented-out dead code unless there is a strong documented reason
+
+---
+
+## Error Handling
+- Fix root causes instead of masking errors
+- Assume external APIs can fail, timeout, rate-limit, or return malformed data
+- Handle empty states, stale states, and partial failures explicitly
+- Provide clear and actionable logs or error messages
+- Degrade gracefully whenever possible instead of breaking the whole dashboard
+
+---
+
+## Performance
+- Optimize for fast page load and fast scanning
+- Avoid unnecessary database queries and duplicate fetching
+- Avoid over-fetching data from external sources
+- Use caching or persistence pragmatically when it improves reliability or performance
+- Measure before making major performance optimizations
+- Be careful with scheduler frequency and API quotas
+
+---
+
+## Reliability / Operations
+- Scheduler jobs should be predictable and observable
+- Log important job outcomes and failures
+- Prefer retry / timeout strategies where appropriate
+- Avoid silent failures in background refresh logic
+- Surface operational issues clearly enough to debug them
+- Keep deployment and runtime behavior simple and stable
+
+---
+
+## Database / Persistence
+- Use PostgreSQL pragmatically, not as an excuse for over-modeling
+- Keep schema understandable and aligned with actual product needs
+- Avoid storing unnecessary historical data
+- If cached or aggregated records are stored, keep retention and purpose clear
+
+---
+
+## Security
+- Never commit secrets or sensitive data
+- Keep `.env` and similar files out of version control
+- Manage API keys, tokens, and secrets through environment variables
+- Validate and sanitize external inputs where relevant
+- Check `git status` and `git diff` before committing
+- Ensure logs do not expose secrets or sensitive operational details
+
+---
+
+## AI Development Rules
+- Understand the existing structure before making changes
+- Prefer small, working diffs over large rewrites
+- Preserve the product’s stateless and lightweight philosophy
+- Do not add heavy frameworks or large architectural changes unless clearly justified
+- When proposing changes, explain trade-offs briefly
+- Prefer API-based integrations over scraping
+- Ask clarifying questions when requirements are ambiguous
+- Suggest lightweight improvements proactively when useful
+
+---
+
+## Testing
+- Write tests when relevant and practical
+- Prefer tests around transformation logic, source handling, and critical behavior
+- Keep tests fast, deterministic, and maintainable
+- Do not skip tests casually when changing important logic
+- If tests are absent, avoid pretending they exist; be explicit
+
+---
+
+## Dependencies
+- Keep dependencies minimal and justified
+- Prefer stable, well-maintained libraries
+- Avoid adding packages when built-in or existing tools are sufficient
+- Consider operational burden before introducing new dependencies
+
+---
+
+## Documentation
+- Update README when setup, architecture, or behavior changes
+- Document important design decisions when they affect future development
+- Keep documentation concise and practical
+- Record source-specific caveats when they matter operationally
+
+---
+
+## Pre-Commit Checklist
+- Assume changes should pass relevant checks before completion
+- Check for syntax, lint, or obvious runtime issues when applicable
+- Check `git status` for unexpected files
+- Check `git diff` for secrets, accidental deletions, or unrelated changes
+- Ensure `.env`, backup files, and temporary files are not included
+- Propose a commit message in English
+- Do not commit automatically

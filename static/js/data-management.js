@@ -246,11 +246,11 @@ function loadNewsBundleFromCache() {
             if (typeof applyCategoryAccordionForAllTables === 'function') {
                 setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
             }
-            if (nhk.data && nhk.data.length > 0 && typeof syncToAllPane === 'function') {
-                setTimeout(function() { syncToAllPane('nhkTrendsTableBody', 'all-nhkTrendsTableBody', 5); }, 0);
-            }
-            if (worldnews.data && worldnews.data.length > 0 && typeof syncToAllPane === 'function') {
-                setTimeout(function() { syncToAllPane('newsTrendsTableBody', 'all-newsTrendsTableBody', 5); }, 0);
+            if (typeof syncAllPaneOrPlaceholder === 'function') {
+                setTimeout(function() {
+                    syncAllPaneOrPlaceholder('nhkTrendsTableBody', 'all-nhkTrendsTableBody', 5, 'データがありません');
+                    syncAllPaneOrPlaceholder('newsTrendsTableBody', 'all-newsTrendsTableBody', 5, 'データがありません');
+                }, 0);
             }
 
             var nhkResultsEl = document.getElementById('nhkResults');

@@ -715,15 +715,21 @@ function loadTrendsFromCache(config) {
                 if (typeof applyCategoryAccordionForAllTables === 'function') {
                     setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
                 }
-                // 全部入り（All）タブ用: メイン表の先頭10行をAll用tbodyへ同期
-                const allPaneSync = config.allPaneSync;
-                if (allPaneSync && typeof syncToAllPane === 'function' && hasData) {
-                    setTimeout(function() {
-                        syncToAllPane(allPaneSync.mainTableBodyId, allPaneSync.allTableBodyId, allPaneSync.limit || 5);
-                    }, 0);
-                }
             } else {
                 console.log(`${serviceName} Trends データなし（表示はメタ情報のみ）:`, data);
+            }
+
+            // 全部入り（All）: 取得後は常に同期または空表示（syncToAllPane は実データ行が無いと動かないため）
+            const allPaneSync = config.allPaneSync;
+            if (allPaneSync && typeof syncAllPaneOrPlaceholder === 'function') {
+                setTimeout(function() {
+                    syncAllPaneOrPlaceholder(
+                        allPaneSync.mainTableBodyId,
+                        allPaneSync.allTableBodyId,
+                        allPaneSync.limit || 5,
+                        'データがありません'
+                    );
+                }, 0);
             }
 
             // 結果エリアを表示
@@ -794,6 +800,47 @@ function runBatchLoad(loadFunctions, options) {
         }
     }
     executeBatch(0);
+}
+
+/**
+ * 全部入り（All）タブの tbody に空メッセージ1行を入れる
+ * @param {string} allTableBodyId
+ * @param {number|null} colspan - null のとき thead の th 数を使う
+ * @param {string} message
+ */
+function setAllPaneEmptyMessage(allTableBodyId, colspan, message) {
+    const tbody = document.getElementById(allTableBodyId);
+    if (!tbody) return;
+    let c = colspan;
+    if (c == null || c < 1) {
+        const table = tbody.closest('table');
+        const ths = table ? table.querySelectorAll('thead th') : [];
+        c = ths.length > 0 ? ths.length : 3;
+    }
+    tbody.innerHTML = '';
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = c;
+    td.className = 'text-muted small px-2 py-1';
+    td.textContent = message || 'データがありません';
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+}
+
+/**
+ * メインに実データ行があれば All へ同期、なければプレースホルダー（syncToAllPane は行が無いと何もしないため）
+ */
+function syncAllPaneOrPlaceholder(mainTableBodyId, allTableBodyId, limit, emptyMessage) {
+    if (typeof syncToAllPane !== 'function') return;
+    const mainBody = document.getElementById(mainTableBodyId);
+    const allBody = document.getElementById(allTableBodyId);
+    if (!mainBody || !allBody) return;
+    const mainRows = mainBody.querySelectorAll('tr:not(.skeleton-row)');
+    if (mainRows.length > 0) {
+        syncToAllPane(mainTableBodyId, allTableBodyId, limit || 5);
+    } else {
+        setAllPaneEmptyMessage(allTableBodyId, null, emptyMessage || 'データがありません');
+    }
 }
 
 /**
@@ -1164,14 +1211,13 @@ function setupCategoryAccordionObserver(limit = 5) {
  * 非同期読み込みの競合でsyncToAllPaneが空の状態で実行された場合の救済
  */
 function reSyncAllPanes() {
-    if (typeof syncToAllPane !== 'function') return;
+    if (typeof syncAllPaneOrPlaceholder !== 'function') return;
     const allTbodys = document.querySelectorAll('#pane-all tbody[id^="all-"][id$="TrendsTableBody"]');
     allTbodys.forEach(function (allTbody) {
         const allId = allTbody.id;
         const mainId = allId.replace(/^all-/, '');
-        const mainTbody = document.getElementById(mainId);
-        if (mainTbody && mainTbody.querySelectorAll('tr:not(.skeleton-row)').length > 0) {
-            syncToAllPane(mainId, allId, 5);
+        if (document.getElementById(mainId)) {
+            syncAllPaneOrPlaceholder(mainId, allId, 5, 'データがありません');
         }
     });
 }

@@ -5851,6 +5851,7 @@ class TrendsCache:
                                 "⚠️ bluesky_trends_cache に region 列がないため旧スキーマ互換モードで保存します"
                             )
                             region_column_supported = False
+                            conn.rollback()
                             cursor.execute("DELETE FROM bluesky_trends_cache")
                         else:
                             raise
@@ -5932,6 +5933,7 @@ class TrendsCache:
                         logger.warning(
                             "⚠️ bluesky_trends_cache に region 列がないため旧スキーマ互換モードで取得します"
                         )
+                        conn.rollback()
                         cursor.execute("""
                             SELECT post_uri, post_id, title, user_handle, user_display_name,
                                    like_count, reply_count, repost_count, url, created_at, rank, cached_at
@@ -5970,6 +5972,7 @@ class TrendsCache:
                     except Exception as schema_err:
                         err_lower = str(schema_err).lower()
                         if "column" in err_lower and "region" in err_lower and "does not exist" in err_lower:
+                            conn.rollback()
                             cursor.execute("DELETE FROM bluesky_trends_cache")
                             logger.warning(
                                 "⚠️ bluesky_trends_cache に region 列がないため全件クリア（旧スキーマ互換）"

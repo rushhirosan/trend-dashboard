@@ -1792,6 +1792,9 @@ function displayNHKResults(data) {
         return;
     }
 
+    const errNhk = document.getElementById('nhkErrorMessage');
+    if (errNhk) errNhk.style.display = 'none';
+
     // データを表示
     data.data.forEach((item, index) => {
         const row = document.createElement('tr');
@@ -1819,6 +1822,7 @@ function displayNHKResults(data) {
 function showNHKError(message) {
     const errorElement = document.getElementById('nhkErrorMessage');
     const resultsElement = document.getElementById('nhkResults');
+    const allNhkBody = document.getElementById('all-nhkTrendsTableBody');
 
     if (errorElement) {
         errorElement.textContent = message;
@@ -1827,6 +1831,18 @@ function showNHKError(message) {
 
     if (resultsElement) {
         resultsElement.style.display = 'block';
+    }
+
+    // 全部入りタブは syncToAllPane がデータ無しでは動かないため、空メッセージを直接入れる
+    if (allNhkBody) {
+        allNhkBody.innerHTML = '';
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 3;
+        td.className = 'text-muted small px-2 py-1';
+        td.textContent = message;
+        tr.appendChild(td);
+        allNhkBody.appendChild(tr);
     }
 }
 
@@ -1980,6 +1996,9 @@ function displayWikipediaResults(data) {
         return;
     }
 
+    const wikiErr = document.getElementById('wikipediaErrorMessage');
+    if (wikiErr) wikiErr.style.display = 'none';
+
     data.data.forEach((item, index) => {
         const row = document.createElement('tr');
         const url = item.url || '#';
@@ -2003,11 +2022,22 @@ function displayWikipediaResults(data) {
 function showWikipediaError(message) {
     const errorElement = document.getElementById('wikipediaErrorMessage');
     const resultsElement = document.getElementById('wikipediaResults');
+    const allWikiBody = document.getElementById('all-wikipediaTrendsTableBody');
     if (errorElement) {
         errorElement.textContent = message;
         errorElement.style.display = 'block';
     }
     if (resultsElement) resultsElement.style.display = 'block';
+    if (allWikiBody) {
+        allWikiBody.innerHTML = '';
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 3;
+        td.className = 'text-muted small px-2 py-1';
+        td.textContent = message;
+        tr.appendChild(td);
+        allWikiBody.appendChild(tr);
+    }
 }
 
 // Qiita トレンド取得

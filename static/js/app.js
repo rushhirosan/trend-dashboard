@@ -221,7 +221,21 @@ function displayGoogleResults(data) {
     }
 
     // テーブルを更新
-    console.log('displayGoogleResults: テーブル更新開始', { dataLength: data.data.length });
+    console.log('displayGoogleResults: テーブル更新開始', { dataLength: data.data ? data.data.length : 0 });
+
+    if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
+        if (typeof setAllPaneEmptyMessage === 'function') {
+            setAllPaneEmptyMessage('googleTrendsTableBody', null, 'データがありません');
+        } else {
+            tableBody.innerHTML = '';
+        }
+        updateGoogleChart([]);
+        showGoogleResults();
+        if (typeof applyCategoryAccordionForAllTables === 'function') {
+            setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+        }
+        return;
+    }
 
     // Popularity（score）の降順でソート
     const sortedData = [...data.data].sort((a, b) => {
@@ -304,15 +318,16 @@ function displayYouTubeResults(data) {
         : [];
 
     if (sortedData.length === 0) {
-        // データが空のときはスケルトン（ダミー）を表示
-        tableBody.innerHTML = `
-            <tr class="skeleton-row"><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton skeleton-text skeleton-text-long"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text skeleton-text-short"></div></td></tr>
-            <tr class="skeleton-row"><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton skeleton-text skeleton-text-long"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text skeleton-text-short"></div></td></tr>
-            <tr class="skeleton-row"><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton skeleton-text skeleton-text-long"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text skeleton-text-short"></div></td></tr>
-            <tr class="skeleton-row"><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton skeleton-text skeleton-text-long"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text skeleton-text-short"></div></td></tr>
-            <tr class="skeleton-row"><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton skeleton-text skeleton-text-long"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text skeleton-text-short"></div></td></tr>
-        `;
+        if (typeof setAllPaneEmptyMessage === 'function') {
+            setAllPaneEmptyMessage('youtubeTrendsTableBody', null, 'データがありません');
+        } else {
+            tableBody.innerHTML = '';
+        }
+        updateYouTubeChart([]);
         showYouTubeResults();
+        if (typeof applyCategoryAccordionForAllTables === 'function') {
+            setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+        }
         return;
     }
 
@@ -398,8 +413,16 @@ function displayMusicResults(data) {
     }
 
     // テーブルを更新
-    console.log('displayMusicResults: テーブル更新開始', { dataLength: data.data.length });
+    console.log('displayMusicResults: テーブル更新開始', { dataLength: data.data ? data.data.length : 0 });
     tableBody.innerHTML = '';
+    if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
+        if (typeof setAllPaneEmptyMessage === 'function') {
+            setAllPaneEmptyMessage('musicTrendsTableBody', null, 'データがありません');
+        }
+        updateMusicChart([]);
+        showMusicResults();
+        return;
+    }
     data.data.forEach((item, index) => {
         const row = document.createElement('tr');
         row.className = 'trend-card';
@@ -1186,6 +1209,8 @@ function displayWorldNewsResults(data) {
             makeTableRowClickable(row, newsUrl, `${titleText}のニュース記事を開く`);
             tableBody.appendChild(row);
         });
+    } else if (typeof setAllPaneEmptyMessage === 'function') {
+        setAllPaneEmptyMessage('newsTrendsTableBody', null, 'データがありません');
     }
 
     // グラフを更新
@@ -1788,7 +1813,12 @@ function displayNHKResults(data) {
     tableBody.innerHTML = '';
 
     if (!data.data || data.data.length === 0) {
-        showNHKError('データがありません');
+        const errNhk = document.getElementById('nhkErrorMessage');
+        if (errNhk) errNhk.style.display = 'none';
+        if (typeof setAllPaneEmptyMessage === 'function') {
+            setAllPaneEmptyMessage('nhkTrendsTableBody', null, 'データがありません');
+        }
+        resultsElement.style.display = 'block';
         return;
     }
 

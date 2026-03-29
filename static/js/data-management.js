@@ -458,8 +458,9 @@ function loadHatenaTrendsFromCache() {
                 }
             } else {
                 console.log('📊 Hatena データが見つかりません:', data);
-                // キャッシュにデータがない場合は、ローディングを非表示にして終了
-                // APIを呼び出さない（画面更新のたびにAPIを呼び出さないようにするため）
+                if (typeof applyTrendCacheEmptyTable === 'function') {
+                    applyTrendCacheEmptyTable('hatenaTrendsTableBody', 'all-hatenaTrendsTableBody');
+                }
             }
         })
         .catch(error => {
@@ -506,6 +507,8 @@ function loadOpenAlexTrendsFromCache() {
                 if (typeof applyCategoryAccordionForAllTables === 'function') {
                     setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
                 }
+            } else if (typeof applyTrendCacheEmptyTable === 'function') {
+                applyTrendCacheEmptyTable('openalexTrendsTableBody', 'all-openalexTrendsTableBody');
             }
             const resultsElement = document.getElementById('openalexResults');
             if (resultsElement) resultsElement.style.display = 'block';
@@ -546,6 +549,8 @@ function loadBlueskyTrendsFromCache() {
                 if (typeof applyCategoryAccordionForAllTables === 'function') {
                     setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
                 }
+            } else if (typeof applyTrendCacheEmptyTable === 'function') {
+                applyTrendCacheEmptyTable('blueskyTrendsTableBody', 'all-blueskyTrendsTableBody');
             }
             const resultsElement = document.getElementById('blueskyResults');
             if (resultsElement) resultsElement.style.display = 'block';
@@ -613,8 +618,9 @@ function loadTwitchTrendsFromCache() {
                 }
             } else {
                 console.log('📊 Twitch データが見つかりません:', data);
-                // キャッシュにデータがない場合は、ローディングを非表示にして終了
-                // APIを呼び出さない（画面更新のたびにAPIを呼び出さないようにするため）
+                if (typeof applyTrendCacheEmptyTable === 'function') {
+                    applyTrendCacheEmptyTable('twitchTrendsTableBody', 'all-twitchTrendsTableBody');
+                }
             }
         })
         .catch(error => {
@@ -1475,6 +1481,9 @@ function loadNoteTrendsFromCache() {
                 }
             } else {
                 console.log('Note Trends データなしまたはエラー:', data);
+                if (typeof applyTrendCacheEmptyTable === 'function') {
+                    applyTrendCacheEmptyTable('noteTrendsTableBody', 'all-noteTrendsTableBody');
+                }
             }
             if (loadingElement) {
                 loadingElement.style.display = 'none';

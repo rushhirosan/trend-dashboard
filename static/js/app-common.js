@@ -717,6 +717,14 @@ function loadTrendsFromCache(config) {
                 }
             } else {
                 console.log(`${serviceName} Trends データなし（表示はメタ情報のみ）:`, data);
+                const sync = config.allPaneSync;
+                const emptyMsg = config.emptyTableMessage || 'データがありません';
+                if (sync && sync.mainTableBodyId && typeof setAllPaneEmptyMessage === 'function') {
+                    setAllPaneEmptyMessage(sync.mainTableBodyId, null, emptyMsg);
+                }
+                if (typeof applyCategoryAccordionForAllTables === 'function') {
+                    setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+                }
             }
 
             // 全部入り（All）: 取得後は常に同期または空表示（syncToAllPane は実データ行が無いと動かないため）
@@ -840,6 +848,24 @@ function syncAllPaneOrPlaceholder(mainTableBodyId, allTableBodyId, limit, emptyM
         syncToAllPane(mainTableBodyId, allTableBodyId, limit || 5);
     } else {
         setAllPaneEmptyMessage(allTableBodyId, null, emptyMessage || 'データがありません');
+    }
+}
+
+/**
+ * キャッシュ反映後にデータが空のとき、メイン枠と All 枠を同じ「空1行」表示に揃える（スケルトンの除去含む）
+ */
+function applyTrendCacheEmptyTable(mainTableBodyId, allTableBodyId, message) {
+    const msg = message || 'データがありません';
+    if (typeof setAllPaneEmptyMessage === 'function') {
+        setAllPaneEmptyMessage(mainTableBodyId, null, msg);
+    }
+    if (allTableBodyId && typeof syncAllPaneOrPlaceholder === 'function') {
+        setTimeout(function() {
+            syncAllPaneOrPlaceholder(mainTableBodyId, allTableBodyId, 5, msg);
+        }, 0);
+    }
+    if (typeof applyCategoryAccordionForAllTables === 'function') {
+        setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
     }
 }
 

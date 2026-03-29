@@ -895,18 +895,35 @@ function displayGoogleResults(data) {
     
     // Clear table
     tableBody.innerHTML = '';
-    
-    // Popularity（score/popularity）の降順でソート
-    const sortedData = [...data.data].sort((a, b) => {
-        const scoreA = a.score || a.popularity || 0;
-        const scoreB = b.score || b.popularity || 0;
-        return scoreB - scoreA; // 降順
-    });
-    
+
+    const sortedData = (!data.data || !Array.isArray(data.data))
+        ? []
+        : [...data.data].sort((a, b) => {
+            const scoreA = a.score || a.popularity || 0;
+            const scoreB = b.score || b.popularity || 0;
+            return scoreB - scoreA;
+        });
+
+    if (sortedData.length === 0) {
+        if (typeof setAllPaneEmptyMessage === 'function') {
+            setAllPaneEmptyMessage('googleTrendsTableBody', null, 'データがありません');
+        }
+        if (typeof syncAllPaneOrPlaceholder === 'function') {
+            setTimeout(function() {
+                syncAllPaneOrPlaceholder('googleTrendsTableBody', 'all-googleTrendsTableBody', 5, 'データがありません');
+            }, 0);
+        }
+        if (typeof applyCategoryAccordionForAllTables === 'function') {
+            setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
+        }
+        console.log('displayGoogleResults: Completed (empty)');
+        return;
+    }
+
     // Add data to table
     console.log('Data structure check:', sortedData[0]); // Debug: Check first item structure
     console.log('All data keys:', Object.keys(sortedData[0] || {})); // Debug: Check all available keys
-    
+
     sortedData.forEach((item, index) => {
         const row = document.createElement('tr');
         const keyword = item.keyword || item.term || item.name || 'N/A';
@@ -979,22 +996,19 @@ function displayYouTubeResults(data) {
         })
         : [];
     
-    // データが空のときはスケルトン（ダミー）を表示
     if (sortedData.length === 0) {
-        tableBody.innerHTML = `
-            <tr class="skeleton-row"><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton skeleton-text skeleton-text-long"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text skeleton-text-short"></div></td></tr>
-            <tr class="skeleton-row"><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton skeleton-text skeleton-text-long"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text skeleton-text-short"></div></td></tr>
-            <tr class="skeleton-row"><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton skeleton-text skeleton-text-long"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text skeleton-text-short"></div></td></tr>
-            <tr class="skeleton-row"><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton skeleton-text skeleton-text-long"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text skeleton-text-short"></div></td></tr>
-            <tr class="skeleton-row"><td><div class="skeleton skeleton-badge"></div></td><td><div class="skeleton skeleton-text skeleton-text-long"></div></td><td><div class="skeleton skeleton-text"></div></td><td><div class="skeleton skeleton-text skeleton-text-short"></div></td></tr>
-        `;
-        if (typeof syncToAllPane === 'function') {
-            setTimeout(() => syncToAllPane('youtubeTrendsTableBody', 'all-youtubeTrendsTableBody', 5), 0);
+        if (typeof setAllPaneEmptyMessage === 'function') {
+            setAllPaneEmptyMessage('youtubeTrendsTableBody', null, 'データがありません');
+        }
+        if (typeof syncAllPaneOrPlaceholder === 'function') {
+            setTimeout(function() {
+                syncAllPaneOrPlaceholder('youtubeTrendsTableBody', 'all-youtubeTrendsTableBody', 5, 'データがありません');
+            }, 0);
         }
         if (typeof applyCategoryAccordionForAllTables === 'function') {
             setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
         }
-        console.log('displayYouTubeResults: No data, showing skeleton');
+        console.log('displayYouTubeResults: No data, empty row');
         return;
     }
     
@@ -1385,8 +1399,15 @@ function displayWorldNewsResults(data) {
     
     // Clear table
     tableBody.innerHTML = '';
-    
-    // Add data to table
+
+    if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
+        if (typeof applyTrendCacheEmptyTable === 'function') {
+            applyTrendCacheEmptyTable('worldnewsTrendsTableBody', 'all-worldnewsTrendsTableBody');
+        }
+        console.log('displayWorldNewsResults: Completed (empty)');
+        return;
+    }
+
     data.data.forEach((item, index) => {
         const row = document.createElement('tr');
         const title = item.title || 'N/A';
@@ -1394,7 +1415,7 @@ function displayWorldNewsResults(data) {
         // CNNと同じ日付フォーマットに統一（MM/DD/YYYY形式）
         const published = publishedRaw ? new Date(publishedRaw).toLocaleDateString('en-US') : 'N/A';
         const url = item.url || '#';
-        
+
         row.innerHTML = `
             <td><span class="badge bg-info">${index + 1}</span></td>
             <td><a href="${url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>${title}</strong></a></td>
@@ -1404,7 +1425,7 @@ function displayWorldNewsResults(data) {
         makeTableRowClickable(row, url, `Open ${title} news article`);
         tableBody.appendChild(row);
     });
-    
+
     if (typeof syncToAllPane === 'function') {
         setTimeout(() => syncToAllPane('worldnewsTrendsTableBody', 'all-worldnewsTrendsTableBody', 5), 0);
     }

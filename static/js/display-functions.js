@@ -764,6 +764,8 @@ function displayWorldNewsResults(data) {
             makeTableRowClickable(row, newsUrl, `${titleText}のニュース記事を開く`);
             tableBody.appendChild(row);
         });
+    } else if (typeof setAllPaneEmptyMessage === 'function') {
+        setAllPaneEmptyMessage('newsTrendsTableBody', null, 'データがありません');
     }
 
     // 結果セクションを表示

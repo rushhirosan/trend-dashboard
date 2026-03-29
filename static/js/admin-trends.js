@@ -417,6 +417,10 @@
 
         fetchJson(url, { timeoutMs: forceRefresh ? 12000 : 6000 })
             .then(function (json) {
+                if (typeof updateTrendMetaDisplay === 'function') {
+                    updateTrendMetaDisplay('header-estat-cache-meta', json.estat || {});
+                    updateTrendMetaDisplay('header-kkj-cache-meta', json.kkj || {});
+                }
                 // e-Stat
                 var estat = json.estat || {};
                 var estatData = (estat.success && estat.data && estat.data.length && (estat.data[0].name_ja || estat.data[0].indicator_id))

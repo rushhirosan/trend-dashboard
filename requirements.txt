@@ -33,3 +33,6 @@ trendspyg>=0.4.2
 yfinance>=0.2.0
 yahooquery>=2.4.0
 feedparser==6.0.12
+
+# Tests
+pytest>=7.0.0

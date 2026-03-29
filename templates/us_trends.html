@@ -101,7 +101,7 @@
     <script src="{{ url_for('static', filename='js/all-freshness.js') }}"></script>
     <script src="{{ url_for('static', filename='js/us-admin-trends.js') }}"></script>
 </head>
-<body id="trends-us" class="bg-light">
+<body id="trends-us" class="bg-light" data-trend-meta-tz="America/New_York">
     <!-- ヘッダー -->
     {% set page_title = 'Trends Dashboard' %}
     {% set page_icon = 'fas fa-chart-line' %}
@@ -142,11 +142,13 @@
                                         <i class="fas fa-chart-line me-1"></i>US Economy (BLS)
                                         <span id="header-estat-latest-period" class="text-muted ms-1"></span>
                                     </div>
+                                    <div id="header-estat-cache-meta" class="mb-1" aria-live="polite"></div>
                                     <div id="header-estat-compact-body" class="header-admin-latest mb-2" aria-live="polite">
                                         <span class="text-muted">Loading...</span>
                                     </div>
 
                                     <div class="header-admin-section-title">US Government Spending (USAspending)</div>
+                                    <div id="header-kkj-cache-meta" class="mb-1" aria-live="polite"></div>
                                     <div id="header-kkj-compact-body" class="header-kkj-body">
                                         <span class="text-muted">Loading...</span>
                                     </div>

@@ -307,6 +307,11 @@
                 if (loading) loading.style.display = 'none';
                 if (body) body.style.display = 'block';
 
+                if (typeof updateTrendMetaDisplay === 'function') {
+                    updateTrendMetaDisplay('header-estat-cache-meta', json.bls || {});
+                    updateTrendMetaDisplay('header-kkj-cache-meta', json.usaspending || {});
+                }
+
                 // BLS
                 var bls = json.bls || {};
                 var blsData = (bls.success && bls.data && bls.data.length) ? bls.data : null;

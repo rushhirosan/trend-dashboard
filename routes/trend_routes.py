@@ -6,9 +6,61 @@
 from functools import wraps
 from flask import Blueprint, jsonify, request, current_app
 from utils.logger_config import get_logger
+from database_config import TrendsCache
 
 # ロガーの初期化
 logger = get_logger(__name__)
+
+
+def _cache_key_worldnews(country: str) -> str:
+    """マネージャー・DB の worldnews_trends_{country} と一致させる（小文字統一）"""
+    return f"worldnews_trends_{(country or 'jp').lower()}"
+
+
+def enrich_trend_payload(response, result, cache_key=None):
+    """
+    API レスポンスに cache_as_of / display_note などを付与する。
+    cache_key: cache_status テーブルの cache_key（ソース別の最終更新時刻）
+    """
+    if cache_key:
+        try:
+            info = TrendsCache().get_cache_info(cache_key)
+            if info:
+                lu = info.get('last_updated')
+                if lu:
+                    response['cache_as_of'] = lu
+                dc = info.get('data_count')
+                if dc is not None:
+                    response['cache_row_count'] = dc
+        except Exception as e:
+            logger.debug('enrich_trend_payload cache_info スキップ: %s', e)
+
+    if isinstance(result, dict):
+        for k in ('refresh_date', 'data_date'):
+            if result.get(k):
+                response[k] = result[k]
+
+    raw_data = response.get('data')
+    if raw_data is None:
+        data = []
+    elif isinstance(raw_data, list):
+        data = raw_data
+    else:
+        # KKJ 等、リスト以外のオブジェクトも「データあり」とみなす
+        data = [raw_data] if raw_data else []
+
+    note_parts = []
+    if response.get('message'):
+        note_parts.append(str(response['message']))
+    elif isinstance(result, dict) and result.get('message'):
+        note_parts.append(str(result['message']))
+    if len(data) == 0 and not note_parts:
+        st = response.get('status') or (result.get('status') if isinstance(result, dict) else '')
+        if st != 'cache_not_found':
+            note_parts.append('直近の取得では表示できるデータがありませんでした。')
+    if note_parts:
+        response['display_note'] = ' '.join(note_parts)
+    return response
 
 # Blueprintを作成
 trend_bp = Blueprint('trends', __name__, url_prefix='/api')
@@ -60,7 +112,7 @@ def require_manager(manager_key):
     return decorator
 
 
-def handle_trend_response(result, error_message, default_source=None, **extra_fields):
+def handle_trend_response(result, error_message, default_source=None, cache_key=None, **extra_fields):
     """
     トレンドAPIのレスポンスを統一フォーマットで返す
     
@@ -68,16 +120,19 @@ def handle_trend_response(result, error_message, default_source=None, **extra_fi
         result: マネージャーから返された結果
         error_message: エラーメッセージのテンプレート
         default_source: デフォルトのソース名
+        cache_key: cache_status のキー（cache_as_of 付与用）
         **extra_fields: レスポンスに追加するフィールド
     """
     # リストが直接返された場合（後方互換性のため）
     if isinstance(result, list):
-        return jsonify({
+        body = {
             'success': True,
             'data': result,
             'status': 'fresh',
             **extra_fields
-        })
+        }
+        enrich_trend_payload(body, {}, cache_key=cache_key)
+        return jsonify(body)
     
     # 辞書形式の結果
     if isinstance(result, dict):
@@ -86,14 +141,16 @@ def handle_trend_response(result, error_message, default_source=None, **extra_fi
             # キャッシュが見つからない場合は、エラーではなく正常なレスポンスとして扱う（200 OK）
             status = result.get('status', '')
             if status == 'cache_not_found':
-                return jsonify({
+                body = {
                     'success': True,
                     'data': result.get('data', []),
                     'status': status,
                     'source': result.get('source', default_source),
                     'message': result.get('error', 'キャッシュにデータがありません'),
                     **extra_fields
-                }), 200
+                }
+                enrich_trend_payload(body, result, cache_key=cache_key)
+                return jsonify(body), 200
             
             # その他のエラーは500エラーとして返す
             error_response = {
@@ -128,6 +185,7 @@ def handle_trend_response(result, error_message, default_source=None, **extra_fi
             if key in result:
                 response[key] = result[key]
         
+        enrich_trend_payload(response, result, cache_key=cache_key)
         return jsonify(response)
     
     # 予期しない形式
@@ -164,7 +222,7 @@ def get_google_trends(manager):
 
         result = manager.get_trends(region=country, force_refresh=force_refresh)
         logger.info(f"✅ Google Trends API成功: result keys={list(result.keys()) if isinstance(result, dict) else 'N/A'}")
-        return handle_trend_response(result, 'Google Trends', 'Google Trends', country=country)
+        return handle_trend_response(result, 'Google Trends', 'Google Trends', cache_key='google_trends', country=country)
 
     except Exception as e:
         logger.error(f"❌ Google Trends APIエラー: {e}", exc_info=True)
@@ -180,7 +238,7 @@ def get_youtube_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(region, force_refresh=force_refresh)
-        return handle_trend_response(result, 'YouTube Trends', 'YouTube Data API', region_code=region)
+        return handle_trend_response(result, 'YouTube Trends', 'YouTube Data API', cache_key='youtube_trends', region_code=region)
         
     except Exception as e:
         return handle_api_error('YouTube Trends', e)
@@ -195,7 +253,7 @@ def get_youtube_rising_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_rising_trends(region, force_refresh=force_refresh)
-        return handle_trend_response(result, 'YouTube急上昇', 'YouTube Data API', region_code=region)
+        return handle_trend_response(result, 'YouTube急上昇', 'YouTube Data API', cache_key='youtube_trends', region_code=region)
         
     except Exception as e:
         return handle_api_error('YouTube急上昇', e)
@@ -207,11 +265,11 @@ def get_music_trends(manager):
     """音楽トレンド APIエンドポイント"""
     try:
         service = request.args.get('service', 'spotify')
-        region = request.args.get('region', 'JP')
+        region = request.args.get('region', 'JP').upper()
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(service, region, force_refresh=force_refresh)
-        return handle_trend_response(result, '音楽トレンド', 'Music API', 
+        return handle_trend_response(result, '音楽トレンド', 'Music API', cache_key=f'music_trends_{region}',
                                     service=service, region=region)
         
     except Exception as e:
@@ -223,12 +281,12 @@ def get_music_trends(manager):
 def get_worldnews_trends(manager):
     """World News APIエンドポイント"""
     try:
-        country = request.args.get('country', 'jp')
+        country = request.args.get('country', 'jp').lower()
         category = request.args.get('category', 'general')
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(country, category, force_refresh=force_refresh)
-        return handle_trend_response(result, 'World News', 'World News API',
+        return handle_trend_response(result, 'World News', 'World News API', cache_key=_cache_key_worldnews(country),
                                     country=country, category=category)
         
     except Exception as e:
@@ -247,7 +305,7 @@ def get_podcast_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(trend_type, genre_id, region, page_size, force_refresh)
-        return handle_trend_response(result, 'ポッドキャストトレンド', 'Podcast API',
+        return handle_trend_response(result, 'ポッドキャストトレンド', 'Podcast API', cache_key='podcast_trends',
                                     trend_type=trend_type, region=region)
         
     except Exception as e:
@@ -277,7 +335,8 @@ def get_rakuten_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(genre_id, force_refresh=force_refresh)
-        return handle_trend_response(result, '楽天トレンド', 'Rakuten API', genre_id=genre_id)
+        gid = genre_id or 'all'
+        return handle_trend_response(result, '楽天トレンド', 'Rakuten API', cache_key=f'rakuten_trends_{gid}', genre_id=genre_id)
         
     except Exception as e:
         return handle_api_error('楽天トレンド', e)
@@ -307,33 +366,39 @@ def get_hatena_trends():
         # エラーが含まれている場合でも、空のデータを返す（500エラーを防ぐ）
         if not result.get('success', True):
             logger.warning(f"⚠️ Hatena: データ取得に失敗しましたが、空のデータを返します: {result.get('error', 'Unknown error')}")
-            return jsonify({
+            body = {
                 'success': True,  # エラーではなく、データがない状態として扱う
                 'data': [],
                 'status': result.get('status', 'api_error'),
                 'category': category,
                 'source': 'Hatena API',
                 'message': result.get('error', 'データを取得できませんでした')
-            }), 200
+            }
+            enrich_trend_payload(body, result, cache_key='hatena_trends')
+            return jsonify(body), 200
         
-        return jsonify({
+        body = {
             'success': True,
             'data': result.get('data', []),
             'status': result.get('status', 'unknown'),
             'category': result.get('category', category),
             'source': result.get('source', 'Hatena API')
-        })
+        }
+        enrich_trend_payload(body, result, cache_key='hatena_trends')
+        return jsonify(body)
         
     except Exception as e:
         logger.error(f"❌ Hatena API エラー: {e}", exc_info=True)
         # 500エラーではなく、空のデータを返す（フロントエンドでエラーハンドリング）
-        return jsonify({
+        body = {
             'success': True,  # エラーではなく、データがない状態として扱う
             'data': [],
             'status': 'api_error',
             'category': category,
-            'error': f'はてなブックマークトレンドの取得に失敗しました: {str(e)}'
-        }), 200
+            'message': f'はてなブックマークトレンドの取得に失敗しました: {str(e)}'
+        }
+        enrich_trend_payload(body, {}, cache_key='hatena_trends')
+        return jsonify(body), 200
 
 
 @trend_bp.route('/openalex-trends')
@@ -349,10 +414,14 @@ def get_openalex_trends(manager):
         force_refresh = get_force_refresh()
         region = request.args.get('region')  # 'jp' で日本語論文のみ
 
+        region_is_jp = (region or '').lower() == 'jp'
+        # マネージャーは region == "jp" のみ日本向けキャッシュ（大文字 JP を正規化）
+        region_for_mgr = 'jp' if region_is_jp else region
         result = manager.get_trends(
-            category=category, limit=limit, force_refresh=force_refresh, region=region
+            category=category, limit=limit, force_refresh=force_refresh, region=region_for_mgr
         )
-        return handle_trend_response(result, 'OpenAlexトレンド', 'OpenAlex API', category=category)
+        oa_key = f"{category}_jp" if region_is_jp else category
+        return handle_trend_response(result, 'OpenAlexトレンド', 'OpenAlex API', cache_key=f'openalex_trends_{oa_key}', category=category)
 
     except Exception as e:
         return handle_api_error('OpenAlexトレンド', e)
@@ -370,11 +439,14 @@ def get_bluesky_trends(manager):
         force_refresh = get_force_refresh()
         region = request.args.get('region')
         cache_only = not force_refresh
+        # マネージャーは region が厳密に "jp" のときのみ日本フィード（大文字小文字ゆらぎを吸収）
+        region_for_mgr = 'jp' if (region or '').lower() == 'jp' else None
 
         result = manager.get_trends(
-            limit=limit, force_refresh=force_refresh, cache_only=cache_only, region=region
+            limit=limit, force_refresh=force_refresh, cache_only=cache_only, region=region_for_mgr
         )
-        return handle_trend_response(result, 'Blueskyトレンド', 'Bluesky API')
+        bsky_key = 'bluesky_trends_jp' if region_for_mgr == 'jp' else 'bluesky_trends'
+        return handle_trend_response(result, 'Blueskyトレンド', 'Bluesky API', cache_key=bsky_key)
 
     except Exception as e:
         return handle_api_error('Blueskyトレンド', e)
@@ -395,7 +467,7 @@ def get_twitch_trends(manager):
         if isinstance(result, dict):
             trend_type = result.get('trend_type', category)
         
-        return handle_trend_response(result, 'Twitchトレンド', 'Twitch API', trend_type=trend_type)
+        return handle_trend_response(result, 'Twitchトレンド', 'Twitch API', cache_key='twitch_trends', trend_type=trend_type)
         
     except Exception as e:
         return handle_api_error('Twitchトレンド', e)
@@ -412,7 +484,7 @@ def get_reddit_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(subreddit, limit, time_filter, force_refresh)
-        return handle_trend_response(result, 'Redditトレンド', 'Reddit API', subreddit=subreddit)
+        return handle_trend_response(result, 'Redditトレンド', 'Reddit API', cache_key='reddit_trends', subreddit=subreddit)
         
     except Exception as e:
         return handle_api_error('Redditトレンド', e)
@@ -428,7 +500,7 @@ def get_hackernews_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(story_type, limit, force_refresh)
-        return handle_trend_response(result, 'Hacker Newsトレンド', 'Hacker News API',
+        return handle_trend_response(result, 'Hacker Newsトレンド', 'Hacker News API', cache_key='hackernews_trends',
                                     story_type=story_type)
         
     except Exception as e:
@@ -445,7 +517,7 @@ def get_qiita_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(limit=limit, sort=sort, force_refresh=force_refresh)
-        return handle_trend_response(result, 'Qiitaトレンド', 'Qiita API', sort=sort)
+        return handle_trend_response(result, 'Qiitaトレンド', 'Qiita API', cache_key='qiita_trends', sort=sort)
         
     except Exception as e:
         return handle_api_error('Qiitaトレンド', e)
@@ -461,7 +533,7 @@ def get_github_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(language=language, limit=limit, force_refresh=force_refresh)
-        return handle_trend_response(result, 'GitHubトレンド', 'GitHub API', language=language)
+        return handle_trend_response(result, 'GitHubトレンド', 'GitHub API', cache_key='github_trends', language=language)
         
     except Exception as e:
         return handle_api_error('GitHubトレンド', e)
@@ -472,13 +544,13 @@ def get_github_trends(manager):
 def get_appstore_trends(manager):
     """App Store Trends APIエンドポイント"""
     try:
-        country = request.args.get('country', 'JP')
+        country = request.args.get('country', 'JP').upper()
         category = request.args.get('category', 'all')
         limit = int(request.args.get('limit', 25))
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(country=country, category=category, limit=limit, force_refresh=force_refresh)
-        return handle_trend_response(result, 'App Storeトレンド', 'App Store API', country=country, category=category)
+        return handle_trend_response(result, 'App Storeトレンド', 'App Store API', cache_key=f'appstore_trends_{country}', country=country, category=category)
         
     except Exception as e:
         return handle_api_error('App Storeトレンド', e)
@@ -492,7 +564,7 @@ def get_nhk_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(limit=limit, force_refresh=force_refresh)
-        return handle_trend_response(result, 'NHKニュース', 'NHK RSS')
+        return handle_trend_response(result, 'NHKニュース', 'NHK RSS', cache_key='nhk_trends')
         
     except Exception as e:
         return handle_api_error('NHKニュース', e)
@@ -548,10 +620,15 @@ def get_news_bundle():
                 return {'success': True, 'data': r, 'status': 'cached'}
             return {'success': False, 'data': [], 'error': '不正なレスポンス'}
 
+        nhk_body = normalize(nhk_result)
+        world_body = normalize(worldnews_result)
+        enrich_trend_payload(nhk_body, nhk_result if isinstance(nhk_result, dict) else {}, cache_key='nhk_trends')
+        enrich_trend_payload(world_body, worldnews_result if isinstance(worldnews_result, dict) else {}, cache_key=_cache_key_worldnews('jp'))
+
         return jsonify({
             'success': True,
-            'nhk': normalize(nhk_result),
-            'worldnews': normalize(worldnews_result)
+            'nhk': nhk_body,
+            'worldnews': world_body
         })
     except Exception as e:
         logger.exception('news-bundle エラー: %s', e)
@@ -571,7 +648,7 @@ def get_prtimes_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(limit=limit, force_refresh=force_refresh)
-        return handle_trend_response(result, 'PR TIMES', 'PR TIMES RSS')
+        return handle_trend_response(result, 'PR TIMES', 'PR TIMES RSS', cache_key='prtimes_trends')
         
     except Exception as e:
         return handle_api_error('PR TIMES', e)
@@ -586,7 +663,7 @@ def get_prtimes_hatena_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(limit=limit, force_refresh=force_refresh)
-        return handle_trend_response(result, 'PR TIMES × はてブ', 'PR TIMES RSS + Hatena Count API')
+        return handle_trend_response(result, 'PR TIMES × はてブ', 'PR TIMES RSS + Hatena Count API', cache_key='prtimes_hatena_trends')
         
     except Exception as e:
         return handle_api_error('PR TIMES × はてブ', e)
@@ -601,7 +678,7 @@ def get_globenewswire_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(limit=limit, force_refresh=force_refresh)
-        return handle_trend_response(result, 'GlobeNewswire', 'GlobeNewswire RSS')
+        return handle_trend_response(result, 'GlobeNewswire', 'GlobeNewswire RSS', cache_key='globenewswire_trends')
         
     except Exception as e:
         return handle_api_error('GlobeNewswire', e)
@@ -616,7 +693,7 @@ def get_globenewswire_market_reaction_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(limit=limit, force_refresh=force_refresh)
-        return handle_trend_response(result, 'GlobeNewswire × Market', 'globenewswire_market_reaction')
+        return handle_trend_response(result, 'GlobeNewswire × Market', 'globenewswire_market_reaction', cache_key='globenewswire_market_reaction_trends')
         
     except Exception as e:
         return handle_api_error('GlobeNewswire × Market Reaction', e)
@@ -632,7 +709,7 @@ def get_wikipedia_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(lang=lang, limit=limit, force_refresh=force_refresh)
-        return handle_trend_response(result, 'Wikipedia 人気記事', 'Wikipedia Featured API', lang=lang)
+        return handle_trend_response(result, 'Wikipedia 人気記事', 'Wikipedia Featured API', cache_key=f'wikipedia_trends_{lang}', lang=lang)
         
     except Exception as e:
         return handle_api_error('Wikipedia 人気記事', e)
@@ -648,7 +725,7 @@ def get_producthunt_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(limit=limit, sort=sort, force_refresh=force_refresh)
-        return handle_trend_response(result, 'Product Huntトレンド', 'Product Hunt API', sort=sort)
+        return handle_trend_response(result, 'Product Huntトレンド', 'Product Hunt API', cache_key='producthunt_trends', sort=sort)
         
     except Exception as e:
         return handle_api_error('Product Huntトレンド', e)
@@ -662,7 +739,7 @@ def get_cnn_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(limit=limit, force_refresh=force_refresh)
-        return handle_trend_response(result, 'CNNニュース', 'CNN RSS')
+        return handle_trend_response(result, 'CNNニュース', 'CNN RSS', cache_key='cnn_trends')
         
     except Exception as e:
         return handle_api_error('CNNニュース', e)
@@ -678,7 +755,7 @@ def get_stock_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(market=market, limit=limit, force_refresh=force_refresh)
-        return handle_trend_response(result, 'Stock Trends', 'yfinance', market=market)
+        return handle_trend_response(result, 'Stock Trends', 'yfinance', cache_key=f'stock_trends_{market}', market=market)
         
     except Exception as e:
         return handle_api_error('Stock Trends', e)
@@ -693,7 +770,7 @@ def get_crypto_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(limit=limit, force_refresh=force_refresh)
-        return handle_trend_response(result, 'Crypto Trends', 'CoinGecko API')
+        return handle_trend_response(result, 'Crypto Trends', 'CoinGecko API', cache_key='crypto_trends')
         
     except Exception as e:
         return handle_api_error('Crypto Trends', e)
@@ -704,13 +781,13 @@ def get_crypto_trends(manager):
 def get_movie_trends(manager):
     """Movie Trends APIエンドポイント"""
     try:
-        country = request.args.get('country', 'JP')  # 'JP' or 'US'
+        country = request.args.get('country', 'JP').upper()  # 'JP' or 'US'
         time_window = request.args.get('time_window', 'day')  # 'day' or 'week'
         limit = int(request.args.get('limit', 25))
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(country=country, time_window=time_window, limit=limit, force_refresh=force_refresh)
-        return handle_trend_response(result, 'Movie Trends', 'TMDB API', time_window=time_window, country=country)
+        return handle_trend_response(result, 'Movie Trends', 'TMDB API', cache_key=f'movie_trends_{country}', time_window=time_window, country=country)
         
     except Exception as e:
         return handle_api_error('Movie Trends', e)
@@ -727,7 +804,7 @@ def get_book_trends(manager):
         force_refresh = get_force_refresh()
         result = manager.get_trends(country=country, limit=limit, force_refresh=force_refresh, category=category)
         source = '楽天ブックスAPI' if country == 'JP' else 'Google Books API'
-        return handle_trend_response(result, 'Book Trends', source, country=country, category=category)
+        return handle_trend_response(result, 'Book Trends', source, cache_key=f'book_trends_{country}_{category}', country=country, category=category)
     except Exception as e:
         return handle_api_error('Book Trends', e)
 
@@ -740,7 +817,7 @@ def get_cisa_kev_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(limit=limit, force_refresh=force_refresh)
-        return handle_trend_response(result, 'CISA KEV', 'CISA KEV API')
+        return handle_trend_response(result, 'CISA KEV', 'CISA KEV API', cache_key='cisa_kev_trends')
         
     except Exception as e:
         return handle_api_error('CISA KEV Trends', e)
@@ -781,6 +858,10 @@ def get_admin_trends():
         except Exception as e:
             logger.exception("政府調達取得エラー: %s", e)
             kkj_result = {"success": False, "data": None, "error": str(e)}
+    if isinstance(estat_result, dict):
+        enrich_trend_payload(estat_result, estat_result, cache_key='estat_trends')
+    if isinstance(kkj_result, dict):
+        enrich_trend_payload(kkj_result, kkj_result, cache_key='kkj_trends')
     return jsonify({
         "success": estat_result.get("success", False) or kkj_result.get("success", False),
         "estat": estat_result,
@@ -795,7 +876,7 @@ def get_estat_trends(manager):
     try:
         force_refresh = get_force_refresh()
         result = manager.get_trends(limit=6, force_refresh=force_refresh)
-        return handle_trend_response(result, 'e-Stat', 'e-Stat API')
+        return handle_trend_response(result, 'e-Stat', 'e-Stat API', cache_key='estat_trends')
     except Exception as e:
         return handle_api_error('e-Stat Trends', e)
 
@@ -827,6 +908,11 @@ def get_us_admin_trends():
             logger.exception("USAspending取得エラー: %s", e)
             usaspending_result = {"success": False, "data": None, "error": str(e)}
 
+    if isinstance(bls_result, dict):
+        enrich_trend_payload(bls_result, bls_result, cache_key='bls_trends')
+    if isinstance(usaspending_result, dict):
+        enrich_trend_payload(usaspending_result, usaspending_result, cache_key='usaspending_trends')
+
     return jsonify({
         "success": bls_result.get("success", False) or usaspending_result.get("success", False),
         "bls": bls_result,
@@ -841,6 +927,8 @@ def get_kkj_trends(manager):
     try:
         force_refresh = get_force_refresh()
         result = manager.get_public_sector_signals(force_refresh=force_refresh)
+        if isinstance(result, dict):
+            enrich_trend_payload(result, result, cache_key='kkj_trends')
         return jsonify(result)
     except Exception as e:
         return handle_api_error('政府調達 KKJ Trends', e)
@@ -855,7 +943,7 @@ def get_thehackernews_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(limit=limit, force_refresh=force_refresh)
-        return handle_trend_response(result, 'The Hacker News', 'The Hacker News RSS')
+        return handle_trend_response(result, 'The Hacker News', 'The Hacker News RSS', cache_key='thehackernews_trends')
         
     except Exception as e:
         return handle_api_error('The Hacker News Trends', e)
@@ -869,7 +957,7 @@ def get_ipa_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(limit=limit, force_refresh=force_refresh)
-        return handle_trend_response(result, 'IPA注意喚起', 'IPA RSS')
+        return handle_trend_response(result, 'IPA注意喚起', 'IPA RSS', cache_key='ipa_trends')
         
     except Exception as e:
         return handle_api_error('IPA Trends', e)
@@ -883,7 +971,7 @@ def get_jpcert_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(limit=limit, force_refresh=force_refresh)
-        return handle_trend_response(result, 'JPCERT/CC', 'JPCERT/CC RSS')
+        return handle_trend_response(result, 'JPCERT/CC', 'JPCERT/CC RSS', cache_key='jpcert_trends')
         
     except Exception as e:
         return handle_api_error('JPCERT/CC Trends', e)
@@ -897,7 +985,7 @@ def get_hackernoon_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(limit=limit, force_refresh=force_refresh)
-        return handle_trend_response(result, 'Hacker Noon', 'Hacker Noon RSS')
+        return handle_trend_response(result, 'Hacker Noon', 'Hacker Noon RSS', cache_key='hackernoon_trends')
         
     except Exception as e:
         return handle_api_error('Hacker Noon Trends', e)
@@ -911,7 +999,7 @@ def get_zenn_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(limit=limit, force_refresh=force_refresh)
-        return handle_trend_response(result, 'Zenn', 'Zenn RSS')
+        return handle_trend_response(result, 'Zenn', 'Zenn RSS', cache_key='zenn_trends')
         
     except Exception as e:
         return handle_api_error('Zenn Trends', e)
@@ -932,7 +1020,7 @@ def get_note_trends(manager):
             force_refresh=force_refresh,
             fetch_all_categories=fetch_all_categories
         )
-        return handle_trend_response(result, 'Note', 'Note RSS')
+        return handle_trend_response(result, 'Note', 'Note RSS', cache_key=f'note_trends_{category}')
         
     except Exception as e:
         return handle_api_error('Note Trends', e)
@@ -954,7 +1042,7 @@ def get_ebay_trends(manager):
             if 'available_categories' not in result:
                 result['available_categories'] = manager.get_available_categories()
         
-        return handle_trend_response(result, 'eBay Popular/Trending', 'eBay API', category=category)
+        return handle_trend_response(result, 'eBay Popular/Trending', 'eBay API', cache_key='ebay_trends', category=category)
         
     except Exception as e:
         return handle_api_error('eBay Popular/Trending Trends', e)
@@ -968,7 +1056,7 @@ def get_medium_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(limit=limit, force_refresh=force_refresh)
-        return handle_trend_response(result, 'Medium', 'Medium RSS')
+        return handle_trend_response(result, 'Medium', 'Medium RSS', cache_key='medium_trends')
         
     except Exception as e:
         return handle_api_error('Medium Trends', e)
@@ -982,7 +1070,7 @@ def get_devto_trends(manager):
         force_refresh = get_force_refresh()
         
         result = manager.get_trends(limit=limit, force_refresh=force_refresh)
-        return handle_trend_response(result, 'DEV.to', 'DEV.to API')
+        return handle_trend_response(result, 'DEV.to', 'DEV.to API', cache_key='devto_trends')
         
     except Exception as e:
         return handle_api_error('DEV.to Trends', e)

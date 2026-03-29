@@ -503,6 +503,132 @@ function createDropdownTrendsManager(config) {
 }
 
 // ============================================
+// ソース別メタ（基準時刻・説明）表示
+// ============================================
+
+function escapeHtmlTrendMeta(s) {
+    if (s == null || s === '') return '';
+    var div = document.createElement('div');
+    div.textContent = String(s);
+    return div.innerHTML;
+}
+
+/**
+ * API の cache_as_of（ISO）を表示用の短い表記にする
+ * @param {string} isoStr
+ * @param {Object} [options] - timeZone（既定 Asia/Tokyo）, locale, timeZoneName 等
+ */
+function formatTrendCacheAsOf(isoStr, options) {
+    if (!isoStr) return null;
+    options = options || {};
+    var timeZone = options.timeZone || 'Asia/Tokyo';
+    var locale = options.locale || 'ja-JP';
+    var fmt = {
+        timeZone: timeZone,
+        month: 'numeric',
+        day: 'numeric',
+        minute: '2-digit'
+    };
+    if (options.timeZoneName) {
+        fmt.timeZoneName = options.timeZoneName;
+        fmt.hour = options.hour != null ? options.hour : 'numeric';
+    } else {
+        fmt.hour = '2-digit';
+    }
+    try {
+        var d = new Date(isoStr);
+        if (Number.isNaN(d.getTime())) return null;
+        return new Intl.DateTimeFormat(locale, fmt).format(d);
+    } catch (e) {
+        return null;
+    }
+}
+
+/**
+ * body[data-trend-meta-tz] があればその IANA タイムゾーンで US 表示（英語・略称 TZ）
+ */
+function getTrendMetaTimeLabels(override) {
+    var tz =
+        (override && override.timeZone) ||
+        (typeof document !== 'undefined' && document.body && document.body.getAttribute('data-trend-meta-tz')) ||
+        '';
+    if (!tz) {
+        return {
+            prefix: 'データ取得: ',
+            suffix: '（日本時間）',
+            refreshPrefix: '基準日: ',
+            format: { timeZone: 'Asia/Tokyo', locale: 'ja-JP' }
+        };
+    }
+    return {
+        prefix: 'Data as of: ',
+        suffix: '',
+        refreshPrefix: 'As of date: ',
+        format: {
+            timeZone: tz,
+            locale: 'en-US',
+            timeZoneName: 'short',
+            hour: 'numeric'
+        }
+    };
+}
+
+/**
+ * トレンドカード内に「データ取得時刻」と「一言説明」を挿入する
+ * @param {string} containerId - #googleResults 等の結果ラッパー要素の id
+ * @param {Object} payload - API JSON（cache_as_of, display_note, refresh_date 等）
+ * @param {Object} [metaOverride] - 省略時は body[data-trend-meta-tz] に従う（US ページ等）
+ */
+function updateTrendMetaDisplay(containerId, payload, metaOverride) {
+    if (typeof containerId !== 'string' || !payload || typeof payload !== 'object') return;
+    var container = document.getElementById(containerId);
+    if (!container) return;
+
+    var row = container.querySelector('.trend-cache-meta');
+    if (!row) {
+        row = document.createElement('div');
+        row.className = 'trend-cache-meta small text-muted mb-2';
+        row.setAttribute('role', 'status');
+        container.insertBefore(row, container.firstChild);
+    }
+
+    var labels = getTrendMetaTimeLabels(metaOverride || {});
+    var parts = [];
+    var asOfLabel = formatTrendCacheAsOf(payload.cache_as_of, labels.format);
+    if (asOfLabel) {
+        parts.push(
+            '<span class="trend-meta-asof">' +
+                labels.prefix +
+                '<time datetime="' +
+                escapeHtmlTrendMeta(payload.cache_as_of) +
+                '">' +
+                escapeHtmlTrendMeta(asOfLabel) +
+                '</time>' +
+                labels.suffix +
+                '</span>'
+        );
+    } else if (payload.refresh_date) {
+        parts.push(
+            '<span class="trend-meta-asof">' +
+                labels.refreshPrefix +
+                escapeHtmlTrendMeta(String(payload.refresh_date)) +
+                '</span>'
+        );
+    }
+
+    if (payload.display_note) {
+        parts.push(
+            '<span class="trend-meta-note d-block mt-1 text-body-secondary">' +
+                escapeHtmlTrendMeta(payload.display_note) +
+                '</span>'
+        );
+    }
+
+    row.innerHTML = parts.join('');
+    row.style.display = parts.length ? 'block' : 'none';
+}
+
+// ============================================
 // シンプルパターン用の共通関数
 // ============================================
 
@@ -573,6 +699,10 @@ function loadTrendsFromCache(config) {
                 }
             }
 
+            if (uiIds.results && typeof updateTrendMetaDisplay === 'function') {
+                updateTrendMetaDisplay(uiIds.results, data);
+            }
+
             const hasData = data.data && data.data.length > 0;
             if (hasData || alwaysCallDisplay) {
                 console.log(`${serviceName} Trends データ表示開始`, hasData ? `(${data.data.length}件)` : '(空)');
@@ -593,7 +723,7 @@ function loadTrendsFromCache(config) {
                     }, 0);
                 }
             } else {
-                console.log(`${serviceName} Trends データなしまたはエラー:`, data);
+                console.log(`${serviceName} Trends データなし（表示はメタ情報のみ）:`, data);
             }
 
             // 結果エリアを表示

@@ -94,6 +94,7 @@ function loadGoogleTrendsFromCache() {
             })
             .then(data => {
                 if (loadingElement) loadingElement.style.display = 'none';
+                if (typeof updateTrendMetaDisplay === 'function') updateTrendMetaDisplay('googleResults', data);
                 if (data.data && data.data.length > 0 && typeof displayGoogleResults === 'function') {
                     displayGoogleResults(data);
                     if (typeof applyCategoryAccordionForAllTables === 'function') {
@@ -149,6 +150,7 @@ function loadYouTubeTrendsFromCache() {
                 return response.json();
             })
             .then(data => {
+                if (typeof updateTrendMetaDisplay === 'function') updateTrendMetaDisplay('youtubeResults', data);
                 if (data.data && data.data.length > 0 && typeof displayYouTubeResults === 'function') {
                     displayYouTubeResults(data);
                 }
@@ -194,6 +196,7 @@ function loadMusicTrendsFromCache() {
                 return response.json();
             })
             .then(data => {
+                if (typeof updateTrendMetaDisplay === 'function') updateTrendMetaDisplay('musicResults', data);
                 if (data.success && data.data && Array.isArray(data.data) && data.data.length > 0) {
                     if (typeof displayMusicResults === 'function') {
                         displayMusicResults(data);
@@ -235,6 +238,10 @@ function loadNewsBundleFromCache() {
             }
             if (typeof displayWorldNewsResults === 'function') {
                 displayWorldNewsResults(worldnews);
+            }
+            if (typeof updateTrendMetaDisplay === 'function') {
+                updateTrendMetaDisplay('nhkResults', nhk);
+                updateTrendMetaDisplay('newsResults', worldnews);
             }
             if (typeof applyCategoryAccordionForAllTables === 'function') {
                 setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
@@ -335,6 +342,7 @@ function loadPodcastTrendsFromCache() {
                 return response.json();
             })
             .then(data => {
+                if (typeof updateTrendMetaDisplay === 'function') updateTrendMetaDisplay('podcastResults', data);
                 if (data.data && data.data.length > 0 && typeof displayPodcastResults === 'function') {
                     displayPodcastResults(data);
                 }
@@ -377,6 +385,7 @@ function loadRakutenTrendsFromCache() {
                 return response.json();
             })
             .then(data => {
+                if (typeof updateTrendMetaDisplay === 'function') updateTrendMetaDisplay('rakutenResults', data);
                 if (data.data && data.data.length > 0 && typeof displayRakutenResults === 'function') {
                     displayRakutenResults(data);
                 }
@@ -429,7 +438,11 @@ function loadHatenaTrendsFromCache() {
             if (loadingElement) {
                 loadingElement.style.display = 'none';
             }
-            
+
+            if (typeof updateTrendMetaDisplay === 'function') {
+                updateTrendMetaDisplay('hatenaResults', data);
+            }
+
             if (data.success && data.data && data.data.length > 0) {
                 console.log('📊 Hatena データ表示開始 (source:', data.source, ')');
                 if (typeof displayHatenaResults === 'function') {
@@ -482,6 +495,9 @@ function loadOpenAlexTrendsFromCache() {
         })
         .then(data => {
             if (loadingElement) loadingElement.style.display = 'none';
+            if (typeof updateTrendMetaDisplay === 'function') {
+                updateTrendMetaDisplay('openalexResults', data);
+            }
             if (data.success && data.data && data.data.length > 0 && typeof displayOpenAlexResults === 'function') {
                 displayOpenAlexResults(data);
                 if (typeof syncToAllPane === 'function') {
@@ -519,6 +535,9 @@ function loadBlueskyTrendsFromCache() {
         })
         .then(data => {
             if (loadingElement) loadingElement.style.display = 'none';
+            if (typeof updateTrendMetaDisplay === 'function') {
+                updateTrendMetaDisplay('blueskyResults', data);
+            }
             if (data.success && data.data && data.data.length > 0 && typeof displayBlueskyResults === 'function') {
                 displayBlueskyResults(data);
                 if (typeof syncToAllPane === 'function') {
@@ -574,7 +593,11 @@ function loadTwitchTrendsFromCache() {
             if (loadingElement) {
                 loadingElement.style.display = 'none';
             }
-            
+
+            if (typeof updateTrendMetaDisplay === 'function') {
+                updateTrendMetaDisplay('twitchResults', data);
+            }
+
             if (data.success && data.data && data.data.length > 0) {
                 console.log('📊 Twitch データ表示開始 (source:', data.source, ')');
                 if (typeof displayTwitchResults === 'function') {
@@ -813,6 +836,7 @@ function loadNHKTrendsFromCache() {
             })
             .then(data => {
                 if (loadingElement) loadingElement.style.display = 'none';
+                if (typeof updateTrendMetaDisplay === 'function') updateTrendMetaDisplay('nhkResults', data);
                 if (data.data && data.data.length > 0 && typeof displayNHKResults === 'function') {
                     displayNHKResults(data);
                 }
@@ -853,6 +877,7 @@ function loadPRTimesHatenaTrendsFromCache() {
             })
             .then(function(data) {
                 if (loadingElement) loadingElement.style.display = 'none';
+                if (typeof updateTrendMetaDisplay === 'function') updateTrendMetaDisplay('prtimesHatenaResults', data);
                 if (data.data && data.data.length > 0 && typeof displayPRTimesHatenaResults === 'function') {
                     displayPRTimesHatenaResults(data);
                     if (typeof applyCategoryAccordionForAllTables === 'function') {
@@ -880,7 +905,8 @@ function loadPRTimesTrendsFromCache() {
             apiEndpoint: '/api/prtimes-trends',
             params: {},
             uiIds: {
-                loading: 'prtimesLoading'
+                loading: 'prtimesLoading',
+                results: 'prtimesResults'
             },
             displayFunction: displayPRTimesResults,
             allPaneSync: { mainTableBodyId: 'prtimesTrendsTableBody', allTableBodyId: 'all-prtimesTrendsTableBody', targetTabId: 'tab-news' }
@@ -899,6 +925,7 @@ function loadPRTimesTrendsFromCache() {
             })
             .then(function(data) {
                 if (loadingElement) loadingElement.style.display = 'none';
+                if (typeof updateTrendMetaDisplay === 'function') updateTrendMetaDisplay('prtimesResults', data);
                 if (data.data && data.data.length > 0 && typeof displayPRTimesResults === 'function') {
                     displayPRTimesResults(data);
                     if (typeof applyCategoryAccordionForAllTables === 'function') {
@@ -947,6 +974,7 @@ function loadWikipediaTrendsFromCache() {
             })
             .then(data => {
                 if (loadingElement) loadingElement.style.display = 'none';
+                if (typeof updateTrendMetaDisplay === 'function') updateTrendMetaDisplay('wikipediaResults', data);
                 if (data.success && typeof displayWikipediaResults === 'function') {
                     displayWikipediaResults(data);
                 }
@@ -969,7 +997,8 @@ function loadQiitaTrendsFromCache() {
             apiEndpoint: '/api/qiita-trends',
             params: { limit: 25, sort: 'likes_count' },
             uiIds: {
-                loading: 'qiitaLoading'
+                loading: 'qiitaLoading',
+                results: 'qiitaResults'
             },
             displayFunction: displayQiitaResults,
             allPaneSync: { mainTableBodyId: 'qiitaTrendsTableBody', allTableBodyId: 'all-qiitaTrendsTableBody', targetTabId: 'tab-tech' }
@@ -989,6 +1018,7 @@ function loadQiitaTrendsFromCache() {
             })
             .then(data => {
                 if (loadingElement) loadingElement.style.display = 'none';
+                if (typeof updateTrendMetaDisplay === 'function') updateTrendMetaDisplay('qiitaResults', data);
                 if (data.data && data.data.length > 0 && typeof displayQiitaResults === 'function') {
                     displayQiitaResults(data);
                 }
@@ -1027,6 +1057,7 @@ function loadStockTrendsFromCache() {
                 return response.json();
             })
             .then(data => {
+                if (typeof updateTrendMetaDisplay === 'function') updateTrendMetaDisplay('stockResults', data);
                 if (typeof displayStockResults === 'function') {
                     displayStockResults(data);
                 }
@@ -1067,6 +1098,7 @@ function loadCryptoTrendsFromCache() {
                 return response.json();
             })
             .then(data => {
+                if (typeof updateTrendMetaDisplay === 'function') updateTrendMetaDisplay('cryptoResults', data);
                 if (data.data && data.data.length > 0 && typeof displayCryptoResults === 'function') {
                     displayCryptoResults(data);
                 }
@@ -1111,6 +1143,7 @@ function loadMovieTrendsFromCache() {
             })
             .then(data => {
                 if (loadingElement) loadingElement.style.display = 'none';
+                if (typeof updateTrendMetaDisplay === 'function') updateTrendMetaDisplay('movieResults', data);
                 if (data.data && data.data.length > 0 && typeof displayMovieResults === 'function') {
                     displayMovieResults(data);
                 }
@@ -1161,6 +1194,7 @@ function loadBookTrendsFromCache(forceRefresh) {
             })
             .then(data => {
                 if (loadingElement) loadingElement.style.display = 'none';
+                if (typeof updateTrendMetaDisplay === 'function') updateTrendMetaDisplay('bookResults', data);
                 if (typeof displayBookResults === 'function') {
                     displayBookResults(data);
                 }
@@ -1202,6 +1236,7 @@ function loadGitHubTrendsFromCache() {
                 return response.json();
             })
             .then(data => {
+                if (typeof updateTrendMetaDisplay === 'function') updateTrendMetaDisplay('githubResults', data);
                 if (data.data && data.data.length > 0 && typeof displayGitHubResults === 'function') {
                     displayGitHubResults(data);
                 }
@@ -1242,6 +1277,7 @@ function loadAppStoreTrendsFromCache() {
                 return response.json();
             })
             .then(data => {
+                if (typeof updateTrendMetaDisplay === 'function') updateTrendMetaDisplay('appstoreResults', data);
                 if (data.data && data.data.length > 0 && typeof displayAppStoreResults === 'function') {
                     displayAppStoreResults(data);
                 }
@@ -1286,6 +1322,7 @@ function loadIPATrendsFromCache() {
             })
             .then(data => {
                 if (loadingElement) loadingElement.style.display = 'none';
+                if (typeof updateTrendMetaDisplay === 'function') updateTrendMetaDisplay('ipaResults', data);
                 if (data.data && data.data.length > 0 && typeof displayIPAResults === 'function') {
                     displayIPAResults(data);
                 }
@@ -1331,6 +1368,7 @@ function loadJPCERTTrendsFromCache() {
             })
             .then(data => {
                 if (loadingElement) loadingElement.style.display = 'none';
+                if (typeof updateTrendMetaDisplay === 'function') updateTrendMetaDisplay('jpcertResults', data);
                 if (data.data && data.data.length > 0 && typeof displayJPCERTResults === 'function') {
                     displayJPCERTResults(data);
                 }
@@ -1376,6 +1414,7 @@ function loadZennTrendsFromCache() {
             })
             .then(data => {
                 if (loadingElement) loadingElement.style.display = 'none';
+                if (typeof updateTrendMetaDisplay === 'function') updateTrendMetaDisplay('zennResults', data);
                 if (data.data && data.data.length > 0 && typeof displayZennResults === 'function') {
                     displayZennResults(data);
                 }
@@ -1418,6 +1457,9 @@ function loadNoteTrendsFromCache() {
         })
         .then(data => {
             console.log('Note Trends API データ:', data);
+            if (typeof updateTrendMetaDisplay === 'function') {
+                updateTrendMetaDisplay('noteResults', data);
+            }
             if (data.data && data.data.length > 0) {
                 console.log('Note Trends データ表示開始');
                 if (typeof displayNoteResults === 'function') {

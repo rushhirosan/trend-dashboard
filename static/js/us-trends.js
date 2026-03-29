@@ -27,6 +27,11 @@ async function fetchWithRetry(url, options = {}, maxRetries = 2) {
     }
 }
 
+/** USページ: キャッシュ基準時刻・メモ（app-common.js の updateTrendMetaDisplay と連携） */
+function applyUsTrendMeta(containerId, data) {
+    if (typeof updateTrendMetaDisplay === 'function') updateTrendMetaDisplay(containerId, data);
+}
+
 // Stock Trends data fetch for US
 async function fetchStockTrendsUS() {
     const loadingElement = document.getElementById('stockLoading');
@@ -50,7 +55,8 @@ async function fetchStockTrendsUS() {
         // API call (US stocks)
         const response = await fetchWithRetry('/api/stock-trends?market=US&limit=25');
         const data = await response.json();
-        
+        applyUsTrendMeta('stockResults', data);
+
         if (!response.ok) {
             throw new Error(data.error || `HTTP ${response.status}`);
         }
@@ -202,7 +208,8 @@ async function fetchCryptoTrendsUS() {
         // API call
         const response = await fetchWithRetry('/api/crypto-trends?limit=25');
         const data = await response.json();
-        
+        applyUsTrendMeta('cryptoResults', data);
+
         if (!response.ok) {
             throw new Error(data.error || `HTTP ${response.status}`);
         }
@@ -311,7 +318,8 @@ async function fetchMovieTrendsUS() {
         // API call (US movies)
         const response = await fetchWithRetry('/api/movie-trends?country=US&limit=25');
         const data = await response.json();
-        
+        applyUsTrendMeta('movieResults', data);
+
         if (!response.ok) {
             throw new Error(data.error || `HTTP ${response.status}`);
         }
@@ -439,7 +447,8 @@ async function fetchBookTrendsUS() {
         if (bookCategorySelectUS) category = bookCategorySelectUS.value || 'all';
         const response = await fetchWithRetry('/api/book-trends?country=US&limit=25&category=' + encodeURIComponent(category));
         const data = await response.json();
-        
+        applyUsTrendMeta('bookResults', data);
+
         // Hide loading
         if (loadingElement) {
             loadingElement.style.display = 'none';
@@ -564,6 +573,7 @@ function loadMovieTrendsFromCacheUS() {
             return response.json();
         })
         .then(data => {
+            applyUsTrendMeta('movieResults', data);
             // スケルトンUIをクリア（処理が走っていないように見えないようにする）
             const tableBody = document.getElementById('movieTrendsTableBody');
             if (tableBody) {
@@ -636,6 +646,7 @@ function loadBookTrendsFromCacheUS(forceRefresh) {
             return response.json();
         })
         .then(data => {
+            applyUsTrendMeta('bookResults', data);
             if (loadingElement) {
                 loadingElement.style.display = 'none';
             }
@@ -770,6 +781,7 @@ async function fetchGoogleTrendsUS() {
         }
         
         const data = await response.json();
+        applyUsTrendMeta('googleResults', data);
         console.log('Google API response:', data);
         console.log('Google API response keys:', Object.keys(data));
         console.log('Google API data length:', data.data ? data.data.length : 'data is undefined');
@@ -827,6 +839,7 @@ async function fetchYouTubeTrendsUS() {
         }
         
         const data = await response.json();
+        applyUsTrendMeta('youtubeResults', data);
         console.log('YouTube API response:', data);
         
         if (data.error) {
@@ -1234,6 +1247,7 @@ function loadGoogleTrendsFromCacheUS() {
             return response.json();
         })
         .then(data => {
+            applyUsTrendMeta('googleResults', data);
             console.log('Google Trends API data:', data);
             if (data.success && data.data && data.data.length > 0) {
                 console.log('Google Trends data display starting');
@@ -1269,6 +1283,7 @@ function loadYouTubeTrendsFromCacheUS() {
             return response.json();
         })
         .then(data => {
+            applyUsTrendMeta('youtubeResults', data);
             console.log('YouTube Trends API data:', data);
             if (data.success && data.data && data.data.length > 0) {
                 console.log('YouTube Trends data display starting');
@@ -1297,6 +1312,7 @@ function loadWorldNewsFromCacheUS() {
             return response.json();
         })
         .then(data => {
+            applyUsTrendMeta('worldnewsResults', data);
             console.log('World News API data:', data);
             if (data.success && data.data && data.data.length > 0) {
                 console.log('World News data display starting');
@@ -1325,6 +1341,7 @@ function loadSpotifyFromCacheUS() {
             return response.json();
         })
         .then(data => {
+            applyUsTrendMeta('spotifyResults', data);
             console.log('Spotify API data:', data);
             if (data.success && data.data && data.data.length > 0) {
                 console.log('Spotify data display starting');
@@ -1502,6 +1519,7 @@ function loadRedditFromCacheUS() {
             return response.json();
         })
         .then(data => {
+            applyUsTrendMeta('redditResults', data);
             console.log('Reddit API data:', data);
             if (data.success && data.data && data.data.length > 0) {
                 console.log('Reddit data display starting');
@@ -1668,6 +1686,7 @@ function loadPodcastFromCacheUS() {
             return response.json();
         })
         .then(data => {
+            applyUsTrendMeta('podcastResults', data);
             console.log('Podcast API data:', data);
             console.log('Podcast API data.success:', data.success);
             console.log('Podcast API data.data:', data.data);
@@ -1800,6 +1819,7 @@ function loadOpenAlexFromCacheUS(category = 'trending') {
     fetch(`/api/openalex-trends?category=${encodeURIComponent(category)}&limit=25&force_refresh=false&region=us`)
         .then(response => response.json())
         .then(data => {
+            applyUsTrendMeta('openalexResults', data);
             if (loadingEl) loadingEl.style.display = 'none';
             const resultsEl = document.getElementById('openalexResults');
             if (resultsEl) resultsEl.style.display = 'block';
@@ -1866,6 +1886,7 @@ function loadBlueskyFromCacheUS() {
     fetch('/api/bluesky-trends?limit=25&force_refresh=false&region=us')
         .then(response => response.json())
         .then(data => {
+            applyUsTrendMeta('blueskyResults', data);
             if (loadingEl) loadingEl.style.display = 'none';
             const resultsEl = document.getElementById('blueskyResults');
             if (resultsEl) resultsEl.style.display = 'block';
@@ -1896,6 +1917,7 @@ function loadTwitchFromCacheUS(type = 'games') {
             return response.json();
         })
         .then(data => {
+            applyUsTrendMeta('twitchResults', data);
             console.log('Twitch API data:', data);
             if (data.success && data.data && data.data.length > 0) {
                 console.log('Twitch data display starting');
@@ -2039,6 +2061,7 @@ function loadHackerNewsFromCacheUS() {
             return data;
         })
         .then(data => {
+            applyUsTrendMeta('hackernewsResults', data);
             console.log('Hacker News final data:', data);
             if (data.success && data.data && data.data.length > 0) {
                 console.log('Hacker News data display starting');
@@ -2155,6 +2178,7 @@ function loadStockTrendsFromCacheUS() {
             return response.json();
         })
         .then(data => {
+            applyUsTrendMeta('stockResults', data);
             console.log('Stock API data:', data);
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
@@ -2192,6 +2216,7 @@ function loadCryptoTrendsFromCacheUS() {
             return response.json();
         })
         .then(data => {
+            applyUsTrendMeta('cryptoResults', data);
             console.log('Crypto API data:', data);
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
@@ -2230,6 +2255,7 @@ function loadGlobeNewswireFromCacheUS() {
             return response.json();
         })
         .then(data => {
+            applyUsTrendMeta('globenewswireResults', data);
             if (loadingElement) loadingElement.style.display = 'none';
             if (data.success && data.data && data.data.length > 0) {
                 displayGlobeNewswireResults(data);
@@ -2322,6 +2348,7 @@ function loadCNNFromCacheUS() {
             return response.json();
         })
         .then(data => {
+            applyUsTrendMeta('cnnResults', data);
             console.log('CNN API data:', data);
             if (data.success && data.data && data.data.length > 0) {
                 console.log('CNN data display starting');
@@ -2403,6 +2430,7 @@ function loadWikipediaFromCacheUS() {
             return response.json();
         })
         .then(data => {
+            applyUsTrendMeta('wikipediaResults', data);
             if (loadingElement) loadingElement.style.display = 'none';
             if (data.success && data.data && data.data.length > 0) {
                 displayWikipediaResultsUS(data);
@@ -2512,6 +2540,7 @@ function loadProductHuntFromCacheUS() {
             });
         })
         .then(data => {
+            applyUsTrendMeta('producthuntResults', data);
             console.log('Product Hunt API data:', data);
             if (data.success && data.data && data.data.length > 0) {
                 console.log('Product Hunt data display starting');
@@ -2623,6 +2652,7 @@ function loadGitHubTrendsFromCacheUS() {
             return response.json();
         })
         .then(data => {
+            applyUsTrendMeta('githubResults', data);
             console.log('GitHub Trends API data:', data);
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
@@ -2679,6 +2709,7 @@ function loadAppStoreTrendsFromCacheUS() {
             return response.json();
         })
         .then(data => {
+            applyUsTrendMeta('appstoreResults', data);
             console.log('App Store Trends API data:', data);
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
@@ -2734,6 +2765,7 @@ function loadCISAKEVTrendsFromCacheUS() {
             return response.json();
         })
         .then(data => {
+            applyUsTrendMeta('cisaKevResults', data);
             console.log('CISA KEV API data:', data);
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
@@ -2789,6 +2821,7 @@ function loadTheHackerNewsTrendsFromCacheUS() {
             return response.json();
         })
         .then(data => {
+            applyUsTrendMeta('thehackernewsResults', data);
             console.log('The Hacker News API data:', data);
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
@@ -2847,6 +2880,7 @@ function loadDevToFromCacheUS() {
             return response.json();
         })
         .then(data => {
+            applyUsTrendMeta('devtoResults', data);
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
             
@@ -2884,6 +2918,7 @@ function loadMediumFromCacheUS() {
             return response.json();
         })
         .then(data => {
+            applyUsTrendMeta('mediumResults', data);
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
             
@@ -2923,6 +2958,7 @@ function loadEbayFromCacheUS(category = 'fashion') {
             return response.json();
         })
         .then(data => {
+            applyUsTrendMeta('ebayResults', data);
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
             
@@ -2979,6 +3015,7 @@ function loadEbayFromCacheUSWithRefresh(category = 'fashion') {
             return response.json();
         })
         .then(data => {
+            applyUsTrendMeta('ebayResults', data);
             if (loadingElement) loadingElement.style.display = 'none';
             if (resultsElement) resultsElement.style.display = 'block';
             

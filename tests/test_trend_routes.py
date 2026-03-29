@@ -65,6 +65,18 @@ class TestEnrichTrendPayload:
         assert "display_note" in r
         assert "表示できるデータがありません" in r["display_note"]
 
+    def test_empty_list_english_note_when_lang_en(self):
+        r = {"success": True, "data": [], "status": "fresh", "lang": "en"}
+        enrich_trend_payload(r, {"success": True, "data": [], "lang": "en"}, cache_key=None)
+        assert "display_note" in r
+        assert "No displayable data" in r["display_note"]
+
+    def test_empty_list_english_note_when_country_us(self):
+        r = {"success": True, "data": [], "status": "fresh", "country": "US"}
+        enrich_trend_payload(r, {"success": True, "data": []}, cache_key=None)
+        assert "display_note" in r
+        assert "No displayable data" in r["display_note"]
+
     def test_message_only_display_note_no_default_empty_text(self):
         r = {"success": True, "data": [], "status": "cache_not_found", "message": "no cache"}
         enrich_trend_payload(r, {}, cache_key=None)
@@ -151,6 +163,27 @@ class TestHandleTrendResponse:
         data = json.loads(resp.get_data(as_text=True))
         assert data["success"] is True
         assert data["status"] == "cache_not_found"
+
+    @patch("routes.trend_routes.TrendsCache")
+    def test_cache_not_found_english_message_when_lang_en(self, mock_tc_class, app):
+        mock_tc_class.return_value.get_cache_info.return_value = None
+
+        with app.app_context():
+            resp, status = handle_trend_response(
+                {
+                    "success": False,
+                    "status": "cache_not_found",
+                    "data": [],
+                },
+                "err",
+                default_source="X",
+                cache_key="wikipedia_trends_en",
+                lang="en",
+            )
+
+        assert status == 200
+        data = json.loads(resp.get_data(as_text=True))
+        assert data["message"] == "No cached data is available."
 
     @patch("routes.trend_routes.TrendsCache")
     def test_api_failure_500(self, mock_tc_class, app):

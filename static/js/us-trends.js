@@ -32,6 +32,14 @@ function applyUsTrendMeta(containerId, data) {
     if (typeof updateTrendMetaDisplay === 'function') updateTrendMetaDisplay(containerId, data);
 }
 
+/** US 向け説明文（日本語ページでは未使用） */
+function usTrendsNoDataUserHint() {
+    if (typeof getTrendUiLocale === 'function' && getTrendUiLocale() === 'en') {
+        return 'No data available. Please try again later.';
+    }
+    return 'ℹ️ データがありません。しばらく待ってから再度お試しください。';
+}
+
 // Stock Trends data fetch for US
 async function fetchStockTrendsUS() {
     const loadingElement = document.getElementById('stockLoading');
@@ -469,10 +477,13 @@ async function fetchBookTrendsUS() {
         if (data.data.length === 0) {
             if (statusMessage) {
                 statusMessage.className = 'alert alert-info status-message';
-                statusMessage.textContent = 'ℹ️ データがありません。しばらく待ってから再度お試しください。';
+                statusMessage.textContent = usTrendsNoDataUserHint();
                 statusMessage.style.display = 'block';
             }
-            tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">データがありません</td></tr>';
+            tableBody.innerHTML =
+                '<tr><td colspan="4" class="text-center text-muted">' +
+                (typeof getTrendEmptyTableMessage === 'function' ? getTrendEmptyTableMessage() : 'データがありません') +
+                '</td></tr>';
             resultsElement.style.display = 'block';
             return;
         }
@@ -541,7 +552,10 @@ function displayBookResultsUS(data) {
         });
     } else {
         console.warn('📊 No book data to display', { bookData, isArray: Array.isArray(bookData), length: Array.isArray(bookData) ? bookData.length : 'N/A' });
-        tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">データがありません</td></tr>';
+        tableBody.innerHTML =
+            '<tr><td colspan="4" class="text-center text-muted">' +
+            (typeof getTrendEmptyTableMessage === 'function' ? getTrendEmptyTableMessage() : 'データがありません') +
+            '</td></tr>';
     }
     
     // Display results
@@ -698,11 +712,14 @@ function loadBookTrendsFromCacheUS(forceRefresh) {
                 });
                 if (statusMessage) {
                     statusMessage.className = 'alert alert-info status-message';
-                    statusMessage.textContent = data.error ? `⚠️ ${data.error}` : 'ℹ️ データがありません。しばらく待ってから再度お試しください。';
+                    statusMessage.textContent = data.error ? `⚠️ ${data.error}` : usTrendsNoDataUserHint();
                     statusMessage.style.display = 'block';
                 }
                 if (tableBody) {
-                    tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">データがありません</td></tr>';
+                    tableBody.innerHTML =
+                        '<tr><td colspan="4" class="text-center text-muted">' +
+                        (typeof getTrendEmptyTableMessage === 'function' ? getTrendEmptyTableMessage() : 'データがありません') +
+                        '</td></tr>';
                 }
                 if (resultsElement) {
                     resultsElement.style.display = 'block';
@@ -906,11 +923,11 @@ function displayGoogleResults(data) {
 
     if (sortedData.length === 0) {
         if (typeof setAllPaneEmptyMessage === 'function') {
-            setAllPaneEmptyMessage('googleTrendsTableBody', null, 'データがありません');
+            setAllPaneEmptyMessage('googleTrendsTableBody', null, null);
         }
         if (typeof syncAllPaneOrPlaceholder === 'function') {
             setTimeout(function() {
-                syncAllPaneOrPlaceholder('googleTrendsTableBody', 'all-googleTrendsTableBody', 5, 'データがありません');
+                syncAllPaneOrPlaceholder('googleTrendsTableBody', 'all-googleTrendsTableBody', 5, null);
             }, 0);
         }
         if (typeof applyCategoryAccordionForAllTables === 'function') {
@@ -998,11 +1015,11 @@ function displayYouTubeResults(data) {
     
     if (sortedData.length === 0) {
         if (typeof setAllPaneEmptyMessage === 'function') {
-            setAllPaneEmptyMessage('youtubeTrendsTableBody', null, 'データがありません');
+            setAllPaneEmptyMessage('youtubeTrendsTableBody', null, null);
         }
         if (typeof syncAllPaneOrPlaceholder === 'function') {
             setTimeout(function() {
-                syncAllPaneOrPlaceholder('youtubeTrendsTableBody', 'all-youtubeTrendsTableBody', 5, 'データがありません');
+                syncAllPaneOrPlaceholder('youtubeTrendsTableBody', 'all-youtubeTrendsTableBody', 5, null);
             }, 0);
         }
         if (typeof applyCategoryAccordionForAllTables === 'function') {
@@ -3259,9 +3276,15 @@ function displayEbayResults(data) {
         let errorMessage = data.error || 'No data available';
         
         if (data.status === 'cache_not_found') {
-            errorMessage = 'キャッシュにデータがありません。更新ボタンを押してデータを取得してください。';
+            errorMessage =
+                typeof getTrendUiLocale === 'function' && getTrendUiLocale() === 'en'
+                    ? 'No cached data. Use refresh to fetch data.'
+                    : 'キャッシュにデータがありません。更新ボタンを押してデータを取得してください。';
         } else if (data.status === 'api_key_not_configured') {
-            errorMessage = 'eBay Client IDが設定されていません。eBay開発者プログラムでApp IDを取得して環境変数EBAY_CLIENT_IDに設定してください。';
+            errorMessage =
+                typeof getTrendUiLocale === 'function' && getTrendUiLocale() === 'en'
+                    ? 'eBay Client ID is not configured. Set EBAY_CLIENT_ID in your environment.'
+                    : 'eBay Client IDが設定されていません。eBay開発者プログラムでApp IDを取得して環境変数EBAY_CLIENT_IDに設定してください。';
         }
         
         showEbayError(errorMessage, data.status);

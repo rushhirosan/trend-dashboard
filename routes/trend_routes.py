@@ -17,6 +17,32 @@ def _cache_key_worldnews(country: str) -> str:
     return f"worldnews_trends_{(country or 'jp').lower()}"
 
 
+def _trend_api_ui_locale(response: dict) -> str:
+    """lang / country / region から UI 文言ロケールを推定（US・英語 Wikipedia 等は en）。"""
+    if str(response.get('lang', '')).lower() == 'en':
+        return 'en'
+    c = str(response.get('country', '')).upper()
+    if c == 'US':
+        return 'en'
+    if str(response.get('country', '')).lower() == 'us':
+        return 'en'
+    r = str(response.get('region_code', '') or response.get('region', '') or '').upper()
+    if r == 'US':
+        return 'en'
+    return 'ja'
+
+
+_EMPTY_DATA_DISPLAY_NOTE = {
+    'ja': '直近の取得では表示できるデータがありませんでした。',
+    'en': 'No displayable data was found in the latest fetch.',
+}
+
+_CACHE_EMPTY_MESSAGE = {
+    'ja': 'キャッシュにデータがありません',
+    'en': 'No cached data is available.',
+}
+
+
 def enrich_trend_payload(response, result, cache_key=None):
     """
     API レスポンスに cache_as_of / display_note などを付与する。
@@ -57,7 +83,8 @@ def enrich_trend_payload(response, result, cache_key=None):
     if len(data) == 0 and not note_parts:
         st = response.get('status') or (result.get('status') if isinstance(result, dict) else '')
         if st != 'cache_not_found':
-            note_parts.append('直近の取得では表示できるデータがありませんでした。')
+            loc = _trend_api_ui_locale(response)
+            note_parts.append(_EMPTY_DATA_DISPLAY_NOTE[loc])
     if note_parts:
         response['display_note'] = ' '.join(note_parts)
     return response
@@ -146,9 +173,10 @@ def handle_trend_response(result, error_message, default_source=None, cache_key=
                     'data': result.get('data', []),
                     'status': status,
                     'source': result.get('source', default_source),
-                    'message': result.get('error', 'キャッシュにデータがありません'),
-                    **extra_fields
+                    **extra_fields,
                 }
+                loc = _trend_api_ui_locale(body)
+                body['message'] = result.get('error', _CACHE_EMPTY_MESSAGE[loc])
                 enrich_trend_payload(body, result, cache_key=cache_key)
                 return jsonify(body), 200
             

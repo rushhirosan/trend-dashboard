@@ -545,6 +545,21 @@ function formatTrendCacheAsOf(isoStr, options) {
 }
 
 /**
+ * US トレンドページ（body[data-trend-meta-tz] あり）では en、それ以外は ja
+ */
+function getTrendUiLocale() {
+    var tz =
+        (typeof document !== 'undefined' && document.body && document.body.getAttribute('data-trend-meta-tz')) ||
+        '';
+    return tz ? 'en' : 'ja';
+}
+
+/** テーブル空行・All タブ用の短いメッセージ（ページロケールに合わせる） */
+function getTrendEmptyTableMessage() {
+    return getTrendUiLocale() === 'en' ? 'No data available' : 'データがありません';
+}
+
+/**
  * body[data-trend-meta-tz] があればその IANA タイムゾーンで US 表示（英語・略称 TZ）
  */
 function getTrendMetaTimeLabels(override) {
@@ -718,7 +733,9 @@ function loadTrendsFromCache(config) {
             } else {
                 console.log(`${serviceName} Trends データなし（表示はメタ情報のみ）:`, data);
                 const sync = config.allPaneSync;
-                const emptyMsg = config.emptyTableMessage || 'データがありません';
+                const emptyMsg =
+                    config.emptyTableMessage ||
+                    (typeof getTrendEmptyTableMessage === 'function' ? getTrendEmptyTableMessage() : 'データがありません');
                 if (sync && sync.mainTableBodyId && typeof setAllPaneEmptyMessage === 'function') {
                     setAllPaneEmptyMessage(sync.mainTableBodyId, null, emptyMsg);
                 }
@@ -735,7 +752,7 @@ function loadTrendsFromCache(config) {
                         allPaneSync.mainTableBodyId,
                         allPaneSync.allTableBodyId,
                         allPaneSync.limit || 5,
-                        'データがありません'
+                        typeof getTrendEmptyTableMessage === 'function' ? getTrendEmptyTableMessage() : 'データがありません'
                     );
                 }, 0);
             }
@@ -830,7 +847,7 @@ function setAllPaneEmptyMessage(allTableBodyId, colspan, message) {
     const td = document.createElement('td');
     td.colSpan = c;
     td.className = 'text-muted small px-2 py-1';
-    td.textContent = message || 'データがありません';
+    td.textContent = message || (typeof getTrendEmptyTableMessage === 'function' ? getTrendEmptyTableMessage() : 'データがありません');
     tr.appendChild(td);
     tbody.appendChild(tr);
 }
@@ -847,7 +864,11 @@ function syncAllPaneOrPlaceholder(mainTableBodyId, allTableBodyId, limit, emptyM
     if (mainRows.length > 0) {
         syncToAllPane(mainTableBodyId, allTableBodyId, limit || 5);
     } else {
-        setAllPaneEmptyMessage(allTableBodyId, null, emptyMessage || 'データがありません');
+        setAllPaneEmptyMessage(
+            allTableBodyId,
+            null,
+            emptyMessage || (typeof getTrendEmptyTableMessage === 'function' ? getTrendEmptyTableMessage() : 'データがありません')
+        );
     }
 }
 
@@ -855,7 +876,9 @@ function syncAllPaneOrPlaceholder(mainTableBodyId, allTableBodyId, limit, emptyM
  * キャッシュ反映後にデータが空のとき、メイン枠と All 枠を同じ「空1行」表示に揃える（スケルトンの除去含む）
  */
 function applyTrendCacheEmptyTable(mainTableBodyId, allTableBodyId, message) {
-    const msg = message || 'データがありません';
+    const msg =
+        message ||
+        (typeof getTrendEmptyTableMessage === 'function' ? getTrendEmptyTableMessage() : 'データがありません');
     if (typeof setAllPaneEmptyMessage === 'function') {
         setAllPaneEmptyMessage(mainTableBodyId, null, msg);
     }
@@ -1243,7 +1266,12 @@ function reSyncAllPanes() {
         const allId = allTbody.id;
         const mainId = allId.replace(/^all-/, '');
         if (document.getElementById(mainId)) {
-            syncAllPaneOrPlaceholder(mainId, allId, 5, 'データがありません');
+            syncAllPaneOrPlaceholder(
+                mainId,
+                allId,
+                5,
+                typeof getTrendEmptyTableMessage === 'function' ? getTrendEmptyTableMessage() : 'データがありません'
+            );
         }
     });
 }

@@ -324,21 +324,31 @@ class UsaspendingTrendsManager(BaseTrendsManager):
                 "status": "dummy_generated",
                 "source": "dummy",
             }
+        cached = self._get_from_cache()
         if force_refresh:
-            self._clear_cache()
-        cached = self._get_from_cache() if not force_refresh else None
-        if cached:
+            logger.info("usaspending: force_refresh（事前キャッシュクリアはしません）")
+        if cached and not force_refresh:
             return {"success": True, "data": cached, "status": "cached", "source": "USAspending API (cache)"}
-        if cache_only:
+        if cache_only and not force_refresh:
             return {"success": True, "data": {}, "status": "cache_only_empty", "source": "USAspending API"}
         api_result = self._fetch_trends()
         if api_result.get("success"):
             data = api_result.get("data", {})
-            self._save_to_cache(data)
-            return {"success": True, "data": data, "status": "api_fetched", "source": "USAspending API"}
+            if data:
+                self._save_to_cache(data)
+                return {"success": True, "data": data, "status": "api_fetched", "source": "USAspending API"}
+        if cached:
+            return {
+                "success": True,
+                "data": cached,
+                "status": "stale_cache_preserved",
+                "source": "USAspending API (cache)",
+                "error": api_result.get("error") if isinstance(api_result, dict) else None,
+                "message": "USAspending APIの取得に失敗したかデータが空のため、保存済みのキャッシュを表示しています。",
+            }
         return {
             "success": False,
             "data": {},
-            "error": api_result.get("error", "Unknown error"),
+            "error": api_result.get("error", "Unknown error") if isinstance(api_result, dict) else "Unknown error",
             "status": "api_error",
         }

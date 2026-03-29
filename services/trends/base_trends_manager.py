@@ -270,8 +270,10 @@ class BaseTrendsManager(ABC):
             Dict: {
                 'success': bool,
                 'data': List[Dict],
-                'status': str ('cached' | 'api_fetched' | 'cache_not_found' | 'api_error' | 'dummy_cached' | 'dummy_generated'),
+                'status': str ('cached' | 'api_fetched' | 'stale_cache_preserved' | 'cache_not_found' |
+                    'cache_only_empty' | 'api_error' | 'dummy_cached' | 'dummy_generated'),
                 'source': str,
+                'message': str (optional, stale_cache_preserved 時など),
                 ... その他のメタデータ
             }
         """
@@ -309,15 +311,14 @@ class BaseTrendsManager(ABC):
                 }
 
             # --- 通常モード（本番用） ---
-            # force_refreshの場合はキャッシュをクリア
+            # force_refresh でも先にキャッシュは消さない。外部APIが0件のとき直前のキャッシュを残すため。
             if force_refresh:
-                logger.info(f"🔄 {self.service_name}: force_refresh指定のためキャッシュをクリアします")
-                self._clear_cache(*args, **kwargs)
+                logger.info(
+                    f"🔄 {self.service_name}: force_refresh指定（外部APIで再取得。事前クリアはしません）"
+                )
 
-            # キャッシュからデータを取得
-            cached_data: Optional[List[Dict[str, Any]]] = None
-            if not force_refresh:
-                cached_data = self._get_from_cache(*args, **kwargs)
+            # 常にキャッシュを読む（強制更新時もステールフォールバック用）
+            cached_data: Optional[List[Dict[str, Any]]] = self._get_from_cache(*args, **kwargs)
 
             # キャッシュの形式検証（一部マネージャーは _is_valid_cached_data で形式チェック）
             if cached_data and hasattr(self, "_is_valid_cached_data") and not self._is_valid_cached_data(cached_data):
@@ -328,8 +329,8 @@ class BaseTrendsManager(ABC):
                 cached_data = None
                 logger.info(f"🔄 {self.service_name}: キャッシュ形式が不正なためクリアし、APIから再取得します")
 
-            # cache_only のときはキャッシュがなければ空を返し、外部APIは呼ばない
-            if cache_only and (not cached_data or len(cached_data) == 0):
+            # cache_only かつ強制更新でないとき、キャッシュがなければ空を返し外部APIは呼ばない
+            if cache_only and not force_refresh and (not cached_data or len(cached_data) == 0):
                 logger.info(f"✅ {self.service_name}: cache_only - キャッシュなしのため空データを返します（外部API非呼び出し）")
                 return {
                     "success": True,
@@ -339,8 +340,8 @@ class BaseTrendsManager(ABC):
                     **kwargs,
                 }
 
-            # キャッシュデータがある場合はそれを返す
-            if cached_data and len(cached_data) > 0:
+            # キャッシュに有効データがあり、強制更新でないならキャッシュを返す
+            if (not force_refresh) and cached_data and len(cached_data) > 0:
                 cached_data = self._apply_default_sorting(cached_data, sort_key=sort_key, reverse=sort_reverse)
                 logger.info(f"✅ {self.service_name}: キャッシュから{len(cached_data)}件のデータを取得しました")
                 return {
@@ -364,8 +365,7 @@ class BaseTrendsManager(ABC):
                     **kwargs,
                 }
 
-            if cache_only:
-                # cache_only 指定時はここには到達しない想定だが、念のため空を返す
+            if cache_only and not force_refresh:
                 return {
                     "success": True,
                     "data": [],
@@ -374,8 +374,11 @@ class BaseTrendsManager(ABC):
                     **kwargs,
                 }
 
-            # 外部APIからデータを取得
-            logger.warning(f"⚠️ {self.service_name}: キャッシュデータが見つかりません。外部APIを呼び出します")
+            # 外部APIからデータを取得（force_refresh、またはキャッシュ空で auto_fetch 許可時）
+            logger.warning(
+                f"⚠️ {self.service_name}: 外部APIを呼び出します"
+                + (" (force_refresh)" if force_refresh else "（キャッシュなし）")
+            )
             api_result = self._fetch_trends(*args, limit=limit, **kwargs)
 
             # success が True の場合は data が空でも成功とする（例: Wikipedia で mostread が未提供の言語/日付）
@@ -485,17 +488,16 @@ class BaseTrendsManager(ABC):
                         except Exception as alert_error:
                             logger.warning(f"⚠️ Discordアラート送信エラー: {alert_error}")
 
-                # API が0件でも DB に直近キャッシュがあれば返す（use_stale_cache_when_api_empty のみ）
-                if (
-                    getattr(self, "use_stale_cache_when_api_empty", False)
-                    and (not trends_data or len(trends_data) == 0)
-                ):
+                # 外部APIが0件でも、DB に直前キャッシュがあればそれを返す（事前全削除をしないため通常は残る）
+                used_stale_fallback = False
+                if not trends_data or len(trends_data) == 0:
                     try:
                         stale = self._get_from_cache(*args, **kwargs)
                         if stale and len(stale) > 0:
                             trends_data = list(stale)
+                            used_stale_fallback = True
                             logger.info(
-                                "✅ %s: APIが0件のためキャッシュの直近データを返します (%d件)",
+                                "✅ %s: 外部APIが0件のため既存キャッシュを返します (%d件)",
                                 self.service_name,
                                 len(trends_data),
                             )
@@ -509,14 +511,23 @@ class BaseTrendsManager(ABC):
                 # デフォルトソートを適用
                 trends_data = self._apply_default_sorting(trends_data, sort_key=sort_key, reverse=sort_reverse)
 
-                return {
+                result_payload = {
                     "success": True,
                     "data": trends_data[:limit],
-                    "status": "api_fetched",
-                    "source": api_result.get("source", "external_api"),
+                    "status": "stale_cache_preserved" if used_stale_fallback else "api_fetched",
+                    "source": (
+                        "database_cache"
+                        if used_stale_fallback
+                        else api_result.get("source", "external_api")
+                    ),
                     **kwargs,
                     **{k: v for k, v in api_result.items() if k not in ["data", "success", "status", "source"]},
                 }
+                if used_stale_fallback:
+                    result_payload["message"] = (
+                        "最新の外部取得は0件のため、保存済みのキャッシュを表示しています。"
+                    )
+                return result_payload
             else:
                 error_msg = (
                     (api_result.get("error") or api_result.get("message") or api_result.get("detail"))
@@ -526,6 +537,32 @@ class BaseTrendsManager(ABC):
                 if not error_msg:
                     error_msg = "API call failed" if not api_result else "Unknown error"
                 logger.error(f"❌ {self.service_name}: 外部APIからデータを取得できませんでした: {error_msg}")
+                try:
+                    stale_api = self._get_from_cache(*args, **kwargs)
+                    if stale_api and len(stale_api) > 0:
+                        stale_api = self._apply_default_sorting(
+                            list(stale_api), sort_key=sort_key, reverse=sort_reverse
+                        )
+                        logger.info(
+                            "✅ %s: API失敗のため既存キャッシュを返します (%d件)",
+                            self.service_name,
+                            len(stale_api),
+                        )
+                        return {
+                            "success": True,
+                            "data": stale_api[:limit],
+                            "status": "stale_cache_preserved",
+                            "source": "database_cache",
+                            "error": error_msg,
+                            "message": "外部APIの取得に失敗したため、保存済みのキャッシュを表示しています。",
+                            **kwargs,
+                        }
+                except Exception as stale_api_err:
+                    logger.debug(
+                        "stale fallback after api_error skipped (%s): %s",
+                        self.service_name,
+                        stale_api_err,
+                    )
                 return {
                     "success": False,
                     "data": [],

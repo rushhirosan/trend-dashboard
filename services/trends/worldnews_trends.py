@@ -180,15 +180,17 @@ class WorldNewsTrendsManager(BaseTrendsManager):
                     'source': 'dummy_database_cache',
                 }
             cache_key = 'worldnews_trends'
-            cached_data = None
-            
-            if force_refresh:
-                logger.info(f"🔄 World News: force_refresh指定のためキャッシュをスキップします (country: {country})")
+            # 事前クリアはしない。API 失敗・0件時に直前キャッシュを返すため常に読む
+            stale_backup = self.get_from_cache(cache_key, country)
+            cached_data = stale_backup if not force_refresh else None
+
+            if not force_refresh:
+                logger.debug(f"🔍 World News: キャッシュデータ取得 (country: {country}), 長さ: {len(cached_data) if cached_data else 0}")
             else:
-                logger.debug(f"🔍 World News: キャッシュデータ取得開始 (country: {country})")
-                cached_data = self.get_from_cache(cache_key, country)
-                logger.debug(f"🔍 World News: キャッシュデータ取得結果: {type(cached_data)}, 長さ: {len(cached_data) if cached_data else 0}")
-            
+                logger.info(
+                    f"🔄 World News: force_refresh（外部APIで再取得。読み込んだキャッシュはフォールバック用に保持） (country: {country})"
+                )
+
             if cached_data:
                 logger.info(f"✅ World News: キャッシュデータを使用 ({len(cached_data)}件)")
                 # 古いキャッシュで source が空の場合は URL からドメインを補完
@@ -223,7 +225,7 @@ class WorldNewsTrendsManager(BaseTrendsManager):
                     'message': 'キャッシュにデータがありません'
                 }
             
-            logger.warning(f"⚠️ World News: キャッシュ未使用のため外部APIを呼び出します")
+            logger.warning(f"⚠️ World News: 外部APIを呼び出します (force_refresh={force_refresh})")
             trends_data = self._get_worldnews_trends(country, category, page_size)
             if trends_data:
                 # 重複排除を適用してからキャッシュに保存
@@ -237,14 +239,35 @@ class WorldNewsTrendsManager(BaseTrendsManager):
                     'category': category,
                     'source': 'World News API'
                 }
-            else:
-                logger.error(f"❌ World News: 外部APIからデータを取得できませんでした")
+            if stale_backup:
+                stale_backup = self._remove_duplicates(list(stale_backup))
+                for item in stale_backup:
+                    if not item.get('source') and item.get('url'):
+                        try:
+                            parsed = urlparse(item['url'])
+                            domain = parsed.netloc or (parsed.path.split('/')[0] if parsed.path else '')
+                            if domain:
+                                item['source'] = domain.replace('www.', '')
+                        except Exception:
+                            pass
+                logger.warning(
+                    f"⚠️ World News: 外部APIが0件/失敗のため既存キャッシュを返します ({len(stale_backup)}件, country={country})"
+                )
                 return {
-                    'data': [],
-                    'status': 'api_error',
+                    'data': stale_backup,
+                    'status': 'stale_cache_preserved',
                     'country': country.upper(),
-                    'category': category
+                    'category': category,
+                    'source': 'World News API (Cached)',
+                    'message': '最新の外部取得に失敗したか0件のため、保存済みのキャッシュを表示しています。',
                 }
+            logger.error(f"❌ World News: 外部APIからデータを取得できませんでした")
+            return {
+                'data': [],
+                'status': 'api_error',
+                'country': country.upper(),
+                'category': category
+            }
                 
         except Exception as e:
             logger.error(f"World News APIトレンド取得エラー: {e}", exc_info=True)

@@ -252,18 +252,10 @@ class BookTrendsManager(BaseTrendsManager):
                     'error': 'RAKUTEN_APP_IDが設定されていません',
                     'data': []
                 }
-            genre_ids = RAKUTEN_BOOK_CATEGORY_GENRES.get(category, RAKUTEN_BOOK_CATEGORY_GENRES['all'])
-            if force_refresh:
-                logger.info(f"🔄 Book (楽天) force_refresh: キャッシュをクリアします (category: {category})")
-                self.db.clear_book_trends_cache('JP', category)
+            _ = RAKUTEN_BOOK_CATEGORY_GENRES.get(category, RAKUTEN_BOOK_CATEGORY_GENRES['all'])
             cached_data = self.db.get_book_trends_from_cache('JP', category)
-            if cached_data:
+            if cached_data and not force_refresh:
                 cached_data.sort(key=lambda x: x.get('rank', 999999))
-                if force_refresh:
-                    try:
-                        self.db.update_cache_status(f'book_trends_JP_{category}', len(cached_data))
-                    except Exception as e:
-                        logger.warning(f"⚠️ Book (楽天): cache_status更新エラー（処理は継続）: {e}")
                 logger.info(f"✅ Book (楽天): キャッシュから{len(cached_data)}件のデータを取得しました (category: {category})")
                 return {
                     'success': True,
@@ -273,7 +265,7 @@ class BookTrendsManager(BaseTrendsManager):
                     'country': 'JP',
                     'category': category
                 }
-            if not force_refresh:
+            if not force_refresh and not cached_data:
                 logger.warning("⚠️ Book (楽天): キャッシュにデータがありませんが、force_refresh=falseのため外部APIは呼び出しません")
                 return {
                     'data': [],
@@ -284,8 +276,31 @@ class BookTrendsManager(BaseTrendsManager):
                     'success': True,
                     'error': 'キャッシュにデータがありません'
                 }
-            logger.warning("⚠️ Book (楽天): キャッシュデータが見つかりません。外部APIを呼び出します")
-            return self._fetch_rakuten_books_trends(limit, category=category)
+            logger.warning(
+                f"⚠️ Book (楽天): 外部APIを呼び出します (force_refresh={force_refresh}, category={category})"
+            )
+            api_result = self._fetch_rakuten_books_trends(limit, category=category)
+            if api_result.get('success') and api_result.get('data'):
+                return api_result
+            stale = self.db.get_book_trends_from_cache('JP', category)
+            if stale:
+                stale.sort(key=lambda x: x.get('rank', 999999))
+                logger.info(
+                    "✅ Book (楽天): API失敗または0件のため既存キャッシュを返します (%d件, category=%s)",
+                    len(stale),
+                    category,
+                )
+                return {
+                    'success': True,
+                    'data': stale[:limit],
+                    'status': 'stale_cache_preserved',
+                    'source': 'database_cache',
+                    'country': 'JP',
+                    'category': category,
+                    'message': '最新の楽天API取得に失敗したか0件のため、保存済みのキャッシュを表示しています。',
+                    'error': api_result.get('error'),
+                }
+            return api_result
         except Exception as e:
             logger.error(f"❌ Book (楽天) トレンド取得エラー: {e}", exc_info=True)
             return {'error': f'楽天ブックストレンドの取得に失敗しました: {str(e)}', 'success': False}
@@ -513,19 +528,11 @@ class BookTrendsManager(BaseTrendsManager):
                     'error': 'GOOGLE_BOOKS_API_KEYが設定されていません',
                     'data': []
                 }
-            if force_refresh:
-                logger.info(f"🔄 Book (Google) force_refresh: キャッシュをクリアします (category: {category})")
-                self._clear_cache(country='US', category=category)
             cached_data = self.db.get_book_trends_from_cache('US', category)
             if cached_data is None:
                 cached_data = []
-            if cached_data and len(cached_data) > 0:
+            if cached_data and not force_refresh:
                 cached_data.sort(key=lambda x: x.get('rank', 999999))
-                if force_refresh:
-                    try:
-                        self.db.update_cache_status(f'book_trends_US_{category}', len(cached_data))
-                    except Exception as e:
-                        logger.warning(f"⚠️ Book (Google): cache_status更新エラー（処理は継続）: {e}")
                 logger.info(f"✅ Book (Google): キャッシュから{len(cached_data)}件のデータを取得しました (category: {category})")
                 return {
                     'success': True,
@@ -535,14 +542,29 @@ class BookTrendsManager(BaseTrendsManager):
                     'country': 'US',
                     'category': category
                 }
-            try:
-                cache_info = self.db.get_cache_info(f'book_trends_US_{category}')
-                if cache_info and cache_info.get('data_count', 0) > 0:
-                    logger.warning("⚠️ Book (Google): cache_statusに記録あり。外部APIを呼び出します")
-                    return self._fetch_google_books_trends(limit, category=category)
-            except Exception as e:
-                logger.warning(f"⚠️ Book (Google): cache_status確認エラー（処理は継続）: {e}")
-            if not force_refresh:
+            if not force_refresh and not cached_data:
+                try:
+                    cache_info = self.db.get_cache_info(f'book_trends_US_{category}')
+                    if cache_info and cache_info.get('data_count', 0) > 0:
+                        logger.warning("⚠️ Book (Google): cache_statusに記録あり。外部APIを呼び出します")
+                        api_result = self._fetch_google_books_trends(limit, category=category)
+                        if api_result.get('success') and api_result.get('data'):
+                            return api_result
+                        stale = self.db.get_book_trends_from_cache('US', category) or []
+                        if stale:
+                            stale.sort(key=lambda x: x.get('rank', 999999))
+                            return {
+                                'success': True,
+                                'data': stale[:limit],
+                                'status': 'stale_cache_preserved',
+                                'source': 'database_cache',
+                                'country': 'US',
+                                'category': category,
+                                'message': 'Google Books API取得後も表示用データが無いためキャッシュを返します。',
+                            }
+                        return api_result
+                except Exception as e:
+                    logger.warning(f"⚠️ Book (Google): cache_status確認エラー（処理は継続）: {e}")
                 return {
                     'data': [],
                     'status': 'cache_not_found',
@@ -552,8 +574,30 @@ class BookTrendsManager(BaseTrendsManager):
                     'success': True,
                     'error': 'キャッシュにデータがありません'
                 }
-            logger.warning("⚠️ Book (Google): キャッシュデータが見つかりません。外部APIを呼び出します")
-            return self._fetch_google_books_trends(limit, category=category)
+            logger.warning(
+                f"⚠️ Book (Google): 外部APIを呼び出します (force_refresh={force_refresh}, category={category})"
+            )
+            api_result = self._fetch_google_books_trends(limit, category=category)
+            if api_result.get('success') and api_result.get('data'):
+                return api_result
+            stale = self.db.get_book_trends_from_cache('US', category) or []
+            if stale:
+                stale.sort(key=lambda x: x.get('rank', 999999))
+                logger.info(
+                    "✅ Book (Google): API失敗または0件のため既存キャッシュを返します (%d件)",
+                    len(stale),
+                )
+                return {
+                    'success': True,
+                    'data': stale[:limit],
+                    'status': 'stale_cache_preserved',
+                    'source': 'database_cache',
+                    'country': 'US',
+                    'category': category,
+                    'message': '最新のGoogle Books API取得に失敗したか0件のため、保存済みのキャッシュを表示しています。',
+                    'error': api_result.get('error'),
+                }
+            return api_result
         except Exception as e:
             logger.error(f"❌ Book (Google) トレンド取得エラー: {e}", exc_info=True)
             return {'error': f'Google Booksトレンドの取得に失敗しました: {str(e)}', 'success': False}

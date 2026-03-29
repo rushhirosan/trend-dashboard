@@ -493,6 +493,23 @@ class KKJTrendsManager(BaseTrendsManager):
         signals = data.get("signals") or []
         return any((s.get("count") or 0) > 0 for s in signals)
 
+    def _kkj_fill_cache_defaults(self, cached: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """古いキャッシュ行の欠損キーを補う（signals / prefecture_rankings がある前提で呼ぶ）"""
+        if cached is None:
+            return None
+        out = dict(cached)
+        if "keyword_top_cases" not in out:
+            out["keyword_top_cases"] = {}
+        if "ranking_result_count" not in out:
+            out["ranking_result_count"] = {}
+        if "keyword_category" not in out:
+            out["keyword_category"] = {}
+        if "category_labels" not in out:
+            out["category_labels"] = dict(KKJ_CATEGORY_LABELS)
+        if "category_order" not in out:
+            out["category_order"] = list(KKJ_CATEGORY_ORDER)
+        return out
+
     def get_public_sector_signals(
         self, force_refresh: bool = False, cache_only: bool = True
     ) -> Dict[str, Any]:
@@ -501,27 +518,19 @@ class KKJTrendsManager(BaseTrendsManager):
         有効なキャッシュがあればそれを返す。cache_only=True のときは外部APIを呼ばず
         キャッシュのみ返す（無い場合は空で返す）。再取得は force_refresh=True のときのみ。
         """
-        cached = None if force_refresh else self._get_from_cache()
+        # API 失敗時のフォールバック用に常に読む（事前クリアはしない）
+        stale_before = self._get_from_cache()
+        cached = stale_before if not force_refresh else None
         # キャッシュは「キーワード別件数＋県別Top5」の構造があれば有効（0件でも表示用に使う）
         if cached is not None and (cached.get("signals") is not None or cached.get("prefecture_rankings") is not None):
-            # 古いキャッシュに keyword_top_cases / ranking_result_count がない場合があるので補う
-            if "keyword_top_cases" not in cached:
-                cached = {**cached, "keyword_top_cases": {}}
-            if "ranking_result_count" not in cached:
-                cached = {**cached, "ranking_result_count": {}}
-            if "keyword_category" not in cached:
-                cached = {**cached, "keyword_category": {}}
-            if "category_labels" not in cached:
-                cached = {**cached, "category_labels": dict(KKJ_CATEGORY_LABELS)}
-            if "category_order" not in cached:
-                cached = {**cached, "category_order": list(KKJ_CATEGORY_ORDER)}
+            filled = self._kkj_fill_cache_defaults(cached)
             return {
                 "success": True,
-                "data": cached,
+                "data": filled,
                 "status": "cached",
                 "source": "官公需情報ポータルサイト検索API",
             }
-        if cache_only:
+        if cache_only and not force_refresh:
             return {
                 "success": True,
                 "data": {
@@ -542,6 +551,18 @@ class KKJTrendsManager(BaseTrendsManager):
                 "source": "官公需情報ポータルサイト検索API",
             }
         result = self._fetch_trends()
+        if not result.get("success") and stale_before is not None and (
+            stale_before.get("signals") is not None or stale_before.get("prefecture_rankings") is not None
+        ):
+            filled = self._kkj_fill_cache_defaults(stale_before)
+            return {
+                "success": True,
+                "data": filled,
+                "status": "stale_cache_preserved",
+                "source": "官公需情報ポータルサイト検索API",
+                "message": "官公需APIの取得に失敗したため、保存済みのキャッシュを表示しています。",
+                "error": result.get("error"),
+            }
         data = result.get("data") if result.get("success") else None
         if data:
             # 0件でもAPI応答はキャッシュする（毎回叩かず表示を安定させる）

@@ -830,11 +830,11 @@ class EstatTrendsManager(BaseTrendsManager):
         そのカテゴリ（指標）においてキャッシュがある場合は外部APIを呼ばない。
         キャッシュがない指標のみAPIで取得し、マージして返す。
         """
+        # force_refresh でも事前にキャッシュは破棄しない（API失敗時に直前データを残す）
         if force_refresh:
-            logger.info("🔄 estat: force_refresh のためキャッシュをクリアします")
-            self._clear_cache(*args, **kwargs)
+            logger.info("🔄 estat: force_refresh（全指標を再取得対象にします。事前クリアはしません）")
 
-        cached_list = self._get_from_cache(*args, **kwargs) if not force_refresh else None
+        cached_list = self._get_from_cache(*args, **kwargs)
         cache_by_id = {}
         if cached_list and isinstance(cached_list, list):
             for it in cached_list:
@@ -843,12 +843,15 @@ class EstatTrendsManager(BaseTrendsManager):
                     cache_by_id[iid] = it
 
         indicator_ids = [row[0] for row in INDICATORS]
-        need_fetch = [
-            iid for iid in indicator_ids
-            if not self._indicator_has_valid_data(cache_by_id.get(iid))
-        ]
+        if force_refresh:
+            need_fetch = list(indicator_ids)
+        else:
+            need_fetch = [
+                iid for iid in indicator_ids
+                if not self._indicator_has_valid_data(cache_by_id.get(iid))
+            ]
 
-        if not need_fetch and cached_list:
+        if not need_fetch and cached_list and not force_refresh:
             logger.info("✅ estat: 全指標キャッシュありのため外部APIを呼ばず返します")
             return {
                 "success": True,
@@ -858,7 +861,8 @@ class EstatTrendsManager(BaseTrendsManager):
                 **kwargs,
             }
 
-        if cache_only:
+        # スケジューラは force_refresh=True のまま cache_only デフォルト True のため、強制更新時は API へ進む
+        if cache_only and not force_refresh:
             return {
                 "success": True,
                 "data": cached_list[:limit] if cached_list else [],
@@ -882,20 +886,35 @@ class EstatTrendsManager(BaseTrendsManager):
             api_result = self._fetch_trends(
                 *args, limit=limit, fetch_indicator_ids=need_fetch, **kwargs
             )
+            if not api_result.get("success") and cached_list:
+                logger.warning("estat: API失敗のため直前キャッシュを返します")
+                return {
+                    "success": True,
+                    "data": (cached_list or [])[:limit],
+                    "status": "stale_cache_preserved",
+                    "source": "e-Stat API (cache)",
+                    "message": "e-Stat APIの取得に失敗したため、保存済みのキャッシュを表示しています。",
+                    **kwargs,
+                }
             fresh_list = api_result.get("data", []) if api_result.get("success") else []
             fresh_by_id = {it.get("indicator_id"): it for it in fresh_list if it.get("indicator_id")}
+            placeholder = lambda iid: {
+                "indicator_id": iid,
+                "name_ja": next((r[1] for r in INDICATORS if r[0] == iid), iid),
+                "series": [],
+                "updated_at": None,
+                "stats_data_id": None,
+            }
 
             for iid in indicator_ids:
-                if self._indicator_has_valid_data(cache_by_id.get(iid)):
-                    merged.append(cache_by_id[iid])
+                fresh = fresh_by_id.get(iid)
+                cached = cache_by_id.get(iid)
+                if self._indicator_has_valid_data(fresh):
+                    merged.append(fresh)
+                elif self._indicator_has_valid_data(cached):
+                    merged.append(cached)
                 else:
-                    merged.append(fresh_by_id.get(iid) or {
-                        "indicator_id": iid,
-                        "name_ja": next((r[1] for r in INDICATORS if r[0] == iid), iid),
-                        "series": [],
-                        "updated_at": None,
-                        "stats_data_id": None,
-                    })
+                    merged.append(fresh or cached or placeholder(iid))
 
             try:
                 self._save_to_cache(merged, *args, **kwargs)

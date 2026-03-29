@@ -69,12 +69,12 @@ class NHKTrendsManager(BaseTrendsManager):
     def get_trends(self, limit=25, force_refresh=False):
         """NHKニューストレンドを取得（キャッシュ優先、published_dateでソート）"""
         # ベースクラスのget_trendsを使用
-        # auto_fetch_on_cache_miss=Falseで、既存動作を維持（キャッシュがない場合はAPIを呼び出さない）
+        # auto_fetch_on_cache_miss=True: キャッシュ空時は RSS を取得（定期失敗後の画面でも復旧しやすい）
         # sort_key='published_date'で公開日でソート
         return super().get_trends(
             limit=limit,
             force_refresh=force_refresh,
-            auto_fetch_on_cache_miss=False,  # 既存動作を維持
+            auto_fetch_on_cache_miss=True,
             sort_key='published_date',  # 公開日でソート
             sort_reverse=True  # 降順（新しい順）
         )

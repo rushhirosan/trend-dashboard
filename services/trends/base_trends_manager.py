@@ -40,6 +40,9 @@ class BaseTrendsManager(ABC):
     - _clear_cache(): キャッシュをクリアするメソッド（オプション）
     """
 
+    # True のサブクラス: API が0件でも DB に直近行があれば応答に使う（Wikipedia 等）
+    use_stale_cache_when_api_empty: bool = False
+
     def __init__(self, service_name: str, max_requests: int = 10, window_seconds: int = 60):
         """初期化
 
@@ -386,18 +389,29 @@ class BaseTrendsManager(ABC):
                 try:
                     save_success = self._save_to_cache(trends_data, *args, **kwargs)
                     if save_success:
-                        logger.info(
-                            f"✅ {self.service_name}: 外部APIから{len(trends_data)}件のデータを取得し、キャッシュに保存しました"
-                        )
+                        n = len(trends_data) if trends_data else 0
+                        if n > 0:
+                            logger.info(
+                                f"✅ {self.service_name}: 外部APIから{n}件のデータを取得し、キャッシュに保存しました"
+                            )
+                        else:
+                            logger.info(
+                                f"✅ {self.service_name}: 外部API取得0件（キャッシュ保存はソース別の方針に従います）"
+                            )
 
-                        # cache_statusを更新（オプション）
+                        # cache_statusを更新（取得0件で直近キャッシュを残すソースは更新しない）
                         try:
                             cache_key = self._get_cache_key(*args, **kwargs)
-                            update_success = self._update_cache_status(cache_key, len(trends_data), *args, **kwargs)
-                            if not update_success:
-                                logger.debug(
-                                    f"⚠️ {self.service_name}: cache_statusの更新をスキップしました（未実装または失敗）"
-                                )
+                            skip_status = (
+                                getattr(self, "use_stale_cache_when_api_empty", False)
+                                and (not trends_data or len(trends_data) == 0)
+                            )
+                            if not skip_status:
+                                update_success = self._update_cache_status(cache_key, len(trends_data or []), *args, **kwargs)
+                                if not update_success:
+                                    logger.debug(
+                                        f"⚠️ {self.service_name}: cache_statusの更新をスキップしました（未実装または失敗）"
+                                    )
                         except Exception as e:
                             logger.warning(f"⚠️ {self.service_name}: cache_status更新中にエラーが発生しました: {e}")
                     else:
@@ -470,6 +484,27 @@ class BaseTrendsManager(ABC):
                                 )
                         except Exception as alert_error:
                             logger.warning(f"⚠️ Discordアラート送信エラー: {alert_error}")
+
+                # API が0件でも DB に直近キャッシュがあれば返す（use_stale_cache_when_api_empty のみ）
+                if (
+                    getattr(self, "use_stale_cache_when_api_empty", False)
+                    and (not trends_data or len(trends_data) == 0)
+                ):
+                    try:
+                        stale = self._get_from_cache(*args, **kwargs)
+                        if stale and len(stale) > 0:
+                            trends_data = list(stale)
+                            logger.info(
+                                "✅ %s: APIが0件のためキャッシュの直近データを返します (%d件)",
+                                self.service_name,
+                                len(trends_data),
+                            )
+                    except Exception as stale_err:
+                        logger.debug(
+                            "stale cache fallback skipped (%s): %s",
+                            self.service_name,
+                            stale_err,
+                        )
 
                 # デフォルトソートを適用
                 trends_data = self._apply_default_sorting(trends_data, sort_key=sort_key, reverse=sort_reverse)

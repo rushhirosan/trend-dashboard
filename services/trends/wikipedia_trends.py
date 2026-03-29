@@ -24,6 +24,9 @@ WIKIPEDIA_USER_AGENT = os.getenv(
 class WikipediaTrendsManager(BaseTrendsManager):
     """Wikipedia の「最も読まれた記事」を取得するマネージャー"""
 
+    # API が一時的に0件でも DB に残っている直近キャッシュを応答に使う
+    use_stale_cache_when_api_empty = True
+
     BASE_URL = "https://api.wikimedia.org/feed/v1/wikipedia"
 
     def __init__(self):

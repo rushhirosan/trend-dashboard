@@ -3630,7 +3630,7 @@ class TrendsCache:
             logger.warning(f"⚠️ wikipedia_trends_cache テーブル作成スキップ: {e}")
 
     def save_wikipedia_trends_to_cache(self, data, lang='ja'):
-        """Wikipedia 人気記事をキャッシュに保存（言語別）。data が空でも成功とする（その日付・言語で most read が未提供の場合に対応）。"""
+        """Wikipedia 人気記事をキャッシュに保存（言語別）。data が空のときは True を返し、既存行を削除しない。"""
         try:
             self._ensure_wikipedia_trends_cache_table()
         except Exception as ensure_e:
@@ -3647,6 +3647,13 @@ class TrendsCache:
 
     def _save_wikipedia_trends_to_cache_impl(self, data, lang):
         """Wikipedia キャッシュ保存の実処理（save_wikipedia_trends_to_cache から呼ぶ）"""
+        # 0件のときは DELETE しない（mostread 未提供の日に既存の表示可能データを残す）
+        if not data:
+            logger.info(
+                "wikipedia_trends (%s): 取得0件のためキャッシュを上書きせず既存行を保持します",
+                lang,
+            )
+            return True
         with self.get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute("DELETE FROM wikipedia_trends_cache WHERE lang = %s", (lang,))

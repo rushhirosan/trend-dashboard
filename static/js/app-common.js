@@ -503,7 +503,7 @@ function createDropdownTrendsManager(config) {
 }
 
 // ============================================
-// ソース別メタ（基準時刻・説明）表示
+// ソース別メタ（説明のみ。キャッシュ取得時刻表示は UX 向上のため停止）
 // ============================================
 
 function escapeHtmlTrendMeta(s) {
@@ -514,10 +514,9 @@ function escapeHtmlTrendMeta(s) {
 }
 
 /**
- * API の cache_as_of（ISO）を表示用の短い表記にする
- * @param {string} isoStr
- * @param {Object} [options] - timeZone（既定 Asia/Tokyo）, locale, timeZoneName 等
+ * API の cache_as_of（ISO）を表示用の短い表記にする（データ取得時刻 UI 停止のためコメントアウト）
  */
+/*
 function formatTrendCacheAsOf(isoStr, options) {
     if (!isoStr) return null;
     options = options || {};
@@ -543,6 +542,7 @@ function formatTrendCacheAsOf(isoStr, options) {
         return null;
     }
 }
+*/
 
 /**
  * US トレンドページ（body[data-trend-meta-tz] あり）では en、それ以外は ja
@@ -561,7 +561,9 @@ function getTrendEmptyTableMessage() {
 
 /**
  * body[data-trend-meta-tz] があればその IANA タイムゾーンで US 表示（英語・略称 TZ）
+ * ※データ取得／基準日ラベル表示は停止のためコメントアウト（復元時に updateTrendMetaDisplay 内と併せて有効化）
  */
+/*
 function getTrendMetaTimeLabels(override) {
     var tz =
         (override && override.timeZone) ||
@@ -587,28 +589,23 @@ function getTrendMetaTimeLabels(override) {
         }
     };
 }
+*/
 
 /**
- * トレンドカード内に「データ取得時刻」と「一言説明」を挿入する
+ * トレンドカード内の display_note（空データ時メッセージ等）のみ表示する。
+ * cache_as_of・refresh_date は画面上に出さない（メタ時刻の整理）。
  * @param {string} containerId - #googleResults 等の結果ラッパー要素の id
- * @param {Object} payload - API JSON（cache_as_of, display_note, refresh_date 等）
- * @param {Object} [metaOverride] - 省略時は body[data-trend-meta-tz] に従う（US ページ等）
+ * @param {Object} payload - API JSON
+ * @param {Object} [_metaOverride] - 未使用（旧・タイムゾーン上書き用。復元時に再配線可）
  */
-function updateTrendMetaDisplay(containerId, payload, metaOverride) {
+function updateTrendMetaDisplay(containerId, payload, _metaOverride) {
     if (typeof containerId !== 'string' || !payload || typeof payload !== 'object') return;
     var container = document.getElementById(containerId);
     if (!container) return;
 
-    var row = container.querySelector('.trend-cache-meta');
-    if (!row) {
-        row = document.createElement('div');
-        row.className = 'trend-cache-meta small text-muted mb-2';
-        row.setAttribute('role', 'status');
-        container.insertBefore(row, container.firstChild);
-    }
-
-    var labels = getTrendMetaTimeLabels(metaOverride || {});
     var parts = [];
+    /*
+    var labels = getTrendMetaTimeLabels((_metaOverride || {}));
     var asOfLabel = formatTrendCacheAsOf(payload.cache_as_of, labels.format);
     if (asOfLabel) {
         parts.push(
@@ -630,6 +627,7 @@ function updateTrendMetaDisplay(containerId, payload, metaOverride) {
                 '</span>'
         );
     }
+    */
 
     if (payload.display_note) {
         parts.push(
@@ -639,8 +637,19 @@ function updateTrendMetaDisplay(containerId, payload, metaOverride) {
         );
     }
 
+    var row = container.querySelector('.trend-cache-meta');
+    if (parts.length === 0) {
+        if (row) row.remove();
+        return;
+    }
+    if (!row) {
+        row = document.createElement('div');
+        row.className = 'trend-cache-meta small text-muted mb-2';
+        row.setAttribute('role', 'status');
+        container.insertBefore(row, container.firstChild);
+    }
     row.innerHTML = parts.join('');
-    row.style.display = parts.length ? 'block' : 'none';
+    row.style.display = 'block';
 }
 
 // ============================================

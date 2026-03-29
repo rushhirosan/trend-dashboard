@@ -27,7 +27,7 @@ async function fetchWithRetry(url, options = {}, maxRetries = 2) {
     }
 }
 
-/** USページ: キャッシュ基準時刻・メモ（app-common.js の updateTrendMetaDisplay と連携） */
+/** USページ: display_note のみ表示（キャッシュ時刻は app-common.js で非表示化） */
 function applyUsTrendMeta(containerId, data) {
     if (typeof updateTrendMetaDisplay === 'function') updateTrendMetaDisplay(containerId, data);
 }

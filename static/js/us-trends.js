@@ -1143,19 +1143,25 @@ function loadEbayFromCacheUSWrapper() {
 
 // NewsタブとAllタブのCNN/World News同期を再試行付きで補強
 function syncNewsCardsToAllUS(retries = 3, delayMs = 250) {
-    if (typeof syncAllPaneOrPlaceholder !== 'function') return;
+    if (typeof syncToAllPane !== 'function') return;
     var attempts = Math.max(1, retries);
     for (var i = 0; i < attempts; i++) {
         setTimeout(function () {
-            syncAllPaneOrPlaceholder('cnnTrendsTableBody', 'all-cnnTrendsTableBody', 5, null);
-            syncAllPaneOrPlaceholder('worldnewsTrendsTableBody', 'all-worldnewsTrendsTableBody', 5, null);
+            var cnnMain = document.getElementById('cnnTrendsTableBody');
+            if (cnnMain && cnnMain.querySelectorAll('tr:not(.skeleton-row)').length > 0) {
+                syncToAllPane('cnnTrendsTableBody', 'all-cnnTrendsTableBody', 5);
+            }
+            var worldMain = document.getElementById('worldnewsTrendsTableBody');
+            if (worldMain && worldMain.querySelectorAll('tr:not(.skeleton-row)').length > 0) {
+                syncToAllPane('worldnewsTrendsTableBody', 'all-worldnewsTrendsTableBody', 5);
+            }
         }, i * delayMs);
     }
 }
 
 // API/描画タイミングの前後関係に依存せず、主要カードを main→All へ再同期
 function forceSyncCoreCardsToAllUS() {
-    if (typeof syncAllPaneOrPlaceholder !== 'function') return;
+    if (typeof syncToAllPane !== 'function') return;
     var pairs = [
         ['cnnTrendsTableBody', 'all-cnnTrendsTableBody'],
         ['worldnewsTrendsTableBody', 'all-worldnewsTrendsTableBody'],
@@ -1164,7 +1170,10 @@ function forceSyncCoreCardsToAllUS() {
         ['youtubeTrendsTableBody', 'all-youtubeTrendsTableBody']
     ];
     pairs.forEach(function (pair) {
-        syncAllPaneOrPlaceholder(pair[0], pair[1], 5, null);
+        var main = document.getElementById(pair[0]);
+        if (main && main.querySelectorAll('tr:not(.skeleton-row)').length > 0) {
+            syncToAllPane(pair[0], pair[1], 5);
+        }
     });
 }
 

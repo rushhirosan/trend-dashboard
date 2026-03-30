@@ -1168,6 +1168,111 @@ function forceSyncCoreCardsToAllUS() {
     });
 }
 
+function escapeHtmlUS(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function setAllRowsUS(allTbodyId, rowsHtml) {
+    var tbody = document.getElementById(allTbodyId);
+    if (!tbody) return;
+    tbody.innerHTML = rowsHtml || '';
+}
+
+// フェイルセーフ: Allタブの主要5カードはAPIレスポンスから直接描画（同期漏れ対策）
+function refreshAllCoreCardsDirectUS() {
+    var tasks = [
+        {
+            url: '/api/cnn-trends?limit=5&force_refresh=false',
+            allId: 'all-cnnTrendsTableBody',
+            render: function (items) {
+                return items.map(function (item, idx) {
+                    var title = escapeHtmlUS(item.title || 'N/A');
+                    var url = escapeHtmlUS(item.url || '#');
+                    var published = item.published_date ? new Date(item.published_date).toLocaleDateString('en-US') : 'N/A';
+                    return '<tr><td><span class="badge bg-danger">' + (idx + 1) + '</span></td><td><a href="' + url + '" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>' + title + '</strong></a></td><td>' + escapeHtmlUS(published) + '</td></tr>';
+                }).join('');
+            }
+        },
+        {
+            url: '/api/worldnews-trends?country=us&category=general&force_refresh=false',
+            allId: 'all-worldnewsTrendsTableBody',
+            render: function (items) {
+                return items.map(function (item, idx) {
+                    var title = escapeHtmlUS(item.title || 'N/A');
+                    var url = escapeHtmlUS(item.url || '#');
+                    var published = (item.published_at || item.publish_date) ? new Date(item.published_at || item.publish_date).toLocaleDateString('en-US') : 'N/A';
+                    return '<tr><td><span class="badge bg-info">' + (idx + 1) + '</span></td><td><a href="' + url + '" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>' + title + '</strong></a></td><td>' + escapeHtmlUS(published) + '</td></tr>';
+                }).join('');
+            }
+        },
+        {
+            url: '/api/wikipedia-trends?lang=en&limit=5&force_refresh=false',
+            allId: 'all-wikipediaTrendsTableBody',
+            render: function (items) {
+                return items.map(function (item, idx) {
+                    var title = escapeHtmlUS(item.title || 'N/A');
+                    var url = escapeHtmlUS(item.url || '#');
+                    var views = escapeHtmlUS(item.views || '-');
+                    return '<tr><td>' + (idx + 1) + '</td><td><a href="' + url + '" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>' + title + '</strong></a></td><td>' + views + '</td></tr>';
+                }).join('');
+            }
+        },
+        {
+            url: '/api/google-trends?country=US&force_refresh=false',
+            allId: 'all-googleTrendsTableBody',
+            render: function (items) {
+                return items.slice(0, 5).map(function (item, idx) {
+                    var keyword = escapeHtmlUS(item.keyword || item.term || 'N/A');
+                    var url = escapeHtmlUS(item.google_search_url || '#');
+                    return '<tr><td><span class="badge bg-primary">' + (idx + 1) + '</span></td><td><a href="' + url + '" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>' + keyword + '</strong></a></td></tr>';
+                }).join('');
+            }
+        },
+        {
+            url: '/api/youtube-trends?region=US&force_refresh=false',
+            allId: 'all-youtubeTrendsTableBody',
+            render: function (items) {
+                return items.slice(0, 5).map(function (item, idx) {
+                    var title = escapeHtmlUS(item.title || 'N/A');
+                    var channel = escapeHtmlUS(item.channel_title || 'N/A');
+                    var views = escapeHtmlUS(item.view_count || item.views || '-');
+                    var url = item.video_id ? 'https://www.youtube.com/watch?v=' + encodeURIComponent(item.video_id) : '#';
+                    return '<tr><td><span class="badge bg-danger">' + (idx + 1) + '</span></td><td><a href="' + escapeHtmlUS(url) + '" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>' + title + '</strong></a></td><td>' + channel + '</td><td>' + views + '</td></tr>';
+                }).join('');
+            }
+        }
+    ];
+
+    tasks.forEach(function (task) {
+        fetchWithRetry(task.url)
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                var list = data && data.success && Array.isArray(data.data) ? data.data : [];
+                if (list.length > 0) {
+                    setAllRowsUS(task.allId, task.render(list));
+                    return;
+                }
+                if (typeof setAllPaneEmptyMessage === 'function') {
+                    setAllPaneEmptyMessage(task.allId, null, null);
+                }
+            })
+            .catch(function () {
+                // 直近表示があれば維持。空の場合のみ空メッセージを入れる
+                var tbody = document.getElementById(task.allId);
+                if (!tbody) return;
+                var hasRows = tbody.querySelectorAll('tr').length > 0;
+                if (!hasRows && typeof setAllPaneEmptyMessage === 'function') {
+                    setAllPaneEmptyMessage(task.allId, null, null);
+                }
+            });
+    });
+}
+
 // Load cached data for US trends（日本と同一のバッチ方式で統一・Allタブの表示順に合わせる）
 function loadCachedDataUS() {
     console.log('📦 Loading cached data for US trends');
@@ -1331,11 +1436,15 @@ function loadCachedDataUS() {
                 syncNewsCardsToAllUS(4, 300);
             }
             forceSyncCoreCardsToAllUS();
+            if (tabId === 'tab-all') {
+                refreshAllCoreCardsDirectUS();
+            }
         });
     }
 
     // 起動後しばらくは定期再同期して、遅延読み込み後にAllが取り残されるケースを回避
     forceSyncCoreCardsToAllUS();
+    refreshAllCoreCardsDirectUS();
     var coreSyncIntervalMs = 3000;
     var coreSyncDurationMs = 180000;
     var coreSyncElapsed = 0;

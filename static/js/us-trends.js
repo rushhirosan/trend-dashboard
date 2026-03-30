@@ -1141,6 +1141,18 @@ function loadEbayFromCacheUSWrapper() {
     loadEbayFromCacheUS(initialCategory);
 }
 
+// NewsタブとAllタブのCNN/World News同期を再試行付きで補強
+function syncNewsCardsToAllUS(retries = 3, delayMs = 250) {
+    if (typeof syncAllPaneOrPlaceholder !== 'function') return;
+    var attempts = Math.max(1, retries);
+    for (var i = 0; i < attempts; i++) {
+        setTimeout(function () {
+            syncAllPaneOrPlaceholder('cnnTrendsTableBody', 'all-cnnTrendsTableBody', 5, null);
+            syncAllPaneOrPlaceholder('worldnewsTrendsTableBody', 'all-worldnewsTrendsTableBody', 5, null);
+        }, i * delayMs);
+    }
+}
+
 // Load cached data for US trends（日本と同一のバッチ方式で統一・Allタブの表示順に合わせる）
 function loadCachedDataUS() {
     console.log('📦 Loading cached data for US trends');
@@ -1156,13 +1168,28 @@ function loadCachedDataUS() {
         try {
             var el = document.getElementById(tbodyId);
             if (!el) return false;
-            // If SSR already filled rows, skip API call.
-            return !!(el.querySelector && el.querySelector('tr'));
+            // 実データ行のみを判定（空メッセージ1行・スケルトン行は除外）
+            var rows = el.querySelectorAll ? Array.from(el.querySelectorAll('tr:not(.skeleton-row)')) : [];
+            if (rows.length === 0) return false;
+            return rows.some(function (tr) {
+                var tds = tr.querySelectorAll ? tr.querySelectorAll('td') : [];
+                // 空メッセージ行は通常 td 1セル(colspan) なので除外
+                return tds.length > 1;
+            });
         } catch (_) { return false; }
     }
 
     function once(key, fn) {
         if (alreadyLoaded(key)) return;
+        markLoaded(key);
+        try { fn(); } catch (e) { /* ignore */ }
+    }
+
+    // loadedフラグが立っていても、main/all どちらにも実データ行が無ければ再取得を許可
+    function onceOrRetry(key, fn, mainTbodyId, allTbodyId) {
+        var hasMainRows = mainTbodyId ? tbodyHasRows(mainTbodyId) : false;
+        var hasAllRows = allTbodyId ? tbodyHasRows(allTbodyId) : false;
+        if (alreadyLoaded(key) && (hasMainRows || hasAllRows)) return;
         markLoaded(key);
         try { fn(); } catch (e) { /* ignore */ }
     }
@@ -1175,8 +1202,9 @@ function loadCachedDataUS() {
     function loadForTab(tabId) {
         if (!tabId) tabId = 'tab-all';
         if (tabId === 'tab-news') {
-            once('cnn', loadCNNFromCacheUS);
-            once('worldnews', loadWorldNewsFromCacheUS);
+            onceOrRetry('cnn', loadCNNFromCacheUS, 'cnnTrendsTableBody', 'all-cnnTrendsTableBody');
+            onceOrRetry('worldnews', loadWorldNewsFromCacheUS, 'worldnewsTrendsTableBody', 'all-worldnewsTrendsTableBody');
+            syncNewsCardsToAllUS(4, 300);
             return;
         }
         if (tabId === 'tab-search') {
@@ -1215,11 +1243,16 @@ function loadCachedDataUS() {
         }
         // All tab: prioritize above-the-fold sources; skip ones already SSR-filled.
         if (tabId === 'tab-all') {
-            if (!tbodyHasRows('all-cnnTrendsTableBody')) once('cnn', loadCNNFromCacheUS);
-            if (!tbodyHasRows('all-worldnewsTrendsTableBody')) once('worldnews', loadWorldNewsFromCacheUS);
+            if (!tbodyHasRows('all-cnnTrendsTableBody') && !tbodyHasRows('cnnTrendsTableBody')) {
+                onceOrRetry('cnn', loadCNNFromCacheUS, 'cnnTrendsTableBody', 'all-cnnTrendsTableBody');
+            }
+            if (!tbodyHasRows('all-worldnewsTrendsTableBody') && !tbodyHasRows('worldnewsTrendsTableBody')) {
+                onceOrRetry('worldnews', loadWorldNewsFromCacheUS, 'worldnewsTrendsTableBody', 'all-worldnewsTrendsTableBody');
+            }
             if (!tbodyHasRows('all-wikipediaTrendsTableBody')) once('wikipedia', loadWikipediaFromCacheUS);
             if (!tbodyHasRows('all-googleTrendsTableBody')) once('google', loadGoogleTrendsFromCacheUS);
             if (!tbodyHasRows('all-youtubeTrendsTableBody')) once('youtube', loadYouTubeTrendsFromCacheUS);
+            syncNewsCardsToAllUS(4, 300);
             // Defer the rest to idle.
             var idle = (typeof requestIdleCallback === 'function')
                 ? requestIdleCallback
@@ -1271,6 +1304,9 @@ function loadCachedDataUS() {
         tabsEl.addEventListener('shown.bs.tab', function (e) {
             var tabId = e && e.target && e.target.id ? e.target.id : null;
             loadForTab(tabId);
+            if (tabId === 'tab-all' || tabId === 'tab-news') {
+                syncNewsCardsToAllUS(4, 300);
+            }
         });
     }
 }
@@ -1469,6 +1505,7 @@ function displayWorldNewsResults(data) {
     if (typeof syncToAllPane === 'function') {
         setTimeout(() => syncToAllPane('worldnewsTrendsTableBody', 'all-worldnewsTrendsTableBody', 5), 0);
     }
+    syncNewsCardsToAllUS(3, 250);
     if (typeof applyCategoryAccordionForAllTables === 'function') {
         setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
     }
@@ -2471,6 +2508,7 @@ function displayCNNResults(data) {
     if (typeof syncToAllPane === 'function') {
         setTimeout(() => syncToAllPane('cnnTrendsTableBody', 'all-cnnTrendsTableBody', 5), 0);
     }
+    syncNewsCardsToAllUS(3, 250);
     if (typeof applyCategoryAccordionForAllTables === 'function') {
         setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
     }

@@ -1194,6 +1194,11 @@ function loadCachedDataUS() {
         try { fn(); } catch (e) { /* ignore */ }
     }
 
+    function loadSource(key, fn, mainTbodyId, allTbodyId) {
+        // 実データが無ければ loaded 済みでも再実行する
+        onceOrRetry(key, fn, mainTbodyId, allTbodyId);
+    }
+
     function getActiveTabId() {
         var active = document.querySelector('#trendCategoryTabs .nav-link.active');
         return active && active.id ? active.id : 'tab-all';
@@ -1202,56 +1207,62 @@ function loadCachedDataUS() {
     function loadForTab(tabId) {
         if (!tabId) tabId = 'tab-all';
         if (tabId === 'tab-news') {
-            onceOrRetry('cnn', loadCNNFromCacheUS, 'cnnTrendsTableBody', 'all-cnnTrendsTableBody');
-            onceOrRetry('worldnews', loadWorldNewsFromCacheUS, 'worldnewsTrendsTableBody', 'all-worldnewsTrendsTableBody');
+            loadSource('cnn', loadCNNFromCacheUS, 'cnnTrendsTableBody', 'all-cnnTrendsTableBody');
+            loadSource('worldnews', loadWorldNewsFromCacheUS, 'worldnewsTrendsTableBody', 'all-worldnewsTrendsTableBody');
             syncNewsCardsToAllUS(4, 300);
             return;
         }
         if (tabId === 'tab-search') {
-            once('google', loadGoogleTrendsFromCacheUS);
-            once('youtube', loadYouTubeTrendsFromCacheUS);
-            once('wikipedia', loadWikipediaFromCacheUS);
+            loadSource('google', loadGoogleTrendsFromCacheUS, 'googleTrendsTableBody', 'all-googleTrendsTableBody');
+            loadSource('youtube', loadYouTubeTrendsFromCacheUS, 'youtubeTrendsTableBody', 'all-youtubeTrendsTableBody');
+            loadSource('wikipedia', loadWikipediaFromCacheUS, 'wikipediaTrendsTableBody', 'all-wikipediaTrendsTableBody');
             return;
         }
         if (tabId === 'tab-tech') {
-            once('hackernews', loadHackerNewsFromCacheUS);
-            once('producthunt', loadProductHuntFromCacheUS);
-            once('devto', loadDevToFromCacheUS);
-            once('medium', loadMediumFromCacheUS);
-            once('github', loadGitHubTrendsFromCacheUS);
-            once('cisakev', loadCISAKEVTrendsFromCacheUS);
-            once('thehackernews', loadTheHackerNewsTrendsFromCacheUS);
-            once('globenewswire', loadGlobeNewswireFromCacheUS);
-            once('appstore', loadAppStoreTrendsFromCacheUS);
+            loadSource('hackernews', loadHackerNewsFromCacheUS, 'hackernewsTrendsTableBody', 'all-hackernewsTrendsTableBody');
+            loadSource('producthunt', loadProductHuntFromCacheUS, 'producthuntTrendsTableBody', 'all-producthuntTrendsTableBody');
+            loadSource('devto', loadDevToFromCacheUS, 'devtoTrendsTableBody', 'all-devtoTrendsTableBody');
+            loadSource('medium', loadMediumFromCacheUS, 'mediumTrendsTableBody', 'all-mediumTrendsTableBody');
+            loadSource('github', loadGitHubTrendsFromCacheUS, 'githubTrendsTableBody', 'all-githubTrendsTableBody');
+            loadSource('cisakev', loadCISAKEVTrendsFromCacheUS, 'cisaKevTrendsTableBody', 'all-cisaKevTrendsTableBody');
+            loadSource('thehackernews', loadTheHackerNewsTrendsFromCacheUS, 'thehackernewsTrendsTableBody', 'all-thehackernewsTrendsTableBody');
+            loadSource('globenewswire', loadGlobeNewswireFromCacheUS, 'globenewswireTrendsTableBody', 'all-globenewswireTrendsTableBody');
+            loadSource('appstore', loadAppStoreTrendsFromCacheUS, 'appstoreTrendsTableBody', 'all-appstoreTrendsTableBody');
             return;
         }
         if (tabId === 'tab-market') {
-            once('stock', loadStockTrendsFromCacheUS);
-            once('crypto', loadCryptoTrendsFromCacheUS);
+            loadSource('stock', loadStockTrendsFromCacheUS, 'stockTrendsTableBody', 'all-stockTrendsTableBody');
+            loadSource('crypto', loadCryptoTrendsFromCacheUS, 'cryptoTrendsTableBody', 'all-cryptoTrendsTableBody');
             return;
         }
         if (tabId === 'tab-entertainment') {
-            once('spotify', loadSpotifyFromCacheUS);
-            once('podcast', loadPodcastFromCacheUS);
-            once('movie', loadMovieTrendsFromCacheUS);
-            once('book', loadBookTrendsFromCacheUS);
-            once('ebay', loadEbayFromCacheUSWrapper);
-            once('bluesky', loadBlueskyFromCacheUS);
-            once('openalex', loadOpenAlexFromCacheUS);
-            once('twitch', loadTwitchFromCacheUS);
+            loadSource('spotify', loadSpotifyFromCacheUS, 'spotifyTrendsTableBody', 'all-spotifyTrendsTableBody');
+            loadSource('podcast', loadPodcastFromCacheUS, 'podcastTrendsTableBody', 'all-podcastTrendsTableBody');
+            loadSource('movie', loadMovieTrendsFromCacheUS, 'movieTrendsTableBody', 'all-movieTrendsTableBody');
+            loadSource('book', loadBookTrendsFromCacheUS, 'bookTrendsTableBody', 'all-bookTrendsTableBody');
+            loadSource('ebay', loadEbayFromCacheUSWrapper, 'ebayTrendsTableBody', 'all-ebayTrendsTableBody');
+            loadSource('bluesky', loadBlueskyFromCacheUS, 'blueskyTrendsTableBody', 'all-blueskyTrendsTableBody');
+            loadSource('openalex', loadOpenAlexFromCacheUS, 'openalexTrendsTableBody', 'all-openalexTrendsTableBody');
+            loadSource('twitch', loadTwitchFromCacheUS, 'twitchTrendsTableBody', 'all-twitchTrendsTableBody');
             return;
         }
         // All tab: prioritize above-the-fold sources; skip ones already SSR-filled.
         if (tabId === 'tab-all') {
             if (!tbodyHasRows('all-cnnTrendsTableBody') && !tbodyHasRows('cnnTrendsTableBody')) {
-                onceOrRetry('cnn', loadCNNFromCacheUS, 'cnnTrendsTableBody', 'all-cnnTrendsTableBody');
+                loadSource('cnn', loadCNNFromCacheUS, 'cnnTrendsTableBody', 'all-cnnTrendsTableBody');
             }
             if (!tbodyHasRows('all-worldnewsTrendsTableBody') && !tbodyHasRows('worldnewsTrendsTableBody')) {
-                onceOrRetry('worldnews', loadWorldNewsFromCacheUS, 'worldnewsTrendsTableBody', 'all-worldnewsTrendsTableBody');
+                loadSource('worldnews', loadWorldNewsFromCacheUS, 'worldnewsTrendsTableBody', 'all-worldnewsTrendsTableBody');
             }
-            if (!tbodyHasRows('all-wikipediaTrendsTableBody')) once('wikipedia', loadWikipediaFromCacheUS);
-            if (!tbodyHasRows('all-googleTrendsTableBody')) once('google', loadGoogleTrendsFromCacheUS);
-            if (!tbodyHasRows('all-youtubeTrendsTableBody')) once('youtube', loadYouTubeTrendsFromCacheUS);
+            if (!tbodyHasRows('all-wikipediaTrendsTableBody') && !tbodyHasRows('wikipediaTrendsTableBody')) {
+                loadSource('wikipedia', loadWikipediaFromCacheUS, 'wikipediaTrendsTableBody', 'all-wikipediaTrendsTableBody');
+            }
+            if (!tbodyHasRows('all-googleTrendsTableBody') && !tbodyHasRows('googleTrendsTableBody')) {
+                loadSource('google', loadGoogleTrendsFromCacheUS, 'googleTrendsTableBody', 'all-googleTrendsTableBody');
+            }
+            if (!tbodyHasRows('all-youtubeTrendsTableBody') && !tbodyHasRows('youtubeTrendsTableBody')) {
+                loadSource('youtube', loadYouTubeTrendsFromCacheUS, 'youtubeTrendsTableBody', 'all-youtubeTrendsTableBody');
+            }
             syncNewsCardsToAllUS(4, 300);
             // Defer the rest to idle.
             var idle = (typeof requestIdleCallback === 'function')
@@ -1284,10 +1295,7 @@ function loadCachedDataUS() {
                 (function next() {
                     if (i >= rest.length) return;
                     var pair = rest[i++];
-                    if (!alreadyLoaded(pair[0])) {
-                        markLoaded(pair[0]);
-                        try { pair[1](); } catch (_) {}
-                    }
+                    try { pair[1](); } catch (_) {}
                     setTimeout(next, 180);
                 })();
             });

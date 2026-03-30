@@ -1153,6 +1153,21 @@ function syncNewsCardsToAllUS(retries = 3, delayMs = 250) {
     }
 }
 
+// API/描画タイミングの前後関係に依存せず、主要カードを main→All へ再同期
+function forceSyncCoreCardsToAllUS() {
+    if (typeof syncAllPaneOrPlaceholder !== 'function') return;
+    var pairs = [
+        ['cnnTrendsTableBody', 'all-cnnTrendsTableBody'],
+        ['worldnewsTrendsTableBody', 'all-worldnewsTrendsTableBody'],
+        ['wikipediaTrendsTableBody', 'all-wikipediaTrendsTableBody'],
+        ['googleTrendsTableBody', 'all-googleTrendsTableBody'],
+        ['youtubeTrendsTableBody', 'all-youtubeTrendsTableBody']
+    ];
+    pairs.forEach(function (pair) {
+        syncAllPaneOrPlaceholder(pair[0], pair[1], 5, null);
+    });
+}
+
 // Load cached data for US trends（日本と同一のバッチ方式で統一・Allタブの表示順に合わせる）
 function loadCachedDataUS() {
     console.log('📦 Loading cached data for US trends');
@@ -1315,8 +1330,22 @@ function loadCachedDataUS() {
             if (tabId === 'tab-all' || tabId === 'tab-news') {
                 syncNewsCardsToAllUS(4, 300);
             }
+            forceSyncCoreCardsToAllUS();
         });
     }
+
+    // 起動後しばらくは定期再同期して、遅延読み込み後にAllが取り残されるケースを回避
+    forceSyncCoreCardsToAllUS();
+    var coreSyncIntervalMs = 3000;
+    var coreSyncDurationMs = 180000;
+    var coreSyncElapsed = 0;
+    var coreSyncTimer = setInterval(function () {
+        coreSyncElapsed += coreSyncIntervalMs;
+        forceSyncCoreCardsToAllUS();
+        if (coreSyncElapsed >= coreSyncDurationMs) {
+            clearInterval(coreSyncTimer);
+        }
+    }, coreSyncIntervalMs);
 }
 
 // Google Trends cache data loading for US

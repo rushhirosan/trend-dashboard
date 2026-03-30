@@ -909,9 +909,6 @@ function displayGoogleResults(data) {
     
     // Hide status message
     statusMessage.style.display = 'none';
-    
-    // Clear table
-    tableBody.innerHTML = '';
 
     const sortedData = (!data.data || !Array.isArray(data.data))
         ? []
@@ -922,13 +919,18 @@ function displayGoogleResults(data) {
         });
 
     if (sortedData.length === 0) {
+        // AllタブでSSR/前回描画の行が残っている場合は、空レスポンスで上書きしない
+        const allTbody = document.getElementById('all-googleTrendsTableBody');
+        const mainHasRows = tableBody && tableBody.querySelectorAll('tr:not(.skeleton-row)').length > 0;
+        const allHasRows = allTbody && allTbody.querySelectorAll('tr:not(.skeleton-row)').length > 0;
+        if (mainHasRows || allHasRows) {
+            console.log('displayGoogleResults: No data but keeping existing rows (main/all have rows)');
+            return;
+        }
+
         if (typeof setAllPaneEmptyMessage === 'function') {
             setAllPaneEmptyMessage('googleTrendsTableBody', null, null);
-        }
-        if (typeof syncAllPaneOrPlaceholder === 'function') {
-            setTimeout(function() {
-                syncAllPaneOrPlaceholder('googleTrendsTableBody', 'all-googleTrendsTableBody', 5, null);
-            }, 0);
+            setAllPaneEmptyMessage('all-googleTrendsTableBody', null, null);
         }
         if (typeof applyCategoryAccordionForAllTables === 'function') {
             setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
@@ -936,6 +938,9 @@ function displayGoogleResults(data) {
         console.log('displayGoogleResults: Completed (empty)');
         return;
     }
+
+    // Clear table and render fresh content
+    tableBody.innerHTML = '';
 
     // Add data to table
     console.log('Data structure check:', sortedData[0]); // Debug: Check first item structure
@@ -1014,13 +1019,18 @@ function displayYouTubeResults(data) {
         : [];
     
     if (sortedData.length === 0) {
+        // AllタブでSSR/前回描画の行が残っている場合は、空レスポンスで上書きしない
+        const allTbody = document.getElementById('all-youtubeTrendsTableBody');
+        const mainHasRows = tableBody && tableBody.querySelectorAll('tr:not(.skeleton-row)').length > 0;
+        const allHasRows = allTbody && allTbody.querySelectorAll('tr:not(.skeleton-row)').length > 0;
+        if (mainHasRows || allHasRows) {
+            console.log('displayYouTubeResults: No data but keeping existing rows (main/all have rows)');
+            return;
+        }
+
         if (typeof setAllPaneEmptyMessage === 'function') {
             setAllPaneEmptyMessage('youtubeTrendsTableBody', null, null);
-        }
-        if (typeof syncAllPaneOrPlaceholder === 'function') {
-            setTimeout(function() {
-                syncAllPaneOrPlaceholder('youtubeTrendsTableBody', 'all-youtubeTrendsTableBody', 5, null);
-            }, 0);
+            setAllPaneEmptyMessage('all-youtubeTrendsTableBody', null, null);
         }
         if (typeof applyCategoryAccordionForAllTables === 'function') {
             setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
@@ -1413,17 +1423,30 @@ function displayWorldNewsResults(data) {
     
     // Hide status message
     statusMessage.style.display = 'none';
-    
-    // Clear table
-    tableBody.innerHTML = '';
 
     if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
-        if (typeof applyTrendCacheEmptyTable === 'function') {
-            applyTrendCacheEmptyTable('worldnewsTrendsTableBody', 'all-worldnewsTrendsTableBody');
+        // AllタブでSSR/前回描画の行が残っている場合は、空レスポンスで上書きしない
+        const allTbody = document.getElementById('all-worldnewsTrendsTableBody');
+        const mainHasRows = tableBody && tableBody.querySelectorAll('tr:not(.skeleton-row)').length > 0;
+        const allHasRows = allTbody && allTbody.querySelectorAll('tr:not(.skeleton-row)').length > 0;
+        if (mainHasRows || allHasRows) {
+            console.log('displayWorldNewsResults: No data but keeping existing rows (main/all have rows)');
+            return;
+        }
+
+        if (typeof setAllPaneEmptyMessage === 'function') {
+            setAllPaneEmptyMessage('worldnewsTrendsTableBody', null, null);
+            setAllPaneEmptyMessage('all-worldnewsTrendsTableBody', null, null);
+        }
+        if (typeof applyCategoryAccordionForAllTables === 'function') {
+            setTimeout(function() { applyCategoryAccordionForAllTables(5); }, 0);
         }
         console.log('displayWorldNewsResults: Completed (empty)');
         return;
     }
+
+    // Clear table and render fresh content
+    tableBody.innerHTML = '';
 
     data.data.forEach((item, index) => {
         const row = document.createElement('tr');

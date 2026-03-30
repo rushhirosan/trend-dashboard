@@ -845,6 +845,9 @@ function runBatchLoad(loadFunctions, options) {
 function setAllPaneEmptyMessage(allTableBodyId, colspan, message) {
     const tbody = document.getElementById(allTableBodyId);
     if (!tbody) return;
+    if (tbody.id && tbody.id.indexOf('all-') === 0) {
+        delete tbody.dataset.syncFromMainFp;
+    }
     let c = colspan;
     if (c == null || c < 1) {
         const table = tbody.closest('table');
@@ -902,6 +905,20 @@ function applyTrendCacheEmptyTable(mainTableBodyId, allTableBodyId, message) {
 }
 
 /**
+ * All 同期の無駄な innerHTML クリアを防ぐ（同一データでの再同期チラつき対策）
+ */
+function computeSyncToAllFingerprint(toCopyRows, isMobile) {
+    const parts = [isMobile ? 'm' : 'd'];
+    toCopyRows.forEach((tr) => {
+        const link = tr.querySelector('a[href]');
+        const href0 = link ? link.getAttribute('href') || '' : '';
+        const text = (tr.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 320);
+        parts.push(href0 + '\x01' + text);
+    });
+    return parts.join('\x02');
+}
+
+/**
  * 全部入り（All）タブ用: メインのテーブル先頭N行をAll用tbodyへコピーする
  * @param {string} mainTableBodyId - メインペインのtbody要素ID（例: 'googleTrendsTableBody'）
  * @param {string} allTableBodyId - Allペインのtbody要素ID（例: 'all-googleTrendsTableBody'）
@@ -918,6 +935,15 @@ function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 5) {
     const isMobile = isMobileViewport();
     // 全部入りタブは常にトップN件のみ表示（デスクトップでもlimitを適用）
     const toCopy = dataRows.slice(0, limit);
+
+    if (toCopy.length > 0) {
+        const fp = computeSyncToAllFingerprint(toCopy, isMobile);
+        const allRowCount = allTbody.querySelectorAll('tr').length;
+        if (fp === allTbody.dataset.syncFromMainFp && allRowCount === toCopy.length) {
+            return;
+        }
+    }
+
     const topCount = 3;
     const visibleRows = toCopy.slice(0, topCount);
     const hiddenRows = toCopy.slice(topCount);
@@ -961,6 +987,11 @@ function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 5) {
 
     if (!isMobile) {
         toCopy.forEach(tr => allTbody.appendChild(cloneWithWrapper(tr)));
+        if (toCopy.length > 0) {
+            allTbody.dataset.syncFromMainFp = computeSyncToAllFingerprint(toCopy, isMobile);
+        } else {
+            delete allTbody.dataset.syncFromMainFp;
+        }
         return;
     }
 
@@ -1002,6 +1033,12 @@ function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 5) {
             this.textContent = isOpen ? lessText : moreText;
         });
         cardBody.appendChild(toggle);
+    }
+
+    if (toCopy.length > 0) {
+        allTbody.dataset.syncFromMainFp = computeSyncToAllFingerprint(toCopy, isMobile);
+    } else {
+        delete allTbody.dataset.syncFromMainFp;
     }
 }
 
@@ -1237,18 +1274,22 @@ function setupCategoryAccordionObserver(limit = 5) {
     window.addEventListener('resize', schedule);
     window.addEventListener('load', schedule);
 
-    // 起動直後25秒間、1秒ごとにアコーディオンを適用（遅延読み込み・US Gov Data等の全テーブルを確実にカバー）
+    // 遅延読み込みテーブル向けにアコーディオンのみ短時間ポーリング（All 同期は毎秒走らせない）
     const pollInterval = 1000;
     const pollDuration = (document.body && document.body.id === 'trends-us') ? 25000 : 15000;
     let pollElapsed = 0;
     const pollTimer = setInterval(function() {
         pollElapsed += pollInterval;
         applyCategoryAccordionForAllTables(limit);
-        if (typeof reSyncAllPanes === 'function') reSyncAllPanes();
         if (pollElapsed >= pollDuration) {
             clearInterval(pollTimer);
         }
     }, pollInterval);
+    if (typeof reSyncAllPanes === 'function') {
+        [4000, 12000].forEach(function(ms) {
+            setTimeout(function() { reSyncAllPanes(); }, ms);
+        });
+    }
 
     // タブ切り替え時にも再適用（非表示タブでデータが後から読み込まれる場合に対応）
     const tabNav = document.getElementById('trendCategoryTabs');

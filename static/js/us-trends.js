@@ -1177,95 +1177,8 @@ function forceSyncCoreCardsToAllUS() {
     });
 }
 
-function escapeHtmlUS(value) {
-    return String(value == null ? '' : value)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
-
-function setAllRowsUS(allTbodyId, rowsHtml) {
-    var tbody = document.getElementById(allTbodyId);
-    if (!tbody) return;
-    if (tbody.id && tbody.id.indexOf('all-') === 0) {
-        delete tbody.dataset.syncFromMainFp;
-    }
-    tbody.innerHTML = rowsHtml || '';
-}
-
-// フェイルセーフ: CNN / World News / YouTube の All 枠を直接描画（Wikipedia・Google は syncToAllPane のみ）
-function refreshAllCoreCardsDirectUS() {
-    console.log('🔁 refreshAllCoreCardsDirectUS: start');
-    var tasks = [
-        {
-            url: '/api/cnn-trends?limit=5&force_refresh=false',
-            allId: 'all-cnnTrendsTableBody',
-            render: function (items) {
-                return items.map(function (item, idx) {
-                    var title = escapeHtmlUS(item.title || 'N/A');
-                    var url = escapeHtmlUS(item.url || '#');
-                    var published = item.published_date ? new Date(item.published_date).toLocaleDateString('en-US') : 'N/A';
-                    return '<tr><td><span class="badge bg-danger">' + (idx + 1) + '</span></td><td><a href="' + url + '" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>' + title + '</strong></a></td><td>' + escapeHtmlUS(published) + '</td></tr>';
-                }).join('');
-            }
-        },
-        {
-            url: '/api/worldnews-trends?country=us&category=general&force_refresh=false',
-            allId: 'all-worldnewsTrendsTableBody',
-            render: function (items) {
-                return items.map(function (item, idx) {
-                    var title = escapeHtmlUS(item.title || 'N/A');
-                    var url = escapeHtmlUS(item.url || '#');
-                    var published = (item.published_at || item.publish_date) ? new Date(item.published_at || item.publish_date).toLocaleDateString('en-US') : 'N/A';
-                    return '<tr><td><span class="badge bg-info">' + (idx + 1) + '</span></td><td><a href="' + url + '" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>' + title + '</strong></a></td><td>' + escapeHtmlUS(published) + '</td></tr>';
-                }).join('');
-            }
-        },
-        // Wikipedia / Google は ensureCore + syncToAllPane で All に反映（二重 fetch / innerHTML 競合によるチラつきを避ける）
-        {
-            url: '/api/youtube-trends?region=US&force_refresh=false',
-            allId: 'all-youtubeTrendsTableBody',
-            render: function (items) {
-                return items.slice(0, 5).map(function (item, idx) {
-                    var title = escapeHtmlUS(item.title || 'N/A');
-                    var channel = escapeHtmlUS(item.channel_title || 'N/A');
-                    var views = escapeHtmlUS(item.view_count || item.views || '-');
-                    var url = item.video_id ? 'https://www.youtube.com/watch?v=' + encodeURIComponent(item.video_id) : '#';
-                    return '<tr><td><span class="badge bg-danger">' + (idx + 1) + '</span></td><td><a href="' + escapeHtmlUS(url) + '" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>' + title + '</strong></a></td><td>' + channel + '</td><td>' + views + '</td></tr>';
-                }).join('');
-            }
-        }
-    ];
-
-    tasks.forEach(function (task) {
-        fetchWithRetry(task.url)
-            .then(function (res) { return res.json(); })
-            .then(function (data) {
-                var list = data && data.success && Array.isArray(data.data) ? data.data : [];
-                if (list.length > 0) {
-                    console.log('✅ refreshAllCoreCardsDirectUS:', task.allId, 'rows=', list.length);
-                    setAllRowsUS(task.allId, task.render(list));
-                    return;
-                }
-                console.log('⚠️ refreshAllCoreCardsDirectUS empty:', task.allId);
-                if (typeof setAllPaneEmptyMessage === 'function') {
-                    setAllPaneEmptyMessage(task.allId, null, null);
-                }
-            })
-            .catch(function (err) {
-                console.warn('❌ refreshAllCoreCardsDirectUS failed:', task.allId, err);
-                // 直近表示があれば維持。空の場合のみ空メッセージを入れる
-                var tbody = document.getElementById(task.allId);
-                if (!tbody) return;
-                var hasRows = tbody.querySelectorAll('tr').length > 0;
-                if (!hasRows && typeof setAllPaneEmptyMessage === 'function') {
-                    setAllPaneEmptyMessage(task.allId, null, null);
-                }
-            });
-    });
-}
+// All タブのカードは日本ページと同様「各ソースのメイン表 → syncToAllPane のみ」。
+// API から all-* tbody へ直接 innerHTML すると件数不一致（例: World News 10→5）とチラつきの原因になるため行わない。
 
 // Allで見せる主要5ソースは必ずロードさせる（active tabや復元状態に依存させない）
 function ensureCoreAllSourcesLoadedUS() {
@@ -1277,7 +1190,6 @@ function ensureCoreAllSourcesLoadedUS() {
     try { loadYouTubeTrendsFromCacheUS(); } catch (e) { console.warn('ensureCore: youtube', e); }
     setTimeout(function () {
         forceSyncCoreCardsToAllUS();
-        refreshAllCoreCardsDirectUS();
     }, 600);
 }
 
@@ -1443,23 +1355,17 @@ function loadCachedDataUS() {
             if (tabId === 'tab-all' || tabId === 'tab-news') {
                 syncNewsCardsToAllUS(4, 300);
             }
-            forceSyncCoreCardsToAllUS();
+            if (tabId === 'tab-all' || tabId === 'tab-news') {
+                forceSyncCoreCardsToAllUS();
+            }
             if (tabId === 'tab-all') {
                 ensureCoreAllSourcesLoadedUS();
-                refreshAllCoreCardsDirectUS();
             }
         });
     }
 
-    // 遅延読み込み後の All 取り残しは少数回の再同期のみ（定期 sync はチラつきの原因になる）
     forceSyncCoreCardsToAllUS();
-    refreshAllCoreCardsDirectUS();
     ensureCoreAllSourcesLoadedUS();
-    [2000, 6000, 15000].forEach(function (ms) {
-        setTimeout(function () {
-            forceSyncCoreCardsToAllUS();
-        }, ms);
-    });
 }
 
 // Google Trends cache data loading for US

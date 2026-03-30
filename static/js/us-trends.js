@@ -1194,6 +1194,7 @@ function setAllRowsUS(allTbodyId, rowsHtml) {
 
 // フェイルセーフ: Allタブの主要5カードはAPIレスポンスから直接描画（同期漏れ対策）
 function refreshAllCoreCardsDirectUS() {
+    console.log('🔁 refreshAllCoreCardsDirectUS: start');
     var tasks = [
         {
             url: '/api/cnn-trends?limit=5&force_refresh=false',
@@ -1263,14 +1264,17 @@ function refreshAllCoreCardsDirectUS() {
             .then(function (data) {
                 var list = data && data.success && Array.isArray(data.data) ? data.data : [];
                 if (list.length > 0) {
+                    console.log('✅ refreshAllCoreCardsDirectUS:', task.allId, 'rows=', list.length);
                     setAllRowsUS(task.allId, task.render(list));
                     return;
                 }
+                console.log('⚠️ refreshAllCoreCardsDirectUS empty:', task.allId);
                 if (typeof setAllPaneEmptyMessage === 'function') {
                     setAllPaneEmptyMessage(task.allId, null, null);
                 }
             })
-            .catch(function () {
+            .catch(function (err) {
+                console.warn('❌ refreshAllCoreCardsDirectUS failed:', task.allId, err);
                 // 直近表示があれば維持。空の場合のみ空メッセージを入れる
                 var tbody = document.getElementById(task.allId);
                 if (!tbody) return;
@@ -1280,6 +1284,20 @@ function refreshAllCoreCardsDirectUS() {
                 }
             });
     });
+}
+
+// Allで見せる主要5ソースは必ずロードさせる（active tabや復元状態に依存させない）
+function ensureCoreAllSourcesLoadedUS() {
+    console.log('🚀 ensureCoreAllSourcesLoadedUS: trigger');
+    try { loadCNNFromCacheUS(); } catch (e) { console.warn('ensureCore: cnn', e); }
+    try { loadWorldNewsFromCacheUS(); } catch (e) { console.warn('ensureCore: worldnews', e); }
+    try { loadWikipediaFromCacheUS(); } catch (e) { console.warn('ensureCore: wikipedia', e); }
+    try { loadGoogleTrendsFromCacheUS(); } catch (e) { console.warn('ensureCore: google', e); }
+    try { loadYouTubeTrendsFromCacheUS(); } catch (e) { console.warn('ensureCore: youtube', e); }
+    setTimeout(function () {
+        forceSyncCoreCardsToAllUS();
+        refreshAllCoreCardsDirectUS();
+    }, 600);
 }
 
 // Load cached data for US trends（日本と同一のバッチ方式で統一・Allタブの表示順に合わせる）
@@ -1446,6 +1464,7 @@ function loadCachedDataUS() {
             }
             forceSyncCoreCardsToAllUS();
             if (tabId === 'tab-all') {
+                ensureCoreAllSourcesLoadedUS();
                 refreshAllCoreCardsDirectUS();
             }
         });
@@ -1454,6 +1473,7 @@ function loadCachedDataUS() {
     // 起動後しばらくは定期再同期して、遅延読み込み後にAllが取り残されるケースを回避
     forceSyncCoreCardsToAllUS();
     refreshAllCoreCardsDirectUS();
+    ensureCoreAllSourcesLoadedUS();
     var coreSyncIntervalMs = 3000;
     var coreSyncDurationMs = 180000;
     var coreSyncElapsed = 0;

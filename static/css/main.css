@@ -4034,3 +4034,48 @@ body#trends-us #trends #pane-entertainment .trend-table-container {
     overflow-y: auto !important;
 }
 
+
+/* ========== All / ジャンルタブ: user layout (view-preferences.js) ========== */
+#all-trends-container > [data-all-card] > .all-card-layout-controls,
+#trendCategoryTabContent .tab-pane:not(#pane-all) article[id^="source-"] > .all-card-layout-controls {
+    display: none;
+}
+.all-layout-edit-mode #all-trends-container > [data-all-card] > .all-card-layout-controls,
+.genre-layout-edit-mode article[id^="source-"] > .all-card-layout-controls {
+    display: flex !important;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    padding: 4px 6px;
+    background: rgba(255, 255, 255, 0.95);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0.25rem 0.25rem 0 0;
+}
+.all-layout-edit-mode #all-trends-container > [data-all-card],
+.genre-layout-edit-mode article[id^="source-"] {
+    padding-top: 2.5rem;
+}
+#all-trends-container [data-all-card].all-card-col-user-hidden,
+article[id^="source-"].all-card-col-user-hidden {
+    display: none !important;
+}
+.all-layout-edit-mode #all-trends-container > [data-all-card].all-card-dragging,
+.genre-layout-edit-mode article[id^="source-"].all-card-dragging {
+    opacity: 0.65;
+}
+.all-layout-edit-mode #all-trends-container .all-card-drag-handle,
+.genre-layout-edit-mode article[id^="source-"] .all-card-drag-handle {
+    touch-action: none;
+    cursor: grab;
+}
+.all-layout-edit-mode #all-trends-container .all-card-drag-handle:active,
+.genre-layout-edit-mode article[id^="source-"] .all-card-drag-handle:active {
+    cursor: grabbing;
+}
+.all-layout-hidden-strip:not(.d-none) {
+    display: flex !important;
+    flex-wrap: wrap;
+    align-items: center;
+}

@@ -19,18 +19,27 @@ description: >-
 1. `python3 -m pytest tests/ -q`
 2. 追跡ファイルの簡易シークレット検出（GitHub PAT、秘密鍵、Google API キー風パターンなど）
 
-## 一発リリース（おすすめ）：自動コミット文 + push main + Fly.io
-
-変更内容から英語の1行メッセージを自動生成（例: `chore: update 3 file(s) (routes, static)`）。`tests/` のみなら `test:`、`.md` のみなら `docs:`。
+## 一発リリース：自動コミット + push main + Fly.io
 
 ```bash
 ./scripts/release.sh --ship
 ```
 
-- チェックをすべて通した**あと** `git add -A` → コミット（変更がなければコミット省略）→ `git push origin main` → `fly deploy -a trends-dashboard`
-- ローカルブランチが **`main` でないと push で失敗**する（意図的）
+- チェック後 `git add -A` → コミット → `git push origin main` → `fly deploy -a trends-dashboard`
+- **自動コミット**は次を含む（`scripts/release.sh` 内の `generate_auto_commit_subject`）:
+  - **件名**: 変更の種類に応じた prefix（例: `test:` / `docs:` / `chore(ui):` / `chore(api):` / `chore(ci):` / 領域混在時は `chore:`）と、**変更ファイルのベース名を最大3つ**（`+N more` で残件数）
+  - **本文**: 変更パス一覧（`- path/to/file`）と、`--commit` で意図を書く旨の一行
+- **背景・理由まで履歴に残したいとき**は `--ship` ではなく `--commit` を使う（下記）。
 
-## 手動コミットメッセージ
+## 意図・背景を明確にしたいとき（推奨）
+
+```bash
+./scripts/release.sh --commit "fix(ui): reduce US All flicker; align with JP sync path" --push --deploy
+```
+
+`--ship` と `--commit` は同時に使えない。
+
+## 手動コミットメッセージのみ（チェック後にその文でコミット）
 
 ```bash
 ./scripts/release.sh --commit "feat: your message in English" --push
@@ -50,5 +59,6 @@ description: >-
 
 ## エージェント向けメモ
 
-- 「コミットしてプッシュしてデプロイ」→ `./scripts/release.sh --ship`（メッセージ自動）。
+- デプロイまで一発: `./scripts/release.sh --ship`（件名はファイル名ベース、本文にパス一覧）。
+- ユーザーが「なぜ変更したか」を履歴に残したい場合は `./scripts/release.sh --commit "..." --push --deploy` を提案する。
 - `memo.txt` 等にトークンが残っているとシークレットチェックで失敗する。

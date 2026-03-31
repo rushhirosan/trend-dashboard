@@ -7,7 +7,7 @@
 #   ./scripts/release.sh --commit "feat: something" --push --deploy
 #   ./scripts/release.sh --deploy
 #   ./scripts/release.sh --ship
-#     → チェック後、変更から自動でコミットメッセージを生成し、main を push し、fly deploy
+#     → チェック後、ファイル名・領域付きの自動コミット（本文にパス一覧）、main を push し、fly deploy
 
 set -euo pipefail
 
@@ -45,7 +45,7 @@ while [[ $# -gt 0 ]]; do
 Usage: $0 [options]
 
   (no args)     pytest, secret scan のみ
-  --ship        上記のあと、変更から自動コミット → origin main へ push → fly deploy
+  --ship        上記のあと、ファイル名・領域付き自動コミット（本文にパス一覧）→ push → fly deploy
   --commit MSG  手動メッセージでコミット（チェック通過後）
   --push        --commit または --ship と併用。origin main へ push（ローカルブランチは main 必須）
   --deploy      Fly.io のみ（チェック通過後）
@@ -75,8 +75,9 @@ if [[ "$DO_PUSH" == true && "$DO_SHIP" == false && -z "$COMMIT_MSG" ]]; then
   exit 1
 fi
 
-generate_auto_commit_message() {
-  local files=() prefix n dirs line
+# 変更パスから Conventional Commits 風の prefix と、一行目に載せる短い要約を作る
+generate_auto_commit_subject() {
+  local files=() line n prefix scope
   while IFS= read -r line; do
     [[ -n "$line" ]] && files+=("$line")
   done < <(git diff --cached --name-only)
@@ -87,24 +88,99 @@ generate_auto_commit_message() {
   fi
 
   local all_test=true all_md=true
+  local has_ui=false has_api=false has_scripts=false
   for line in "${files[@]}"; do
     [[ "$line" == tests/* ]] || all_test=false
     [[ "$line" == *.md ]] || all_md=false
+    case "$line" in
+      static/*|templates/*|*.html|*.css) has_ui=true ;;
+      routes/*|services/*|managers/*|jobs/*|database_config.py|app.py|wsgi.py|gunicorn*.py|utils/*.py) has_api=true ;;
+      scripts/*|.github/*|fly.toml|Dockerfile|requirements.txt) has_scripts=true ;;
+    esac
   done
+
+  local areas=0
+  [[ "$has_ui" == true ]] && areas=$((areas + 1))
+  [[ "$has_api" == true ]] && areas=$((areas + 1))
+  [[ "$has_scripts" == true ]] && areas=$((areas + 1))
+
   if [[ "$all_test" == true ]]; then
     prefix="test"
+    scope=""
   elif [[ "$all_md" == true ]]; then
     prefix="docs"
+    scope=""
+  elif [[ "$areas" -gt 1 ]]; then
+    prefix="chore"
+    scope=""
+  elif [[ "$has_ui" == true ]]; then
+    prefix="chore"
+    scope="ui"
+  elif [[ "$has_api" == true ]]; then
+    prefix="chore"
+    scope="api"
+  elif [[ "$has_scripts" == true ]]; then
+    prefix="chore"
+    scope="ci"
   else
     prefix="chore"
+    scope=""
   fi
 
-  dirs=$(printf '%s\n' "${files[@]}" | awk -F/ 'NF>=1 { print $1 }' | sort -u | paste -sd ', ' -)
-  local subject="${prefix}: update ${n} file(s) (${dirs})"
+  # ファイル名（重複除く）を最大3つまで列挙し、残りは (+N)
+  local names=()
+  local seen="|"
+  for line in "${files[@]}"; do
+    local base
+    base="$(basename "$line")"
+    case "$seen" in
+      *"|${base}|"*) continue ;;
+    esac
+    seen="${seen}${base}|"
+    names+=("$base")
+  done
+  local namepart="" extra=""
+  local maxnames=3
+  local u=${#names[@]}
+  local parts=() i=0
+  for name in "${names[@]}"; do
+    [[ "$i" -ge "$maxnames" ]] && break
+    parts+=("$name")
+    i=$((i + 1))
+  done
+  if [[ ${#parts[@]} -gt 0 ]]; then
+    namepart=$(printf '%s, ' "${parts[@]}" | sed 's/, $//')
+  else
+    namepart="(no basename)"
+  fi
+  if [[ "$u" -gt "$maxnames" ]]; then
+    extra=" (+$(( u - maxnames )) more)"
+  fi
+
+  local subject
+  if [[ -n "$scope" ]]; then
+    subject="${prefix}(${scope}): ${namepart}${extra}"
+  else
+    subject="${prefix}: ${namepart}${extra}"
+  fi
+
+  # 一行目は 72 文字程度に収める（Git の習慣）
   if [[ ${#subject} -gt 72 ]]; then
     subject="${subject:0:69}..."
   fi
   echo "$subject"
+}
+
+generate_auto_commit_body() {
+  local n
+  n=$(git diff --cached --name-only | wc -l | tr -d ' ')
+  if [[ "$n" -eq 0 ]]; then
+    return 1
+  fi
+  echo "Changed paths (${n}):"
+  git diff --cached --name-only | sed 's/^/- /'
+  echo ""
+  echo "For intent/background in history, prefer: ./scripts/release.sh --commit \"fix(ui): …\" --push [--deploy]"
 }
 
 assert_on_main_branch() {
@@ -151,13 +227,14 @@ if [[ -n "$COMMIT_MSG" ]]; then
     git commit -m "$COMMIT_MSG"
   fi
 elif [[ "$DO_SHIP" == true ]]; then
-  echo "==> git commit（変更内容から自動生成）"
+  echo "==> git commit（変更内容から自動生成：ファイル名・領域付き。意図は --commit で）"
   if git diff --cached --quiet; then
     echo "変更なしのためコミットをスキップ"
   else
-    AUTO_MSG="$(generate_auto_commit_message)"
-    echo "  メッセージ: $AUTO_MSG"
-    git commit -m "$AUTO_MSG"
+    AUTO_SUBJECT="$(generate_auto_commit_subject)"
+    AUTO_BODY="$(generate_auto_commit_body)"
+    echo "  件名: $AUTO_SUBJECT"
+    git commit -m "$AUTO_SUBJECT" -m "$AUTO_BODY"
   fi
 fi
 

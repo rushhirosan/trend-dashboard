@@ -4037,11 +4037,13 @@ body#trends-us #trends #pane-entertainment .trend-table-container {
 
 /* ========== All / ジャンルタブ: user layout (view-preferences.js) ========== */
 #all-trends-container > [data-all-card] > .all-card-layout-controls,
-#trendCategoryTabContent .tab-pane:not(#pane-all) article[id^="source-"] > .all-card-layout-controls {
+#trendCategoryTabContent .tab-pane:not(#pane-all) article[id^="source-"] > .all-card-layout-controls,
+#trendCategoryTabContent .tab-pane:not(#pane-all) div[id^="source-"] > .all-card-layout-controls {
     display: none;
 }
 .all-layout-edit-mode #all-trends-container > [data-all-card] > .all-card-layout-controls,
-.genre-layout-edit-mode article[id^="source-"] > .all-card-layout-controls {
+.genre-layout-edit-mode article[id^="source-"] > .all-card-layout-controls,
+.genre-layout-edit-mode div[id^="source-"] > .all-card-layout-controls {
     display: flex !important;
     position: absolute;
     top: 0;
@@ -4054,24 +4056,29 @@ body#trends-us #trends #pane-entertainment .trend-table-container {
     border-radius: 0.25rem 0.25rem 0 0;
 }
 .all-layout-edit-mode #all-trends-container > [data-all-card],
-.genre-layout-edit-mode article[id^="source-"] {
+.genre-layout-edit-mode article[id^="source-"],
+.genre-layout-edit-mode div[id^="source-"] {
     padding-top: 2.5rem;
 }
 #all-trends-container [data-all-card].all-card-col-user-hidden,
-article[id^="source-"].all-card-col-user-hidden {
+article[id^="source-"].all-card-col-user-hidden,
+#trendCategoryTabContent .tab-pane:not(#pane-all) div[id^="source-"].all-card-col-user-hidden {
     display: none !important;
 }
 .all-layout-edit-mode #all-trends-container > [data-all-card].all-card-dragging,
-.genre-layout-edit-mode article[id^="source-"].all-card-dragging {
+.genre-layout-edit-mode article[id^="source-"].all-card-dragging,
+.genre-layout-edit-mode div[id^="source-"].all-card-dragging {
     opacity: 0.65;
 }
 .all-layout-edit-mode #all-trends-container .all-card-drag-handle,
-.genre-layout-edit-mode article[id^="source-"] .all-card-drag-handle {
+.genre-layout-edit-mode article[id^="source-"] .all-card-drag-handle,
+.genre-layout-edit-mode div[id^="source-"] .all-card-drag-handle {
     touch-action: none;
     cursor: grab;
 }
 .all-layout-edit-mode #all-trends-container .all-card-drag-handle:active,
-.genre-layout-edit-mode article[id^="source-"] .all-card-drag-handle:active {
+.genre-layout-edit-mode article[id^="source-"] .all-card-drag-handle:active,
+.genre-layout-edit-mode div[id^="source-"] .all-card-drag-handle:active {
     cursor: grabbing;
 }
 .all-layout-hidden-strip:not(.d-none) {

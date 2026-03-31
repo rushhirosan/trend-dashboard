@@ -117,8 +117,9 @@
         });
     }
 
+    /** JP: article#source-* / US: div#source-*.col-*（us_trends.html は article 未使用） */
     function getGenreArticlesInPane(pane) {
-        return Array.prototype.slice.call(pane.querySelectorAll('article[id^="source-"]'));
+        return Array.prototype.slice.call(pane.querySelectorAll('article[id^="source-"], div[id^="source-"]'));
     }
 
     function getVisibleGenreArticles(container) {
@@ -216,7 +217,7 @@
         });
         Array.prototype.slice.call(pane.querySelectorAll('.row')).forEach(function (r) {
             if (r === row) return;
-            if (!r.querySelector('article[id^="source-"]') && r.children.length === 0) {
+            if (!r.querySelector('article[id^="source-"], div[id^="source-"]') && r.children.length === 0) {
                 try {
                     r.remove();
                 } catch (e) {}
@@ -254,7 +255,7 @@
             if (hidden[s]) el.classList.add('all-card-col-user-hidden');
             else el.classList.remove('all-card-col-user-hidden');
         });
-        document.querySelectorAll('article[id^="source-"]').forEach(function (el) {
+        document.querySelectorAll('#trendCategoryTabContent .tab-pane:not(#pane-all) [id^="source-"]').forEach(function (el) {
             var s = sourceIdToSlug(el.id);
             if (hidden[s]) el.classList.add('all-card-col-user-hidden');
             else el.classList.remove('all-card-col-user-hidden');
@@ -266,7 +267,7 @@
         document.querySelectorAll('[data-all-card].all-card-col-user-hidden').forEach(function (el) {
             set[el.getAttribute('data-all-card')] = true;
         });
-        document.querySelectorAll('article[id^="source-"].all-card-col-user-hidden').forEach(function (el) {
+        document.querySelectorAll('#trendCategoryTabContent .tab-pane:not(#pane-all) [id^="source-"].all-card-col-user-hidden').forEach(function (el) {
             set[sourceIdToSlug(el.id)] = true;
         });
         return Object.keys(set);
@@ -656,7 +657,7 @@
 
             function findDropTarget(clientX, clientY) {
                 var el = document.elementFromPoint(clientX, clientY);
-                var drop = el && el.closest && el.closest('article[id^="source-"]');
+                var drop = el && el.closest && el.closest('[id^="source-"]');
                 if (!drop || !pane.contains(drop)) return null;
                 if (drop.classList.contains('all-card-col-user-hidden')) return null;
                 if (drop === artEl) return null;

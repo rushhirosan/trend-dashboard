@@ -117,9 +117,28 @@
         });
     }
 
-    /** JP: article#source-* / US: div#source-*.col-*（us_trends.html は article 未使用） */
+    /**
+     * ジャンルタブの「ソース1枚＝カラム」要素（並べ替え・非表示の対象）。
+     * .row 直下のみに限定（div[id^="source-"] の誤マッチやネストを避ける）。JP: article / US: article 推奨・div も可。
+     */
     function getGenreArticlesInPane(pane) {
-        return Array.prototype.slice.call(pane.querySelectorAll('article[id^="source-"], div[id^="source-"]'));
+        if (!pane) return [];
+        var seen = {};
+        var out = [];
+        function pushIfSource(el) {
+            if (!el || !el.matches || !el.matches('article[id^="source-"], div[id^="source-"]')) return;
+            if (seen[el.id]) return;
+            seen[el.id] = true;
+            out.push(el);
+        }
+        var directRows = pane.querySelectorAll(':scope > .row');
+        directRows.forEach(function (row) {
+            Array.prototype.forEach.call(row.children, pushIfSource);
+        });
+        if (out.length === 0) {
+            return Array.prototype.slice.call(pane.querySelectorAll('article[id^="source-"], div[id^="source-"]'));
+        }
+        return out;
     }
 
     function getVisibleGenreArticles(container) {

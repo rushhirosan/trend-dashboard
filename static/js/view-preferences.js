@@ -131,7 +131,11 @@
             seen[el.id] = true;
             out.push(el);
         }
-        var directRows = pane.querySelectorAll(':scope > .row');
+        var directRows = [];
+        for (var ri = 0; ri < pane.children.length; ri++) {
+            var rch = pane.children[ri];
+            if (rch && rch.classList && rch.classList.contains('row')) directRows.push(rch);
+        }
         directRows.forEach(function (row) {
             Array.prototype.forEach.call(row.children, pushIfSource);
         });

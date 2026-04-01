@@ -48,20 +48,8 @@ body#trends-us #trends #pane-govdata:not(.active):not(.show) {
     pointer-events: none !important;
     opacity: 0 !important;
 }
-body#trends-us #trends #pane-all:not(.active):not(.show) *,
-body#trends-us #trends #pane-news:not(.active):not(.show) *,
-body#trends-us #trends #pane-search:not(.active):not(.show) *,
-body#trends-us #trends #pane-tech:not(.active):not(.show) *,
-body#trends-us #trends #pane-market:not(.active):not(.show) *,
-body#trends-us #trends #pane-entertainment:not(.active):not(.show) *,
-body#trends-us #trends #pane-govdata:not(.active):not(.show) * {
-    display: none !important;
-    visibility: hidden !important;
-    height: 0 !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-    pointer-events: none !important;
-}
+/* 子要素すべてに display:none !important を当てない（タブ表示後も子の表示が復帰しないケースがあり、
+   レイアウト編集ツールバー .all-layout-toolbar が効かない原因になる）。非表示は上記ペイン自体で足りる。 */
 body#trends-us #trends #trendCategoryTabContent > .tab-pane.show.active,
 body#trends-us #trends #trendCategoryTabContent > .tab-pane.active.show {
     display: block !important;

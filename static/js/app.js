@@ -891,6 +891,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // 非表示タブ内のレイアウトUIを、表示制御の後に付け直す（行政・エンタメ）
+    setTimeout(function () {
+        if (typeof window.refreshTrendViewGenrePane === 'function') {
+            window.refreshTrendViewGenrePane('pane-entertainment');
+            window.refreshTrendViewGenrePane('pane-admin');
+        }
+    }, 150);
+
     // 全部入り「もっと見る」: タブ切り替え後に対象ソースのアンカーへスクロール（各要素に直接リスナー・body委譲はハイパーリンクを妨げるため使わない）
     var pendingMoreLinkAnchor = null;
     function bindMoreLink(el) {

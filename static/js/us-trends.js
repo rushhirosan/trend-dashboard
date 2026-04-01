@@ -3515,7 +3515,7 @@ function hideInactivePanesUS(activeTabTrigger) {
         }
     }
 
-    const paneIds = ['pane-all', 'pane-news', 'pane-search', 'pane-tech', 'pane-market', 'pane-entertainment'];
+    const paneIds = ['pane-all', 'pane-news', 'pane-search', 'pane-tech', 'pane-market', 'pane-entertainment', 'pane-govdata'];
     paneIds.forEach(function(id) {
         const pane = document.getElementById(id);
         if (!pane) return;
@@ -3539,7 +3539,7 @@ function hideInactivePanesUS(activeTabTrigger) {
 }
 
 // 日本ページと同一のタブID一覧（前回タブ復元・保存で使用）
-var TREND_TAB_IDS_US = ['tab-all', 'tab-news', 'tab-search', 'tab-tech', 'tab-market', 'tab-entertainment'];
+var TREND_TAB_IDS_US = ['tab-all', 'tab-news', 'tab-search', 'tab-tech', 'tab-market', 'tab-entertainment', 'tab-govdata'];
 
 function setupAllTabAccordionUS() {
     const cards = document.querySelectorAll('#pane-all [data-all-card] .card');
@@ -3625,6 +3625,13 @@ document.addEventListener('DOMContentLoaded', function() {
     hideInactivePanesUS();
     setTimeout(hideInactivePanesUS, 0);
     setTimeout(hideInactivePanesUS, 100);
+    // hideInactivePanesUS のインライン指定の後にジャンルレイアウトを付け直す（Entertainment / Gov）
+    setTimeout(function () {
+        if (typeof window.refreshTrendViewGenrePane === 'function') {
+            window.refreshTrendViewGenrePane('pane-entertainment');
+            window.refreshTrendViewGenrePane('pane-govdata');
+        }
+    }, 150);
 
     // All tab "More" link: タブ切り替え後に対象ソースのアンカーへスクロール
     var pendingMoreLinkAnchor = null;

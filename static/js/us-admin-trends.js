@@ -169,8 +169,9 @@
             : '<p class="text-muted small mb-0">No data available.</p>';
         var style = BLS_CARD_STYLE[item.indicator_id] || { header: 'bg-secondary text-white', icon: 'fa-chart-bar' };
         var title = escapeHtml(item.name_en || item.indicator_id || '');
+        var blsId = 'source-us-bls-' + String(item.indicator_id || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
         return (
-            '<article class="col-12 col-md-6 col-lg-4" aria-label="' + title + '">' +
+            '<article class="col-12 col-md-6 col-lg-4" id="' + blsId + '" aria-label="' + title + '">' +
             '  <div class="card h-100">' +
             '    <div class="card-header ' + style.header + ' py-2"><h2 class="h6 mb-0"><i class="fas ' + style.icon + '"></i> ' + title + '</h2></div>' +
             '    <div class="card-body p-2">' + tableHtml + '</div>' +
@@ -335,9 +336,10 @@
                 var usaspending = json.usaspending || {};
                 var usData = (usaspending.success && usaspending.data) ? usaspending.data : null;
                 if (usaspendingCards) {
-                    usaspendingCards.innerHTML = usData
+                    var usaInner = usData
                         ? renderUsaspendingBody(usData)
                         : '<p class="text-muted small">' + escapeHtml('Temporarily unavailable') + '</p>';
+                    usaspendingCards.innerHTML = '<div id="source-us-usaspending" class="col-12">' + usaInner + '</div>';
                     if (usData && typeof applyCategoryAccordionForAllTables === 'function') {
                         setTimeout(function () { applyCategoryAccordionForAllTables(5); }, 50);
                     }
@@ -348,6 +350,9 @@
                         : '<span class="text-muted">' + escapeHtml('Temporarily unavailable') + '</span>';
                 }
                 bindGotoTab();
+                if (typeof window.refreshTrendViewGenrePane === 'function') {
+                    window.refreshTrendViewGenrePane('pane-govdata');
+                }
             })
             .catch(function (err) {
                 var raw = err && err.message ? err.message : 'Network error';
@@ -368,6 +373,9 @@
                 var periodEl = document.getElementById('header-estat-latest-period');
                 if (periodEl) periodEl.textContent = '';
                 bindGotoTab();
+                if (typeof window.refreshTrendViewGenrePane === 'function') {
+                    window.refreshTrendViewGenrePane('pane-govdata');
+                }
             });
     }
 

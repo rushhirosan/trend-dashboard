@@ -96,8 +96,9 @@
         }
         var style = ESTAT_CARD_STYLE[item.indicator_id] || { header: 'bg-secondary text-white', icon: 'fa-chart-bar' };
         var title = escapeHtml(item.name_ja || item.indicator_id || '');
+        var estatSourceId = 'source-estat-' + String(item.indicator_id || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
         return (
-            '<article class="col-12 col-md-6 col-lg-4" aria-label="' + title + '">' +
+            '<article class="col-12 col-md-6 col-lg-4" id="' + estatSourceId + '" aria-label="' + title + '">' +
             '  <div class="card h-100">' +
             '    <div class="card-header ' + style.header + ' d-flex justify-content-between align-items-center">' +
             '      <h2 class="h5 mb-0"><i class="fas ' + style.icon + '" aria-hidden="true"></i> ' + title + '</h2>' +
@@ -473,6 +474,9 @@
                 }
 
                 bindGotoTab();
+                if (typeof window.refreshTrendViewGenrePane === 'function') {
+                    window.refreshTrendViewGenrePane('pane-admin');
+                }
             })
             .catch(function (err) {
                 var raw = err && err.message ? err.message : '通信エラー';
@@ -494,6 +498,9 @@
                 }
                 if (kkjCompact) kkjCompact.innerHTML = '<span class="text-muted">' + escapeHtml(msg) + '</span>';
                 bindGotoTab();
+                if (typeof window.refreshTrendViewGenrePane === 'function') {
+                    window.refreshTrendViewGenrePane('pane-admin');
+                }
             });
     }
 

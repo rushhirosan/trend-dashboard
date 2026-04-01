@@ -8,8 +8,8 @@
     var STORAGE_SUFFIX = 'view_';
     var DRAG_THRESHOLD_PX = 10;
 
-    var GENRE_PANE_IDS_JP = ['pane-news', 'pane-search', 'pane-tech', 'pane-market', 'pane-entertainment'];
-    var GENRE_PANE_IDS_US = ['pane-news', 'pane-search', 'pane-tech', 'pane-market', 'pane-entertainment'];
+    var GENRE_PANE_IDS_JP = ['pane-news', 'pane-search', 'pane-tech', 'pane-market', 'pane-entertainment', 'pane-admin'];
+    var GENRE_PANE_IDS_US = ['pane-news', 'pane-search', 'pane-tech', 'pane-market', 'pane-entertainment', 'pane-govdata'];
 
     var I18N = {
         jp: {
@@ -580,6 +580,37 @@
         });
     }
 
+    /** ジャンルタブのレイアウトUIを外す（動的コンテンツ後の再初期化用） */
+    function teardownGenrePaneLayout(pane) {
+        if (!pane) return;
+        var tb = pane.querySelector('.all-layout-toolbar');
+        if (tb) tb.remove();
+        pane.querySelectorAll('.all-card-layout-controls').forEach(function (n) {
+            n.remove();
+        });
+        pane.classList.remove('genre-layout-edit-mode');
+    }
+
+    /**
+     * 行政・Gov など DOM が後から入るタブ用。保存済みの並び・非表示を当て直してからツールバーとカード操作を付け直す。
+     */
+    function refreshTrendViewGenrePane(paneId) {
+        var body = document.body;
+        if (!body) return;
+        var bid = body.id;
+        if (bid !== 'trends-jp' && bid !== 'trends-us') return;
+        var region = bid === 'trends-jp' ? 'jp' : 'us';
+        if (getGenrePaneIds(region).indexOf(paneId) === -1) return;
+        var pane = document.getElementById(paneId);
+        if (!pane) return;
+        var prefs = normalizePrefs(loadPrefs(region));
+        teardownGenrePaneLayout(pane);
+        applyGenrePaneOrder(pane, paneId, prefs);
+        applyGlobalHidden(prefs);
+        initGenrePaneLayoutPreferences(region, paneId);
+        syncAllHiddenStrips(region);
+    }
+
     function initGenrePaneLayoutPreferences(region, paneId) {
         var pane = document.getElementById(paneId);
         if (!pane) return;
@@ -804,4 +835,6 @@
     } else {
         boot();
     }
+
+    window.refreshTrendViewGenrePane = refreshTrendViewGenrePane;
 })();

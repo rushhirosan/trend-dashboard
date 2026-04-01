@@ -3625,10 +3625,10 @@ document.addEventListener('DOMContentLoaded', function() {
     hideInactivePanesUS();
     setTimeout(hideInactivePanesUS, 0);
     setTimeout(hideInactivePanesUS, 100);
-    // hideInactivePanesUS のインライン指定の後にジャンルレイアウトを付け直す（Entertainment / Gov）
+    // hideInactivePanesUS の後に Gov だけ付け直す（動的 DOM）。Entertainment は Market と同様に初回 boot のみでよく、
+    // refresh 内の teardown ＋再 init が失敗すると Edit layout が消えるため対象外にする。
     setTimeout(function () {
         if (typeof window.refreshTrendViewGenrePane === 'function') {
-            window.refreshTrendViewGenrePane('pane-entertainment');
             window.refreshTrendViewGenrePane('pane-govdata');
         }
     }, 150);
@@ -3662,11 +3662,11 @@ document.addEventListener('DOMContentLoaded', function() {
             if (tabId && typeof setTrendPreference === 'function') {
                 setTrendPreference('active_tab', tabId);
             }
-            // 非表示だったペインが表示されたあと、ジャンルレイアウトUIを付け直す（div#source-* の US エンタメ等）
+            // Gov のみレイアウト UI を付け直す（動的コンテンツ）。Entertainment は refresh しない（上記 150ms と同じ理由）。
             if (tabId === 'tab-entertainment' || tabId === 'tab-govdata') {
-                var pid = tabId === 'tab-govdata' ? 'pane-govdata' : 'pane-entertainment';
+                var pid = tabId === 'tab-govdata' ? 'pane-govdata' : null;
                 setTimeout(function () {
-                    if (typeof window.refreshTrendViewGenrePane === 'function') {
+                    if (pid && typeof window.refreshTrendViewGenrePane === 'function') {
                         window.refreshTrendViewGenrePane(pid);
                     }
                     if (typeof applyCategoryAccordionForAllTables === 'function') {

@@ -637,6 +637,8 @@
     function initGenrePaneLayoutPreferences(region, paneId) {
         var pane = document.getElementById(paneId);
         if (!pane) return;
+        // 複数 .row やマークアップ差のあとでも 1 段に寄せてから数える（早期 return 誤爆を防ぐ）
+        consolidateGenrePane(pane);
         if (getGenreArticlesInPane(pane).length === 0) return;
 
         var editMode = false;

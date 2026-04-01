@@ -3527,6 +3527,12 @@ function hideInactivePanesUS(activeTabTrigger) {
             pane.style.removeProperty('min-height');
             pane.style.removeProperty('visibility');
             pane.style.removeProperty('overflow');
+            pane.style.removeProperty('opacity');
+            pane.style.removeProperty('pointer-events');
+            pane.style.removeProperty('max-height');
+            pane.style.removeProperty('padding');
+            pane.style.removeProperty('margin');
+            pane.style.removeProperty('border');
         } else {
             pane.classList.remove('active', 'show');
             pane.style.setProperty('display', 'none', 'important');

@@ -21,6 +21,9 @@ body#trends-us #trendCategoryTabContent > .tab-pane.active.show {
     visibility: visible !important;
     height: auto !important;
     overflow: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    max-height: none !important;
 }
 body#trends-us #trendCategoryTabContent > .tab-pane.active.show #all-trends-container {
     display: flex !important;
@@ -56,6 +59,9 @@ body#trends-us #trends #trendCategoryTabContent > .tab-pane.active.show {
     visibility: visible !important;
     height: auto !important;
     overflow: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    max-height: none !important;
 }
 
 /* === 日本ページと同一レイアウト（広大な余白を解消） === */

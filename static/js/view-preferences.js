@@ -53,6 +53,20 @@
         return region === 'jp' ? GENRE_PANE_IDS_JP : GENRE_PANE_IDS_US;
     }
 
+    /** US エンタメ等: テンプレに置いたマウント（常に DOM に存在）へツールバーを入れる */
+    function getGenreToolbarMount(pane, paneId) {
+        if (!pane || !paneId) return null;
+        try {
+            return pane.querySelector(':scope > [data-genre-toolbar-mount="' + paneId + '"]');
+        } catch (e) {
+            for (var i = 0; i < pane.children.length; i++) {
+                var ch = pane.children[i];
+                if (ch.getAttribute && ch.getAttribute('data-genre-toolbar-mount') === paneId) return ch;
+            }
+            return null;
+        }
+    }
+
     function loadPrefs(region) {
         if (typeof getTrendPreference !== 'function') return null;
         var raw = getTrendPreference(STORAGE_SUFFIX + region);
@@ -119,30 +133,39 @@
 
     /**
      * ジャンルタブの「ソース1枚＝カラム」要素（並べ替え・非表示の対象）。
-     * .row 直下のみに限定（div[id^="source-"] の誤マッチやネストを避ける）。JP: article / US: article 推奨・div も可。
+     * ペイン内の article/div#source-* を常に列挙する（.row 直下のみだと col ラッパー配下のカードを取りこぼし、
+     * ツールバー初期化がスキップされることがある）。id で重複除去。
      */
     function getGenreArticlesInPane(pane) {
         if (!pane) return [];
         var seen = {};
         var out = [];
-        function pushIfSource(el) {
-            if (!el || !el.matches || !el.matches('article[id^="source-"], div[id^="source-"]')) return;
-            if (seen[el.id]) return;
+        var nodes = pane.querySelectorAll('article[id^="source-"], div[id^="source-"]');
+        Array.prototype.forEach.call(nodes, function (el) {
+            if (!el.id || seen[el.id]) return;
             seen[el.id] = true;
             out.push(el);
-        }
-        var directRows = [];
-        for (var ri = 0; ri < pane.children.length; ri++) {
-            var rch = pane.children[ri];
-            if (rch && rch.classList && rch.classList.contains('row')) directRows.push(rch);
-        }
-        directRows.forEach(function (row) {
-            Array.prototype.forEach.call(row.children, pushIfSource);
         });
-        if (out.length === 0) {
-            return Array.prototype.slice.call(pane.querySelectorAll('article[id^="source-"], div[id^="source-"]'));
-        }
         return out;
+    }
+
+    /** ペイン直下の空 .row だけ削除（カード内のネストした .row を誤って消さない） */
+    function removeEmptyDirectChildRowsExcept(pane, keepRow) {
+        if (!pane) return;
+        var remove = [];
+        for (var i = 0; i < pane.children.length; i++) {
+            var ch = pane.children[i];
+            if (!ch.classList || !ch.classList.contains('row')) continue;
+            if (ch === keepRow) continue;
+            if (!ch.querySelector('article[id^="source-"], div[id^="source-"]') && ch.children.length === 0) {
+                remove.push(ch);
+            }
+        }
+        remove.forEach(function (r) {
+            try {
+                r.remove();
+            } catch (e) {}
+        });
     }
 
     function getVisibleGenreArticles(container) {
@@ -226,26 +249,29 @@
         if (!row) {
             row = document.createElement('div');
             row.className = 'row g-3 mb-3';
-            var tb = pane.querySelector('.all-layout-toolbar');
-            if (tb && tb.nextSibling) {
-                pane.insertBefore(row, tb.nextSibling);
+            var pid = pane.id || '';
+            var mount = pid ? getGenreToolbarMount(pane, pid) : null;
+            if (mount) {
+                if (mount.nextSibling) {
+                    pane.insertBefore(row, mount.nextSibling);
+                } else {
+                    pane.appendChild(row);
+                }
             } else {
-                var intro = pane.querySelector('p.text-muted.small.mb-3');
-                if (intro && intro.nextSibling) pane.insertBefore(row, intro.nextSibling);
-                else pane.insertBefore(row, pane.firstChild);
+                var tb = pane.querySelector('.all-layout-toolbar');
+                if (tb && tb.nextSibling) {
+                    pane.insertBefore(row, tb.nextSibling);
+                } else {
+                    var intro = pane.querySelector('p.text-muted.small.mb-3');
+                    if (intro && intro.nextSibling) pane.insertBefore(row, intro.nextSibling);
+                    else pane.insertBefore(row, pane.firstChild);
+                }
             }
         }
         articles.forEach(function (a) {
             row.appendChild(a);
         });
-        Array.prototype.slice.call(pane.querySelectorAll('.row')).forEach(function (r) {
-            if (r === row) return;
-            if (!r.querySelector('article[id^="source-"], div[id^="source-"]') && r.children.length === 0) {
-                try {
-                    r.remove();
-                } catch (e) {}
-            }
-        });
+        removeEmptyDirectChildRowsExcept(pane, row);
         return row;
     }
 
@@ -639,7 +665,9 @@
         if (!pane) return;
         // 複数 .row やマークアップ差のあとでも 1 段に寄せてから数える（早期 return 誤爆を防ぐ）
         consolidateGenrePane(pane);
-        if (getGenreArticlesInPane(pane).length === 0) return;
+        var mount = getGenreToolbarMount(pane, paneId);
+        var articleCount = getGenreArticlesInPane(pane).length;
+        if (articleCount === 0 && !mount) return;
 
         var editMode = false;
         var rowRef = consolidateGenrePane(pane);
@@ -672,11 +700,16 @@
         toolbar.appendChild(hint);
         toolbar.appendChild(hiddenStrip);
 
-        var intro = pane.querySelector('p.text-muted.small.mb-3');
-        if (intro && intro.nextSibling) {
-            pane.insertBefore(toolbar, intro.nextSibling);
+        if (mount) {
+            mount.innerHTML = '';
+            mount.appendChild(toolbar);
         } else {
-            pane.insertBefore(toolbar, pane.firstChild);
+            var intro = pane.querySelector('p.text-muted.small.mb-3');
+            if (intro && intro.nextSibling) {
+                pane.insertBefore(toolbar, intro.nextSibling);
+            } else {
+                pane.insertBefore(toolbar, pane.firstChild);
+            }
         }
 
         syncAllHiddenStrips(region);
@@ -805,6 +838,10 @@
 
         getGenreArticlesInPane(pane).forEach(ensureControlsArticle);
 
+        if (articleCount === 0) {
+            editBtn.disabled = true;
+        }
+
         editBtn.addEventListener('click', function () {
             setEditMode(!editMode);
         });
@@ -855,11 +892,17 @@
         });
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', boot);
-    } else {
-        boot();
+    function scheduleBoot() {
+        var run = function () {
+            setTimeout(boot, 0);
+        };
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', run);
+        } else {
+            run();
+        }
     }
+    scheduleBoot();
 
     window.refreshTrendViewGenrePane = refreshTrendViewGenrePane;
 })();

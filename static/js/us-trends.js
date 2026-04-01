@@ -3662,6 +3662,18 @@ document.addEventListener('DOMContentLoaded', function() {
             if (tabId && typeof setTrendPreference === 'function') {
                 setTrendPreference('active_tab', tabId);
             }
+            // 非表示だったペインが表示されたあと、ジャンルレイアウトUIを付け直す（div#source-* の US エンタメ等）
+            if (tabId === 'tab-entertainment' || tabId === 'tab-govdata') {
+                var pid = tabId === 'tab-govdata' ? 'pane-govdata' : 'pane-entertainment';
+                setTimeout(function () {
+                    if (typeof window.refreshTrendViewGenrePane === 'function') {
+                        window.refreshTrendViewGenrePane(pid);
+                    }
+                    if (typeof applyCategoryAccordionForAllTables === 'function') {
+                        applyCategoryAccordionForAllTables(5);
+                    }
+                }, 0);
+            }
             // もっと見るからの遷移時のみアンカーへスクロール（日本と同一）
             if (pendingMoreLinkAnchor) {
                 var anchor = document.getElementById(pendingMoreLinkAnchor);

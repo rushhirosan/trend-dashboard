@@ -1001,6 +1001,17 @@ document.addEventListener('DOMContentLoaded', function() {
             if (tabId && typeof setTrendPreference === 'function') {
                 setTrendPreference('active_tab', tabId);
             }
+            if (tabId === 'tab-entertainment' || tabId === 'tab-admin') {
+                var pid = tabId === 'tab-admin' ? 'pane-admin' : 'pane-entertainment';
+                setTimeout(function () {
+                    if (typeof window.refreshTrendViewGenrePane === 'function') {
+                        window.refreshTrendViewGenrePane(pid);
+                    }
+                    if (typeof applyCategoryAccordionForAllTables === 'function') {
+                        applyCategoryAccordionForAllTables(5);
+                    }
+                }, 0);
+            }
             if (pendingMoreLinkAnchor) {
                 var anchor = document.getElementById(pendingMoreLinkAnchor);
                 if (anchor) {

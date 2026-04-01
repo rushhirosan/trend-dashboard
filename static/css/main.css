@@ -4029,7 +4029,8 @@ body#trends-us #trends #pane-tech .trend-table-container,
 body#trends-us #trends #pane-news .trend-table-container,
 body#trends-us #trends #pane-search .trend-table-container,
 body#trends-us #trends #pane-market .trend-table-container,
-body#trends-us #trends #pane-entertainment .trend-table-container {
+body#trends-us #trends #pane-entertainment .trend-table-container,
+body#trends-us #trends #pane-govdata .trend-table-container {
     max-height: 400px !important;
     overflow-y: auto !important;
 }

@@ -100,7 +100,9 @@ body#trends-us #trends #pane-news .trend-table-container,
 body#trends-us #trends #pane-search .trend-table-container,
 body#trends-us #trends #pane-market .trend-table-container,
 body#trends-us #trends #pane-entertainment .trend-table-container,
-body#trends-us #trends #pane-govdata .trend-table-container {
+body#trends-us #trends #pane-govdata .trend-table-container,
+/* Gov: .trend-table-container を使わず card-body 直下だけの表（ネストした BLS 内は除外） */
+body#trends-us #trends #pane-govdata #us-gov-body .card-body > .table-responsive {
     max-height: 400px !important;
     overflow-y: auto !important;
     padding-bottom: 0.5rem !important; /* 最下部のタイトルが切れない最小余白（スクロールバー下端と行を揃える） */

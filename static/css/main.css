@@ -235,12 +235,16 @@ body {
         align-items: stretch !important;
     }
     
-    #trends .row .col-md-6 {
+    #trends .row .col-md-6,
+    #trends .row .col-md-4,
+    #trends .row .col-lg-4 {
         display: flex !important;
         flex-direction: column !important;
     }
     
-    #trends .row .col-md-6 .card.h-100 {
+    #trends .row .col-md-6 .card.h-100,
+    #trends .row .col-md-4 .card.h-100,
+    #trends .row .col-lg-4 .card.h-100 {
         height: 100% !important;
         display: flex !important;
         flex-direction: column !important;
@@ -4030,7 +4034,16 @@ body#trends-us #trends #pane-news .trend-table-container,
 body#trends-us #trends #pane-search .trend-table-container,
 body#trends-us #trends #pane-market .trend-table-container,
 body#trends-us #trends #pane-entertainment .trend-table-container,
-body#trends-us #trends #pane-govdata .trend-table-container {
+body#trends-us #trends #pane-govdata .trend-table-container,
+body#trends-us #trends #pane-govdata #us-gov-body .card-body > .table-responsive {
+    max-height: 400px !important;
+    overflow-y: auto !important;
+}
+
+/* JP: エンタメ・行政タブも同じテーブル高さ（e-Stat は .trend-table-container 外の .table-responsive のみの箇所あり） */
+body#trends-jp #trends #pane-entertainment .trend-table-container,
+body#trends-jp #trends #pane-admin .trend-table-container,
+body#trends-jp #trends #pane-admin #estat-full-body .table-responsive {
     max-height: 400px !important;
     overflow-y: auto !important;
 }

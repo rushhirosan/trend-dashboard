@@ -143,8 +143,9 @@
         var nodes = pane.querySelectorAll('article[id^="source-"], div[id^="source-"]');
         Array.prototype.forEach.call(nodes, function (el) {
             if (!el.id || seen[el.id]) return;
-            // 行政タブの政府調達: カード内の2カラム（案件Top5・月次）は #source-admin-kkj の子レイアウト。
-            // ここを「ジャンルカード」として row へ移すと DOM から外れ、中央が空白になる。
+            // 行政タブ: e-Stat 指標カードは #estat-full-body 内のグリッド。政府調達は #admin-kkj-body 内の2カラム。
+            // いずれも「ジャンル用カード」として外の .row へ移すと元のコンテナが空になり白抜けになる。
+            if (el.closest && el.closest('#estat-full-body')) return;
             if (el.closest && el.closest('#admin-kkj-body')) return;
             seen[el.id] = true;
             out.push(el);

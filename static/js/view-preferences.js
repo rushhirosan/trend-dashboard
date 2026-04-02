@@ -143,6 +143,9 @@
         var nodes = pane.querySelectorAll('article[id^="source-"], div[id^="source-"]');
         Array.prototype.forEach.call(nodes, function (el) {
             if (!el.id || seen[el.id]) return;
+            // 行政タブの政府調達: カード内の2カラム（案件Top5・月次）は #source-admin-kkj の子レイアウト。
+            // ここを「ジャンルカード」として row へ移すと DOM から外れ、中央が空白になる。
+            if (el.closest && el.closest('#admin-kkj-body')) return;
             seen[el.id] = true;
             out.push(el);
         });

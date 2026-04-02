@@ -442,7 +442,7 @@
                         var hint = (estat.error && estat.error.indexOf('ESTAT') !== -1)
                             ? ' <span class="text-muted small">（e-Stat APIキーを.envに設定すると実データを取得できます）</span>'
                             : '';
-                        fullBody.innerHTML = '<div class="col-12 mb-2"><span class="badge bg-warning text-dark">サンプルデータ</span>' + hint + '</div>' + SAMPLE_ESTAT.map(renderEstatFullCard).join('');
+                        fullBody.innerHTML = (hint ? '<div class="col-12 mb-2">' + hint + '</div>' : '') + SAMPLE_ESTAT.map(renderEstatFullCard).join('');
                     }
                 }
 

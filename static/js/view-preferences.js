@@ -161,6 +161,9 @@
             var ch = pane.children[i];
             if (!ch.classList || !ch.classList.contains('row')) continue;
             if (ch === keepRow) continue;
+            // 行政タブ: API 完了前に空のまま refresh されると、ここで #estat-full-body が消え
+            // その後 admin-trends が getElementById で取れず e-Stat カードが永遠に出ない。
+            if (ch.id === 'estat-full-body') continue;
             if (!ch.querySelector('article[id^="source-"], div[id^="source-"]') && ch.children.length === 0) {
                 remove.push(ch);
             }
@@ -261,6 +264,20 @@
                 } else {
                     pane.appendChild(row);
                 }
+            } else if (pane.id === 'pane-admin') {
+                // 景気・行政（e-Stat）ブロックの直下に政府調達を置く（説明文直後だと順序が逆になる）
+                var estatBody = pane.querySelector('#estat-full-body');
+                if (estatBody) {
+                    if (estatBody.nextSibling) {
+                        pane.insertBefore(row, estatBody.nextSibling);
+                    } else {
+                        pane.appendChild(row);
+                    }
+                } else {
+                    var introAd = pane.querySelector('p.text-muted.small.mb-3');
+                    if (introAd && introAd.nextSibling) pane.insertBefore(row, introAd.nextSibling);
+                    else pane.insertBefore(row, pane.firstChild);
+                }
             } else {
                 var tb = pane.querySelector('.all-layout-toolbar');
                 if (tb && tb.nextSibling) {
@@ -275,6 +292,20 @@
         articles.forEach(function (a) {
             row.appendChild(a);
         });
+        // 行政タブ: 既存 .row の位置が古い場合も、e-Stat の直下に揃える
+        if (pane.id === 'pane-admin' && row && row.parentNode === pane) {
+            var estatAnchor = pane.querySelector('#estat-full-body');
+            if (estatAnchor && estatAnchor !== row) {
+                var afterEstat = estatAnchor.nextSibling;
+                if (afterEstat !== row) {
+                    if (afterEstat) {
+                        pane.insertBefore(row, afterEstat);
+                    } else {
+                        pane.appendChild(row);
+                    }
+                }
+            }
+        }
         removeEmptyDirectChildRowsExcept(pane, row);
         return row;
     }

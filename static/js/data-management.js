@@ -23,11 +23,22 @@ async function fetchWithRetry(url, options = {}, maxRetries = 2) {
     }
 }
 
+/** 景気・行政（e-Stat + 官公需）は admin-trends.js の /api/admin-trends。従来 requestIdleCallback のみでバッチ負荷時に未実行になりやすかったためここに含める */
+function loadAdminTrendsFromCache() {
+    console.log('📊 景気・行政データ（e-Stat / 官公需）キャッシュ読み込み');
+    if (typeof window.__fetchAdminTrendsFromCache === 'function') {
+        window.__fetchAdminTrendsFromCache();
+    } else {
+        console.warn('景気・行政データ: admin-trends.js が未読み込みです');
+    }
+}
+
 // キャッシュデータを自動読み込み（外部から呼び出し用）
 // 並び順: 全部入り（All）タブの表示順に合わせる（上からバッチで読み込み）
 function loadCachedDataExternal() {
     console.log('📦 キャッシュデータの読み込み処理開始');
     var allCategories = [
+        loadAdminTrendsFromCache,
         loadNewsBundleFromCache,
         loadWikipediaTrendsFromCache,
         loadGoogleTrendsFromCache,

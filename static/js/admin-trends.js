@@ -504,18 +504,23 @@
             });
     }
 
+    /** loadCachedDataExternal と従来の requestIdleCallback のどちらか一方だけが初回取得する（二重 fetch 防止） */
+    var adminTrendsInitialFetchScheduled = false;
+    function scheduleInitialAdminTrendsFetch() {
+        if (adminTrendsInitialFetchScheduled) return;
+        adminTrendsInitialFetchScheduled = true;
+        fetchAndRender(false);
+    }
+    window.__fetchAdminTrendsFromCache = scheduleInitialAdminTrendsFetch;
+
     function init() {
-        var hasFetchedOnce = false;
-        // 初回はユーザーの操作を邪魔しない（Live Testのような短時間レンダリングでもエラーを露出させない）
-        // ただし体感を落とさないため、アイドル時にベストエフォートで事前取得する
+        // バッチより前に DOMContentLoaded が走る構成・古いキャッシュ等で未実行のときの保険（従来どおり）
         var idle = (typeof requestIdleCallback === 'function')
             ? requestIdleCallback
             : function (cb) { return setTimeout(cb, 1200); };
         idle(function () {
             try {
-                if (hasFetchedOnce) return;
-                hasFetchedOnce = true;
-                fetchAndRender(false);
+                scheduleInitialAdminTrendsFetch();
             } catch (_) {}
         });
         function onRefreshClick() {

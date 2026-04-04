@@ -1,3 +1,4 @@
+import gc
 import feedparser
 import requests
 from datetime import datetime
@@ -96,26 +97,22 @@ class NoteTrendsManager(BaseTrendsManager):
         # 全カテゴリを取得する場合
         if fetch_all_categories:
             logger.info("🔄 Note: 全カテゴリのデータを取得します")
-            all_data = self._fetch_and_cache_all_categories()
-            if all_data:
-                self._save_all_categories_to_cache(all_data)
-                # 'all'カテゴリのデータを返す（互換性のため）
-                all_category_data = [item for item in all_data if item.get('category') == 'all']
+            all_rows, any_saved = self._fetch_and_cache_all_categories()
+            if any_saved:
                 return {
-                    'data': all_category_data[:limit] if all_category_data else [],
+                    'data': all_rows[:limit] if all_rows else [],
                     'status': 'api_fetched',
                     'category': 'all',
                     'source': 'Note RSS',
                     'success': True
                 }
-            else:
-                return {
-                    'data': [],
-                    'status': 'api_error',
-                    'category': 'all',
-                    'error': '全カテゴリのデータ取得に失敗しました',
-                    'success': False
-                }
+            return {
+                'data': [],
+                'status': 'api_error',
+                'category': 'all',
+                'error': '全カテゴリのデータ取得に失敗しました',
+                'success': False
+            }
 
         # ベースクラスのget_trendsを使用
         # auto_fetch_on_cache_miss=Trueで、キャッシュがない場合はAPIを呼び出す（はてぶと同じ挙動）
@@ -213,36 +210,57 @@ class NoteTrendsManager(BaseTrendsManager):
             logger.error(f"❌ Note RSS エラー: {e}", exc_info=True)
             return {'error': f'Note RSS取得エラー: {str(e)}', 'success': False}
 
+    def _dedupe_note_items(self, items):
+        seen = set()
+        out = []
+        for item in items or []:
+            key = (item.get('title', ''), item.get('url', ''))
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(item)
+        return out
+
     def _fetch_and_cache_all_categories(self):
-        """全カテゴリのデータを一度に取得"""
+        """全カテゴリを順に取得し、カテゴリごとにキャッシュへ保存（ピークメモリ抑制）"""
+        all_rows_for_all = []
+        any_saved = False
+        total_saved = 0
         try:
             logger.info("🔄 Note: 全カテゴリのデータを取得開始")
-            
             categories = self.get_available_categories()
-            all_data = []
-            
+
             for category in categories:
                 logger.info(f"📊 Note カテゴリ '{category}' のデータを取得中...")
                 result = self._fetch_trends(category, 25)
-                if result.get('success') and result.get('data'):
-                    trends_data = result.get('data', [])
-                    for item in trends_data:
-                        item['category'] = category
-                    all_data.extend(trends_data)
-                    logger.info(f"✅ Note カテゴリ '{category}': {len(trends_data)}件取得")
-                else:
+                if not result.get('success') or not result.get('data'):
                     logger.warning(f"❌ Note カテゴリ '{category}': データ取得失敗")
-            
-            if all_data:
-                logger.info(f"✅ Note: 全カテゴリのデータ取得完了 ({len(all_data)}件)")
-            else:
+                    gc.collect()
+                    continue
+                trends_data = result.get('data', [])
+                for item in trends_data:
+                    item['category'] = category
+                unique = self._dedupe_note_items(trends_data)
+                if not unique:
+                    gc.collect()
+                    continue
+                if self.db.save_note_trends_to_cache(unique, category):
+                    any_saved = True
+                    total_saved += len(unique)
+                    logger.info(f"✅ Note カテゴリ '{category}': {len(unique)}件取得・キャッシュ保存")
+                if category == 'all':
+                    all_rows_for_all = list(unique)
+                gc.collect()
+
+            if any_saved and total_saved > 0:
+                logger.info(f"✅ Note: 全カテゴリのデータ取得・保存完了 ({total_saved}件)")
+            elif not any_saved:
                 logger.warning("❌ Note: 取得したデータがありません")
-                
         except Exception as e:
             logger.error(f"❌ Note 全カテゴリ取得エラー: {e}", exc_info=True)
-            all_data = []
-        
-        return all_data
+            any_saved = False
+
+        return all_rows_for_all, any_saved
 
     def _save_all_categories_to_cache(self, all_data):
         """全カテゴリのデータをキャッシュに保存"""

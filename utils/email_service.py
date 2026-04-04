@@ -19,13 +19,6 @@ class EmailService:
         self.smtp_server = (os.getenv('SMTP_SERVER') or '').strip()
         self.smtp_port = int((os.getenv('SMTP_PORT') or '587').strip())
         
-        # デバッグ情報を出力
-        logger.info(f"🔍 メール設定確認:")
-        logger.info(f"  SENDER_EMAIL: {self.sender_email}")
-        logger.info(f"  SENDER_PASSWORD: {'*' * len(self.sender_password) if self.sender_password else 'None'}")
-        logger.info(f"  SMTP_SERVER: {self.smtp_server}")
-        logger.info(f"  SMTP_PORT: {self.smtp_port}")
-        
     def send_trends_summary(self, to_email, trends_data, frequency='daily'):
         """トレンドサマリーをメール送信"""
         try:
@@ -167,21 +160,10 @@ class EmailService:
     def _send_email(self, to_email, subject, html_content, text_content):
         """メール送信"""
         try:
-            # メール設定確認（INFOレベルで出力）
-            logger.info(f"   🔍 メール設定確認:")
-            logger.info(f"      SENDER_EMAIL: {self.sender_email}")
-            logger.info(f"      SENDER_PASSWORD: {'*' * len(self.sender_password) if self.sender_password else 'None'}")
-            logger.info(f"      SMTP_SERVER: {self.smtp_server}")
-            logger.info(f"      SMTP_PORT: {self.smtp_port}")
-            
             if not self.sender_email or not self.sender_password:
-                logger.error("   ❌ メール設定が不完全です - メール送信をスキップします")
-                logger.error(f"   📧 送信予定メール: {to_email}")
-                logger.error(f"   📧 件名: {subject}")
-                return False  # エラーとしてFalseを返す
-            
-            # メール作成
-            logger.info(f"   📝 メール内容を作成中...")
+                logger.debug("メール未設定のため送信をスキップします（SENDER_EMAIL / SENDER_PASSWORD）")
+                return False
+
             msg = MIMEMultipart('alternative')
             msg['Subject'] = subject
             msg['From'] = self.sender_email  # 環境変数から読み込んだ送信者アドレス
@@ -193,18 +175,13 @@ class EmailService:
             
             msg.attach(text_part)
             msg.attach(html_part)
-            
-            # SMTPサーバーに接続して送信
-            logger.info(f"   🔌 SMTPサーバーに接続中... ({self.smtp_server}:{self.smtp_port})")
+
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                logger.info(f"   🔐 STARTTLSを実行中...")
                 server.starttls()
-                logger.info(f"   🔑 ログイン中... ({self.sender_email})")
                 server.login(self.sender_email, self.sender_password)
-                logger.info(f"   📤 メール送信中... ({to_email})")
                 server.send_message(msg)
-            
-            logger.info(f"   ✅ メール送信完了: {to_email}")
+
+            logger.debug("メール送信完了: %s", to_email)
             return True
             
         except smtplib.SMTPAuthenticationError as e:

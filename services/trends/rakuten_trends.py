@@ -1,4 +1,5 @@
 import os
+import gc
 import time
 import requests
 from datetime import datetime, timedelta
@@ -164,27 +165,23 @@ class RakutenTrendsManager(BaseTrendsManager):
         # 全カテゴリを取得する場合（スケジューラー用、はてな同様）
         if fetch_all_categories:
             logger.info("🔄 楽天商品: 全カテゴリのデータを取得します")
-            all_data, last_error = self._fetch_and_cache_all_categories(limit)
-            if all_data:
-                self._save_all_categories_to_cache(all_data)
-                all_category_data = [item for item in all_data if item.get('genre_id') == 'all']
+            rows_all, last_error, any_saved = self._fetch_and_cache_all_categories(limit)
+            if any_saved:
                 return {
-                    'data': all_category_data[:limit] if all_category_data else [],
+                    'data': rows_all[:limit] if rows_all else [],
                     'status': 'api_fetched',
                     'genre_id': 'all',
                     'source': '楽天商品ランキングAPI',
                     'success': True
                 }
-            else:
-                # 実際のエラー内容をDiscord/ログに表示するため last_error を使用
-                error_msg = last_error or '全カテゴリのデータ取得に失敗しました'
-                return {
-                    'data': [],
-                    'status': 'api_error',
-                    'genre_id': 'all',
-                    'error': error_msg,
-                    'success': False
-                }
+            error_msg = last_error or '全カテゴリのデータ取得に失敗しました'
+            return {
+                'data': [],
+                'status': 'api_error',
+                'genre_id': 'all',
+                'error': error_msg,
+                'success': False
+            }
 
         cache_scope = genre_id or 'all'
         result = super().get_trends(
@@ -211,19 +208,19 @@ class RakutenTrendsManager(BaseTrendsManager):
         ]
 
     def _fetch_and_cache_all_categories(self, limit=25):
-        """全カテゴリのデータを一度に取得（楽天APIは1秒1回制限のため順次取得）
+        """全カテゴリを順に取得し、ジャンルごとにキャッシュへ保存（ピークメモリ抑制）
 
         Returns:
-            tuple: (all_data: list, last_error: str|None)
-                   all_dataが空の場合はlast_errorに最後の失敗理由を入れる
+            tuple: (rows_for_all_genre: list, last_error: str|None, any_saved: bool)
         """
         if not self.rakuten_app_id:
             logger.warning("楽天ランキングAPI: RAKUTEN_APP_ID が未設定です")
-            return [], 'RAKUTEN_APP_ID が未設定です'
+            return [], 'RAKUTEN_APP_ID が未設定です', False
+        rows_for_all_genre = []
+        last_error = None
+        any_saved = False
         try:
             logger.info("🔄 楽天商品: 全カテゴリのデータを取得開始")
-            all_data = []
-            last_error = None
             categories = self.get_available_categories()
 
             for cat in categories:
@@ -233,23 +230,28 @@ class RakutenTrendsManager(BaseTrendsManager):
                 result = self._get_rakuten_ranking(genre_id, limit)
                 if result and result.get('data'):
                     for item in result['data']:
-                        item['genre_id'] = genre_id  # キャッシュ保存用のスコープ
-                    all_data.extend(result['data'])
-                    logger.info(f"✅ ジャンル '{genre_id}': {len(result['data'])}件取得")
+                        item['genre_id'] = genre_id
+                    data = result['data']
+                    if self.db.save_rakuten_trends_to_cache(data, genre_id):
+                        any_saved = True
+                        logger.info(f"✅ ジャンル '{genre_id}': {len(data)}件取得・キャッシュ保存")
+                    if genre_id == 'all':
+                        rows_for_all_genre = list(data)
                 else:
                     err = (result.get('error') if isinstance(result, dict) else None) or str(result)
                     last_error = err
                     logger.warning(f"❌ ジャンル '{genre_id}': データ取得失敗 - {err}")
+                gc.collect()
 
-            if all_data:
-                logger.info(f"✅ 楽天商品: 全カテゴリのデータ取得完了 ({len(all_data)}件)")
+            if any_saved:
+                logger.info("✅ 楽天商品: 全カテゴリのデータ取得・保存完了")
             else:
                 logger.warning(f"❌ 楽天商品: 取得したデータがありません (最終エラー: {last_error})")
-            return all_data, last_error
+            return rows_for_all_genre, last_error, any_saved
         except Exception as e:
             err_msg = str(e)
             logger.error(f"❌ 楽天商品: 全カテゴリ取得エラー: {e}", exc_info=True)
-            return [], err_msg
+            return [], err_msg, False
 
     def _save_all_categories_to_cache(self, all_data):
         """全カテゴリのデータをキャッシュに保存"""

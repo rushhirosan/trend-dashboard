@@ -1,4 +1,5 @@
 import os
+import gc
 import requests
 import json
 import feedparser
@@ -117,26 +118,22 @@ class HatenaTrendsManager(BaseTrendsManager):
         # 全カテゴリを取得する場合（スケジューラー用の特殊ケース）
         if fetch_all_categories:
             logger.info("🔄 はてなブックマーク: 全カテゴリのデータを取得します")
-            all_data = self._fetch_and_cache_all_categories()
-            if all_data:
-                self._save_all_categories_to_cache(all_data)
-                # 'all'カテゴリのデータを返す（互換性のため）
-                all_category_data = [item for item in all_data if item.get('category') == 'all']
+            all_rows, any_saved = self._fetch_and_cache_all_categories()
+            if any_saved:
                 return {
-                    'data': all_category_data[:limit] if all_category_data else [],
+                    'data': all_rows[:limit] if all_rows else [],
                     'status': 'api_fetched',
                     'category': 'all',
                     'source': 'Hatena API',
                     'success': True
                 }
-            else:
-                return {
-                    'data': [],
-                    'status': 'api_error',
-                    'category': 'all',
-                    'error': '全カテゴリのデータ取得に失敗しました',
-                    'success': False
-                }
+            return {
+                'data': [],
+                'status': 'api_error',
+                'category': 'all',
+                'error': '全カテゴリのデータ取得に失敗しました',
+                'success': False
+            }
         
         # BaseTrendsManagerの共通処理を使用
         # auto_fetch_on_cache_miss=Trueで、キャッシュがない場合はAPIを呼び出す（既存動作を維持）
@@ -359,52 +356,60 @@ class HatenaTrendsManager(BaseTrendsManager):
         # 後方互換性のため、_get_from_cacheを呼び出す
         return self._get_from_cache(category=category)
     
+    def _dedupe_hatena_items(self, items):
+        """同一カテゴリ内の (title, url) 重複を除く"""
+        seen = set()
+        out = []
+        for item in items or []:
+            key = (item.get('title', ''), item.get('url', ''))
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(item)
+        return out
+
     def _fetch_and_cache_all_categories(self):
-        """全カテゴリのデータを一度に取得してキャッシュに保存"""
+        """全カテゴリを順に取得し、カテゴリごとにキャッシュへ保存（ピークメモリ抑制）"""
+        all_rows_for_category_all = []
+        total_saved = 0
+        any_saved = False
         try:
             logger.info("🔄 はてなブックマーク: 全カテゴリのデータを取得開始")
-            
-            # 利用可能なカテゴリを取得
             categories = self.get_available_categories()
-            all_data = []
-            
+
             for category in categories:
                 logger.info(f"📊 カテゴリ '{category}' のデータを取得中...")
                 api_result = self.get_new_entries(category, 25)
                 logger.debug(f"🔍 カテゴリ '{category}' API結果: {api_result}")
-                if api_result and not api_result.get('error'):
-                    trends_data = api_result.get('data', [])
-                    for item in trends_data:
-                        item['category'] = category
-                    all_data.extend(trends_data)
-                    logger.info(f"✅ カテゴリ '{category}': {len(trends_data)}件取得")
-                else:
+                if not api_result or api_result.get('error'):
                     logger.warning(f"❌ カテゴリ '{category}': データ取得失敗 - {api_result}")
-            
-            # 'all'カテゴリのデータを追加（ホットエントリーから取得）
-            logger.info(f"📊 カテゴリ 'all' のデータを取得中...")
-            api_result = self.get_new_entries('all', 25)
-            if api_result and not api_result.get('error'):
+                    gc.collect()
+                    continue
                 trends_data = api_result.get('data', [])
                 for item in trends_data:
-                    item['category'] = 'all'
-                all_data.extend(trends_data)
-                logger.info(f"✅ カテゴリ 'all': {len(trends_data)}件取得")
-            
-            # データ取得は成功（保存は呼び出し元で行う）
-            if all_data:
-                logger.info(f"✅ はてなブックマーク: 全カテゴリのデータ取得完了 ({len(all_data)}件)")
-            else:
+                    item['category'] = category
+                unique = self._dedupe_hatena_items(trends_data)
+                if not unique:
+                    gc.collect()
+                    continue
+                if self.db.save_hatena_trends_to_cache(unique, category):
+                    any_saved = True
+                    total_saved += len(unique)
+                    logger.info(f"✅ カテゴリ '{category}': {len(unique)}件取得・キャッシュ保存")
+                if category == 'all':
+                    all_rows_for_category_all = list(unique)
+                gc.collect()
+
+            if any_saved and total_saved > 0:
+                self._update_cache_status('hatena_trends', total_saved)
+                logger.info(f"✅ はてなブックマーク: 全カテゴリのデータ取得・保存完了 ({total_saved}件)")
+            elif not any_saved:
                 logger.warning("❌ はてなブックマーク: 取得したデータがありません")
-                
         except Exception as e:
-            import traceback
             logger.error(f"❌ 全カテゴリ取得エラー: {e}", exc_info=True)
-            traceback.print_exc()
-            all_data = []
-        
-        # 取得したデータを返す（保存処理は呼び出し元で行う）
-        return all_data
+            any_saved = False
+
+        return all_rows_for_category_all, any_saved
     
     def _save_all_categories_to_cache(self, all_data):
         """全カテゴリのデータをキャッシュに保存"""

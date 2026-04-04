@@ -1,3 +1,4 @@
+import gc
 import os
 import requests
 import json
@@ -203,11 +204,10 @@ class TwitchTrendsManager(BaseTrendsManager):
             logger.error(f"❌ Twitch: カテゴリ別キャッシュ保存エラー: {e}", exc_info=True)
     
     def _fetch_and_cache_all_categories(self):
-        """全カテゴリのデータを取得してキャッシュに保存"""
+        """全カテゴリを順に取得し、カテゴリごとにキャッシュへ保存（ピークメモリ抑制）"""
         try:
             logger.info("🔍 Twitch: 全カテゴリのデータを取得開始")
-            
-            # 認証情報の確認
+
             if not self.client_id or not self.client_secret:
                 error_msg = "Twitch API認証情報が設定されていません（TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET）"
                 logger.error(f"❌ {error_msg}")
@@ -216,14 +216,13 @@ class TwitchTrendsManager(BaseTrendsManager):
                     'error': error_msg,
                     'data': []
                 }
-            
-            all_data = []
+
             categories = self.get_available_categories()
             errors = []
-            
+            total_saved = 0
+
             for category in categories:
                 logger.debug(f"🔍 カテゴリ '{category}': データ取得中...")
-                
                 try:
                     if category == 'games':
                         result = self._get_top_games_from_api(25)
@@ -232,15 +231,18 @@ class TwitchTrendsManager(BaseTrendsManager):
                     elif category == 'clips':
                         result = self._get_top_clips_from_api(25)
                     else:
+                        gc.collect()
                         continue
-                    
+
                     if result and result.get('data'):
                         trends_data = result['data']
-                        # カテゴリ情報を追加
                         for item in trends_data:
                             item['category'] = category
-                        all_data.extend(trends_data)
-                        logger.info(f"✅ カテゴリ '{category}': {len(trends_data)}件取得")
+                        if self._save_to_cache(trends_data, category=category):
+                            total_saved += len(trends_data)
+                            logger.info(f"✅ カテゴリ '{category}': {len(trends_data)}件取得・キャッシュ保存")
+                        else:
+                            logger.warning(f"⚠️ Twitch: カテゴリ '{category}' のキャッシュ保存失敗")
                     else:
                         error_msg = result.get('error', 'Unknown error') if result else 'API call failed'
                         logger.warning(f"⚠️ カテゴリ '{category}': データ取得失敗 - {error_msg}")
@@ -249,31 +251,33 @@ class TwitchTrendsManager(BaseTrendsManager):
                     error_msg = f"カテゴリ '{category}' 取得エラー: {str(e)}"
                     logger.error(f"❌ {error_msg}", exc_info=True)
                     errors.append(error_msg)
-            
-            if all_data:
-                logger.info(f"🔍 Twitch: 全カテゴリのデータをキャッシュに保存開始 ({len(all_data)}件)")
-                self._save_all_categories_to_cache(all_data)
-                logger.info(f"✅ Twitch: 全カテゴリのデータをキャッシュに保存完了 ({len(all_data)}件)")
+                finally:
+                    gc.collect()
+
+            if total_saved > 0:
+                # save_to_cache がカテゴリごとに data_count を上書きするため、合計件数で最終反映
+                self._update_cache_status('twitch_trends', total_saved)
+                logger.info(f"✅ Twitch: 全カテゴリのデータをキャッシュに保存完了 ({total_saved}件)")
                 return {
                     'success': True,
-                    'data': all_data,
+                    'data': [],
                     'status': 'api_fetched',
                     'source': 'Twitch API',
-                    'total_count': len(all_data),
+                    'total_count': total_saved,
                     'errors': errors if errors else None
                 }
-            else:
-                error_msg = "取得できるデータがありませんでした"
-                if errors:
-                    error_msg += f" (エラー: {', '.join(errors)})"
-                logger.warning(f"⚠️ Twitch: {error_msg}")
-                return {
-                    'success': False,
-                    'error': error_msg,
-                    'data': [],
-                    'errors': errors
-                }
-                
+
+            error_msg = "取得できるデータがありませんでした"
+            if errors:
+                error_msg += f" (エラー: {', '.join(errors)})"
+            logger.warning(f"⚠️ Twitch: {error_msg}")
+            return {
+                'success': False,
+                'error': error_msg,
+                'data': [],
+                'errors': errors
+            }
+
         except Exception as e:
             error_msg = f"全カテゴリ取得エラー: {str(e)}"
             logger.error(f"❌ Twitch: {error_msg}", exc_info=True)
@@ -282,36 +286,6 @@ class TwitchTrendsManager(BaseTrendsManager):
                 'error': error_msg,
                 'data': []
             }
-    
-    def _save_all_categories_to_cache(self, all_data):
-        """全カテゴリのデータをキャッシュに保存"""
-        try:
-            logger.info(f"🔍 Twitch: データ保存開始 - {len(all_data)}件")
-            
-            # カテゴリごとにデータをグループ化
-            categories = self.get_available_categories()
-            total_saved = 0
-            
-            for category in categories:
-                category_data = [item for item in all_data if item.get('category') == category]
-                if category_data:
-                    logger.debug(f"🔍 Twitch: カテゴリ '{category}' のデータをキャッシュに保存中 ({len(category_data)}件)")
-                    success = self._save_to_cache(category_data, category=category)
-                    if success:
-                        total_saved += len(category_data)
-                        logger.info(f"✅ Twitch: カテゴリ '{category}' のデータをキャッシュに保存完了 ({len(category_data)}件)")
-                    else:
-                        logger.warning(f"⚠️ Twitch: カテゴリ '{category}' のデータをキャッシュに保存失敗")
-            
-            if total_saved > 0:
-                logger.info(f"✅ Twitch: 全カテゴリのデータをキャッシュに保存完了 ({total_saved}件)")
-                # cache_statusを更新
-                self._update_cache_status('twitch_trends', total_saved)
-            else:
-                logger.warning("⚠️ Twitch: 保存されたデータがありません")
-            
-        except Exception as e:
-            logger.error(f"❌ Twitch: キャッシュ保存エラー: {e}", exc_info=True)
     
     def _get_access_token(self):
         """アクセストークンを取得・更新"""
@@ -615,14 +589,6 @@ class TwitchTrendsManager(BaseTrendsManager):
                 'twitchioライブラリ'
             ]
         }
-    
-    def _update_cache_status(self, cache_key, data_count):
-        """cache_statusテーブルを更新"""
-        try:
-            return self.db.update_cache_status(cache_key, data_count)
-        except Exception as e:
-            logger.error(f"❌ Twitch: cache_status更新エラー: {e}", exc_info=True)
-            return False
     
     def _get_cache_info(self, cache_key):
         """キャッシュ情報を取得"""

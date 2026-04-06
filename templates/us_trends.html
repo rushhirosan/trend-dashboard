@@ -115,11 +115,38 @@
             To view the trends dashboard, please enable JavaScript. Track U.S. trends from Google Trends, YouTube, Hacker News, OpenAlex, Bluesky, Spotify, and more.
         </div>
     </noscript>
+    <section class="visually-hidden" aria-label="US trends page summary and internal links">
+        <h2>US trends page summary</h2>
+        <p>
+            This page is an America-focused trends dashboard for quickly scanning what is happening now across search, video, news, technology, markets, and public data.
+            It aggregates public signals from Google Trends, YouTube, CNN, world news, Wikipedia, Hacker News, OpenAlex, Bluesky, stock and cryptocurrency feeds, and selected government data sources.
+            Data refresh processing starts four times daily at 1 AM, 7 AM, 1 PM, and 7 PM JST, and completion may take approximately 25-45 minutes.
+        </p>
+        <p>
+            Related pages:
+            <a href="/us">US Trends dashboard home (English)</a> /
+            <a href="/">Japan Trends dashboard home (Japanese)</a> /
+            <a href="/data-status">Data status and freshness details</a> /
+            <a href="/about">About the project, sources, and usage notes</a>
+        </p>
+        <h3>Server-rendered highlights (US)</h3>
+        <ul>
+            {% for item in (ssr_trends or {}).get('google', [])[:5] %}
+            <li>Google Trends: {{ item.get('keyword') or item.get('title') }}</li>
+            {% endfor %}
+            {% for item in (ssr_trends or {}).get('cnn', [])[:5] %}
+            <li>CNN: {{ item.get('title') }}</li>
+            {% endfor %}
+            {% for item in (ssr_trends or {}).get('youtube', [])[:5] %}
+            <li>YouTube: {{ item.get('title') }}</li>
+            {% endfor %}
+        </ul>
+    </section>
     <main class="container-fluid main-content-compact">
         <div id="mainContent">
             <header class="page-header-compact">
                 <h1 class="h3 fw-bold mb-1">US Trends - Latest Trends in America</h1>
-                <p class="visually-hidden">Trends Dashboard displays U.S. trends in one place. Google Trends, YouTube, Spotify, Hacker News, OpenAlex, Bluesky, S&amp;P 500, cryptocurrency, and more. America-focused trends updated 4 times daily (JST).</p>
+                <p class="visually-hidden">Trends Dashboard displays U.S. trends in one place. Google Trends, YouTube, Spotify, Hacker News, OpenAlex, Bluesky, CNN, world news, S&amp;P 500, cryptocurrency, and more. This page is optimized for America-focused trend scanning and updated on a 4-times-daily refresh cycle (JST). It complements the Japan page with different regional sources, language context, and ranking signals.</p>
                 <div class="row align-items-start g-2 header-row">
                     <div class="col-12 col-lg-6 header-desc-col d-none">
                         <div class="header-description-modern">
@@ -164,9 +191,9 @@
                                     </p>
                                     <p class="small mb-0">
                                         For details, see
-                                        <a href="/" class="me-2">Japan Trends</a>
-                                        <a href="/data-status" class="me-2">Data Status</a>
-                                        <a href="/about">About</a>.
+                                        <a href="/" class="me-2">Japan Trends Dashboard</a>
+                                        <a href="/data-status" class="me-2">Data Status and Freshness</a>
+                                        <a href="/about">About this project and sources</a>.
                                     </p>
                                 </section>
                             </div>

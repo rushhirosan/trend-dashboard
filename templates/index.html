@@ -209,11 +209,38 @@
             <p class="mb-0"><strong>データ更新頻度：</strong>すべてのトレンドデータは毎日1時、7時、13時、19時（JST）に自動更新されます。最新のデータを確認するには、JavaScriptを有効にしてページを再読み込みしてください。</p>
         </div>
     </noscript>
+    <section class="visually-hidden" aria-label="日本トレンドページの概要と主要リンク">
+        <h2>日本トレンドページの概要</h2>
+        <p>
+            このページは、日本国内の現在の関心を素早く把握するためのトレンドダッシュボードです。検索、動画、ニュース、開発コミュニティ、マーケット、行政データを横断して、
+            Google Trends、YouTube、NHK、Wikipedia、はてなブックマーク、Zenn、Note、Qiita、OpenAlex、Bluesky、株価、仮想通貨などの公開データを同時に確認できます。
+            更新処理は毎日1時・7時・13時・19時（JST）に開始し、完了までおおむね25〜45分かかることがあります。
+        </p>
+        <p>
+            関連ページ:
+            <a href="/">日本の最新トレンド一覧（Japan Trends Dashboard）</a> /
+            <a href="/us">米国の最新トレンド一覧（US Trends Dashboard）</a> /
+            <a href="/data-status">データ鮮度と更新状況の確認ページ</a> /
+            <a href="/about">サイト概要・データソース・使い方の説明ページ</a>
+        </p>
+        <h3>サーバーサイドで埋め込まれた主要トレンド（日本）</h3>
+        <ul>
+            {% for item in (ssr_trends or {}).get('google', [])[:5] %}
+            <li>Google Trends: {{ item.get('keyword') or item.get('title') }}</li>
+            {% endfor %}
+            {% for item in (ssr_trends or {}).get('news', [])[:5] %}
+            <li>ニュース: {{ item.get('title') }}</li>
+            {% endfor %}
+            {% for item in (ssr_trends or {}).get('youtube', [])[:5] %}
+            <li>YouTube: {{ item.get('title') }}</li>
+            {% endfor %}
+        </ul>
+    </section>
     <main class="container-fluid main-content-compact">
         <div id="mainContent">
             <header class="page-header-compact">
                 <h1 class="h3 fw-bold mb-1">日本の最新トレンド情報</h1>
-                <p class="visually-hidden">トレンドダッシュボードは、日本国内の最新トレンドを一括表示する無料ツールです。Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Zenn、Note、Qiita、OpenAlex、Bluesky、株価・仮想通貨など、日本向けのトレンド情報を毎日4回更新しています。</p>
+                <p class="visually-hidden">トレンドダッシュボードは、日本国内の最新トレンドを一括表示する無料ツールです。Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Zenn、Note、Qiita、OpenAlex、Bluesky、NHK、Wikipedia、株価・仮想通貨など、日本向けの公開トレンド情報を毎日4回の更新サイクルで整理し、カテゴリ別に見比べやすく表示します。日本ページは日本語の話題把握に最適化され、USページとはデータソースと文脈が異なります。</p>
                 <div class="row align-items-start g-2 header-row">
                     <div class="col-12 col-lg-6 header-desc-col d-none">
                         <div class="header-description-modern">

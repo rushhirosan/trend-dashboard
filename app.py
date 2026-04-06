@@ -294,35 +294,57 @@ Sitemap: https://trends-dashboard.fly.dev/sitemap.xml
             try:
                 from flask import Response
                 from datetime import datetime
+                from pathlib import Path
                 import pytz
                 
                 jst = pytz.timezone('Asia/Tokyo')
                 now = datetime.now(jst)
-                now_str = now.strftime('%Y-%m-%dT%H:%M:%S') + '+09:00'
+
+                cache_instance = app.config.get('TRENDS_CACHE')
+                trends_last_update = cache_instance.get_last_update_time() if cache_instance else None
+                if trends_last_update:
+                    if trends_last_update.tzinfo is None:
+                        trends_last_update = pytz.UTC.localize(trends_last_update)
+                    trends_last_update_jst = trends_last_update.astimezone(jst)
+                else:
+                    trends_last_update_jst = now
+
+                templates_dir = Path(__file__).resolve().parent / 'templates'
+
+                def _template_lastmod(filename: str):
+                    try:
+                        mtime = datetime.fromtimestamp((templates_dir / filename).stat().st_mtime, tz=jst)
+                        return mtime
+                    except Exception:
+                        return now
+
+                trends_lastmod_str = trends_last_update_jst.strftime('%Y-%m-%dT%H:%M:%S') + '+09:00'
+                about_lastmod_str = _template_lastmod('about.html').strftime('%Y-%m-%dT%H:%M:%S') + '+09:00'
+                status_lastmod_str = _template_lastmod('data-status.html').strftime('%Y-%m-%dT%H:%M:%S') + '+09:00'
                 
                 sitemap_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://trends-dashboard.fly.dev/</loc>
-    <lastmod>{now_str}</lastmod>
+    <lastmod>{trends_lastmod_str}</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://trends-dashboard.fly.dev/us</loc>
-    <lastmod>{now_str}</lastmod>
+    <lastmod>{trends_lastmod_str}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://trends-dashboard.fly.dev/about</loc>
-    <lastmod>{now_str}</lastmod>
+    <lastmod>{about_lastmod_str}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://trends-dashboard.fly.dev/data-status</loc>
-    <lastmod>{now_str}</lastmod>
+    <lastmod>{status_lastmod_str}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>

@@ -15,7 +15,7 @@ SSR_SOURCES = [
     {'key': 'news', 'manager_key': 'worldnews', 'fetcher': lambda m: m.get_trends(country='jp', category='general', force_refresh=False)},
     {'key': 'wikipedia', 'manager_key': 'wikipedia', 'fetcher': lambda m: m.get_trends(lang='ja', limit=5, force_refresh=False)},
     {'key': 'google', 'manager_key': 'google', 'fetcher': lambda m: m.get_trends(region='JP', force_refresh=False)},
-    {'key': 'youtube', 'manager_key': 'youtube', 'fetcher': lambda m: m.get_trends(region='JP', force_refresh=False)},
+    {'key': 'youtube', 'manager_key': 'youtube', 'fetcher': lambda m: m.get_trends(region_code='JP', max_results=5, force_refresh=False)},
 ]
 
 # US全部入りタブでSSRするソース一覧

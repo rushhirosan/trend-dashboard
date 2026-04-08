@@ -9,7 +9,7 @@
 - **日本トレンド**: https://trends-dashboard.fly.dev/
 - **USトレンド**: https://trends-dashboard.fly.dev/us
 - **データ鮮度**: https://trends-dashboard.fly.dev/data-status
-- **メールサブスクリプション**: https://trends-dashboard.fly.dev/subscription
+- **このサイトについて**: https://trends-dashboard.fly.dev/about
 
 ## 📊 機能
 
@@ -66,7 +66,6 @@
 ### 主な機能
 
 - 📈 **リアルタイムトレンド表示**: 各プラットフォームの最新トレンドを一覧表示
-- 📧 **メールサブスクリプション**: 毎日1時、7時、13時、19時（JST）に更新処理を開始し、完了次第トレンドサマリーをメール配信（完了までおおむね25〜45分かかることがあります）
 - 📊 **データ鮮度情報**: 各トレンドデータの最終更新時刻とデータ件数を確認
 - 🔄 **自動更新**: 毎日1時、7時、13時、19時（JST）に更新処理を開始（完了までおおむね25〜45分かかることがあります）
 - 💾 **キャッシュシステム**: PostgreSQLを使用した高速なデータ取得
@@ -128,7 +127,7 @@ trends_dashboard/
 ├── routes/               # APIルート定義
 ├── services/             # ビジネスロジック
 │   ├── scheduler/        # スケジューラー
-│   ├── subscription/     # メールサブスクリプション
+│   ├── subscription/
 │   └── trends/           # 各トレンドサービスの実装
 ├── static/               # 静的ファイル（CSS, JavaScript）
 ├── templates/            # HTMLテンプレート
@@ -139,7 +138,6 @@ trends_dashboard/
 ## 📝 データ更新スケジュール
 
 - **自動更新**: 毎日1:00、7:00、13:00、19:00（JST）にスケジューラーが実行
-- **メール配信**: データ更新完了後、自動的にメール送信（7:20頃、13:20頃、19:20頃）
 - **キャッシュ**: 更新間隔中はキャッシュデータを使用
 
 ## 🔒 セキュリティ

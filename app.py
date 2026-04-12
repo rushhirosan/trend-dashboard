@@ -204,13 +204,20 @@ def create_app():
                 ga_id = app.config.get('GOOGLE_ANALYTICS_ID')
                 # SSR用トレンドデータ（キャッシュから取得、初回表示・SEO向け）
                 ssr_trends = {}
+                ssr_itemlist_ld = None
                 try:
-                    from services.ssr_data import fetch_ssr_trends
+                    from services.ssr_data import build_ssr_itemlist_json_ld, fetch_ssr_trends
                     managers = app.config.get('TREND_MANAGERS') or {}
                     ssr_trends = fetch_ssr_trends(managers)
+                    ssr_itemlist_ld = build_ssr_itemlist_json_ld(ssr_trends, variant='jp')
                 except Exception as ssr_err:
                     logger.debug(f"SSRデータ取得スキップ: {ssr_err}")
-                return render_template('index.html', config={'GOOGLE_ANALYTICS_ID': ga_id}, ssr_trends=ssr_trends)
+                return render_template(
+                    'index.html',
+                    config={'GOOGLE_ANALYTICS_ID': ga_id},
+                    ssr_trends=ssr_trends,
+                    ssr_itemlist_ld=ssr_itemlist_ld,
+                )
             except Exception as e:
                 logger.error(f"❌ メインページレンダリングエラー: {e}", exc_info=True)
                 return f"Error rendering index page: {e}", 500
@@ -226,13 +233,20 @@ def create_app():
                 ga_id = app.config.get('GOOGLE_ANALYTICS_ID')
                 # SSR用トレンドデータ（キャッシュから取得、初回表示・SEO向け）
                 ssr_trends = {}
+                ssr_itemlist_ld = None
                 try:
-                    from services.ssr_data import fetch_ssr_trends_us
+                    from services.ssr_data import build_ssr_itemlist_json_ld, fetch_ssr_trends_us
                     managers = app.config.get('TREND_MANAGERS') or {}
                     ssr_trends = fetch_ssr_trends_us(managers)
+                    ssr_itemlist_ld = build_ssr_itemlist_json_ld(ssr_trends, variant='us')
                 except Exception as ssr_err:
                     logger.debug(f"SSR USデータ取得スキップ: {ssr_err}")
-                return render_template('us_trends.html', config={'GOOGLE_ANALYTICS_ID': ga_id}, ssr_trends=ssr_trends)
+                return render_template(
+                    'us_trends.html',
+                    config={'GOOGLE_ANALYTICS_ID': ga_id},
+                    ssr_trends=ssr_trends,
+                    ssr_itemlist_ld=ssr_itemlist_ld,
+                )
             except Exception as e:
                 logger.error(f"❌ USトレンドページレンダリングエラー: {e}", exc_info=True)
                 return f"Error rendering US trends page: {e}", 500

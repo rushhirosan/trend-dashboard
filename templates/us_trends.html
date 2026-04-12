@@ -73,6 +73,9 @@
       }
     }
     </script>
+    {% if ssr_itemlist_ld %}
+    <script type="application/ld+json">{{ ssr_itemlist_ld | tojson }}</script>
+    {% endif %}
     
     <!-- Google Analytics (GA4) -->
     {% if config.get('GOOGLE_ANALYTICS_ID') %}
@@ -115,38 +118,10 @@
             To view the trends dashboard, please enable JavaScript. Track U.S. trends from Google Trends, YouTube, Hacker News, OpenAlex, Bluesky, Spotify, and more.
         </div>
     </noscript>
-    <section class="visually-hidden" aria-label="US trends page summary and internal links">
-        <h2>US trends page summary</h2>
-        <p>
-            This page is an America-focused trends dashboard for quickly scanning what is happening now across search, video, news, technology, markets, and public data.
-            It aggregates public signals from Google Trends, YouTube, CNN, world news, Wikipedia, Hacker News, OpenAlex, Bluesky, stock and cryptocurrency feeds, and selected government data sources.
-            Data refresh processing starts four times daily at 1 AM, 7 AM, 1 PM, and 7 PM JST, and completion may take approximately 25-45 minutes.
-        </p>
-        <p>
-            Related pages:
-            <a href="/us">US Trends dashboard home (English)</a> /
-            <a href="/">Japan Trends dashboard home (Japanese)</a> /
-            <a href="/data-status">Data status and freshness details</a> /
-            <a href="/about">About the project, sources, and usage notes</a>
-        </p>
-        <h3>Server-rendered highlights (US)</h3>
-        <ul>
-            {% for item in (ssr_trends or {}).get('google', [])[:5] %}
-            <li>Google Trends: {{ item.get('keyword') or item.get('title') }}</li>
-            {% endfor %}
-            {% for item in (ssr_trends or {}).get('cnn', [])[:5] %}
-            <li>CNN: {{ item.get('title') }}</li>
-            {% endfor %}
-            {% for item in (ssr_trends or {}).get('youtube', [])[:5] %}
-            <li>YouTube: {{ item.get('title') }}</li>
-            {% endfor %}
-        </ul>
-    </section>
     <main class="container-fluid main-content-compact">
         <div id="mainContent">
             <header class="page-header-compact">
                 <h1 class="h3 fw-bold mb-1">US Trends - Latest Trends in America</h1>
-                <p class="visually-hidden">Trends Dashboard displays U.S. trends in one place. Google Trends, YouTube, Spotify, Hacker News, OpenAlex, Bluesky, CNN, world news, S&amp;P 500, cryptocurrency, and more. This page is optimized for America-focused trend scanning and updated on a 4-times-daily refresh cycle (JST). It complements the Japan page with different regional sources, language context, and ranking signals.</p>
                 <div class="row align-items-start g-2 header-row">
                     <div class="col-12 col-lg-6 header-desc-col d-none">
                         <div class="header-description-modern">
@@ -186,14 +161,15 @@
                                 <section class="rounded border bg-light p-2 w-100 h-100" aria-label="About this page">
                                     <h2 class="h6 fw-bold mb-2">What this page covers</h2>
                                     <p class="small mb-2">
-                                        This page summarizes U.S. trend signals across search, video, news, tech, market, and public data.
-                                        Data refresh starts 4 times daily (1/7/13/19 JST), and each tab focuses on a different category.
+                                        This dashboard scans U.S. trend signals across search, video, news, technology, markets, and public data.
+                                        Sources include Google Trends, YouTube, CNN, world news, Wikipedia, Hacker News, OpenAlex, Bluesky, stock and cryptocurrency feeds, and selected government data.
+                                        Refresh starts four times daily (1/7/13/19 JST) and may take about 25–45 minutes to complete. Use the tabs to browse by category.
                                     </p>
                                     <p class="small mb-0">
-                                        For details, see
+                                        Related:
                                         <a href="/" class="me-2">Japan Trends Dashboard</a>
-                                        <a href="/data-status" class="me-2">Data Status and Freshness</a>
-                                        <a href="/about">About this project and sources</a>.
+                                        <a href="/data-status" class="me-2">Data status and freshness</a>
+                                        <a href="/about">About this project and sources</a>
                                     </p>
                                 </section>
                             </div>

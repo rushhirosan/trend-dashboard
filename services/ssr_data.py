@@ -88,6 +88,68 @@ def fetch_ssr_trends(managers: dict) -> Dict[str, List[dict]]:
     return out
 
 
+def build_ssr_itemlist_json_ld(
+    ssr: Optional[Dict[str, List[dict]]], *, variant: str
+) -> Optional[Dict[str, Any]]:
+    """
+    トレンドのサーバースナップショットを schema.org ItemList として返す（本文との二重表示を避けつつ HTML に含める）。
+    variant: 'jp' | 'us'
+    """
+    if not ssr:
+        return None
+    if variant == "jp":
+        specs = [
+            ("google", "Google Trends"),
+            ("news", "ニュース"),
+            ("youtube", "YouTube"),
+        ]
+        list_name = "主要トレンド（サーバー側スナップショット）"
+    elif variant == "us":
+        specs = [
+            ("google", "Google Trends"),
+            ("cnn", "CNN"),
+            ("youtube", "YouTube"),
+        ]
+        list_name = "Trend highlights (server snapshot)"
+    else:
+        return None
+
+    elements: List[Dict[str, Any]] = []
+    position = 1
+    max_items = 24
+    for key, label in specs:
+        for item in ssr.get(key) or []:
+            if len(elements) >= max_items:
+                break
+            text = (item.get("keyword") or item.get("title") or "").strip()
+            if not text:
+                continue
+            name = f"{label}: {text}"
+            if len(name) > 500:
+                name = name[:497] + "..."
+            elements.append(
+                {
+                    "@type": "ListItem",
+                    "position": position,
+                    "name": name,
+                }
+            )
+            position += 1
+        if len(elements) >= max_items:
+            break
+
+    if not elements:
+        return None
+
+    return {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        "name": list_name,
+        "numberOfItems": len(elements),
+        "itemListElement": elements,
+    }
+
+
 def fetch_ssr_trends_us(managers: dict) -> Dict[str, List[dict]]:
     """
     US全部入りタブ用のトレンドデータを並列取得（キャッシュのみ、外部APIは呼ばない）

@@ -107,6 +107,9 @@
       }
     }
     </script>
+    {% if ssr_itemlist_ld %}
+    <script type="application/ld+json">{{ ssr_itemlist_ld | tojson }}</script>
+    {% endif %}
     
     <!-- Google Analytics (GA4) -->
     {% if config.get('GOOGLE_ANALYTICS_ID') %}
@@ -209,38 +212,10 @@
             <p class="mb-0"><strong>データ更新頻度：</strong>すべてのトレンドデータは毎日1時、7時、13時、19時（JST）に自動更新されます。最新のデータを確認するには、JavaScriptを有効にしてページを再読み込みしてください。</p>
         </div>
     </noscript>
-    <section class="visually-hidden" aria-label="日本トレンドページの概要と主要リンク">
-        <h2>日本トレンドページの概要</h2>
-        <p>
-            このページは、日本国内の現在の関心を素早く把握するためのトレンドダッシュボードです。検索、動画、ニュース、開発コミュニティ、マーケット、行政データを横断して、
-            Google Trends、YouTube、NHK、Wikipedia、はてなブックマーク、Zenn、Note、Qiita、OpenAlex、Bluesky、株価、仮想通貨などの公開データを同時に確認できます。
-            更新処理は毎日1時・7時・13時・19時（JST）に開始し、完了までおおむね25〜45分かかることがあります。
-        </p>
-        <p>
-            関連ページ:
-            <a href="/">日本の最新トレンド一覧（Japan Trends Dashboard）</a> /
-            <a href="/us">米国の最新トレンド一覧（US Trends Dashboard）</a> /
-            <a href="/data-status">データ鮮度と更新状況の確認ページ</a> /
-            <a href="/about">サイト概要・データソース・使い方の説明ページ</a>
-        </p>
-        <h3>サーバーサイドで埋め込まれた主要トレンド（日本）</h3>
-        <ul>
-            {% for item in (ssr_trends or {}).get('google', [])[:5] %}
-            <li>Google Trends: {{ item.get('keyword') or item.get('title') }}</li>
-            {% endfor %}
-            {% for item in (ssr_trends or {}).get('news', [])[:5] %}
-            <li>ニュース: {{ item.get('title') }}</li>
-            {% endfor %}
-            {% for item in (ssr_trends or {}).get('youtube', [])[:5] %}
-            <li>YouTube: {{ item.get('title') }}</li>
-            {% endfor %}
-        </ul>
-    </section>
     <main class="container-fluid main-content-compact">
         <div id="mainContent">
             <header class="page-header-compact">
                 <h1 class="h3 fw-bold mb-1">日本の最新トレンド情報</h1>
-                <p class="visually-hidden">トレンドダッシュボードは、日本国内の最新トレンドを一括表示する無料ツールです。Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Zenn、Note、Qiita、OpenAlex、Bluesky、NHK、Wikipedia、株価・仮想通貨など、日本向けの公開トレンド情報を毎日4回の更新サイクルで整理し、カテゴリ別に見比べやすく表示します。日本ページは日本語の話題把握に最適化され、USページとはデータソースと文脈が異なります。</p>
                 <div class="row align-items-start g-2 header-row">
                     <div class="col-12 col-lg-6 header-desc-col d-none">
                         <div class="header-description-modern">
@@ -280,16 +255,14 @@
                                 <section class="rounded border bg-light p-2 w-100 h-100" aria-label="このページの説明">
                                     <h2 class="h6 fw-bold mb-2">このページで分かること</h2>
                                     <p class="small mb-2">
-                                        トレンドダッシュボードは、日本向けのトレンド情報を横断して比較できる無料ダッシュボードです。
-                                        ニュース、検索、動画、テック、マーケット、行政データを毎日4回（1時/7時/13時/19時 JST）更新し、
-                                        タブでカテゴリごとに確認できます。
+                                        トレンドダッシュボードは、日本国内の関心を素早く把握するための無料ダッシュボードです。Google Trends、YouTube、NHK、Wikipedia、はてなブックマーク、Zenn、Note、Qiita、OpenAlex、Bluesky、株価・仮想通貨などの公開データを横断して比較できます。
+                                        更新は毎日1・7・13・19時（JST）に開始し、完了までおおむね25〜45分かかることがあります。タブでカテゴリごとに確認できます。
                                     </p>
                                     <p class="small mb-0">
-                                        詳細は
-                                        <a href="/us" class="me-2">USトレンド</a>
-                                        <a href="/data-status" class="me-2">データ更新状況</a>
-                                        <a href="/about">このサイトについて</a>
-                                        を参照してください。
+                                        関連:
+                                        <a href="/us" class="me-2">米国トレンド（US）</a>
+                                        <a href="/data-status" class="me-2">データ鮮度・更新状況</a>
+                                        <a href="/about">サイト概要・データソース</a>
                                     </p>
                                 </section>
                             </div>

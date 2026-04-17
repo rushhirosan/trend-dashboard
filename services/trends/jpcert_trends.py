@@ -1,7 +1,7 @@
 import requests
 import feedparser
 from datetime import datetime
-from database_config import TrendsCache
+from email.utils import parsedate_to_datetime
 from utils.logger_config import get_logger
 from services.trends.base_trends_manager import BaseTrendsManager
 
@@ -17,8 +17,15 @@ class JPCERTTrendsManager(BaseTrendsManager):
         
         # JPCERT/CC RSSフィードURL
         self.rss_url = "https://www.jpcert.or.jp/rss/jpcert.rdf"
-        # フォールバック用のXML URL
-        self.rss_xml_url = "https://www.jpcert.or.jp/rss/jpcert.xml"
+        # jpcert.xml は404のため、公式サイト掲載の広域フィードへフォールバック
+        self.rss_fallback_url = "https://www.jpcert.or.jp/rss/jpcert-all.rdf"
+
+        self._http = requests.Session()
+        self._http.headers.update({
+            'User-Agent': 'TrendDashboard/1.0 (trend detection; link-out only)',
+            'Accept': 'application/rss+xml,application/xml,text/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8',
+        })
         
         logger.info("JPCERT/CC Trends Manager初期化:")
         logger.info(f"  RSS URL: {self.rss_url}")
@@ -67,23 +74,61 @@ class JPCERTTrendsManager(BaseTrendsManager):
             sort_key='published_date',  # 公開日でソート
             sort_reverse=True  # 降順（新しい順）
         )
+
+    def _parse_feed_from_url(self, url, label):
+        """HTTPで本文を取得してからパース（feedparser の URL 直読みは環境によって 0 件になる）"""
+        self.rate_limiter.wait_if_needed()
+        try:
+            resp = self._http.get(url, timeout=20)
+        except requests.exceptions.Timeout:
+            logger.error(f"❌ JPCERT/CC RSS タイムアウト ({label})", exc_info=True)
+            raise
+        if resp.status_code != 200:
+            logger.warning(f"⚠️ JPCERT/CC RSS HTTP {resp.status_code} ({label})")
+            return feedparser.parse(b'')
+        parsed = feedparser.parse(resp.content)
+        if getattr(parsed, 'bozo', False) and getattr(parsed, 'bozo_exception', None):
+            logger.warning(
+                f"⚠️ JPCERT/CC RSS パース警告 ({label}): {parsed.bozo_exception}"
+            )
+        return parsed
+
+    def _published_datetime(self, entry):
+        """RSS 1.0 の dc:date は updated に入ることが多いため両方を見る"""
+        time_struct = entry.get('published_parsed') or entry.get('updated_parsed')
+        if time_struct:
+            try:
+                return datetime(*time_struct[:6])
+            except Exception as e:
+                logger.debug(f"日付パースエラー(time_struct): {e}")
+        for key in ('published', 'updated'):
+            val = entry.get(key)
+            if not val:
+                continue
+            if isinstance(val, datetime):
+                return val
+            s = str(val).strip()
+            try:
+                return parsedate_to_datetime(s)
+            except Exception:
+                pass
+            try:
+                if 'T' in s or s[:4].isdigit() and s[4:5] == '-':
+                    return datetime.fromisoformat(s.replace('Z', '+00:00'))
+            except Exception as e:
+                logger.debug(f"日付パースエラー(fromisoformat {key}): {e}")
+        return datetime.now()
     
     def _fetch_trends(self, limit=25, *args, **kwargs):
         """JPCERT/CC RSSフィードからトレンドデータを取得"""
         try:
             logger.info(f"JPCERT/CC RSS呼び出し開始")
             
-            # レート制限をチェック
-            self.rate_limiter.wait_if_needed()
-            
-            # RSSフィードを取得（まずRDFを試す）
-            feed = feedparser.parse(self.rss_url)
-            
-            # RDFが取得できない場合はXMLを試す
+            feed = self._parse_feed_from_url(self.rss_url, 'primary')
+
             if not feed.entries:
-                logger.warning(f"⚠️ JPCERT/CC RDFから取得失敗。XMLを試します")
-                self.rate_limiter.wait_if_needed()
-                feed = feedparser.parse(self.rss_xml_url)
+                logger.warning("⚠️ JPCERT/CC メインRSSからエントリーなし。フォールバックを試します")
+                feed = self._parse_feed_from_url(self.rss_fallback_url, 'fallback')
             
             if not feed.entries:
                 logger.warning("⚠️ JPCERT/CC RSS: エントリーが見つかりませんでした")
@@ -101,23 +146,7 @@ class JPCERTTrendsManager(BaseTrendsManager):
             formatted_data = []
             for entry in feed.entries[:limit]:
                 try:
-                    # 公開日をパース
-                    published_date = None
-                    if hasattr(entry, 'published_parsed') and entry.published_parsed:
-                        try:
-                            published_date = datetime(*entry.published_parsed[:6])
-                        except Exception as e:
-                            logger.debug(f"日付パースエラー: {e}")
-                            published_date = datetime.now()
-                    elif hasattr(entry, 'published'):
-                        try:
-                            from email.utils import parsedate_to_datetime
-                            published_date = parsedate_to_datetime(entry.published)
-                        except Exception as e:
-                            logger.debug(f"日付パースエラー: {e}")
-                            published_date = datetime.now()
-                    else:
-                        published_date = datetime.now()
+                    published_date = self._published_datetime(entry)
                     
                     # 説明文を取得
                     description = ''

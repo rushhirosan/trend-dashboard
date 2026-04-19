@@ -105,6 +105,14 @@ if scheduler:
 else:
     logger.info("ℹ️ スケジューラーは無効です（初期化されていないか、無効化されています）")
 
+# メモリ逼迫時の Discord 事前警告（OOM 直後はプロセスが死ぬためアプリ内では検知不可）
+try:
+    from utils.memory_watchdog import start_memory_watchdog
+
+    start_memory_watchdog()
+except Exception as mw_err:
+    logger.warning("⚠️ memory_watchdog 開始スキップ: %s", mw_err)
+
 # 最終確認：appが確実に存在し、Flaskアプリケーションであることを確認
 if not isinstance(app, Flask):
     logger.error(f"❌ アプリケーションがFlaskインスタンスではありません（型: {type(app)}）。フォールバックアプリを使用します")

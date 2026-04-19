@@ -505,7 +505,28 @@ class TrendsScheduler:
             # 同一秒で複数実行された場合にアラートで区別できるようミリ秒・プロセスIDを含める
             host_short, pid = _process_identity()
             execution_id = f"scheduler_{start_time.strftime('%Y%m%d_%H%M%S')}_{start_time.microsecond // 1000:03d}_p{pid}"
-            
+
+            # 長時間バッチの途中で OOM 等すると「完了」Discordが届かない。任意で開始時に1通送り状態を可視化（課金なし・既定オフ）
+            if (
+                trigger_source == "scheduler"
+                and os.getenv("DISCORD_NOTIFY_SCHEDULER_START", "").lower() in ("1", "true", "yes")
+                and self.alert_service
+            ):
+                try:
+                    self._send_alert(
+                        "success",
+                        "トレンド取得ジョブ開始",
+                        "一括取得を開始しました。完了時は別途「正常終了」通知が届きます。",
+                        {
+                            "実行ID": execution_id,
+                            "トリガー": self._trigger_label(trigger_source),
+                            "ホスト": host_short,
+                            "PID": str(pid),
+                        },
+                    )
+                except Exception as e:
+                    logger.warning("⚠️ 開始通知Discord送信スキップ: %s", e)
+
             # メモリ節約のため、古いキャッシュデータを削除（2日以上経過したデータ）
             try:
                 logger.info("🧹 古いキャッシュデータを削除中...")

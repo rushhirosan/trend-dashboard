@@ -349,16 +349,37 @@ def scheduler_lock_status():
         return handle_data_error('ロック状態取得', e)
 
 
-@data_bp.route('/alert/test', methods=['POST'])
+@data_bp.route('/alert/test', methods=['GET', 'POST'])
 def test_alert():
-    """Discord アラートのテスト送信（Webhook 動作確認用）"""
+    """Discord Webhook の状態確認（GET）とテスト送信（POST）"""
     try:
         from utils.alert_service import AlertService
+        from utils.memory_watchdog import get_memory_status
+
         svc = AlertService()
+        webhook_ok = bool(svc.webhook_url)
+
+        if request.method == 'GET':
+            return jsonify({
+                'success': True,
+                'webhook_configured': webhook_ok,
+                'memory': get_memory_status(),
+                'memory_watchdog': {
+                    'enabled_env': os.getenv('DISCORD_MEMORY_PRESSURE_ALERT', 'true'),
+                    'hint': 'POST 同じURLでテストメッセージを Discord に送信します',
+                },
+                'discord_hint': (
+                    'webhook_configured=false のとき: fly secrets set DISCORD_WEBHOOK_URL=... で設定し、'
+                    'URL に discord が含まれることを確認してください。'
+                    if not webhook_ok else None
+                ),
+            }), 200
+
         if not svc.webhook_url:
             return jsonify({
                 'success': False,
-                'error': 'DISCORD_WEBHOOK_URL が未設定です。.env に設定してください。'
+                'error': 'DISCORD_WEBHOOK_URL が未設定か、URL に discord が含まれません。',
+                'detail': getattr(svc, 'last_send_error', None),
             }), 400
         ok = svc.send_alert(
             'warning',
@@ -367,7 +388,11 @@ def test_alert():
             {'環境': 'test', 'エンドポイント': '/api/alert/test'},
         )
         if not ok:
-            return jsonify({'success': False, 'error': 'Discord 送信に失敗しました。'}), 500
+            return jsonify({
+                'success': False,
+                'error': 'Discord 送信に失敗しました。',
+                'detail': getattr(svc, 'last_send_error', None),
+            }), 500
         return jsonify({
             'success': True,
             'message': 'Discord にテストアラートを送信しました。チャンネルを確認してください。'

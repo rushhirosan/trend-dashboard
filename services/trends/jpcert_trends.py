@@ -117,19 +117,22 @@ class JPCERTTrendsManager(BaseTrendsManager):
                     return datetime.fromisoformat(s.replace('Z', '+00:00'))
             except Exception as e:
                 logger.debug(f"日付パースエラー(fromisoformat {key}): {e}")
-        return datetime.now()
-    
+        # 日付不明はソートで末尾に回す（現在時刻を捏造しない）
+        return None
+
     def _fetch_trends(self, limit=25, *args, **kwargs):
         """JPCERT/CC RSSフィードからトレンドデータを取得"""
         try:
             logger.info(f"JPCERT/CC RSS呼び出し開始")
-            
+
             feed = self._parse_feed_from_url(self.rss_url, 'primary')
+            feed_label = 'primary'
 
             if not feed.entries:
                 logger.warning("⚠️ JPCERT/CC メインRSSからエントリーなし。フォールバックを試します")
                 feed = self._parse_feed_from_url(self.rss_fallback_url, 'fallback')
-            
+                feed_label = 'fallback'
+
             if not feed.entries:
                 logger.warning("⚠️ JPCERT/CC RSS: エントリーが見つかりませんでした")
                 return {
@@ -139,25 +142,31 @@ class JPCERTTrendsManager(BaseTrendsManager):
                     'source': 'jpcert_rss',
                     'message': '記事が見つかりませんでした'
                 }
-            
-            logger.info(f"✅ JPCERT/CC RSS: {len(feed.entries)}件のエントリーを取得")
-            
-            # データを整形
+
+            logger.info(f"✅ JPCERT/CC RSS ({feed_label}): {len(feed.entries)}件のエントリーを取得")
+
+            # feedparser の並びは保証されないため、先に [:limit] すると新しい記事を落とす。
+            # 十分な件数をパースしてから公開日でソートし、最新 limit 件を採用する。
+            parse_cap = min(len(feed.entries), max(limit * 5, 80), 300)
+
             formatted_data = []
-            for entry in feed.entries[:limit]:
+            for entry in feed.entries[:parse_cap]:
                 try:
                     published_date = self._published_datetime(entry)
-                    
-                    # 説明文を取得
+
                     description = ''
                     if hasattr(entry, 'description'):
                         description = entry.description
                     elif hasattr(entry, 'summary'):
                         description = entry.summary
-                    
+
+                    link = entry.get('link', '')
+                    if isinstance(link, list) and link:
+                        link = link[0]
+
                     formatted_item = {
                         'title': entry.get('title', 'No Title'),
-                        'url': entry.get('link', ''),
+                        'url': link or '',
                         'published_date': published_date.isoformat() if published_date else None,
                         'description': description,
                         'author': entry.get('author', ''),
@@ -167,12 +176,11 @@ class JPCERTTrendsManager(BaseTrendsManager):
                 except Exception as e:
                     logger.warning(f"⚠️ JPCERT/CC エントリーパースエラー: {e}")
                     continue
-            
-            # 公開日でソート（新しい順）
+
             formatted_data.sort(key=lambda x: x.get('published_date') or '', reverse=True)
-            
-            # 制限数まで取得
             formatted_data = formatted_data[:limit]
+            for i, row in enumerate(formatted_data, start=1):
+                row['rank'] = i
             
             logger.info(f"✅ JPCERT/CC: {len(formatted_data)}件の注意喚起情報を取得しました")
             

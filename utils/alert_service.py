@@ -134,13 +134,18 @@ class AlertService:
     """Discord Webhook でアラート通知"""
 
     def __init__(self):
+        self.last_send_error: str | None = None
         # 環境変数から取得（秘密情報のためコードに含めない）
         url = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
         # discordapp.com / discord.com どちらも許容
-        if url and "discord" in url:
+        if url and "discord" in url.lower():
             self.webhook_url = url
         else:
             self.webhook_url = None
+            if url:
+                logger.warning(
+                    "🔔 AlertService: DISCORD_WEBHOOK_URL は有効な Discord Webhook の URL である必要があります（'discord' を含むこと）"
+                )
 
         if self.webhook_url:
             logger.info("🔔 AlertService: Discord Webhook 有効")
@@ -168,11 +173,14 @@ class AlertService:
         """
         if not self.webhook_url:
             logger.debug("DISCORD_WEBHOOK_URL 未設定のためアラート送信をスキップ")
+            self.last_send_error = "DISCORD_WEBHOOK_URL 未設定、または URL に discord が含まれません"
             return False
 
+        self.last_send_error = None
         try:
             return self._send_discord(alert_type, title, message, details)
         except Exception as e:
+            self.last_send_error = str(e)
             logger.error("Discord アラート送信エラー: %s", e, exc_info=True)
             return False
 
@@ -217,6 +225,13 @@ class AlertService:
             timeout=10,
             headers={"Content-Type": "application/json"},
         )
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            body = (resp.text or "")[:2500]
+            logger.error(
+                "Discord Webhook HTTP %s: %s",
+                resp.status_code,
+                body,
+            )
+            raise RuntimeError(f"Discord HTTP {resp.status_code}: {body[:500]}")
         logger.info("✅ Discord アラート送信完了: %s", title)
         return True

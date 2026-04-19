@@ -26,5 +26,5 @@ EXPOSE 8080
 ENV PORT=8080
 ENV FLASK_PORT=8080
 
-# gunicornでアプリケーションを起動（並列実行に対応してタイムアウトを延長）
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--timeout", "1200", "--workers", "1", "wsgi:app"]
+# gunicorn: timeout=0 でワーカー無音タイムアウトを無効化（長時間の refresh_all 中もプロセスを殺さない）。OOM は別問題→fly.toml の memory を十分に。
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--timeout", "0", "--workers", "1", "wsgi:app"]

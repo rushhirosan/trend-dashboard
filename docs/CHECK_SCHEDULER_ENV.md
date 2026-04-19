@@ -177,3 +177,25 @@ Discord 通知の **実行ID** と **ホスト・プロセスID** で、どの�
 - 実行IDの形式: `scheduler_YYYYMMDD_HHMMSS_MMM_p{PID}`（例: `scheduler_20260223_070000_032_p12`）
 - 通知の「ホスト」「プロセスID」フィールドを確認
 - ログで `[二重実行防止]` を含む WARNING が出ていれば、ロックでスキップされた側
+
+---
+
+## 8. OOM（Out of memory）と Discord
+
+### アプリ内でできること
+
+- **OOM が起きた瞬間**はプロセスが SIGKILL されるため、**その場で Discord を送ることはできない**（Python が動かない）。
+- 代わりに **`utils/memory_watchdog`** が、cgroup の上限に対する **RSS 比率**を定期的に見て、**逼迫時に事前通知**する（`DISCORD_WEBHOOK_URL` があり、`DISCORD_MEMORY_PRESSURE_ALERT` が true のとき）。閾値は環境変数 `MEMORY_PRESSURE_WARN_RATIO` / `MEMORY_PRESSURE_CRITICAL_RATIO` で調整可能。
+- **Webhook の生存確認**: `GET /api/alert/test` で `webhook_configured` と現在のメモリ概算を JSON で返す（送信はしない）。テスト送信は `POST /api/alert/test`。
+
+### Grafana / Fly ログで「Out of memory」を監視
+
+- ログ検索クエリ例: `Out of memory` または `Killed process` / `gunicorn`（カーネルが OOM した行を拾う）。
+- **Grafana アラート**で上記にマッチしたら通知チャネルへ（公式の Discord 通知や Webhook 連携を利用）。これが「OOM 発生後」の確実な検知手段になる。
+
+### 本番での確認コマンド例
+
+```bash
+curl -s "https://あなたのアプリ.fly.dev/api/alert/test"
+curl -s -X POST "https://あなたのアプリ.fly.dev/api/alert/test"
+```

@@ -18,6 +18,8 @@ primary_region = "nrt"
   TREND_REFRESH_MAX_CONCURRENT = "2"
   # バッチ間待機秒数（メモリ・接続の解放を待つ、OOM対策）
   TREND_REFRESH_BATCH_DELAY_SECONDS = "3"
+  # スケジューラ一括取得の開始時に Discord へ1通（完了通知と切り分け用）
+  DISCORD_NOTIFY_SCHEDULER_START = "true"
 
 [http_service]
   internal_port = 8080

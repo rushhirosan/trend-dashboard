@@ -14,7 +14,9 @@ primary_region = "nrt"
   SKIP_STARTUP_EXECUTION = "false"
   # デプロイ時のメール送信を無効化（スケジューラー実行時のみメール送信）
   SKIP_EMAIL_ON_UPDATE = "false"
-  # トレンド取得の同時実行数（OOM対策。512MB VMでは2を推奨）
+  # DB分散ロックの保持時間（分）。一括取得が長時間でも期限切れで二重実行されないよう、想定最長ジョブより長めに
+  TRENDS_SCHEDULER_LOCK_MINUTES = "90"
+  # トレンド取得の同時実行数（OOM対策。1GB VMでは 2〜4 でも可）
   TREND_REFRESH_MAX_CONCURRENT = "2"
   # バッチ間待機秒数（メモリ・接続の解放を待つ、OOM対策）
   TREND_REFRESH_BATCH_DELAY_SECONDS = "3"
@@ -44,4 +46,5 @@ primary_region = "nrt"
 [[vm]]
   cpu_kind = "shared"
   cpus = 1
-  memory_mb = 512
+  # 一括取得（80+タスク・低メモリモード）で OOM しにくくする（以前は 512MB）
+  memory_mb = 1024

@@ -18,12 +18,13 @@ class GitHubTrendsManager(BaseTrendsManager):
         super().__init__(service_name='github', max_requests=10, window_seconds=60)
         
         self.base_url = "https://api.github.com"
-        # GitHub APIの認証トークン（オプション、レート制限緩和のため）
-        self.access_token = os.getenv('GITHUB_ACCESS_TOKEN')
-        
+        # GitHub API の認証トークン（オプション）。前後空白は除去。fine-grained PAT は Bearer が必要なため Authorization は Bearer で送る。
+        raw = os.getenv("GITHUB_ACCESS_TOKEN") or ""
+        self.access_token = raw.strip() or None
+
         logger.info(f"GitHub Trends Manager初期化:")
         logger.info(f"  API URL: {self.base_url}")
-        logger.info(f"  Access Token: {'設定済み' if self.access_token else '未設定（認証なし、1時間60回制限）'}")
+        logger.info(f"  Access Token: {'設定済み' if self.access_token else '未設定（認証なし）'}")
     
     def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
@@ -124,14 +125,17 @@ class GitHubTrendsManager(BaseTrendsManager):
             
             # GitHub Search APIを使用してスター数が多いリポジトリを取得
             url = f"{self.base_url}/search/repositories"
-            headers = {
+            headers_base = {
                 'Accept': 'application/vnd.github.v3+json',
                 'User-Agent': 'Trend-Dashboard'
             }
-            
-            # 認証トークンが設定されている場合は追加
-            if self.access_token:
-                headers['Authorization'] = f'token {self.access_token}'
+
+            def _headers(with_token: bool) -> dict:
+                h = dict(headers_base)
+                if with_token and self.access_token:
+                    # REST v3: classic / fine-grained PAT とも Bearer が推奨（token プレフィックスは fine-grained で 401 になりやすい）
+                    h['Authorization'] = f'Bearer {self.access_token}'
+                return h
             
             # クエリパラメータ: 過去1週間でスターが多く、言語でフィルタ
             query = f"stars:>1000"
@@ -148,7 +152,15 @@ class GitHubTrendsManager(BaseTrendsManager):
             logger.debug(f"GitHub API呼び出し: {url}")
             logger.debug(f"GitHub API パラメータ: {params}")
             
-            response = requests.get(url, params=params, headers=headers, timeout=15)
+            response = requests.get(url, params=params, headers=_headers(True), timeout=15)
+
+            # トークン欠損・期限切れ・形式違いで 401 のとき、未認証で 1 回だけ再試行（レートは厳しめだが取得は継続可能）
+            if response.status_code == 401 and self.access_token:
+                logger.warning(
+                    "⚠️ GitHub API: HTTP 401（トークンが無効か期限切れの可能性）。"
+                    "未認証で再試行します。本番では `fly secrets set GITHUB_ACCESS_TOKEN=...` で有効な PAT を設定してください。"
+                )
+                response = requests.get(url, params=params, headers=_headers(False), timeout=15)
             
             # レート制限情報をログに記録
             if 'X-RateLimit-Remaining' in response.headers:

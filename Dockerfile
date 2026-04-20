@@ -26,5 +26,5 @@ EXPOSE 8080
 ENV PORT=8080
 ENV FLASK_PORT=8080
 
-# gunicorn: timeout=0 でワーカー無音タイムアウトを無効化（長時間の refresh_all 中もプロセスを殺さない）。OOM は別問題→fly.toml の memory を十分に。
+# gunicorn: timeout=0 でワーカー無音タイムアウトを無効化（長時間の refresh_all 中もプロセスを殺さない）。OOM は fly.toml の memory_mb（例: 1024）で調整。
 CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--timeout", "0", "--workers", "1", "wsgi:app"]

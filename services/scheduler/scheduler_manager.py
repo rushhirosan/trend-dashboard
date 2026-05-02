@@ -501,6 +501,8 @@ class TrendsScheduler:
                         return
             
             logger.info("🔄 自動トレンド取得開始 [trigger=%s]", trigger_source)
+            # 終了時刻ではなく「開始時」の slot_key で business_day / slot を確定（長時間バッチでもずれない）
+            snapshot_slot_key = slot_key
             start_time = datetime.now(jst)
             # 同一秒で複数実行された場合にアラートで区別できるようミリ秒・プロセスIDを含める
             host_short, pid = _process_identity()
@@ -557,6 +559,24 @@ class TrendsScheduler:
                     logger.info("🔄 refresh_all_trends実行開始 (force_refresh=True)")
                     result = refresh_all_trends(managers, force_refresh=True)
                 logger.info(f"🔄 refresh_all_trends実行完了: success={result.get('success')}")
+
+                # 7時起点 business_day の薄いスナップショット（キャッシュから Top タイトル等）
+                try:
+                    from services.trend_snapshot_service import write_snapshots_for_scheduler_run
+
+                    cap = datetime.now(jst)
+                    write_snapshots_for_scheduler_run(
+                        managers=managers,
+                        scheduler_slot_key=snapshot_slot_key,
+                        trigger_source=trigger_source,
+                        captured_at=cap,
+                    )
+                except Exception as snap_exc:
+                    logger.warning(
+                        "⚠️ トレンドスナップショット保存スキップ/失敗: %s",
+                        snap_exc,
+                        exc_info=True,
+                    )
             
             # 結果をログ出力
             results = result.get('results', {})

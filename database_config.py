@@ -845,6 +845,19 @@ class TrendsCache:
                 CREATE INDEX IF NOT EXISTS idx_subscriptions_email ON subscriptions(email);
                 CREATE INDEX IF NOT EXISTS idx_subscriptions_active ON subscriptions(is_active);
                 CREATE INDEX IF NOT EXISTS idx_subscriptions_token ON subscriptions(unsubscribe_token);
+
+                -- 7時起点の business_day ごとのスナップショット（スロット 01/07/13/19 × series_key）
+                CREATE TABLE IF NOT EXISTS trend_daily_snapshots (
+                    id BIGSERIAL PRIMARY KEY,
+                    business_day DATE NOT NULL,
+                    slot VARCHAR(2) NOT NULL,
+                    series_key VARCHAR(180) NOT NULL,
+                    items JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    captured_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    CONSTRAINT trend_daily_snapshots_slot_chk CHECK (slot IN ('01','07','13','19')),
+                    CONSTRAINT trend_daily_snapshots_unique UNIQUE (business_day, slot, series_key)
+                );
+                CREATE INDEX IF NOT EXISTS idx_trend_daily_snapshots_day_slot ON trend_daily_snapshots (business_day, slot);
                 
                 -- 既存テーブルにrankカラムがない場合のマイグレーション（CREATE TABLE IF NOT EXISTSでは更新されないため）
                 ALTER TABLE bluesky_trends_cache ADD COLUMN IF NOT EXISTS region VARCHAR(10) DEFAULT 'us';
@@ -2448,6 +2461,43 @@ class TrendsCache:
                     conn.commit()
         except Exception as e:
             logger.warning("⚠️ mark_slot_completed エラー: %s", e)
+
+    def upsert_trend_daily_snapshots_batch(self, rows):
+        """business_day × slot × series_key 単位でスナップショットをUPSERTする。
+
+        Args:
+            rows: iterable of (business_day, slot, series_key, items_list_or_dict, captured_at)
+                  items は JSON 直列化可能な list/dict（トレンド行の薄い配列）
+        """
+        if not rows:
+            return True
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    for business_day, slot, series_key, items, captured_at in rows:
+                        cursor.execute(
+                            """
+                            INSERT INTO trend_daily_snapshots
+                                (business_day, slot, series_key, items, captured_at)
+                            VALUES (%s, %s, %s, %s::jsonb, %s)
+                            ON CONFLICT (business_day, slot, series_key)
+                            DO UPDATE SET
+                                items = EXCLUDED.items,
+                                captured_at = EXCLUDED.captured_at
+                            """,
+                            (
+                                business_day,
+                                slot,
+                                series_key,
+                                json.dumps(items, ensure_ascii=False),
+                                captured_at,
+                            ),
+                        )
+                    conn.commit()
+            return True
+        except Exception as e:
+            logger.error("❌ upsert_trend_daily_snapshots_batch エラー: %s", e, exc_info=True)
+            return False
 
     def get_scheduler_lock_status(self):
         """スケジューラー分散ロックの現在状態を返す（デバッグ用）。取得失敗時は None。"""

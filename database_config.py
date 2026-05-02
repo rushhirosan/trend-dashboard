@@ -22,6 +22,27 @@ load_dotenv()
 # ロガーの初期化
 logger = get_logger(__name__)
 
+
+def _strip_leading_line_comments(fragment: str) -> str:
+    """DDL 断片の先頭にある空行と単独行コメント (-- ...) を除く。
+
+    ``split(';')`` のあと「-- コメント\\nCREATE TABLE ...」が一塊になると、
+    ``startswith('--')`` 判定で CREATE ごとスキップされるのを防ぐ。
+    """
+    lines = fragment.splitlines()
+    i = 0
+    while i < len(lines):
+        s = lines[i].strip()
+        if not s:
+            i += 1
+            continue
+        if s.startswith("--"):
+            i += 1
+            continue
+        break
+    return "\n".join(lines[i:]).strip()
+
+
 # シングルトンインスタンス（全マネージャーで共有）
 _shared_cache_instance = None
 
@@ -925,8 +946,8 @@ class TrendsCache:
                             continue
                         # 通常の文は ; で分割
                         for stmt in part.split(';'):
-                            stmt = stmt.strip()
-                            if stmt and not stmt.startswith('--'):
+                            stmt = _strip_leading_line_comments(stmt.strip())
+                            if stmt:
                                 _execute_sql(stmt + ';')
                 finally:
                     conn.set_isolation_level(old_isolation)

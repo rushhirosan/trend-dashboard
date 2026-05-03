@@ -119,8 +119,16 @@ def _safe_call_series(
 ) -> Tuple[str, List[Dict[str, Any]]]:
     try:
         res = fetch()
-        if not res or not isinstance(res, dict) or not res.get("success"):
+        if not res or not isinstance(res, dict):
             return series_key, []
+        # BaseTrendsManager は success を付ける。省略されている旧実装は data があれば許容する。
+        if res.get("success") is False:
+            return series_key, []
+        if res.get("success") is None:
+            if res.get("error") and "data" not in res:
+                return series_key, []
+            if "data" not in res:
+                return series_key, []
         data = res.get("data")
         if data is None:
             return series_key, []

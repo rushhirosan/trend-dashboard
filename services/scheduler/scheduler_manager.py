@@ -40,6 +40,8 @@ SCHEDULER_LOCK_PATH = os.environ.get("TRENDS_SCHEDULER_LOCK_PATH", "/tmp/trends_
 SCHEDULER_LOCK_MINUTES = int(os.environ.get("TRENDS_SCHEDULER_LOCK_MINUTES", "30"))
 # 単一インスタンス運用時は false にするとDBロックを使わずファイルロックのみで確実に1本だけ実行する
 USE_DB_LOCK = os.environ.get("TRENDS_SCHEDULER_USE_DB_LOCK", "true").lower() == "true"
+# 一括取得の「実行時間が長い」Discord 警告の閾値（秒）。54 ソース・低同時実行では 40 分超も起こりうる
+SCHEDULER_DURATION_ALERT_SECONDS = int(os.environ.get("TRENDS_SCHEDULER_DURATION_ALERT_SECONDS", "2400"))
 
 class TrendsScheduler:
     """トレンド自動取得スケジューラークラス"""
@@ -967,8 +969,9 @@ class TrendsScheduler:
             )
             has_anomaly = True
 
-        # 実行時間 40 分以上
-        if duration >= 2400:
+        # 実行時間が閾値以上（デフォルト 40 分 = 2400 秒、TRENDS_SCHEDULER_DURATION_ALERT_SECONDS で変更可）
+        if duration >= SCHEDULER_DURATION_ALERT_SECONDS:
+            thr_min = SCHEDULER_DURATION_ALERT_SECONDS / 60.0
             details = {
                 "実行ID": execution_id,
                 "実行時間": f"{duration / 60:.1f}分 ({duration:.2f}秒)",
@@ -980,7 +983,7 @@ class TrendsScheduler:
             self._send_alert(
                 "warning",
                 "実行時間が異常に長い",
-                f"トレンド取得の実行時間が {duration / 60:.1f} 分です（閾値: 40 分）。",
+                f"トレンド取得の実行時間が {duration / 60:.1f} 分です（閾値: {thr_min:g} 分）。",
                 details,
             )
             has_anomaly = True

@@ -32,7 +32,8 @@ export DATABASE_URL=$(fly secrets list -a trends-dashboard \
 ```
 
 プロキシ経由で接続する場合は別ターミナルで `fly proxy 5433 -a trends-db` を起動し、  
-`DATABASE_URL` のホスト名／ポートを `localhost:5433` に書き換えてください。
+`DATABASE_URL` のホスト名／ポートを `localhost:5433` に書き換えてください。  
+（TablePlus で本番を閲覧する手順は [VIEW_PRODUCTION_DB_TABLEPLUS.md](./VIEW_PRODUCTION_DB_TABLEPLUS.md)）
 
 ## 4. スキーマの適用
 

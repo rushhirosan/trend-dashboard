@@ -84,7 +84,19 @@ def _label_from_item(item: Any, idx: int) -> Optional[Dict[str, Any]]:
     if not isinstance(item, dict):
         return None
     text = None
-    for k in ("title", "keyword", "name", "term", "repo"):
+    for k in (
+        "title",
+        "keyword",
+        "name",
+        "term",
+        "repo",
+        "name_ja",
+        "name_en",
+        "vulnerability_name",
+        "agency_name",
+        "indicator_id",
+        "cve_id",
+    ):
         v = item.get(k)
         if v is not None and str(v).strip():
             text = str(v).strip()[:500]
@@ -112,6 +124,28 @@ def _items_from_data_list(data: Any, limit: int) -> List[Dict[str, Any]]:
     return out
 
 
+def _items_from_usaspending_payload(payload: Dict[str, Any], limit: int) -> List[Dict[str, Any]]:
+    """USAspending の dict payload を snapshot 用の薄い配列へ変換する。"""
+    out: List[Dict[str, Any]] = []
+    top_cases = payload.get("keyword_top_cases")
+    if isinstance(top_cases, dict):
+        # ai / dx / cyber の順で優先し、rank は通し番号にする。
+        for cat in ("ai", "dx", "cyber"):
+            rows = top_cases.get(cat)
+            if not isinstance(rows, list):
+                continue
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                title = row.get("title")
+                if title is None or not str(title).strip():
+                    continue
+                out.append({"t": str(title).strip()[:500], "r": len(out) + 1})
+                if len(out) >= limit:
+                    return out
+    return out
+
+
 def _safe_call_series(
     series_key: str,
     fetch: Callable[[], Any],
@@ -132,6 +166,8 @@ def _safe_call_series(
         data = res.get("data")
         if data is None:
             return series_key, []
+        if series_key == "usaspending_us" and isinstance(data, dict):
+            return series_key, _items_from_usaspending_payload(data, limit)
         if isinstance(data, dict) and "data" in data:
             inner = data.get("data")
             if isinstance(inner, list):
@@ -204,22 +240,26 @@ def collect_series_snapshots(managers: Dict[str, Any]) -> List[Tuple[str, List[D
     if mu:
         add(
             "music_trends_jp",
-            lambda: mu.get_trends("spotify", "JP", limit=25, force_refresh=False),
+            lambda: mu.get_trends("spotify", "JP", force_refresh=False),
         )
         add(
             "music_trends_us",
-            lambda: mu.get_trends("spotify", "US", limit=25, force_refresh=False),
+            lambda: mu.get_trends("spotify", "US", force_refresh=False),
         )
 
     wn = managers.get("worldnews")
     if wn:
         add(
             "worldnews_jp",
-            lambda: wn.get_trends(country="jp", category=None, limit=25, force_refresh=False),
+            lambda: wn.get_trends(
+                country="jp", category=None, page_size=25, force_refresh=False
+            ),
         )
         add(
             "worldnews_us",
-            lambda: wn.get_trends(country="us", category=None, limit=25, force_refresh=False),
+            lambda: wn.get_trends(
+                country="us", category=None, page_size=25, force_refresh=False
+            ),
         )
 
     po = managers.get("podcast")

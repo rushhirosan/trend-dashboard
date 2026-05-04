@@ -156,9 +156,34 @@ def create_app():
     @app.context_processor
     def inject_config():
         """テンプレートで使用できる設定を注入"""
+        show_local_ai_summary_mock = (
+            AppConfig.DEBUG
+            and (os.getenv('FLY_APP_NAME') or '').strip() == ''
+            and os.getenv('ENABLE_LOCAL_AI_SUMMARY_MOCK', 'true').lower() in ('1', 'true', 'yes')
+        )
+        ai_summary_mock = {
+            'today_label': '対象日: 2026-05-03 (07/13/19/01)',
+            'week_label': '対象週: 2026-04-27 - 2026-05-03',
+            'today_top5': [
+                '生成AIエージェント運用（JP/US両方で継続）',
+                '地政学リスクとサプライチェーン再編',
+                '半導体投資関連トピックの再上昇',
+                'サイバーセキュリティ脆弱性対応',
+                '公共調達・行政DX関連キーワード',
+            ],
+            'week_top5': [
+                'AIエージェント実装・運用の実務化',
+                '米国発ニュースの日本波及（時差1-2日）',
+                'セキュリティインシデント関連の持続的関心',
+                '開発者向け情報源（GitHub/HN/DEV）連動',
+                '景気・行政データと市場テーマの接続',
+            ],
+        }
         return {
             'ENABLE_SUBSCRIPTION_UI': AppConfig.ENABLE_SUBSCRIPTION_UI,
-            'BUY_ME_A_COFFEE_USERNAME': AppConfig.BUY_ME_A_COFFEE_USERNAME
+            'BUY_ME_A_COFFEE_USERNAME': AppConfig.BUY_ME_A_COFFEE_USERNAME,
+            'SHOW_LOCAL_AI_SUMMARY_MOCK': show_local_ai_summary_mock,
+            'AI_SUMMARY_MOCK': ai_summary_mock,
         }
 
     # ルートを定義（エラーが発生しても続行）

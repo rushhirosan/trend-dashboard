@@ -177,6 +177,50 @@
                     </div>
                 </div>
             </header>
+            {% if SHOW_LOCAL_AI_SUMMARY_MOCK and AI_SUMMARY_MOCK %}
+            <section class="mb-3" aria-label="AI summary (local mock)">
+                <details>
+                    <summary style="cursor: pointer; padding: 8px 12px; background: #f0f4ff; border: 1px solid #dbe6ff; border-radius: 0.375rem;">
+                        AI Summary (Daily / Weekly) ▶
+                    </summary>
+                    <div class="alert alert-info py-2 px-3 mt-2 mb-2 small">
+                        Local mock preview only: not enabled in production
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-12 col-lg-6">
+                            <div class="card h-100 border-primary">
+                                <div class="card-header bg-primary text-white py-2">
+                                    <h2 class="h6 mb-0"><i class="fas fa-calendar-day me-1"></i> Daily AI Summary (Top 5)</h2>
+                                </div>
+                                <div class="card-body py-2">
+                                    <p class="small text-muted mb-2">{{ AI_SUMMARY_MOCK.today_label }}</p>
+                                    <ol class="small mb-0">
+                                        {% for item in AI_SUMMARY_MOCK.today_top5 %}
+                                        <li class="mb-1">{{ item }}</li>
+                                        {% endfor %}
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6">
+                            <div class="card h-100 border-success">
+                                <div class="card-header bg-success text-white py-2">
+                                    <h2 class="h6 mb-0"><i class="fas fa-calendar-week me-1"></i> Weekly AI Summary (Top 5)</h2>
+                                </div>
+                                <div class="card-body py-2">
+                                    <p class="small text-muted mb-2">{{ AI_SUMMARY_MOCK.week_label }}</p>
+                                    <ol class="small mb-0">
+                                        {% for item in AI_SUMMARY_MOCK.week_top5 %}
+                                        <li class="mb-1">{{ item }}</li>
+                                        {% endfor %}
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+            </section>
+            {% endif %}
             <section id="trends" aria-label="Trend information">
                 <!-- Category tabs (horizontal scroll on mobile) -->
                 <div class="trend-tabs-wrapper trend-tabs-compact">

@@ -105,6 +105,23 @@ body#trends-us #trends #pane-govdata #us-gov-body .card-body > .table-responsive
 /* === USヘッダー: Gov Data 最新表示 === */
 /* === USヘッダー: 日本ページと同じレイアウト === */
 body#trends-us .header-row { margin-bottom: 0 !important; }
+body#trends-us .dashboard-summary-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: start;
+}
+@media (min-width: 992px) {
+    body#trends-us .dashboard-summary-grid--3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    body#trends-us .dashboard-summary-grid--2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+body#trends-us .dashboard-summary-panel#header-admin-unified {
+    display: flex;
+    flex-direction: column;
+}
 body#trends-us #header-admin-unified .header-admin-cols { padding-top: 0.1rem; padding-right: 3rem; }
 body#trends-us #header-admin-unified .header-admin-section-title {
     font-size: 0.7rem;

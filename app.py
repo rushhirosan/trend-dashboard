@@ -17,6 +17,7 @@ from managers.trend_managers import initialize_managers
 from routes.trend_routes import trend_bp
 from routes.data_routes import data_bp
 from services.subscription.subscription_routes import subscription_bp
+from routes.waitlist_routes import waitlist_bp
 from services.scheduler.scheduler_manager import TrendsScheduler
 from utils.logger_config import get_logger
 
@@ -74,6 +75,12 @@ def create_app():
         logger.info("✅ subscription_bp Blueprint登録完了")
     except Exception as e:
         logger.error(f"❌ subscription_bp登録エラー: {e}", exc_info=True)
+    
+    try:
+        app.register_blueprint(waitlist_bp)
+        logger.info("✅ waitlist_bp Blueprint登録完了")
+    except Exception as e:
+        logger.error(f"❌ waitlist_bp登録エラー: {e}", exc_info=True)
     
     # データベースを初期化（接続失敗時は警告のみでアプリは起動を続行）
     cache = None
@@ -179,11 +186,40 @@ def create_app():
                 '景気・行政データと市場テーマの接続',
             ],
         }
+        ai_summary_fake_door = None
+        if AppConfig.ENABLE_AI_SUMMARY_FAKE_DOOR:
+            ai_summary_fake_door = {
+                'today_label': ai_summary_mock['today_label'],
+                'week_label': ai_summary_mock['week_label'],
+                'today_top1': ai_summary_mock['today_top5'][0],
+                'week_top1': ai_summary_mock['week_top5'][0],
+                'today_top5_en': [
+                    'Generative AI agent operations (ongoing in JP/US)',
+                    'Geopolitical risk and supply chain shifts',
+                    'Semiconductor investment themes',
+                    'Cybersecurity vulnerability response',
+                    'Public procurement / gov DX keywords',
+                ],
+                'week_top5_en': [
+                    'AI agents moving into production',
+                    'US-originated news propagating to Japan (1–2 day lag)',
+                    'Sustained interest in security incidents',
+                    'Developer sources (GitHub/HN/DEV) moving together',
+                    'Macro / gov data connecting to market themes',
+                ],
+            }
+            # EN top1 lines derived from EN lists when we add EN labels later
+            ai_summary_fake_door['today_top1_en'] = ai_summary_fake_door['today_top5_en'][0]
+            ai_summary_fake_door['week_top1_en'] = ai_summary_fake_door['week_top5_en'][0]
+            ai_summary_fake_door['today_label_en'] = 'Day: 2026-05-03 (runs 01:00 / 07:00 / 13:00 / 19:00 JST)'
+            ai_summary_fake_door['week_label_en'] = 'Week: 2026-04-27 – 2026-05-03'
         return {
             'ENABLE_SUBSCRIPTION_UI': AppConfig.ENABLE_SUBSCRIPTION_UI,
             'BUY_ME_A_COFFEE_USERNAME': AppConfig.BUY_ME_A_COFFEE_USERNAME,
             'SHOW_LOCAL_AI_SUMMARY_MOCK': show_local_ai_summary_mock,
             'AI_SUMMARY_MOCK': ai_summary_mock,
+            'ENABLE_AI_SUMMARY_FAKE_DOOR': AppConfig.ENABLE_AI_SUMMARY_FAKE_DOOR,
+            'AI_SUMMARY_FAKE_DOOR': ai_summary_fake_door,
         }
 
     # ルートを定義（エラーが発生しても続行）

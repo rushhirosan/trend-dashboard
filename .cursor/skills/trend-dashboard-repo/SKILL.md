@@ -51,6 +51,13 @@ Product philosophy and conventions live in `.cursor/rules/trend-dashboard.mdc`. 
 | `fly.toml` | Fly.io app config |
 | `scripts/release.sh` | Preflight: `pytest`, secret scan; optional `--ship` / `--deploy` |
 
+## Documentation (product / ops)
+
+| Path | Role |
+|------|------|
+| `docs/summary_pattern_a_phase1.md` | **Paid summary experiment (Pattern A, phase 1)**: daily/weekly deliverable timeboxes, copy-paste templates, checklists, exit criteria. Use when the user asks about 有料サマリー, 日次/週次, フェーズ1, or delivery SLAs. |
+| `docs/summaries/` | **Committed Markdown drafts** (`daily/YYYY-MM-DD.md`, `weekly/YYYY-Www.md`). Not rendered by the web app; naming rules in `docs/summaries/README.md`. |
+
 ## When adding a feature
 
 1. Decide whether it belongs in **routes**, **services**, **managers**, or **templates/static** (see `trend-sources-pipeline` and `trend-dashboard-ui` skills).

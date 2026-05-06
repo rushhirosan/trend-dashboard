@@ -104,6 +104,9 @@
     <script src="{{ url_for('static', filename='js/bluesky-trends.js') }}"></script>
     <script src="{{ url_for('static', filename='js/all-freshness.js') }}"></script>
     <script src="{{ url_for('static', filename='js/us-admin-trends.js') }}"></script>
+    {% if ENABLE_AI_SUMMARY_FAKE_DOOR %}
+    <script defer src="{{ url_for('static', filename='js/ai-summary-fake-door.js') }}?v=20260507-fake-door-placeholder"></script>
+    {% endif %}
 </head>
 <body id="trends-us" class="bg-light" data-trend-meta-tz="America/New_York">
     <!-- ヘッダー -->
@@ -120,10 +123,10 @@
     </noscript>
     <main class="container-fluid main-content-compact">
         <div id="mainContent">
-            <header class="page-header-compact">
-                <h1 class="h3 fw-bold mb-1">US Trends - Latest Trends in America</h1>
-                <div class="row align-items-start g-2 header-row">
-                    <div class="col-12 col-lg-6 header-desc-col d-none">
+            <header class="page-header-compact mb-3">
+                <h1 class="h3 fw-bold mb-2">US Trends - Latest Trends in America</h1>
+                <div class="row align-items-start g-2 header-row d-none">
+                    <div class="col-12 col-lg-6 header-desc-col">
                         <div class="header-description-modern">
                             <span class="header-desc-short">Google Trends, YouTube, Spotify, Hacker News, OpenAlex, Bluesky, Stock, Crypto, Twitch, Podcasts — all in one place.</span>
                             <span class="header-desc-meta">
@@ -134,93 +137,97 @@
                             </span>
                         </div>
                     </div>
-                    <div class="col-12">
-                        <div class="row g-2 mb-0 align-items-stretch">
-                            <div class="col-12 col-lg-6 d-flex">
-                                <div id="header-admin-unified" class="rounded border bg-light p-2 position-relative w-100 h-100">
-                                    <span class="position-absolute top-0 end-0 mt-1 me-1" style="font-size: 0.7rem;">
-                                        <a href="#" class="btn btn-sm btn-outline-primary py-0 px-1 estat-goto-tab ms-1" data-target-tab="tab-govdata" aria-label="Go to Gov Data tab">More</a>
-                                    </span>
-                                    <div class="header-admin-section-title">
-                                        <i class="fas fa-chart-line me-1"></i>US Economy (BLS)
-                                        <span id="header-estat-latest-period" class="text-muted ms-1"></span>
+                </div>
+                {% set dashboard_show_ai = (ENABLE_AI_SUMMARY_FAKE_DOOR and AI_SUMMARY_FAKE_DOOR) or (SHOW_LOCAL_AI_SUMMARY_MOCK and AI_SUMMARY_MOCK) %}
+                <div class="dashboard-summary-grid gap-2 mb-0 {% if dashboard_show_ai %}dashboard-summary-grid--3{% else %}dashboard-summary-grid--2{% endif %}" aria-label="Dashboard summary">
+                        <section id="dashboard-summary-intro" class="rounded border bg-light p-2 min-w-0 dashboard-summary-panel" aria-label="About this page">
+                            <h2 class="h6 fw-bold mb-2">What this page covers</h2>
+                            <p class="small mb-2">
+                                This dashboard scans U.S. trend signals across search, video, news, technology, markets, and public data.
+                                Sources include Google Trends, YouTube, CNN, world news, Wikipedia, Hacker News, OpenAlex, Bluesky, stock and cryptocurrency feeds, and selected government data.
+                                Refresh starts four times daily (1/7/13/19 JST) and may take about 25–45 minutes to complete. Use the tabs to browse by category.
+                            </p>
+                            <p class="small mb-0">
+                                Related:
+                                <a href="/" class="me-2">Japan Trends Dashboard</a>
+                                <a href="/data-status" class="me-2">Data status and freshness</a>
+                                <a href="/about">About this project and sources</a>
+                            </p>
+                        </section>
+                    {% if dashboard_show_ai %}
+                        {% if ENABLE_AI_SUMMARY_FAKE_DOOR and AI_SUMMARY_FAKE_DOOR %}
+                        {% set fake_door_locale = 'en' %}
+                        {% set fake_door_region = 'us' %}
+                        {% set fake_door_embedded = true %}
+                        {% include 'partials/ai_summary_fake_door.html' %}
+                        {% elif SHOW_LOCAL_AI_SUMMARY_MOCK and AI_SUMMARY_MOCK %}
+                        <section id="dashboard-summary-ai" class="mb-0 min-w-0 dashboard-summary-panel rounded border bg-white d-flex flex-column" aria-label="AI summary (local mock)">
+                            <details class="m-0">
+                                <summary class="px-2 py-2 small" style="cursor: pointer; background: #f0f4ff; border-bottom: 1px solid #dbe6ff;">
+                                    AI Summary (Daily / Weekly) ▶
+                                </summary>
+                                <div class="p-2 small">
+                                    <div class="alert alert-info py-2 px-2 mb-2 small">
+                                        Local mock preview only: not enabled in production
                                     </div>
-                                    <div id="header-estat-cache-meta" class="mb-1" aria-live="polite"></div>
-                                    <div id="header-estat-compact-body" class="header-admin-latest mb-2" aria-live="polite">
-                                        <span class="text-muted">Loading...</span>
-                                    </div>
-
-                                    <div class="header-admin-section-title">US Government Spending (USAspending)</div>
-                                    <div id="header-kkj-cache-meta" class="mb-1" aria-live="polite"></div>
-                                    <div id="header-kkj-compact-body" class="header-kkj-body">
-                                        <span class="text-muted">Loading...</span>
+                                    <div class="row g-2">
+                                        <div class="col-12">
+                                            <div class="card border-primary mb-2">
+                                                <div class="card-header bg-primary text-white py-1 px-2">
+                                                    <h3 class="h6 mb-0 small"><i class="fas fa-calendar-day me-1"></i>Daily AI Summary (Top 5)</h3>
+                                                </div>
+                                                <div class="card-body py-2 px-2">
+                                                    <p class="small text-muted mb-1">{{ AI_SUMMARY_MOCK.today_label }}</p>
+                                                    <ol class="small mb-0 ps-3">
+                                                        {% for item in AI_SUMMARY_MOCK.today_top5 %}
+                                                        <li class="mb-1">{{ item }}</li>
+                                                        {% endfor %}
+                                                    </ol>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12">
+                                            <div class="card border-success mb-0">
+                                                <div class="card-header bg-success text-white py-1 px-2">
+                                                    <h3 class="h6 mb-0 small"><i class="fas fa-calendar-week me-1"></i>Weekly AI Summary (Top 5)</h3>
+                                                </div>
+                                                <div class="card-body py-2 px-2">
+                                                    <p class="small text-muted mb-1">{{ AI_SUMMARY_MOCK.week_label }}</p>
+                                                    <ol class="small mb-0 ps-3">
+                                                        {% for item in AI_SUMMARY_MOCK.week_top5 %}
+                                                        <li class="mb-1">{{ item }}</li>
+                                                        {% endfor %}
+                                                    </ol>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
+                            </details>
+                        </section>
+                        {% endif %}
+                    {% endif %}
+                        <div id="header-admin-unified" class="rounded border bg-light p-2 position-relative min-w-0 dashboard-summary-panel">
+                            <span class="position-absolute top-0 end-0 mt-1 me-1" style="font-size: 0.7rem;">
+                                <a href="#" class="btn btn-sm btn-outline-primary py-0 px-1 estat-goto-tab ms-1" data-target-tab="tab-govdata" aria-label="Go to Gov Data tab">More</a>
+                            </span>
+                            <div class="header-admin-section-title">
+                                <i class="fas fa-chart-line me-1"></i>US Economy (BLS)
+                                <span id="header-estat-latest-period" class="text-muted ms-1"></span>
                             </div>
-                            <div class="col-12 col-lg-6 d-flex">
-                                <section class="rounded border bg-light p-2 w-100 h-100" aria-label="About this page">
-                                    <h2 class="h6 fw-bold mb-2">What this page covers</h2>
-                                    <p class="small mb-2">
-                                        This dashboard scans U.S. trend signals across search, video, news, technology, markets, and public data.
-                                        Sources include Google Trends, YouTube, CNN, world news, Wikipedia, Hacker News, OpenAlex, Bluesky, stock and cryptocurrency feeds, and selected government data.
-                                        Refresh starts four times daily (1/7/13/19 JST) and may take about 25–45 minutes to complete. Use the tabs to browse by category.
-                                    </p>
-                                    <p class="small mb-0">
-                                        Related:
-                                        <a href="/" class="me-2">Japan Trends Dashboard</a>
-                                        <a href="/data-status" class="me-2">Data status and freshness</a>
-                                        <a href="/about">About this project and sources</a>
-                                    </p>
-                                </section>
+                            <div id="header-estat-cache-meta" class="mb-1" aria-live="polite"></div>
+                            <div id="header-estat-compact-body" class="header-admin-latest mb-2" aria-live="polite">
+                                <span class="text-muted">Loading...</span>
+                            </div>
+
+                            <div class="header-admin-section-title">US Government Spending (USAspending)</div>
+                            <div id="header-kkj-cache-meta" class="mb-1" aria-live="polite"></div>
+                            <div id="header-kkj-compact-body" class="header-kkj-body">
+                                <span class="text-muted">Loading...</span>
                             </div>
                         </div>
-                    </div>
                 </div>
             </header>
-            {% if SHOW_LOCAL_AI_SUMMARY_MOCK and AI_SUMMARY_MOCK %}
-            <section class="mb-3" aria-label="AI summary (local mock)">
-                <details>
-                    <summary style="cursor: pointer; padding: 8px 12px; background: #f0f4ff; border: 1px solid #dbe6ff; border-radius: 0.375rem;">
-                        AI Summary (Daily / Weekly) ▶
-                    </summary>
-                    <div class="alert alert-info py-2 px-3 mt-2 mb-2 small">
-                        Local mock preview only: not enabled in production
-                    </div>
-                    <div class="row g-2">
-                        <div class="col-12 col-lg-6">
-                            <div class="card h-100 border-primary">
-                                <div class="card-header bg-primary text-white py-2">
-                                    <h2 class="h6 mb-0"><i class="fas fa-calendar-day me-1"></i> Daily AI Summary (Top 5)</h2>
-                                </div>
-                                <div class="card-body py-2">
-                                    <p class="small text-muted mb-2">{{ AI_SUMMARY_MOCK.today_label }}</p>
-                                    <ol class="small mb-0">
-                                        {% for item in AI_SUMMARY_MOCK.today_top5 %}
-                                        <li class="mb-1">{{ item }}</li>
-                                        {% endfor %}
-                                    </ol>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-12 col-lg-6">
-                            <div class="card h-100 border-success">
-                                <div class="card-header bg-success text-white py-2">
-                                    <h2 class="h6 mb-0"><i class="fas fa-calendar-week me-1"></i> Weekly AI Summary (Top 5)</h2>
-                                </div>
-                                <div class="card-body py-2">
-                                    <p class="small text-muted mb-2">{{ AI_SUMMARY_MOCK.week_label }}</p>
-                                    <ol class="small mb-0">
-                                        {% for item in AI_SUMMARY_MOCK.week_top5 %}
-                                        <li class="mb-1">{{ item }}</li>
-                                        {% endfor %}
-                                    </ol>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </details>
-            </section>
-            {% endif %}
             <section id="trends" aria-label="Trend information">
                 <!-- Category tabs (horizontal scroll on mobile) -->
                 <div class="trend-tabs-wrapper trend-tabs-compact">
@@ -2661,6 +2668,7 @@
         </div>
     </footer>
     <!-- build:us-layout-20250207 (About section removed, GlobeNewswire in tech row) -->
+    {% include 'partials/dashboard_summary_height_sync.html' %}
 
 </body>
 </html>

@@ -1,0 +1,80 @@
+{# AIサマリー Fake door: Top1 ティーザー + Top5 CTA → モーダルは「準備中」のみ（locale: ja|en, region: jp|us）
+   fake_door_embedded: 高さはコンテンツ基準（左右は dashboard_summary_height_sync で中央に合わせる） #}
+{% set embedded = fake_door_embedded | default(false) %}
+{% set loc = fake_door_locale | default('ja') %}
+{% set reg = fake_door_region | default('jp') %}
+{% set fd = AI_SUMMARY_FAKE_DOOR %}
+{% if loc == 'en' %}
+  {% set t1 = fd.today_top1_en %}
+  {% set w1 = fd.week_top1_en %}
+  {% set lab_t = fd.today_label_en %}
+  {% set lab_w = fd.week_label_en %}
+  {% set title_a = "AI summary preview" %}
+  {% set h_today = "Daily (Top 1)" %}
+  {% set h_week = "Weekly (Top 1)" %}
+  {% set cta = "View Top 5" %}
+  {% set modal_title = "Top 5 full text" %}
+  {% set modal_lead = "Preview shows Top 1 only. Full Top 5 text is not available yet." %}
+  {% set btn_close = "Close" %}
+  {% set sub_hint = "Full Top 5: coming soon" %}
+{% else %}
+  {% set t1 = fd.today_top1 %}
+  {% set w1 = fd.week_top1 %}
+  {% set lab_t = fd.today_label %}
+  {% set lab_w = fd.week_label %}
+  {% set title_a = "AIサマリー（プレビュー）" %}
+  {% set h_today = "今日（Top1 のみ）" %}
+  {% set h_week = "今週（Top1 のみ）" %}
+  {% set cta = "Top5を見る" %}
+  {% set modal_title = "Top5 全文" %}
+  {% set modal_lead = "現在は Top1 のみ表示です。Top5 全文は準備中です。" %}
+  {% set btn_close = "閉じる" %}
+  {% set sub_hint = "Top5全文は準備中" %}
+{% endif %}
+<section id="ai-summary-fake-door-root" aria-label="{{ title_a }}"
+    class="ai-summary-fake-door-root{% if embedded %} dashboard-summary-panel mb-0 w-100{% else %} mb-3{% endif %}"
+    data-fake-door-region="{{ reg }}"
+    data-fake-door-locale="{{ loc }}">
+  <div class="card border-secondary">
+    <div class="card-header bg-light py-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
+      <h2 class="h6 mb-0"><i class="fas fa-magic me-1 text-primary" aria-hidden="true"></i>{{ title_a }}</h2>
+      <span class="badge bg-secondary">Preview</span>
+    </div>
+    <div class="card-body {% if embedded %}py-2 d-flex flex-column gap-4{% else %}py-3{% endif %}">
+      <div class="row {% if embedded %}g-2{% else %}g-3{% endif %}">
+        <div class="col-12 {% if not embedded %}col-md-6{% endif %}">
+          <p class="small text-muted mb-1">{{ lab_t }}</p>
+          <p class="small mb-0 fw-semibold"><span class="text-muted">{{ h_today }}:</span> {{ t1 }}</p>
+        </div>
+        <div class="col-12 {% if not embedded %}col-md-6{% endif %}">
+          <p class="small text-muted mb-1">{{ lab_w }}</p>
+          <p class="small mb-0 fw-semibold"><span class="text-muted">{{ h_week }}:</span> {{ w1 }}</p>
+        </div>
+      </div>
+      <div class="d-flex flex-wrap align-items-center gap-3{% if not embedded %} mt-4{% endif %}">
+        <button type="button" class="btn btn-primary btn-sm" id="ai-summary-fake-door-cta"
+            data-bs-toggle="modal" data-bs-target="#aiSummaryFakeDoorModal">
+          {{ cta }}
+        </button>
+        <span class="small text-muted">{{ sub_hint }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="aiSummaryFakeDoorModal" tabindex="-1" aria-labelledby="aiSummaryFakeDoorModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title h5" id="aiSummaryFakeDoorModalLabel">{{ modal_title }}</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ btn_close }}"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small mb-0 text-muted">{{ modal_lead }}</p>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">{{ btn_close }}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

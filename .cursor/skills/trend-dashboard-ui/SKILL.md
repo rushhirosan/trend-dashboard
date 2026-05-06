@@ -15,6 +15,13 @@ Stack: **HTML templates**, **Bootstrap 5.1.3**, **Font Awesome**, vanilla **Java
 | Styles | `static/css/` (`main.css`, feature-specific CSS) |
 | Scripts | `static/js/` (`app.js`, `app-common.js`, region- or feature-specific JS) |
 
+## AI summary fake door (preview / placeholder)
+
+| Path | Role |
+|------|------|
+| `templates/partials/ai_summary_fake_door.html` | JP/US locale via `fake_door_locale`, embedded on `index.html` / `us_trends.html`; Top1 teaser + CTA opens modal with “coming soon” copy only. |
+| `static/js/ai-summary-fake-door.js` | GA4: `ai_summary_top5_click`, `fake_door_view`. |
+
 ## Principles (align with project rules)
 
 - **One-screen** comprehension where possible; clear **section hierarchy** and scanability.

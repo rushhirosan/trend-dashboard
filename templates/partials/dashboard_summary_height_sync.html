@@ -1,0 +1,129 @@
+{# 3カラム要約: 中央 AI の見た目の高さに左右を固定。body 末尾で実行（レイアウト確定後）。 #}
+<script>
+(function () {
+  var mq = window.matchMedia('(min-width: 992px)');
+  var debounced;
+  var armed;
+
+  function clearSidePanels() {
+    ['dashboard-summary-intro', 'header-admin-unified'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.style.removeProperty('height');
+      el.style.removeProperty('max-height');
+      el.style.removeProperty('overflow-y');
+      el.style.removeProperty('min-height');
+      el.style.removeProperty('box-sizing');
+    });
+  }
+
+  function refRoot() {
+    return document.getElementById('ai-summary-fake-door-root') ||
+      document.getElementById('dashboard-summary-ai');
+  }
+
+  /** Fake door は外枠 section ではなく内側 .card を基準にすると見た目と一致しやすい */
+  function refMeasureEl(root) {
+    if (!root) return null;
+    if (root.id === 'ai-summary-fake-door-root') {
+      var card = root.querySelector('.card.border-secondary');
+      return card || root.querySelector('.card') || root;
+    }
+    return root;
+  }
+
+  function refHeight() {
+    var root = refRoot();
+    var el = refMeasureEl(root);
+    if (!el) return 0;
+    var h = el.getBoundingClientRect().height;
+    return Math.round(h);
+  }
+
+  function sync() {
+    try {
+      if (!mq.matches) {
+        clearSidePanels();
+        return;
+      }
+      var grid = document.querySelector('.dashboard-summary-grid--3');
+      if (!grid) {
+        clearSidePanels();
+        return;
+      }
+      var root = refRoot();
+      var left = document.getElementById('dashboard-summary-intro');
+      var right = document.getElementById('header-admin-unified');
+      if (!root || !left || !right) return;
+      var h = refHeight();
+      if (h < 1) return;
+      [left, right].forEach(function (el) {
+        el.style.setProperty('box-sizing', 'border-box', 'important');
+        el.style.setProperty('min-height', '0', 'important');
+        el.style.setProperty('height', h + 'px', 'important');
+        el.style.setProperty('max-height', h + 'px', 'important');
+        el.style.setProperty('overflow-y', 'auto', 'important');
+      });
+    } catch (e) {}
+  }
+
+  function debounce(fn, ms) {
+    var t;
+    return function () {
+      clearTimeout(t);
+      t = setTimeout(fn, ms);
+    };
+  }
+
+  function kick() {
+    sync();
+    var i = 0;
+    function step() {
+      sync();
+      if (++i < 12) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function armObserversAndPoll() {
+    if (armed) return;
+    armed = true;
+    debounced = debounce(sync, 48);
+
+    var root = refRoot();
+    var observeEl = refMeasureEl(root) || root;
+    if (observeEl && typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(debounced).observe(observeEl);
+    }
+    var right = document.getElementById('header-admin-unified');
+    if (right && typeof MutationObserver !== 'undefined') {
+      new MutationObserver(debounced).observe(right, { childList: true, subtree: true, characterData: true });
+    }
+    window.addEventListener('resize', debounced);
+    window.addEventListener('load', debounced);
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(debounced);
+    }
+    if (mq.addEventListener) mq.addEventListener('change', debounced);
+    else mq.addListener(debounced);
+
+    var n = 0;
+    var poll = setInterval(function () {
+      sync();
+      if (++n >= 100) clearInterval(poll);
+    }, 40);
+  }
+
+  function start() {
+    kick();
+    armObserversAndPoll();
+    var d = 0;
+    var delayed = setInterval(function () {
+      sync();
+      if (++d >= 25) clearInterval(delayed);
+    }, 120);
+  }
+
+  start();
+})();
+</script>

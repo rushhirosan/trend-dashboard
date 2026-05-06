@@ -228,6 +228,7 @@ alwaysApply: true
 - Document important design decisions when they affect future development
 - Keep documentation concise and practical
 - Record source-specific caveats when they matter operationally
+- Paid-summary validation (Pattern A, phase 1 templates and checklists): `docs/summary_pattern_a_phase1.md`
 
 ---
 

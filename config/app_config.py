@@ -50,6 +50,11 @@ class AppConfig:
     # Buy Me a Coffee設定
     BUY_ME_A_COFFEE_USERNAME = os.getenv('BUY_ME_A_COFFEE_USERNAME', '')
     
+    # AIサマリー Fake door（Top1 ティーザー → Top5 CTA はモーダル「準備中」のみ）
+    ENABLE_AI_SUMMARY_FAKE_DOOR = os.getenv(
+        'ENABLE_AI_SUMMARY_FAKE_DOOR', 'true'
+    ).lower() in ('true', '1', 'yes')
+    
     @classmethod
     def get_config_dict(cls):
         """設定を辞書形式で取得"""
@@ -66,7 +71,8 @@ class AppConfig:
             'ENABLE_SCHEDULER': cls.ENABLE_SCHEDULER,
             'ENABLE_SUBSCRIPTION_UI': cls.ENABLE_SUBSCRIPTION_UI,
             'USE_DUMMY_DATA': cls.USE_DUMMY_DATA,
-            'BUY_ME_A_COFFEE_USERNAME': cls.BUY_ME_A_COFFEE_USERNAME
+            'BUY_ME_A_COFFEE_USERNAME': cls.BUY_ME_A_COFFEE_USERNAME,
+            'ENABLE_AI_SUMMARY_FAKE_DOOR': cls.ENABLE_AI_SUMMARY_FAKE_DOOR,
         }
 
 

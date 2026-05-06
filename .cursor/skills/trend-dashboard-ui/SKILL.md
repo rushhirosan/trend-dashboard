@@ -19,7 +19,7 @@ Stack: **HTML templates**, **Bootstrap 5.1.3**, **Font Awesome**, vanilla **Java
 
 | Path | Role |
 |------|------|
-| `templates/partials/ai_summary_fake_door.html` | JP/US locale via `fake_door_locale`, embedded on `index.html` / `us_trends.html`; Top1 teaser + CTA opens modal with “coming soon” copy only. |
+| `templates/partials/ai_summary_fake_door.html` | JP/US locale via `fake_door_locale`, embedded on `index.html` / `us_trends.html`; date labels from mock data, lines show 準備中/Coming soon; modal title “Top5” / “Top 5”, body one line. |
 | `static/js/ai-summary-fake-door.js` | GA4: `ai_summary_top5_click`, `fake_door_view`. |
 
 ## Principles (align with project rules)

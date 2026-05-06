@@ -42,6 +42,20 @@ SCHEDULER_LOCK_MINUTES = int(os.environ.get("TRENDS_SCHEDULER_LOCK_MINUTES", "30
 USE_DB_LOCK = os.environ.get("TRENDS_SCHEDULER_USE_DB_LOCK", "true").lower() == "true"
 # 一括取得の「実行時間が長い」Discord 警告の閾値（秒）。54 ソース・低同時実行では 40 分超も起こりうる
 SCHEDULER_DURATION_ALERT_SECONDS = int(os.environ.get("TRENDS_SCHEDULER_DURATION_ALERT_SECONDS", "2400"))
+# 定期スケジューラ実行の低負荷モード。OOM対策は維持しつつ、同時実行数/待機秒を固定値から環境変数化
+SCHEDULER_LOW_MEMORY_MODE = os.environ.get("TRENDS_SCHEDULER_LOW_MEMORY_MODE", "true").lower() == "true"
+try:
+    SCHEDULER_LOW_MEMORY_MAX_CONCURRENT = max(
+        1, min(20, int(os.environ.get("TRENDS_SCHEDULER_LOW_MEMORY_MAX_CONCURRENT", "2")))
+    )
+except (TypeError, ValueError):
+    SCHEDULER_LOW_MEMORY_MAX_CONCURRENT = 2
+try:
+    SCHEDULER_LOW_MEMORY_BATCH_DELAY_SECONDS = max(
+        0.0, float(os.environ.get("TRENDS_SCHEDULER_LOW_MEMORY_BATCH_DELAY_SECONDS", "1"))
+    )
+except (TypeError, ValueError):
+    SCHEDULER_LOW_MEMORY_BATCH_DELAY_SECONDS = 1.0
 
 class TrendsScheduler:
     """トレンド自動取得スケジューラークラス"""
@@ -435,9 +449,9 @@ class TrendsScheduler:
             trigger_source: 呼び出し元の識別子。'scheduler'=定期実行、'api'=API（手動/外部）
             low_memory_mode: Trueの場合、max_concurrent=1, batch_delay=5で実行（OOM対策・起動時補完用）
         """
-        # 定時実行（1/7/13/19時）は低負荷モードでOOM対策（API手動実行は従来どおり）
+        # 定時実行（1/7/13/19時）は低負荷モードを環境変数で制御（API手動実行は従来どおり）
         if trigger_source == 'scheduler' and not force:
-            low_memory_mode = True
+            low_memory_mode = SCHEDULER_LOW_MEMORY_MODE
         # 同時実行防止: 既に実行中の場合はスキップ（同一プロセス内）
         if self._fetching_in_progress:
             logger.warning("⚠️ データ取得処理が既に実行中です。重複実行をスキップします")
@@ -552,10 +566,15 @@ class TrendsScheduler:
                 # これにより、既存のキャッシュがあっても最新データを取得する
                 from managers.trend_managers import refresh_all_trends
                 if low_memory_mode:
-                    logger.info("🔄 refresh_all_trends実行開始 (force_refresh=True, low_memory: max_concurrent=1, batch_delay=5)")
+                    logger.info(
+                        "🔄 refresh_all_trends実行開始 (force_refresh=True, low_memory: max_concurrent=%s, batch_delay=%s)",
+                        SCHEDULER_LOW_MEMORY_MAX_CONCURRENT,
+                        SCHEDULER_LOW_MEMORY_BATCH_DELAY_SECONDS,
+                    )
                     result = refresh_all_trends(
                         managers, force_refresh=True,
-                        max_concurrent=1, batch_delay_seconds=5
+                        max_concurrent=SCHEDULER_LOW_MEMORY_MAX_CONCURRENT,
+                        batch_delay_seconds=SCHEDULER_LOW_MEMORY_BATCH_DELAY_SECONDS,
                     )
                 else:
                     logger.info("🔄 refresh_all_trends実行開始 (force_refresh=True)")

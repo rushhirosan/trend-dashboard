@@ -49,11 +49,11 @@ https://trends-dashboard.fly.dev/
 
 ```
 【2026-05-10】今日の5つ（JP）
-① man city vs brentford／ラ…（Google）
-② Motoki Ohmori -「催し」Offici…（YouTube）
-③ スパイ罪で服役中に入院 中国紙元幹部 “釈…（NHK・WN）
-④ Claude Codeを"使いこなす"ため…（Tech）
-⑤ 爆裂愛してる／ザ・スーパーマリオギャラ…（Apple Music・映画）
+① 株式／阿部亮平（Google）
+② HAN "back to life" | [Str…（YouTube）
+③ 【速報中】磐越道 部活バス21人死傷事故 …（NHK・WN）
+④ CodexをローカルLLMで駆動する／WR…（Tech）
+⑤ ライラック／ザ・スーパーマリオギャラク…（Apple Music・映画）
 一覧: https://trends-dashboard.fly.dev/
 ```
 
@@ -61,10 +61,10 @@ https://trends-dashboard.fly.dev/
 
 ```
 Today's 5 (US) 2026-05-10 · 8pm JST, same as JP (~US AM)
-① inter miami vs toront… (Google)
-② CDC teams will meet Ameri… (CNN)
-③ Google broke reCAPTCH… (HN)
-④ CVE-2026-42208 · DEV · Erro… (Tech)
+① rachel campos-duffy /… (Google)
+② Frontier plane reportedly… (CNN)
+③ A recent experience w… (HN)
+④ CVE-2026-42208 · THN · cPan… (Tech)
 ⑤ Choosin' Texas … (Apple Music)
 https://trends-dashboard.fly.dev/
 ```

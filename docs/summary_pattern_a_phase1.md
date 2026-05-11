@@ -8,6 +8,8 @@
 
 完成した原稿は `**docs/summaries/`** に Markdown でコミットする（日次・週次のファイル名や週次とホットのまとめ方は `[summaries/README.md](summaries/README.md)`）。**アプリのページではまだ読み込まない。**
 
+配信前に品質を確認する場合は、原稿のフロントマターで `status: draft` → レビュー後 `approved` とし、**承認済みのみ配信に使う**（運用の詳細は `summaries/README.md`）。
+
 ---
 
 ## パターンA（タイムボックス）

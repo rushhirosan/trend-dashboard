@@ -96,6 +96,36 @@ python scripts/bootstrap_dummy_cache.py
 - 外部APIキーは不要です（ダミーモードのため）
 - 一度実行すれば、その後は通常モードでアプリを起動するだけでダミーデータが表示されます
 
+### scaffold_summary_drafts.py
+`docs/summaries/` 以下に、サマリー用の空 Markdown をテンプレから生成する（X ポストサンプルと同様、**リポジトリに下書きを積む**運用向け）。
+
+**使用方法:**
+```bash
+python scripts/scaffold_summary_drafts.py --today
+python scripts/scaffold_summary_drafts.py --daily 2026-05-11
+python scripts/scaffold_summary_drafts.py --weekly-for-date 2026-06-01
+python scripts/scaffold_summary_drafts.py --today --weekly-for-date 2026-05-11 --force
+```
+
+**注意:** 同名ファイルがある場合はスキップする。上書きは `--force`。
+
+詳細は `docs/summaries/README.md` を参照。
+
+### generate_ai_daily_summary.py
+`DATABASE_URL` の `trend_daily_snapshots`（前日 × スロット 07/13/19/01）から OpenAI で日次サマリー Markdown を生成する。
+
+**環境変数:** `DATABASE_URL`（必須）、`OPENAI_API_KEY`（`--dry-run` でキーなしのときは JSON のみで可）、`OPENAI_SUMMARY_MODEL`（省略時 `gpt-4o-mini`）。
+
+**使用方法:**
+```bash
+python scripts/generate_ai_daily_summary.py --dry-run --business-day 2026-05-10
+python scripts/generate_ai_daily_summary.py --write --force
+```
+
+**注意:** 本番 DB 直結のため、リポジトリやログに接続文字列を出さないこと。CI では GitHub **Secrets** のみを使用。
+
+詳細は `docs/summaries/README.md` を参照。
+
 ## 注意事項
 
 - これらのスクリプトは開発・デバッグ用です

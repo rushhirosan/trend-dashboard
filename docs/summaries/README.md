@@ -1,55 +1,112 @@
-# サマリー原稿（リポジトリ保管）
+# サマリー原稿（リポジトリ保管・配信前レビュー）
 
-パターンA・フェーズ1で作成する **日次サマリー／週次サマリー／週のホットトピック** を Markdown で残す場所。**サイトには公開しない**（静的ページやルートは未接続）。
+パターンA・フェーズ1で作成する **日次サマリー／週次サマリー／週のホットトピック** を Markdown で毎コミットしていく場所。**サイトには公開しない**（静的ページやルートは未接続）。
 
-運用手順・テンプレ本体は [`summary_pattern_a_phase1.md`](../summary_pattern_a_phase1.md) を参照。
+**X ポストサンプル**（`docs/x_post_samples/`）と同じ考え方:
+
+1. **ここに下書きを日々積む**（人が書く／AIが叩いた案を貼る、どちらでもよい）
+2. **レビューで品質・リンク・事実関係を確認**（フロントマターの `status` で区別）
+3. **問題なければ配信パイプラインに載せる**（メール・X・有料枠などは別実装。原稿の正本はこのディレクトリ）
+
+運用の約束・タイムボックス・チェックリストの詳細は [`summary_pattern_a_phase1.md`](../summary_pattern_a_phase1.md) を正とする。
 
 ---
 
-## ディレクトリ
+## ディレクトリとファイル
 
 | パス | 内容 |
 |------|------|
-| `daily/` | 日次サマリー（1日1ファイル） |
-| `weekly/` | 週次サマリーと週のホットトピックを **1ファイルにまとめる**（フェーズ1では運用を単純化） |
+| `daily_template.md` | 日次のひな形（フロントマター付き） |
+| `weekly_hot_bundle_template.md` | 週次＋ホットを1ファイルにまとめるひな形 |
+| `daily/` | 日次サマリー（**1日1ファイル**） |
+| `weekly/` | 週次サマリーと週のホットトピックを **1ファイルにまとめる** |
 
 ---
 
-## ファイル命名
+## 命名規則
 
 | 種別 | 形式 | 例 |
 |------|------|-----|
-| 日次 | `YYYY-MM-DD.md`（カレンダー日 = **掲題の観測日／発行日を JST で表す日付**） | `2026-05-06.md` |
-| 週次（＋ホット） | `YYYY-Www.md`（**ISO 週番号**、週の月曜を含む年の週） | `2026-W19.md` |
+| 日次 | `daily/YYYY-MM-DD.md`（掲題の観測日／発行日を **JST** のカレンダー日で表す） | `daily/2026-05-06.md` |
+| 週次（＋ホット） | `weekly/YYYY-Www.md`（**ISO 週番号**・その週の月曜を含む ISO 年） | `weekly/2026-W19.md` |
 
-日付の解釈で迷ったら、ファイル先頭のメタ行（テンプレの「対象」「対象週」）を正とする。
+日付の解釈で迷ったら、各ファイル先頭のフロントマターと見出しの「対象」「対象週」を正とする。
 
 ---
 
 ## 週次ファイルの中身
 
-`weekly/YYYY-Www.md` の一つのファイルに、次の両方を含める：
+`weekly/YYYY-Www.md` の **1ファイル**に次の両方を含める:
 
-1. 週次サマリー（テンプレは `summary_pattern_a_phase1.md` の「週次サマリー」）
-2. 週のホットトピック（同ドキュメントの「週のホットトピック」）
+1. 週次サマリー（パターンAの「週次サマリー」セクション）
+2. 週のホットトピック（同「週のホットトピック」セクション）
 
-見出しレベルは例：
-
-```markdown
-# 週次サマリー — …
-
-## …
+見出しの分け方の例は `weekly_hot_bundle_template.md` を参照。
 
 ---
 
-# 週のホットトピック — …
+## レビューと配信のゲート（フェーズ1）
 
-## …
+| `status` | 意味 |
+|----------|------|
+| `draft` | 推敲・事実確認中。**配信に使わない** |
+| `approved` | レビュー済み。**配信してよい正本**として扱う |
+
+- レビューした人はフロントマターの `reviewer` / `reviewed_at` を埋める（任意だが推奨）
+- 配信開始の判断はプロダクト側の合意で行う（この README だけでは自動化しない）
+
+品質の観点は `summary_pattern_a_phase1.md` のチェックリストをそのまま使える。
+
+---
+
+## 下書きファイルの作成（スキャフォルド）
+
+テンプレから空の Markdown を生成する:
+
+```bash
+# JST の今日の日付で日次だけ
+python scripts/scaffold_summary_drafts.py --today
+
+# 指定日の日次
+python scripts/scaffold_summary_drafts.py --daily 2026-05-11
+
+# その日が属する ISO 週の週次＋ホット用ファイル（weekly/2026-W19.md など）
+python scripts/scaffold_summary_drafts.py --weekly-for-date 2026-05-11
+
+# まとめて（上書きしたいときは --force）
+python scripts/scaffold_summary_drafts.py --today --weekly-for-date 2026-05-11
 ```
+
+`--weekly-for-date` は、その**日付が属する ISO 週**のファイルを作る。パターンAの「先週」まとめを月曜に書くときは、**先週のカレンダー上の日**を1つ渡す（例: 先週の月曜）。
+
+既に同名ファイルがある場合は **上書きしない**（`skip (exists): ...`）。上書きする場合のみ `--force`。
+
+---
+
+## AI 日次サマリー（DB スナップショット → OpenAI）
+
+`scripts/generate_ai_daily_summary.py` が `trend_daily_snapshots` の **前日 `business_day`** × スロット **07 → 13 → 19 → 01**（`01` は翌暦日 1 時ジョブで前日を閉じる）を読み、`gpt-4o-mini`（`OPENAI_SUMMARY_MODEL` で変更可）で `docs/summaries/daily/YYYY-MM-DD.md` を生成する。
+
+- **JST 6:50 前後**に動かす想定（7 時一括取得より前で、前日の `01` スロットが揃ったあと）。GitHub Actions: `.github/workflows/ai-daily-summary.yml`（UTC `50 21 * * *`）。
+- **Secrets（GHA）**: `DATABASE_URL`（本番 Postgres 接続文字列）、`OPENAI_API_KEY`。
+- **手元**: `.env` に `DATABASE_URL` と `OPENAI_API_KEY` を設定。
+
+```bash
+# JSON ペイロードだけ（API 課金なし・DB 必須）
+python scripts/generate_ai_daily_summary.py --dry-run --business-day 2026-05-10
+
+# 標準出力へ全文（課金あり）
+python scripts/generate_ai_daily_summary.py --business-day 2026-05-10
+
+# ファイルへ（既存は --force で上書き）
+python scripts/generate_ai_daily_summary.py --write --force --business-day 2026-05-10
+```
+
+生成ファイルはフロントマターに `generator: openai` を付ける。**レビュー後に `approved` にするまで配信に使わない。**
 
 ---
 
 ## Git
 
-- コミットメッセージ例: `docs(summaries): add daily 2026-05-06` / `docs(summaries): weekly 2026-W19`
+- コミットメッセージ例: `docs(summaries): add daily 2026-05-06` / `docs(summaries): weekly 2026-W19` / `docs(summaries): approve weekly 2026-W19`
 - 個人情報・社外秘を本文に書かない（リンクは公開 URL のみ推奨）

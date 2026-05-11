@@ -56,7 +56,7 @@ Product philosophy and conventions live in `.cursor/rules/trend-dashboard.mdc`. 
 | Path | Role |
 |------|------|
 | `docs/summary_pattern_a_phase1.md` | **Paid summary experiment (Pattern A, phase 1)**: daily/weekly deliverable timeboxes, copy-paste templates, checklists, exit criteria. Use when the user asks about 有料サマリー, 日次/週次, フェーズ1, or delivery SLAs. |
-| `docs/summaries/` | **Committed Markdown drafts** (`daily/YYYY-MM-DD.md`, `weekly/YYYY-Www.md`). Not rendered by the web app; naming rules in `docs/summaries/README.md`. |
+| `docs/summaries/` | **Committed Markdown drafts** (`daily/`, `weekly/`). AI 日次: `scripts/generate_ai_daily_summary.py` + `.github/workflows/ai-daily-summary.yml`。運用は `docs/summaries/README.md`。 |
 
 ## When adding a feature
 

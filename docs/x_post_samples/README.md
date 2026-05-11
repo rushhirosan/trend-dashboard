@@ -10,7 +10,7 @@ Trend Dashboard 向けの **1日1ツイート（20時）** と **週1振り返�
 - トレンド一括取得は **1 / 7 / 13 / 19 時（JST）** のスケジューラ実行がベース。
 - **20時投稿**なら、本文の「反映」は例として **「当日 13:00・19:00 更新を中心に反映」** のように書くと誤解が少ない。
 - **JP / US を同じ JST 20:00** に出す運用にすると、US 向け英語ポストは現地ではだいたい**朝**になる。**US 投稿の冒頭（または返信）にその前提**を書いておくと時差の誤解が減る（`daily_template.md` の「同時刻運用」参照）。
-- **日次の本文投入:** `scripts/generate_daily_x_post_series.py --write` または GitHub Actions `Daily X post series`（JST 20:10 前後）で `daily_series_from_2026-05-09.md` を更新する。
+- **日次の本文投入:** `DATABASE_URL` を渡した `scripts/generate_daily_x_post_series.py --write`（既定は `trend_daily_snapshots`）または GitHub Actions `Daily X post series`（JST 20:10 前後、`DATABASE_URL` シークレット）で `daily_series_from_2026-05-09.md` を更新する。HTTP のみのときは `--from-api`。
 
 ---
 
@@ -23,3 +23,5 @@ Trend Dashboard 向けの **1日1ツイート（20時）** と **週1振り返�
 | `samples_2026-05-07.md` | **2026-05-07** 初回投稿向けのサンプル文案（本番APIキャッシュを参照して作成・更新） |
 | `samples_2026-05-08.md` | **2026-05-08** 20時向け・カテゴリ別ハイライト全文、スレッド／1ツイート案、**今日の5つ（JP/US・①〜③+④Tech+⑤エンタメ）** 例（`GENERATED_AT_UTC` を冒頭に記載） |
 | `daily_series_from_2026-05-09.md` | **2026-05-09 〜 05-22** の日別ツイート案（**`scripts/generate_daily_x_post_series.py`** で API から①〜⑤を自動投入可） |
+
+サマリー原稿（配信前レビュー用）— 日次／週次／週のホットトピックをリポジトリに積む運用は、X サンプルと同様の流れで [`docs/summaries/README.md`](../summaries/README.md) を参照（下書き生成: `scripts/scaffold_summary_drafts.py`）。

@@ -19,11 +19,12 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install script dependency
-        run: pip install "requests>=2.31"
+      - name: Install script dependencies
+        run: pip install "requests>=2.31" "psycopg2-binary>=2.9"
 
-      - name: Fill today's stubs from production API
+      - name: Fill today's block from trend_daily_snapshots
         env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           TREND_DASHBOARD_BASE_URL: https://trends-dashboard.fly.dev
         run: python scripts/generate_daily_x_post_series.py --write
 

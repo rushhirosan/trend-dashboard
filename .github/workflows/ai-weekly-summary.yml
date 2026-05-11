@@ -1,0 +1,41 @@
+# After the last daily of the ISO week is generated (Mon 06:50 JST for Sun business_day ≈ Sun 21:50 UTC),
+# run once on Monday UTC so the repo contains all seven daily files.
+name: AI weekly summary
+
+on:
+  schedule:
+    - cron: "15 23 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install "requests>=2.31" "python-dotenv>=0.19"
+
+      - name: Generate weekly from daily Markdown
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python scripts/generate_ai_weekly_summary.py --write --force
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/summaries/weekly/
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "docs(summaries): ai weekly summary"
+          git push

@@ -126,6 +126,20 @@ python scripts/generate_ai_daily_summary.py --write --force
 
 詳細は `docs/summaries/README.md` を参照。
 
+### generate_ai_weekly_summary.py
+`docs/summaries/daily/*.md`（その ISO 週の7日分、欠損可）だけを入力に OpenAI で週次＋ホットトピックを1ファイル生成する。DB・トレンド API は使わない。
+
+**環境変数:** `OPENAI_API_KEY`（必須）、`OPENAI_SUMMARY_MODEL`（省略時 `gpt-4o-mini`）。
+
+**使用方法:**
+```bash
+python scripts/generate_ai_weekly_summary.py --dry-run
+python scripts/generate_ai_weekly_summary.py --write --force
+python scripts/generate_ai_weekly_summary.py --weekly-for-date 2026-05-14 --write --force
+```
+
+詳細は `docs/summaries/README.md` を参照。
+
 ## 注意事項
 
 - これらのスクリプトは開発・デバッグ用です

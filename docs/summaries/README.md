@@ -106,6 +106,30 @@ python scripts/generate_ai_daily_summary.py --write --force --business-day 2026-
 
 ---
 
+## AI 週次サマリー（日次 Markdown ×7 → OpenAI）
+
+`scripts/generate_ai_weekly_summary.py` は **`docs/summaries/daily/YYYY-MM-DD.md` を最大7件読むだけ**で、DB や公開トレンド API・スナップショットには触れない。入力はその週の日次本文（フロントマター除く）の積み上げ。`gpt-4o-mini`（`OPENAI_SUMMARY_MODEL` で変更可）で `docs/summaries/weekly/YYYY-Www.md`（週次＋週のホットトピックを1ファイル）を生成する。
+
+- **既定の対象週**: JST の「今週の月曜」から7日前の月曜が始まる **直前に終了した ISO 週**（日次が揃いきっていない日は欠損としてプロンプトに渡し、モデルに前提を書かせる）。
+- **`--weekly-for-date YYYY-MM-DD`**: その日を含む ISO 週をまとめる（`scaffold_summary_drafts.py --weekly-for-date` と同じ週の取り方）。
+- **Secrets（GHA）**: `OPENAI_API_KEY` のみ（`DATABASE_URL` は不要）。GitHub Actions: `.github/workflows/ai-weekly-summary.yml`（UTC 月曜 `15 23 * * 1` ≒ 翌 JST 火曜朝。日曜分の日次ジョブのあと想定）。
+- **手元**: `.env` に `OPENAI_API_KEY`。`--dry-run` でキーなしのときは読み込みマニフェストとロールアップ先頭のみ（課金なし）。
+
+```bash
+# マニフェストのみ（API 課金なし）
+python scripts/generate_ai_weekly_summary.py --dry-run --weekly-for-date 2026-05-14
+
+# 標準出力へ全文（課金あり）
+python scripts/generate_ai_weekly_summary.py --weekly-for-date 2026-05-14
+
+# ファイルへ（既存は --force で上書き）
+python scripts/generate_ai_weekly_summary.py --write --force --weekly-for-date 2026-05-14
+```
+
+生成ファイルはフロントマターに `generator: openai` と欠損日一覧を付ける。**レビュー後に `approved` にするまで配信に使わない。**
+
+---
+
 ## Git
 
 - コミットメッセージ例: `docs(summaries): add daily 2026-05-06` / `docs(summaries): weekly 2026-W19` / `docs(summaries): approve weekly 2026-W19`

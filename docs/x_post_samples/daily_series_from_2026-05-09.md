@@ -77,11 +77,11 @@ https://trends-dashboard.fly.dev/
 
 ```
 【2026-05-11】今日の5つ（JP）
-① …（Google）
-② …（YouTube）
-③ …（NHK・WN）
-④ …（Tech）
-⑤ …（Apple Music・映画）
+① 千葉 対 群馬／柳川るい（Google）
+② BOYNEXTDOOR (보이넥스트도어) '똑똑…（YouTube）
+③ 高市内閣支持率61％ 不支持23％ NHK…（NHK・WN）
+④ コードを書かなくなった我々は何者か —— …（Tech）
+⑤ 爆裂愛してる／プークーと魔法の植物（Apple Music・映画）
 一覧: https://trends-dashboard.fly.dev/
 ```
 
@@ -89,11 +89,11 @@ https://trends-dashboard.fly.dev/
 
 ```
 Today's 5 (US) 2026-05-11 · 8pm JST, same as JP (~US AM)
-① … (Google)
-② … (CNN)
-③ … (HN)
-④ … (Tech)
-⑤ … (Apple Music)
+① ryan seacrest / bianc… (Google)
+② Live updates: Hantavirus … (CNN)
+③ Hardware Attestation … (HN)
+④ CVE-2026-42208 · DEV · Meme… (Tech)
+⑤ Choosin' Texas … (Apple Music)
 https://trends-dashboard.fly.dev/
 ```
 

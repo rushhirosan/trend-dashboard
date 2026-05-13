@@ -24,11 +24,13 @@ jobs:
         run: |
           pip install "requests>=2.31" "psycopg2-binary>=2.9" "python-dotenv>=0.19"
 
-      - name: Generate summary from DB snapshots
+      # DATABASE_URL with *.flycast does not resolve on GitHub-hosted runners.
+      # Snapshots are read from production /api/summaries/daily-snapshots (same DB on Fly).
+      - name: Generate summary (HTTP snapshots + OpenAI)
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TREND_DASHBOARD_BASE_URL: https://trends-dashboard.fly.dev
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: python scripts/generate_ai_daily_summary.py --write --force
+        run: python scripts/generate_ai_daily_summary.py --from-api --write --force
 
       - name: Commit if changed
         run: |

@@ -4,6 +4,7 @@
 """
 
 import os
+from datetime import date
 from flask import Blueprint, jsonify, request, current_app
 from database_config import TrendsCache
 from utils.logger_config import get_logger
@@ -347,6 +348,48 @@ def scheduler_lock_status():
         return jsonify({'success': True, 'lock': status})
     except Exception as e:
         return handle_data_error('ロック状態取得', e)
+
+
+@data_bp.route('/summaries/daily-snapshots')
+def get_daily_snapshots_for_ai_summary():
+    """business_day ごとの trend_daily_snapshots（スロット 01/07/13/19）を返す。
+
+    GitHub Actions など Fly 外から DB に繋げない環境で、本番アプリ経由で
+    ``scripts/generate_ai_daily_summary.py --from-api`` が同じ入力を得るために使う。
+    """
+    raw = (request.args.get("business_day") or "").strip()
+    if not raw:
+        return jsonify({"success": False, "error": "business_day query parameter is required"}), 400
+    try:
+        business_day = date.fromisoformat(raw)
+    except ValueError:
+        return jsonify({"success": False, "error": "business_day must be YYYY-MM-DD"}), 400
+
+    cache_instance = get_cache()
+    if not cache_instance:
+        return jsonify({"success": False, "error": "キャッシュシステムが初期化されていません"}), 500
+
+    rows = cache_instance.get_trend_daily_snapshots_for_business_day(business_day)
+    # JSON 応答用に dict 化（RealDictRow / datetime をそのまま jsonify できるよう揃える）
+    out = []
+    for row in rows:
+        cap = row.get("captured_at")
+        cap_s = cap.isoformat() if hasattr(cap, "isoformat") else str(cap)
+        out.append(
+            {
+                "slot": row.get("slot"),
+                "series_key": row.get("series_key"),
+                "items": row.get("items"),
+                "captured_at": cap_s,
+            }
+        )
+    return jsonify(
+        {
+            "success": True,
+            "business_day": business_day.isoformat(),
+            "data": out,
+        }
+    )
 
 
 @data_bp.route('/alert/test', methods=['GET', 'POST'])

@@ -11,7 +11,14 @@ OpenAI Chat Completions で日次サマリー Markdown を生成する。
   python scripts/generate_ai_daily_summary.py --dry-run
   python scripts/generate_ai_daily_summary.py --write --force
 
+GitHub Actions 等 Fly 外では ``DATABASE_URL`` の ``*.flycast`` が解決できない。
+その場合は本番の HTTP API 経由で同じ行を取る:
+
+  export OPENAI_API_KEY=sk-...
+  python scripts/generate_ai_daily_summary.py --from-api --write --force
+
 既定の対象日: JST の「昨日」（--business-day で上書き可）。
+HTTP モードのベース URL: ``TREND_DASHBOARD_BASE_URL``（既定 https://trends-dashboard.fly.dev）。
 """
 
 from __future__ import annotations
@@ -34,6 +41,7 @@ from psycopg2.extras import RealDictCursor
 JST = ZoneInfo("Asia/Tokyo")
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DAILY_DIR = REPO_ROOT / "docs" / "summaries" / "daily"
+BASE_DEFAULT = "https://trends-dashboard.fly.dev"
 
 SLOT_ORDER = ("07", "13", "19", "01")
 SLOT_LABELS = {
@@ -77,6 +85,30 @@ def fetch_snapshots(
             return list(cur.fetchall())
     finally:
         conn.close()
+
+
+def fetch_snapshots_from_api(
+    base_url: str, business_day: date, timeout: int = 120
+) -> List[Dict[str, Any]]:
+    """本番 ``/api/summaries/daily-snapshots`` から DB と同形の行を取得する。"""
+    url = (
+        f"{base_url.rstrip('/')}/api/summaries/daily-snapshots"
+        f"?business_day={business_day.isoformat()}"
+    )
+    r = requests.get(
+        url,
+        headers={"User-Agent": "trend-dashboard-ai-daily-summary/1.0"},
+        timeout=timeout,
+    )
+    r.raise_for_status()
+    payload = r.json()
+    if not isinstance(payload, dict) or not payload.get("success"):
+        err = payload.get("error") if isinstance(payload, dict) else None
+        raise RuntimeError(f"snapshot API error: {err or payload!r}")
+    rows = payload.get("data")
+    if not isinstance(rows, list):
+        raise RuntimeError("snapshot API: expected data array")
+    return rows
 
 
 def compact_rows(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -216,12 +248,10 @@ SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ�
 
 def run_generate(
     business_day: date,
-    database_url: str,
+    rows: List[Dict[str, Any]],
     api_key: str,
     model: str,
-    connect_timeout: int,
 ) -> tuple[str, Dict[str, Any]]:
-    rows = fetch_snapshots(database_url, business_day, connect_timeout=connect_timeout)
     meta: Dict[str, Any] = {
         "business_day": business_day.isoformat(),
         "row_count": len(rows),
@@ -264,6 +294,22 @@ def main() -> int:
         default=20,
         help="DB connect timeout seconds",
     )
+    p.add_argument(
+        "--from-api",
+        action="store_true",
+        help="Fetch snapshots via TREND_DASHBOARD_BASE_URL (for CI / no DATABASE_URL)",
+    )
+    p.add_argument(
+        "--base-url",
+        default=None,
+        help="Override TREND_DASHBOARD_BASE_URL for --from-api",
+    )
+    p.add_argument(
+        "--request-timeout",
+        type=int,
+        default=120,
+        help="HTTP timeout seconds for --from-api snapshot fetch",
+    )
     args = p.parse_args()
 
     if args.business_day:
@@ -274,13 +320,31 @@ def main() -> int:
     database_url = (os.getenv("DATABASE_URL") or "").strip()
     api_key = (os.getenv("OPENAI_API_KEY") or "").strip()
     model = (os.getenv("OPENAI_SUMMARY_MODEL") or "gpt-4o-mini").strip()
+    base_url = (
+        (args.base_url or os.getenv("TREND_DASHBOARD_BASE_URL") or BASE_DEFAULT).rstrip("/")
+    )
 
-    if not database_url:
-        print("❌ DATABASE_URL が未設定です", file=sys.stderr)
-        return 1
+    if args.from_api:
+        try:
+            rows = fetch_snapshots_from_api(
+                base_url, bd, timeout=args.request_timeout
+            )
+        except (requests.RequestException, json.JSONDecodeError, RuntimeError) as e:
+            print(f"❌ スナップショット API 取得失敗: {e}", file=sys.stderr)
+            return 1
+    else:
+        if not database_url:
+            print("❌ DATABASE_URL が未設定です（Fly 外の CI では --from-api を使う）", file=sys.stderr)
+            return 1
+        try:
+            rows = fetch_snapshots(
+                database_url, bd, connect_timeout=args.connect_timeout
+            )
+        except psycopg2.Error as e:
+            print(f"❌ DB スナップショット取得失敗: {e}", file=sys.stderr)
+            return 1
 
     if args.dry_run and not api_key:
-        rows = fetch_snapshots(database_url, bd, connect_timeout=args.connect_timeout)
         payload = compact_rows(rows)
         payload["business_day"] = bd.isoformat()
         print(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -297,9 +361,7 @@ def main() -> int:
         )
         return 1
 
-    text, meta = run_generate(
-        bd, database_url, api_key, model, connect_timeout=args.connect_timeout
-    )
+    text, meta = run_generate(bd, rows, api_key, model)
     if meta.get("error") == "no_snapshot_rows":
         print(
             f"❌ business_day={bd} の trend_daily_snapshots 行がありません。",

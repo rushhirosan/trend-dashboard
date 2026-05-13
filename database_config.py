@@ -11,7 +11,7 @@ import psycopg2
 from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
 from psycopg2 import extensions
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from contextlib import contextmanager
 from dotenv import load_dotenv
 from utils.logger_config import get_logger
@@ -2519,6 +2519,28 @@ class TrendsCache:
         except Exception as e:
             logger.error("❌ upsert_trend_daily_snapshots_batch エラー: %s", e, exc_info=True)
             return False
+
+    def get_trend_daily_snapshots_for_business_day(self, business_day: date):
+        """指定 business_day の trend_daily_snapshots 行を取得（スロット 01/07/13/19）。
+
+        AI 日次サマリー用。各 items は JSON（薄い {t,r} 配列想定）。
+        """
+        slot_order = ("07", "13", "19", "01")
+        order_sql = " ".join(f"WHEN '{s}' THEN {i}" for i, s in enumerate(slot_order))
+        sql = f"""
+            SELECT slot, series_key, items, captured_at
+            FROM trend_daily_snapshots
+            WHERE business_day = %s AND slot IN ('01','07','13','19')
+            ORDER BY CASE slot {order_sql} END, series_key
+        """
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                    cursor.execute(sql, (business_day,))
+                    return list(cursor.fetchall())
+        except Exception as e:
+            logger.error("❌ get_trend_daily_snapshots_for_business_day エラー: %s", e, exc_info=True)
+            return []
 
     def get_scheduler_lock_status(self):
         """スケジューラー分散ロックの現在状態を返す（デバッグ用）。取得失敗時は None。"""

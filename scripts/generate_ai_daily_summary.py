@@ -12,7 +12,10 @@ OpenAI Chat Completions で日次サマリー Markdown を生成する。
   python scripts/generate_ai_daily_summary.py --write --force
 
 GitHub Actions 等 Fly 外では ``DATABASE_URL`` の ``*.flycast`` が解決できない。
-その場合は本番の HTTP API 経由で同じ行を取る:
+リポジトリのワークフローでは ``--from-api`` を付ける。加えて、環境変数 ``GITHUB_ACTIONS=true``
+かつ ``DATABASE_URL`` に Fly 内部 DNS（``.flycast`` / ``.internal``）が含まれる場合は、
+``--from-api`` が無くても自動で HTTP スナップショット経路に切り替える（組織レベルで ``DATABASE_URL`` が
+注入される場合の保険）。
 
   export OPENAI_API_KEY=sk-...
   python scripts/generate_ai_daily_summary.py --from-api --write --force
@@ -53,6 +56,18 @@ SLOT_LABELS = {
 
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 MAX_USER_CHARS = 100_000
+
+
+def use_http_snapshots(*, cli_from_api: bool, database_url: str) -> bool:
+    """True → ``fetch_snapshots_from_api``。GitHub Actions で Fly 専用 DB ホストが注入されたときのフォールバック。"""
+    if cli_from_api:
+        return True
+    if os.getenv("GITHUB_ACTIONS", "").lower() != "true":
+        return False
+    if not database_url:
+        return False
+    lo = database_url.lower()
+    return ".flycast" in lo or ".internal" in lo
 
 
 def default_business_day_jst(now: Optional[datetime] = None) -> date:
@@ -297,7 +312,8 @@ def main() -> int:
     p.add_argument(
         "--from-api",
         action="store_true",
-        help="Fetch snapshots via TREND_DASHBOARD_BASE_URL (for CI / no DATABASE_URL)",
+        help="Fetch snapshots via TREND_DASHBOARD_BASE_URL (for CI / no DATABASE_URL). "
+        "On GitHub Actions, also implied when DATABASE_URL uses .flycast / .internal.",
     )
     p.add_argument(
         "--base-url",
@@ -324,7 +340,15 @@ def main() -> int:
         (args.base_url or os.getenv("TREND_DASHBOARD_BASE_URL") or BASE_DEFAULT).rstrip("/")
     )
 
-    if args.from_api:
+    via_http = use_http_snapshots(cli_from_api=args.from_api, database_url=database_url)
+    if via_http and not args.from_api:
+        print(
+            "NOTE: GITHUB_ACTIONS with Fly-private DATABASE_URL; "
+            "using /api/summaries/daily-snapshots (same as --from-api).",
+            file=sys.stderr,
+        )
+
+    if via_http:
         try:
             rows = fetch_snapshots_from_api(
                 base_url, bd, timeout=args.request_timeout

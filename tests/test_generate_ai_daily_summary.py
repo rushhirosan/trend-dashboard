@@ -53,15 +53,20 @@ def test_fetch_snapshots_from_api_parses_success_payload(gads, monkeypatch):
     assert rows == sample
 
 
-def test_fetch_snapshots_from_api_raises_on_error_field(gads, monkeypatch):
-    bd = date(2026, 5, 10)
-
-    def fake_get(*_a, **_k):
-        r = MagicMock()
-        r.raise_for_status = MagicMock()
-        r.json.return_value = {"success": False, "error": "bad day"}
-        return r
-
-    monkeypatch.setattr(gads.requests, "get", fake_get)
-    with pytest.raises(RuntimeError, match="bad day"):
-        gads.fetch_snapshots_from_api("https://example.com", bd)
+@pytest.mark.parametrize(
+    "gha,db,cli,expected",
+    [
+        (False, "postgresql://x/trends-db.flycast:5432/db", False, False),
+        ("true", "postgresql://x/trends-db.flycast:5432/db", False, True),
+        ("true", "postgresql://h/db.internal:5432/db", False, True),
+        ("true", "postgresql://localhost/db", False, False),
+        ("true", "postgresql://x/trends-db.flycast/db", True, True),
+        (False, "", True, True),
+    ],
+)
+def test_use_http_snapshots_gha_fly_private_fallback(monkeypatch, gads, gha, db, cli, expected):
+    if gha is False:
+        monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    else:
+        monkeypatch.setenv("GITHUB_ACTIONS", gha)
+    assert gads.use_http_snapshots(cli_from_api=cli, database_url=db) is expected

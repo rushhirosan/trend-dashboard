@@ -112,14 +112,15 @@ python scripts/scaffold_summary_drafts.py --today --weekly-for-date 2026-05-11 -
 詳細は `docs/summaries/README.md` を参照。
 
 ### generate_ai_daily_summary.py
-`DATABASE_URL` の `trend_daily_snapshots`（前日 × スロット 07/13/19/01）から OpenAI で日次サマリー Markdown を生成する。
+`DATABASE_URL` の `trend_daily_snapshots`（前日 × スロット 07/13/19/01）から OpenAI で日次サマリー Markdown を生成する。GitHub Actions では **`--from-api`** で本番の `/api/summaries/daily-snapshots` を使う（`*.flycast` はランナーから解決できない）。`GITHUB_ACTIONS` かつ `DATABASE_URL` に `.flycast` / `.internal` が含まれる場合は、`--from-api` が無くても HTTP 経路に自動切替する。
 
-**環境変数:** `DATABASE_URL`（必須）、`OPENAI_API_KEY`（`--dry-run` でキーなしのときは JSON のみで可）、`OPENAI_SUMMARY_MODEL`（省略時 `gpt-4o-mini`）。
+**環境変数:** `DATABASE_URL`（ローカル直読み時）、`OPENAI_API_KEY`（`--dry-run` でキーなしのときは JSON のみで可）、`OPENAI_SUMMARY_MODEL`（省略時 `gpt-4o-mini`）、CI の HTTP 読みでは `TREND_DASHBOARD_BASE_URL`。
 
 **使用方法:**
 ```bash
 python scripts/generate_ai_daily_summary.py --dry-run --business-day 2026-05-10
 python scripts/generate_ai_daily_summary.py --write --force
+python scripts/generate_ai_daily_summary.py --from-api --write --force
 ```
 
 **注意:** 本番 DB 直結のため、リポジトリやログに接続文字列を出さないこと。CI では GitHub **Secrets** のみを使用。

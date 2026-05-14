@@ -161,11 +161,11 @@ https://trends-dashboard.fly.dev/
 
 ```
 【2026-05-14】今日の5つ（JP）
-① 黒島結菜／corinthians x…（検索）
-② Replace to be -…（動画）
-③ 政府・日銀の介入警戒で今週も神経質な展開か…（ニュース）
-④ CodexをローカルLLMで駆動する／WR…（IT）
-⑤ 爆裂愛してる／ザ・スーパーマリオギャラクシ…（エンタメ）
+① 超かぐや姫／入江大生（検索）
+② かぐや (cv. 夏吉ゆうこ) & 月見ヤチヨ (cv.…（動画）
+③ 広島 呉の船解体現場で火災 船や廃材が焼ける…（ニュース）
+④ Qt 6 を Zephyr…（IT）
+⑤ 夜の踊り子／プークーと魔法の植物（エンタメ）
 一覧: https://trends-dashboard.fly.dev/
 ```
 
@@ -173,11 +173,11 @@ https://trends-dashboard.fly.dev/
 
 ```
 Today's 5 (US) 2026-05-14 · 8pm JST
-① kelsey plum / atlanta braves… (Search)
-② Escape 50 Pros, Win $50,000 (Video)
-③ Atlanta announces Bobby Cox,… (News)
-④ CVE-2026-42208 · DEV · How… (IT)
-⑤ Choosin' Texas / The Super… (Entertainment)
+① pga championship tee times /… (Search)
+② Backrooms | Official Promo | A24 (Video)
+③ Live updates: Trump arrives in… (News)
+④ CVE-2026-42208 · DEV · How to… (IT)
+⑤ Choosin' Texas / Swapped (Entertainment)
 https://trends-dashboard.fly.dev/
 ```
 

@@ -146,6 +146,34 @@ def test_pick_prefers_rank_jump_when_freq_equal(gx):
     assert top[0] == "Climber"
 
 
+def test_load_snapshots_daytime_slots_from_api_parses_payload(gx, monkeypatch):
+    api_rows = [
+        {"slot": "07", "series_key": "google_trends_jp", "items": [{"t": "a", "r": 1}]},
+        {"slot": "01", "series_key": "google_trends_jp", "items": [{"t": "ignore", "r": 1}]},
+        {"slot": "19", "series_key": "google_trends_jp", "items": [{"t": "b", "r": 1}]},
+    ]
+
+    def fake_get(url, **_kwargs):
+        assert "daily-snapshots" in url
+        assert "business_day=2026-05-12" in url
+        return _mk_resp({"success": True, "data": api_rows})
+
+    monkeypatch.setattr(gx.requests, "get", fake_get)
+    out = gx.load_snapshots_daytime_slots_from_api("https://example.com", date(2026, 5, 12))
+    assert out["07"]["google_trends_jp"][0]["t"] == "a"
+    assert out["19"]["google_trends_jp"][0]["t"] == "b"
+    assert "01" not in out
+
+
+def test_load_snapshots_daytime_slots_from_api_empty_raises(gx, monkeypatch):
+    def fake_get(url, **_kwargs):
+        return _mk_resp({"success": True, "data": []})
+
+    monkeypatch.setattr(gx.requests, "get", fake_get)
+    with pytest.raises(ValueError, match="No trend_daily_snapshots"):
+        gx.load_snapshots_daytime_slots_from_api("https://example.com", date(2026, 5, 12))
+
+
 def test_load_snapshots_daytime_merges_slots(gx, monkeypatch):
     class FakeCursor:
         def __enter__(self):

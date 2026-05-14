@@ -2,8 +2,8 @@
 
 `daily_template.md` / `samples_2026-05-08.md` で固めた型のまま、**日付ごとに JP / US の「今日の5つ」**を並べたファイルです。
 
-- **自動投入:** `scripts/generate_daily_x_post_series.py` が **`DATABASE_URL` の `trend_daily_snapshots`** の **7時・13時・19時（スロット 07/13/19）**を読み、ラベルごとに「複数スロットへの登場」と「順位の上がり（07→13→19）」をスコアにして①〜⑤を選び、このファイルの該当日付ブロックを上書きします。DB が無い環境では `--from-api` で本番 `**/api/*` にフォールバック（`pip install requests psycopg2-binary`）。
-- **GitHub Actions:** `.github/workflows/daily-x-post-series.yml` が **JST 20:10 前後（UTC 11:10）** に同スクリプトを実行し、リポジトリシークレットの **`DATABASE_URL`** で DB のスナップショットを読み、差分があればコミットして push します（フォールバックで HTTP を使う場合のみ `TREND_DASHBOARD_BASE_URL`）。
+- **自動投入:** `scripts/generate_daily_x_post_series.py` が **`trend_daily_snapshots`** の **7時・13時・19時（スロット 07/13/19）**を読み、ラベルごとに「複数スロットへの登場」と「順位の上がり（07→13→19）」をスコアにして①〜⑤を選び、このファイルの該当日付ブロックを上書きします。入力は **`DATABASE_URL` で直接 DB** か、**`--from-api`** で本番の **`GET /api/summaries/daily-snapshots?business_day=…`**（AI 日次サマリーと同じ行）。ソース別の `/api/google-trends` 等は使いません（`pip install requests psycopg2-binary`）。
+- **GitHub Actions:** `.github/workflows/daily-x-post-series.yml` が **JST 20:10 前後（UTC 11:10）** に `--from-api --write` を実行し、`TREND_DASHBOARD_BASE_URL`（既定で本番）の **daily-snapshots** から当日分を読み、差分があればコミットして push します。
 - 一覧: [https://trends-dashboard.fly.dev/](https://trends-dashboard.fly.dev/)
 - 鮮度: [https://trends-dashboard.fly.dev/data-status](https://trends-dashboard.fly.dev/data-status)
 
@@ -411,9 +411,9 @@ https://trends-dashboard.fly.dev/
 
 1. 直前の `## YYYY-MM-DD` ブロックをコピーする。
 2. 見出しとフェンス内の日付を **翌日** に置換する。
-3. ①〜⑤は **`DATABASE_URL` ありなら** `python scripts/generate_daily_x_post_series.py --write`（スナップショット経由）、**なければ** `--from-api --write` で埋める（手動で直す場合はダッシュまたは `curl` で確認）。
+3. ①〜⑤は **`DATABASE_URL` ありなら** `python scripts/generate_daily_x_post_series.py --write`、**なければ** `python scripts/generate_daily_x_post_series.py --from-api --write`（本番 `/api/summaries/daily-snapshots`）で埋める（手動で直す場合はダッシュまたは `curl` で確認）。
 
 ```bash
-curl -sS "https://trends-dashboard.fly.dev/api/google-trends?country=JP&force_refresh=false" | head
+curl -sS "https://trends-dashboard.fly.dev/api/summaries/daily-snapshots?business_day=2026-05-15" | head
 ```
 

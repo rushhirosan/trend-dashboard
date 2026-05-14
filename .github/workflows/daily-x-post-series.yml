@@ -23,11 +23,12 @@ jobs:
         run: pip install "requests>=2.31" "psycopg2-binary>=2.9"
 
       # DATABASE_URL with *.flycast (Fly private DNS) does not resolve on GitHub-hosted
-      # runners. Use public JSON APIs instead; app cache reflects scheduler snapshots.
-      - name: Fill today's block (HTTP APIs)
+      # runners. Read the same trend_daily_snapshots rows as AI daily summary via
+      # GET /api/summaries/daily-snapshots?business_day=… (slots 07/13/19).
+      - name: Fill today's block (daily-snapshots API)
         env:
           TREND_DASHBOARD_BASE_URL: https://trends-dashboard.fly.dev
-        run: python scripts/generate_daily_x_post_series.py --from-api --no-force-refresh --write
+        run: python scripts/generate_daily_x_post_series.py --from-api --write
 
       - name: Commit if changed
         run: |

@@ -7,17 +7,21 @@ Fill ``docs/x_post_samples/daily_series_from_2026-05-09.md`` for a given date.
 higher) plus **rank improvement** from morning→afternoon→evening (lower rank number =
 better). No extra upstream API traffic from this script.
 
-**Fallback:** public Trend Dashboard JSON APIs with ``force_refresh`` query param
-(use ``--from-api`` when ``DATABASE_URL`` is set but HTTP を使いたいとき).
+**Fly / CI (no direct DB):** ``--from-api`` reads the same rows as the AI daily summary:
+``GET /api/summaries/daily-snapshots?business_day=…`` (``trend_daily_snapshots``, slots 07/13/19),
+then composes JP/US blocks. No per-source ``/api/google-trends`` traffic.
+
+**Legacy per-source HTTP** (no ``DATABASE_URL`` and **without** ``--from-api``): each
+``/api/*`` with ``force_refresh`` (default false).
 
   export DATABASE_URL=...
   python scripts/generate_daily_x_post_series.py --write
 
-  python scripts/generate_daily_x_post_series.py --from-api --write --no-force-refresh
+  python scripts/generate_daily_x_post_series.py --from-api --write
 
 Env:
-  DATABASE_URL        PostgreSQL（スナップショット読み取り。CI で推奨）
-  TREND_DASHBOARD_BASE_URL  HTTP フォールバック用ベース URL（既定: https://trends-dashboard.fly.dev）
+  DATABASE_URL             直接 PostgreSQL から 07/13/19 を読む（``--from-api`` なしのとき）
+  TREND_DASHBOARD_BASE_URL ``--from-api`` またはレガシー HTTP 用ベース URL（既定: https://trends-dashboard.fly.dev）
 
 JP / US ともデフォルトで X 無料枠（加重カウント合計 280 相当）に収める。
 JP は east_asian_width の Wide/Full を 2、その他を 1 とする近似。末尾 URL は 23 相当。
@@ -328,11 +332,68 @@ def load_snapshots_daytime_slots(
     finally:
         conn.close()
 
+    _validate_daytime_snapshot_bundle(out, business_day)
+    return out
+
+
+def _validate_daytime_snapshot_bundle(
+    out: dict[str, dict[str, list[Any]]], business_day: date
+) -> None:
     if all(len(out[s]) == 0 for s in SNAPSHOT_SLOTS_DAYTIME):
         raise ValueError(
             f"No trend_daily_snapshots for business_day={business_day.isoformat()} "
             f"in slots {', '.join(SNAPSHOT_SLOTS_DAYTIME)}"
         )
+
+
+def load_snapshots_daytime_slots_from_api(
+    base_url: str,
+    business_day: date,
+    *,
+    timeout: int = 120,
+) -> dict[str, dict[str, list[Any]]]:
+    """
+    ``/api/summaries/daily-snapshots`` から DB と同形の行を取り、
+    ``load_snapshots_daytime_slots`` と同じ ``{ slot: { series_key: items } }`` を返す。
+    スロット 01 は無視し 07/13/19 のみ詰める（DB 読みと一致）。
+    """
+    out: dict[str, dict[str, list[Any]]] = {s: {} for s in SNAPSHOT_SLOTS_DAYTIME}
+    url = (
+        f"{base_url.rstrip('/')}/api/summaries/daily-snapshots"
+        f"?business_day={business_day.isoformat()}"
+    )
+    r = requests.get(
+        url,
+        headers={"User-Agent": "trend-dashboard-daily-x-post-series/1.0"},
+        timeout=timeout,
+    )
+    r.raise_for_status()
+    payload = r.json()
+    if not isinstance(payload, dict) or not payload.get("success"):
+        err = payload.get("error") if isinstance(payload, dict) else None
+        raise RuntimeError(f"snapshot API error: {err or payload!r}")
+    rows = payload.get("data")
+    if not isinstance(rows, list):
+        raise RuntimeError("snapshot API: expected data array")
+
+    for row in rows:
+        slot = str(row.get("slot") or "")
+        if slot not in out:
+            continue
+        sk = row.get("series_key")
+        if sk is None or not str(sk).strip():
+            continue
+        items = row.get("items")
+        if isinstance(items, str):
+            try:
+                items = json.loads(items)
+            except json.JSONDecodeError:
+                items = []
+        if not isinstance(items, list):
+            items = []
+        out[slot][str(sk)] = items
+
+    _validate_daytime_snapshot_bundle(out, business_day)
     return out
 
 
@@ -724,7 +785,7 @@ def main() -> int:
     p.add_argument(
         "--from-api",
         action="store_true",
-        help="Use HTTP JSON APIs instead of DATABASE_URL (even if DATABASE_URL is set)",
+        help="Read /api/summaries/daily-snapshots (07/13/19 for --date); same rows as AI daily summary",
     )
     p.add_argument("--dry-run", action="store_true", help="Print blocks only; do not write")
     p.add_argument("--write", action="store_true", help="Update series file")
@@ -732,12 +793,12 @@ def main() -> int:
     fr.add_argument(
         "--force-refresh",
         action="store_true",
-        help="HTTP mode only: force_refresh=true on all /api calls",
+        help="Legacy per-source HTTP only: force_refresh=true on each /api/* call (ignored with --from-api)",
     )
     fr.add_argument(
         "--no-force-refresh",
         action="store_true",
-        help="HTTP mode only: force_refresh=false (dashboard cache)",
+        help="Legacy per-source HTTP only: force_refresh=false (ignored with --from-api)",
     )
     p.add_argument(
         "--jp-inner-max",
@@ -775,9 +836,9 @@ def main() -> int:
         return 1
 
     database_url = (args.database_url or os.environ.get("DATABASE_URL") or "").strip()
-    use_snapshots = bool(database_url) and not args.from_api
+    use_snapshots_db = bool(database_url) and not args.from_api
 
-    if use_snapshots:
+    if use_snapshots_db:
         try:
             series_by_slot = load_snapshots_daytime_slots(database_url, business_day)
         except (ValueError, psycopg2.Error) as e:
@@ -799,6 +860,31 @@ def main() -> int:
         except ValueError as e:
             print(f"ERROR: compose failed: {e}", file=sys.stderr)
             return 1
+    elif args.from_api:
+        base = (args.base_url or os.environ.get("TREND_DASHBOARD_BASE_URL") or BASE_DEFAULT).rstrip("/")
+        print(
+            f"Source: HTTP {base}/api/summaries/daily-snapshots business_day={d} "
+            f"slots={'/'.join(SNAPSHOT_SLOTS_DAYTIME)}; scores=freq×{FREQ_WEIGHT}+jump×{JUMP_WEIGHT}",
+            file=sys.stderr,
+        )
+        try:
+            series_by_slot = load_snapshots_daytime_slots_from_api(base, business_day)
+            jp = build_jp_block_from_snapshots(
+                series_by_slot,
+                d,
+                inner_max=args.jp_inner_max,
+                max_jp_x_weighted=args.jp_max_x_weighted,
+            )
+            us = build_us_block_from_snapshots(series_by_slot, d, max_chars=args.max_us_chars)
+        except (
+            requests.RequestException,
+            TimeoutError,
+            json.JSONDecodeError,
+            RuntimeError,
+            ValueError,
+        ) as e:
+            print(f"ERROR: snapshot HTTP load/compose failed: {e}", file=sys.stderr)
+            return 1
     else:
         base = (args.base_url or os.environ.get("TREND_DASHBOARD_BASE_URL") or BASE_DEFAULT).rstrip(
             "/"
@@ -810,7 +896,7 @@ def main() -> int:
         else:
             force_refresh = False
         print(
-            f"Source: HTTP {base} force_refresh={force_refresh}",
+            f"Source: HTTP {base} per-source /api/* force_refresh={force_refresh}",
             file=sys.stderr,
         )
         try:

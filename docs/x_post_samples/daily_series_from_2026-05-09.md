@@ -189,11 +189,11 @@ https://trends-dashboard.fly.dev/
 
 ```
 【2026-05-15】今日の5つ（JP）
-① 黒島結菜／corinthians x…（検索）
-② Replace to be -…（動画）
-③ 政府・日銀の介入警戒で今週も神経質な展開か…（ニュース）
-④ CodexをローカルLLMで駆動する／WR…（IT）
-⑤ 爆裂愛してる／ザ・スーパーマリオギャラクシ…（エンタメ）
+① エドウィン・ディアス／真木よう子（検索）
+② 荷物を配達するだけのバイトなのに色々ヤ…（動画）
+③ 米中首脳会談 トランプ大統領…（ニュース）
+④ AI×Unityゲーム開発スターターキ…（IT）
+⑤ Blue Jeans／私がビーバーにな…（エンタメ）
 一覧: https://trends-dashboard.fly.dev/
 ```
 
@@ -201,11 +201,11 @@ https://trends-dashboard.fly.dev/
 
 ```
 Today's 5 (US) 2026-05-15 · 8pm JST
-① kelsey plum / atlanta braves… (Search)
-② Escape 50 Pros, Win $50,000 (Video)
-③ Atlanta announces Bobby Cox,… (News)
-④ CVE-2026-42208 · DEV · How… (IT)
-⑤ Choosin' Texas / The Super… (Entertainment)
+① destin florida / school bus… (Search)
+② Wildwood – Official Teaser… (Video)
+③ Previously unaccounted for… (News)
+④ Cisco Catalyst SD-WAN… (IT)
+⑤ Choosin' Texas / Hoppers (Entertainment)
 https://trends-dashboard.fly.dev/
 ```
 

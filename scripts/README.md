@@ -112,7 +112,7 @@ python scripts/scaffold_summary_drafts.py --today --weekly-for-date 2026-05-11 -
 詳細は `docs/summaries/README.md` を参照。
 
 ### generate_ai_daily_summary.py
-`DATABASE_URL` の `trend_daily_snapshots`（前日 × スロット 07/13/19/01）から OpenAI で日次サマリー Markdown を生成する。GitHub Actions では **`--from-api`** で本番の `/api/summaries/daily-snapshots` を使う（`*.flycast` はランナーから解決できない）。`GITHUB_ACTIONS` かつ `DATABASE_URL` に `.flycast` / `.internal` が含まれる場合は、`--from-api` が無くても HTTP 経路に自動切替する。
+`DATABASE_URL` の `trend_daily_snapshots`（前日 × スロット 07/13/19/01）から OpenAI で日次サマリーを書く。**`--write`** 時は **`docs/summaries/daily/YYYY-MM-DD.md`** に加え、成否ログ **`YYYY-MM-DD.generation.json`** を同ディレクトリに必ず書く。GitHub Actions では **`--from-api`**（本番 `/api/summaries/daily-snapshots`）。`GITHUB_ACTIONS` で Fly-private `DATABASE_URL` が注入されていても `--from-api` と同様に HTTP で読める。
 
 **環境変数:** `DATABASE_URL`（ローカル直読み時）、`OPENAI_API_KEY`（`--dry-run` でキーなしのときは JSON のみで可）、`OPENAI_SUMMARY_MODEL`（省略時 `gpt-4o-mini`）、CI の HTTP 読みでは `TREND_DASHBOARD_BASE_URL`。
 

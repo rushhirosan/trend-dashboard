@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Fill ``docs/x_post_samples/daily_series_from_2026-05-09.md`` for a given date.
+Writes **one Markdown file per calendar day** under ``docs/x_post_samples/daily/{YYYY-MM-DD}.md``
+(same JP/US fenced layout as before).
 
 **Preferred:** read ``trend_daily_snapshots`` for slots **07 / 13 / 19** (JST) via
 ``DATABASE_URL``. Labels are scored by **slot coverage** (same keyword in more slots =
@@ -37,6 +38,7 @@ import os
 import re
 import sys
 from datetime import date, datetime
+from pathlib import Path
 from typing import Any, Callable
 from unicodedata import east_asian_width
 from zoneinfo import ZoneInfo
@@ -53,8 +55,7 @@ except ImportError:
 
 
 BASE_DEFAULT = "https://trends-dashboard.fly.dev"
-SERIES_REL = "docs/x_post_samples/daily_series_from_2026-05-09.md"
-ANCHOR_HEADING = "## この先の日付を足すとき"
+DEFAULT_OUTPUT_DIR = "docs/x_post_samples/daily"
 DEFAULT_JP_INNER_MAX = 200
 X_FREE_CHARACTER_LIMIT = 280
 DEFAULT_MAX_US_CHARS = X_FREE_CHARACTER_LIMIT
@@ -709,57 +710,42 @@ def build_us_block(
     )
 
 
-def substitute_fenced_section(section: str, jp_inner: str, us_inner: str) -> str:
-    jp_pat = r"(### JP — 今日の5つ\n\n```\n)(.*?)(\n```)"
-    us_pat = r"(### US — 今日の5つ(?:（英語・同時刻前提）)?\n\n```\n)(.*?)(\n```)"
-
-    def jp_sub(m: re.Match[str]) -> str:
-        return m.group(1) + jp_inner + m.group(3)
-
-    def us_sub(m: re.Match[str]) -> str:
-        return m.group(1) + us_inner + m.group(3)
-
-    out, n_jp = re.subn(jp_pat, jp_sub, section, count=1, flags=re.DOTALL)
-    if n_jp != 1:
-        raise ValueError("JP fenced block not found or not unique in section")
-    out, n_us = re.subn(us_pat, us_sub, out, count=1, flags=re.DOTALL)
-    if n_us != 1:
-        raise ValueError("US fenced block not found or not unique in section")
-    return out
-
-
-def replace_or_insert(content: str, date: str, jp_inner: str, us_inner: str) -> str:
-    marker = f"## {date}\n"
-    idx = content.find(marker)
-    if idx < 0:
-        block = f"""---
-
-## {date}
-
-### JP — 今日の5つ
-
-```
-{jp_inner}
-```
-
-### US — 今日の5つ（英語・同時刻前提）
-
-```
-{us_inner}
-```
-"""
-        ins = content.find(f"\n{ANCHOR_HEADING}")
-        if ins < 0:
-            raise ValueError(f"Cannot find anchor {ANCHOR_HEADING!r} to append new date")
-        return content[:ins] + block + content[ins:]
-
-    next_h = content.find("\n## ", idx + 1)
-    anchor = content.find(f"\n{ANCHOR_HEADING}", idx + 1)
-    candidates = [x for x in (next_h, anchor) if x >= 0]
-    end = min(candidates) if candidates else len(content)
-    section = content[idx:end]
-    new_section = substitute_fenced_section(section, jp_inner, us_inner)
-    return content[:idx] + new_section + content[end:]
+def compose_daily_markdown(date_str: str, jp_inner: str, us_inner: str) -> str:
+    """Single-day file: same section shape as the former monolithic series doc."""
+    lines = [
+        f"# 日次 X ツイート案 — {date_str}",
+        "",
+        "`docs/x_post_samples/daily_guide.md` で固めた型のまま、**その日の JP / US「今日の5つ」**です。",
+        "",
+        "- **自動投入:** `scripts/generate_daily_x_post_series.py --write` が **`trend_daily_snapshots`** の **7時・13時・19時（スロット 07/13/19）**を読み、ラベルごとに「複数スロットへの登場」と「順位の上がり（07→13→19）」をスコアにして①〜⑤を選びます。入力は **`DATABASE_URL` で直接 DB** か、**`--from-api`** で本番の **`GET /api/summaries/daily-snapshots?business_day=…`**（AI 日次サマリーと同じ行）。ソース別の `/api/google-trends` 等は使いません。",
+        "- **GitHub Actions:** `.github/workflows/daily-x-post-series.yml` が **JST 20:10 前後（UTC 11:10）** に **`docs/x_post_samples/daily/{日付}.md`** を更新します。",
+        "- 一覧: https://trends-dashboard.fly.dev/",
+        "- 鮮度: https://trends-dashboard.fly.dev/data-status",
+        "",
+        "**US 返信に足す場合（任意・英語）:**",
+        "",
+        "```",
+        "Dashboard refreshes on a JST schedule (1/7/13/19 JST). Same post time as our JP tweet (8pm JST ≈ US morning).",
+        "```",
+        "",
+        "---",
+        "",
+        f"## {date_str}",
+        "",
+        "### JP — 今日の5つ",
+        "",
+        "```",
+        jp_inner,
+        "```",
+        "",
+        "### US — 今日の5つ（英語・同時刻前提）",
+        "",
+        "```",
+        us_inner,
+        "```",
+        "",
+    ]
+    return "\n".join(lines)
 
 
 def default_date_jst() -> str:
@@ -772,9 +758,15 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--date", help="YYYY-MM-DD (default: today JST) — business_day for snapshots")
     p.add_argument(
-        "--series-file",
-        default=SERIES_REL,
-        help="Path to daily_series markdown (repo-relative or absolute)",
+        "--output-dir",
+        default=DEFAULT_OUTPUT_DIR,
+        help=f"Directory for per-day files (default: {DEFAULT_OUTPUT_DIR})",
+    )
+    p.add_argument(
+        "--output-file",
+        default=None,
+        metavar="PATH",
+        help="Exact output path (overrides --output-dir; parent dirs are created)",
     )
     p.add_argument("--base-url", default=None, help="Override TREND_DASHBOARD_BASE_URL (HTTP mode)")
     p.add_argument(
@@ -788,7 +780,7 @@ def main() -> int:
         help="Read /api/summaries/daily-snapshots (07/13/19 for --date); same rows as AI daily summary",
     )
     p.add_argument("--dry-run", action="store_true", help="Print blocks only; do not write")
-    p.add_argument("--write", action="store_true", help="Update series file")
+    p.add_argument("--write", action="store_true", help="Write docs/x_post_samples/daily/{date}.md")
     fr = p.add_mutually_exclusive_group()
     fr.add_argument(
         "--force-refresh",
@@ -933,13 +925,14 @@ def main() -> int:
         print("\n(pass --write to save)", file=sys.stderr)
         return 0
 
-    path = args.series_file
-    with open(path, encoding="utf-8") as f:
-        content = f.read()
-    new_content = replace_or_insert(content, d, jp, us)
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(new_content)
-    print(f"\nWrote {path}", file=sys.stderr)
+    if args.output_file:
+        out_path = Path(args.output_file)
+    else:
+        out_path = Path(args.output_dir) / f"{d}.md"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    body = compose_daily_markdown(d, jp, us)
+    out_path.write_text(body, encoding="utf-8")
+    print(f"\nWrote {out_path}", file=sys.stderr)
     return 0
 
 

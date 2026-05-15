@@ -18,7 +18,7 @@
 |------|------|
 | `daily_template.md` | 日次のひな形（フロントマター付き） |
 | `weekly_hot_bundle_template.md` | 週次＋ホットを1ファイルにまとめるひな形 |
-| `daily/` | 日次サマリー（**1日1ファイル**） |
+| `daily/` | 日次サマリー（**1日1組**）。`YYYY-MM-DD.md` と **成否用** `YYYY-MM-DD.generation.json`（[`daily/README.md`](daily/README.md)） |
 | `weekly/` | 週次サマリーと週のホットトピックを **1ファイルにまとめる** |
 
 ---
@@ -28,6 +28,7 @@
 | 種別 | 形式 | 例 |
 |------|------|-----|
 | 日次 | `daily/YYYY-MM-DD.md`（掲題の観測日／発行日を **JST** のカレンダー日で表す） | `daily/2026-05-06.md` |
+| 日次（成否ログ） | `daily/YYYY-MM-DD.generation.json`（[`daily/README.md`](daily/README.md)） | `daily/2026-05-06.generation.json` |
 | 週次（＋ホット） | `weekly/YYYY-Www.md`（**ISO 週番号**・その週の月曜を含む ISO 年） | `weekly/2026-W19.md` |
 
 日付の解釈で迷ったら、各ファイル先頭のフロントマターと見出しの「対象」「対象週」を正とする。
@@ -87,22 +88,28 @@ python scripts/scaffold_summary_drafts.py --today --weekly-for-date 2026-05-11
 
 `scripts/generate_ai_daily_summary.py` が `trend_daily_snapshots` の **前日 `business_day`** × スロット **07 → 13 → 19 → 01**（`01` は翌暦日 1 時ジョブで前日を閉じる）を読み、`gpt-4o-mini`（`OPENAI_SUMMARY_MODEL` で変更可）で `docs/summaries/daily/YYYY-MM-DD.md` を生成する。
 
-- **JST 6:50 前後**に動かす想定（7 時一括取得より前で、前日の `01` スロットが揃ったあと）。GitHub Actions: `.github/workflows/ai-daily-summary.yml`（UTC `50 21 * * *`）。
-- **Secrets（GHA）**: `DATABASE_URL`（本番 Postgres 接続文字列）、`OPENAI_API_KEY`。
-- **手元**: `.env` に `DATABASE_URL` と `OPENAI_API_KEY` を設定。
+**`--write` 時は同じディレクトリに `YYYY-MM-DD.generation.json` を必ず書き**（成功・失敗・キー欠如・スナップショット空・OpenAI エラー）— X 投稿の `daily/*.md` と同様に、**日付ごとに結果を追いやすくする**ため。
+
+- **JST 6:50 前後**に動かす想定（7 時一括取得より前で、前日の `01` スロットが揃ったあと）。GitHub Actions: `.github/workflows/ai-daily-summary.yml`（UTC `50 21 * * *`）。失敗時も `.generation.json` をコミットしてからジョブを失敗扱いにする。
+- **Secrets（GHA）**: `OPENAI_API_KEY`（必須）。`DATABASE_URL` は不要（`--from-api` で本番 `/api/summaries/daily-snapshots` を使用）。
+- **手元**: `.env` に `DATABASE_URL` と `OPENAI_API_KEY` を設定（DB 直読み）、または `--from-api`。
 
 ```bash
-# JSON ペイロードだけ（API 課金なし・DB 必須）
+# JSON ペイロードだけ（API 課金なし）。DB があれば自動、無ければ --from-api
 python scripts/generate_ai_daily_summary.py --dry-run --business-day 2026-05-10
+python scripts/generate_ai_daily_summary.py --dry-run --from-api --business-day 2026-05-10
 
 # 標準出力へ全文（課金あり）
 python scripts/generate_ai_daily_summary.py --business-day 2026-05-10
 
-# ファイルへ（既存は --force で上書き）
+# ファイルへ（`YYYY-MM-DD.md` と `YYYY-MM-DD.generation.json`、既存 .md は --force）
 python scripts/generate_ai_daily_summary.py --write --force --business-day 2026-05-10
+
+# CI 相当
+python scripts/generate_ai_daily_summary.py --from-api --write --force
 ```
 
-生成ファイルはフロントマターに `generator: openai` を付ける。**レビュー後に `approved` にするまで配信に使わない。**
+生成ファイルはフロントマターに `generator: openai` を付ける。成否は **`daily/README.md`** のとおり **`*.generation.json`** で確認。**レビュー後に `approved` にするまで配信に使わない。**
 
 ---
 

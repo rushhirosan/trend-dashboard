@@ -24,15 +24,18 @@ jobs:
         run: |
           pip install "requests>=2.31" "psycopg2-binary>=2.9" "python-dotenv>=0.19"
 
-      # DATABASE_URL with *.flycast does not resolve on GitHub-hosted runners.
-      # Snapshots are read from production /api/summaries/daily-snapshots (same DB on Fly).
+      # Writes daily/YYYY-MM-DD.md and companion .generation.json (--write). On failure we still
+      # record .generation.json; continue-on-error so Commit can push the status file, then we fail the job.
       - name: Generate summary (HTTP snapshots + OpenAI)
+        id: summarize
+        continue-on-error: true
         env:
           TREND_DASHBOARD_BASE_URL: https://trends-dashboard.fly.dev
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python scripts/generate_ai_daily_summary.py --from-api --write --force
 
       - name: Commit if changed
+        if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -43,3 +46,7 @@ jobs:
           fi
           git commit -m "docs(summaries): ai daily summary"
           git push
+
+      - name: Fail if summary step failed
+        if: steps.summarize.outcome == 'failure'
+        run: exit 1

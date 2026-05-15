@@ -1,6 +1,7 @@
 """Tests for scripts/generate_ai_daily_summary.py (date helper + API fetch)."""
 
 import importlib.util
+import json
 from datetime import date, datetime
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -70,3 +71,22 @@ def test_use_http_snapshots_gha_fly_private_fallback(monkeypatch, gads, gha, db,
     else:
         monkeypatch.setenv("GITHUB_ACTIONS", gha)
     assert gads.use_http_snapshots(cli_from_api=cli, database_url=db) is expected
+
+
+def test_write_generation_status_json(tmp_path, gads):
+    bd = date(2026, 6, 1)
+    daily_dir = tmp_path / "daily"
+    p = gads.write_generation_status(
+        bd,
+        ok=True,
+        daily_dir=daily_dir,
+        markdown="docs/summaries/daily/2026-06-01.md",
+        model="gpt-4o-mini",
+        snapshot_row_count=42,
+    )
+    assert p.name == "2026-06-01.generation.json"
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert data["business_day"] == "2026-06-01"
+    assert data["ok"] is True
+    assert data["snapshot_row_count"] == 42
+    assert "logged_at" in data

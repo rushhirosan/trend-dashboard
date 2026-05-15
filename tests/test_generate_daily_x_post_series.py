@@ -146,6 +146,16 @@ def test_pick_prefers_rank_jump_when_freq_equal(gx):
     assert top[0] == "Climber"
 
 
+def test_compose_daily_markdown_includes_date_and_fenced_blocks(gx):
+    md = gx.compose_daily_markdown("2026-05-20", "【2026-05-20】jp", "us body")
+    assert "# 日次 X ツイート案 — 2026-05-20" in md
+    assert "## 2026-05-20" in md
+    assert "### JP — 今日の5つ" in md
+    assert "【2026-05-20】jp" in md
+    assert "### US — 今日の5つ（英語・同時刻前提）" in md
+    assert "us body" in md
+
+
 def test_load_snapshots_daytime_slots_from_api_parses_payload(gx, monkeypatch):
     api_rows = [
         {"slot": "07", "series_key": "google_trends_jp", "items": [{"t": "a", "r": 1}]},

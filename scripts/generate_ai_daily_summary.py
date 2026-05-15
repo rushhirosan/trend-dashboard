@@ -22,6 +22,9 @@ GitHub Actions 等 Fly 外では ``DATABASE_URL`` の ``*.flycast`` が解決で
 
 既定の対象日: JST の「昨日」（--business-day で上書き可）。
 HTTP モードのベース URL: ``TREND_DASHBOARD_BASE_URL``（既定 https://trends-dashboard.fly.dev）。
+
+``--write`` 時、その ``business_day`` 向けに **``daily/YYYY-MM-DD.generation.json``** を必ず書く（成功 /
+失敗 / キー欠如 / スナップショット空 / OpenAI 失敗）。CI でコミットするとリポジトリ上で結果が追える。
 """
 
 from __future__ import annotations
@@ -56,6 +59,28 @@ SLOT_LABELS = {
 
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 MAX_USER_CHARS = 100_000
+
+
+def write_generation_status(
+    business_day: date,
+    *,
+    ok: bool,
+    repo_root: Path = REPO_ROOT,
+    daily_dir: Optional[Path] = None,
+    **fields: Any,
+) -> Path:
+    """``daily/{business_day}.generation.json`` — Markdown の横に成否を残す（GHA でコミット用）。"""
+    base = daily_dir if daily_dir is not None else repo_root / "docs" / "summaries" / "daily"
+    base.mkdir(parents=True, exist_ok=True)
+    payload: Dict[str, Any] = {
+        "business_day": business_day.isoformat(),
+        "ok": ok,
+        "logged_at": datetime.now(JST).isoformat(),
+        **fields,
+    }
+    path = base / f"{business_day.isoformat()}.generation.json"
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return path
 
 
 def use_http_snapshots(*, cli_from_api: bool, database_url: str) -> bool:
@@ -300,7 +325,7 @@ def main() -> int:
     p.add_argument(
         "--write",
         action="store_true",
-        help="Write docs/summaries/daily/{business_day}.md",
+        help="Write docs/summaries/daily/{business_day}.md and .generation.json (status)",
     )
     p.add_argument("--force", action="store_true", help="Overwrite existing file")
     p.add_argument(
@@ -340,6 +365,13 @@ def main() -> int:
         (args.base_url or os.getenv("TREND_DASHBOARD_BASE_URL") or BASE_DEFAULT).rstrip("/")
     )
 
+    def emit_status(ok: bool, **fields: Any) -> None:
+        """``--write`` かつ dry-run でないときだけ sidecar JSON を書く。"""
+        if not args.write or args.dry_run:
+            return
+        p = write_generation_status(bd, ok=ok, **fields)
+        print(f"wrote status {p.relative_to(REPO_ROOT)}", file=sys.stderr)
+
     via_http = use_http_snapshots(cli_from_api=args.from_api, database_url=database_url)
     if via_http and not args.from_api:
         print(
@@ -348,6 +380,8 @@ def main() -> int:
             file=sys.stderr,
         )
 
+    rows: List[Dict[str, Any]]
+
     if via_http:
         try:
             rows = fetch_snapshots_from_api(
@@ -355,10 +389,12 @@ def main() -> int:
             )
         except (requests.RequestException, json.JSONDecodeError, RuntimeError) as e:
             print(f"❌ スナップショット API 取得失敗: {e}", file=sys.stderr)
+            emit_status(False, phase="snapshot_fetch", error=str(e))
             return 1
     else:
         if not database_url:
             print("❌ DATABASE_URL が未設定です（Fly 外の CI では --from-api を使う）", file=sys.stderr)
+            emit_status(False, phase="config", error="missing_database_url_use_from_api")
             return 1
         try:
             rows = fetch_snapshots(
@@ -366,6 +402,7 @@ def main() -> int:
             )
         except psycopg2.Error as e:
             print(f"❌ DB スナップショット取得失敗: {e}", file=sys.stderr)
+            emit_status(False, phase="snapshot_db", error=str(e))
             return 1
 
     if args.dry_run and not api_key:
@@ -383,14 +420,22 @@ def main() -> int:
             "❌ OPENAI_API_KEY が未設定です（--dry-run のみ、キーなしでは JSON ペイロードを出せます）",
             file=sys.stderr,
         )
+        emit_status(False, phase="config", error="missing_openai_api_key", snapshot_row_count=len(rows))
         return 1
 
-    text, meta = run_generate(bd, rows, api_key, model)
+    try:
+        text, meta = run_generate(bd, rows, api_key, model)
+    except RuntimeError as e:
+        print(f"❌ OpenAI / 合成失敗: {e}", file=sys.stderr)
+        emit_status(False, phase="openai", error=str(e), snapshot_row_count=len(rows))
+        return 1
+
     if meta.get("error") == "no_snapshot_rows":
         print(
             f"❌ business_day={bd} の trend_daily_snapshots 行がありません。",
             file=sys.stderr,
         )
+        emit_status(False, phase="snapshots", error="no_snapshot_rows", snapshot_row_count=0)
         return 2
 
     if args.dry_run:
@@ -405,10 +450,17 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     if out.exists() and not args.force:
         print(f"skip (exists): {out.relative_to(REPO_ROOT)}", file=sys.stderr)
+        emit_status(False, skipped=True, reason="markdown_exists_use_force", snapshot_row_count=len(rows))
         return 0
 
     out.write_text(text, encoding="utf-8")
     print(f"wrote {out.relative_to(REPO_ROOT)}")
+    emit_status(
+        True,
+        markdown=str(out.relative_to(REPO_ROOT)),
+        model=meta.get("model", model),
+        snapshot_row_count=len(rows),
+    )
     return 0
 
 

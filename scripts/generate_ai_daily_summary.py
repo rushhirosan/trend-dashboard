@@ -60,6 +60,24 @@ SLOT_LABELS = {
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 MAX_USER_CHARS = 100_000
 
+# 日次サマリーの論点見出し（この順・この文言で固定）
+SUMMARY_CATEGORY_ORDER: tuple[str, ...] = (
+    "ニュース",
+    "検索・動画",
+    "テック・開発",
+    "マーケット",
+    "エンタメ",
+    "行政",
+)
+SUMMARY_CATEGORY_HINTS: dict[str, str] = {
+    "ニュース": "NHK・ワールドニュース・CNN・プレス等",
+    "検索・動画": "Google トレンド・YouTube・Wikipedia・SNS 等",
+    "テック・開発": "Zenn・Qiita・GitHub・セキュリティ注意・HN 等",
+    "マーケット": "株・暗号・楽天・App Store 等",
+    "エンタメ": "音楽・映画・Podcast・書籍等",
+    "行政": "e-Stat・官公需・米 BLS・政府支出等",
+}
+
 
 def write_generation_status(
     business_day: date,
@@ -151,30 +169,114 @@ def fetch_snapshots_from_api(
     return rows
 
 
+def _thin_items_from_row(row: Dict[str, Any]) -> tuple[str, str, List[Dict[str, Any]], str]:
+    """行から (slot, series_key, thin items) を取り出す。"""
+    slot = str(row.get("slot") or "")
+    series_key = str(row.get("series_key") or "")
+    items = row.get("items")
+    if isinstance(items, str):
+        try:
+            items = json.loads(items)
+        except json.JSONDecodeError:
+            items = []
+    if not isinstance(items, list):
+        items = []
+    thin: List[Dict[str, Any]] = []
+    for it in items[:25]:
+        if isinstance(it, dict) and it.get("t"):
+            thin.append({"t": it.get("t"), "r": it.get("r")})
+    cap = row.get("captured_at")
+    cap_s = cap.isoformat() if hasattr(cap, "isoformat") else str(cap)
+    return slot, series_key, thin, cap_s
+
+
+def categorize_series_key(series_key: str) -> str:
+    """snapshot の series_key を日次サマリー用カテゴリへ。"""
+    sk = (series_key or "").strip().lower()
+    if not sk:
+        return "検索・動画"
+
+    if sk in ("estat_jp", "kkj_jp", "bls_us", "usaspending_us"):
+        return "行政"
+    if sk.startswith("globenewswire_market"):
+        return "マーケット"
+    if any(
+        sk.startswith(p)
+        for p in (
+            "nhk_",
+            "worldnews_",
+            "cnn_",
+            "globenewswire",
+            "prtimes",
+        )
+    ):
+        return "ニュース"
+    if any(
+        sk.startswith(p)
+        for p in (
+            "stock_",
+            "crypto_",
+            "rakuten_",
+            "ebay_",
+            "appstore_",
+        )
+    ):
+        return "マーケット"
+    if any(
+        sk.startswith(p)
+        for p in (
+            "music_",
+            "movie_",
+            "podcast_",
+            "book_",
+        )
+    ):
+        return "エンタメ"
+    if any(
+        sk.startswith(p)
+        for p in (
+            "zenn_",
+            "qiita_",
+            "github_",
+            "jpcert_",
+            "ipa_",
+            "hackernews_",
+            "devto_",
+            "thehackernews_",
+            "cisa_",
+            "producthunt_",
+            "medium_",
+            "note_",
+            "openalex_",
+        )
+    ):
+        return "テック・開発"
+    if any(
+        sk.startswith(p)
+        for p in (
+            "google_trends_",
+            "youtube_",
+            "wikipedia_",
+            "hatena_",
+            "twitch_",
+            "bluesky_",
+        )
+    ):
+        return "検索・動画"
+
+    return "テック・開発"
+
+
 def compact_rows(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """LLM 用に行をスロット単位でまとめる。"""
+    """LLM 用に行をスロット単位でまとめる（レガシー形）。"""
     by_slot: Dict[str, List[Dict[str, Any]]] = {s: [] for s in SLOT_ORDER}
     for row in rows:
-        slot = str(row.get("slot") or "")
+        slot, series_key, thin, cap_s = _thin_items_from_row(row)
         if slot not in by_slot:
             continue
-        items = row.get("items")
-        if isinstance(items, str):
-            try:
-                items = json.loads(items)
-            except json.JSONDecodeError:
-                items = []
-        if not isinstance(items, list):
-            items = []
-        thin = []
-        for it in items[:25]:
-            if isinstance(it, dict) and it.get("t"):
-                thin.append({"t": it.get("t"), "r": it.get("r")})
-        cap = row.get("captured_at")
-        cap_s = cap.isoformat() if hasattr(cap, "isoformat") else str(cap)
         by_slot[slot].append(
             {
-                "series_key": row.get("series_key"),
+                "series_key": series_key,
                 "captured_at": cap_s,
                 "items": thin,
             }
@@ -189,6 +291,43 @@ def compact_rows(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
             for s in SLOT_ORDER
         ],
     }
+
+
+def compact_rows_by_category(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """LLM 用にカテゴリ → スロット → 系列でまとめる。"""
+    # category -> slot -> list of series dicts
+    buckets: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
+        cat: {s: [] for s in SLOT_ORDER} for cat in SUMMARY_CATEGORY_ORDER
+    }
+    for row in rows:
+        slot, series_key, thin, cap_s = _thin_items_from_row(row)
+        if slot not in SLOT_ORDER:
+            continue
+        cat = categorize_series_key(series_key)
+        buckets[cat][slot].append(
+            {
+                "series_key": series_key,
+                "captured_at": cap_s,
+                "items": thin,
+            }
+        )
+    categories = []
+    for cat in SUMMARY_CATEGORY_ORDER:
+        categories.append(
+            {
+                "category": cat,
+                "hint": SUMMARY_CATEGORY_HINTS.get(cat, ""),
+                "slots": [
+                    {
+                        "slot": s,
+                        "label_ja": SLOT_LABELS.get(s, s),
+                        "series": buckets[cat][s],
+                    }
+                    for s in SLOT_ORDER
+                ],
+            }
+        )
+    return {"categories": categories}
 
 
 def build_user_payload(payload: Dict[str, Any]) -> str:
@@ -267,21 +406,34 @@ generated_at: "{gen_at}"
 
 
 SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ。入力は、ある1日（business_day）の
-日本時間基準で 07→13→19→翌01 時台の定期ジョブ後に保存された「系列キー」と「キーワード／タイトル」
-のスナップショットだけである。Web記事の本文やURLは含まれない。
+日本時間基準で 07→13→19→翌01 時台の定期ジョブ後に保存されたスナップショットを、
+**カテゴリ別**（ニュース／検索・動画／テック・開発／マーケット／エンタメ／行政）に整理した JSON である。
+各系列は series_key とキーワード／タイトル（items）だけ。Web記事の本文やURLは含まれない。
 
 次を厳守すること:
 - 出力は日本語のMarkdownのみ（YAMLフロントマターは書かない。先頭から # 見出しでよい）。
-- 構成は次の見出しをこの順で含めること:
-  1. トップレベル見出し: `# 日次サマリー — BUSINESS_DAY（JST）` の形式（BUSINESS_DAY は入力の日付文字列）
-  2. `- **対象**:` と `- **生成・送信完了**:` の2行（生成時刻は不明なら「自動生成（時刻未入力）」）
-  3. `## 今日の一行結論`
-  4. `## 論点（3〜5）` の下に `###` 見出しで3〜5個
-  5. `## データ前提メモ（任意）` で欠損スロットや系列が少ないことに触れる
+- **BUSINESS_DAY** はユーザー指示と JSON の business_day に一致させる（見出し・対象行の日付を絶対にずらさない）。
+- 構成は次の見出しをこの順で**すべて**含めること:
+  1. `# 日次サマリー — BUSINESS_DAY（JST）`
+  2. `- **対象**:` に BUSINESS_DAY（例: 2026年5月17日）
+  3. `- **生成・送信完了**:`（不明なら「自動生成（時刻未入力）」）
+  4. `## 今日の一行結論`（2〜3文。カテゴリ横断の要約）
+  5. `## 論点（カテゴリ別）` の下に、**次の6見出しをこの順・この文言で必ず書く**:
+     - `### ニュース`
+     - `### 検索・動画`
+     - `### テック・開発`
+     - `### マーケット`
+     - `### エンタメ`
+     - `### 行政`
+  6. `## データ前提メモ`（欠損スロット・薄いカテゴリに触れる）
+
+各 `###` カテゴリでは:
+- 入力に当該カテゴリの items がある場合: **2〜4文**で動きを述べ、代表キーワードを具体的に挙げる。
+- 全スロットで items が空に近い場合: 「スナップショット上、当該カテゴリで目立つ変化は少ない。」と1文でよい。
+- 各カテゴリの末尾に **1行**: `- **ソース**: (系列: …)（スロット: …）`（複数系列・スロットを列挙してよい）。
 
 事実・リンクについて:
 - 入力にURLが無いので、**架空のURLや存在しない記事タイトルへのリンクを作らない**。
-- 「ソース」行には `(系列: google_trends_jp など)（スロット: 07時台ジョブ後 等）` のように観測出所を書く。
 - 憶測・未確認の断定は避け、「スナップショット上は…」と書く。
 - 複数スロットで語が動いていれば変化に言及してよい。"""
 
@@ -300,9 +452,14 @@ def run_generate(
         meta["error"] = "no_snapshot_rows"
         return "", meta
 
-    payload = compact_rows(rows)
+    payload = compact_rows_by_category(rows)
     payload["business_day"] = business_day.isoformat()
-    user = build_user_payload(payload)
+    bd = business_day.isoformat()
+    user = (
+        f"business_day={bd}。トップ見出し `# 日次サマリー — {bd}（JST）` と **対象** 行の日付も "
+        f"必ず {bd} にすること。\n\n"
+        + build_user_payload(payload)
+    )
     inner = call_openai(SYSTEM_PROMPT, user, api_key, model)
     meta["model"] = model
     full = merge_front_matter(business_day, model, inner)
@@ -406,7 +563,7 @@ def main() -> int:
             return 1
 
     if args.dry_run and not api_key:
-        payload = compact_rows(rows)
+        payload = compact_rows_by_category(rows)
         payload["business_day"] = bd.isoformat()
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         print(

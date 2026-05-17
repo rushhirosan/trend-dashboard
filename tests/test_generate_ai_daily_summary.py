@@ -73,6 +73,50 @@ def test_use_http_snapshots_gha_fly_private_fallback(monkeypatch, gads, gha, db,
     assert gads.use_http_snapshots(cli_from_api=cli, database_url=db) is expected
 
 
+@pytest.mark.parametrize(
+    "series_key,expected",
+    [
+        ("nhk_jp", "ニュース"),
+        ("google_trends_jp", "検索・動画"),
+        ("youtube_trends_us", "検索・動画"),
+        ("zenn_jp", "テック・開発"),
+        ("jpcert_jp", "テック・開発"),
+        ("stock_jp", "マーケット"),
+        ("book_jp_fiction", "エンタメ"),
+        ("estat_jp", "行政"),
+        ("kkj_jp", "行政"),
+    ],
+)
+def test_categorize_series_key(gads, series_key, expected):
+    assert gads.categorize_series_key(series_key) == expected
+
+
+def test_compact_rows_by_category_groups_series(gads):
+    rows = [
+        {
+            "slot": "07",
+            "series_key": "google_trends_jp",
+            "items": [{"t": "kw", "r": 1}],
+            "captured_at": "2026-05-17T07:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "nhk_jp",
+            "items": [{"t": "headline", "r": 1}],
+            "captured_at": "2026-05-17T19:00:00+09:00",
+        },
+    ]
+    payload = gads.compact_rows_by_category(rows)
+    headings = [c["category"] for c in payload["categories"]]
+    assert headings == list(gads.SUMMARY_CATEGORY_ORDER)
+    news = next(c for c in payload["categories"] if c["category"] == "ニュース")
+    search = next(c for c in payload["categories"] if c["category"] == "検索・動画")
+    slot19 = next(s for s in news["slots"] if s["slot"] == "19")
+    slot07 = next(s for s in search["slots"] if s["slot"] == "07")
+    assert slot19["series"][0]["series_key"] == "nhk_jp"
+    assert slot07["series"][0]["series_key"] == "google_trends_jp"
+
+
 def test_write_generation_status_json(tmp_path, gads):
     bd = date(2026, 6, 1)
     daily_dir = tmp_path / "daily"

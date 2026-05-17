@@ -24,7 +24,8 @@ Env:
   DATABASE_URL             直接 PostgreSQL から 07/13/19 を読む（``--from-api`` なしのとき）
   TREND_DASHBOARD_BASE_URL ``--from-api`` またはレガシー HTTP 用ベース URL（既定: https://trends-dashboard.fly.dev）
 
-夜の X 文案は **急上昇3つ**（07→13→19 で順位が上がった話題を全ソースから最大3件）。JP / US とも X 無料枠（加重 280 相当）に収める。
+夜の X 文案は **急上昇3つ**（07→13→19 で順位が上がった話題を全ソースから最大3件。
+前スロット未出現は top-N 圏外として N+1 相当で jump 計算）。JP / US とも X 無料枠（加重 280 相当）に収める。
 JP は east_asian_width の Wide/Full を 2、その他を 1 とする近似。末尾 URL は 23 相当。
 長めのコピー用（JP の加重チェックなし・US は生文字数）の例:
   python scripts/generate_daily_x_post_series.py --jp-max-x-weighted 0 --max-us-chars 500
@@ -125,6 +126,19 @@ SNAPSHOT_SLOTS_DAYTIME = ("07", "13", "19")
 # 選定スコア: 複数スロットに出たラベルを優先し、順位が上がった（数値が小さくなった）ほど加点
 FREQ_WEIGHT = 10.0
 JUMP_WEIGHT = 1.0
+
+
+def _snapshot_top_n() -> int:
+    """``trend_snapshot_service._top_n`` と同じ（スナップショットの圏外判定用）。"""
+    try:
+        return max(1, min(25, int(os.getenv("TREND_SNAPSHOT_TOP_N", "10"))))
+    except (TypeError, ValueError):
+        return 10
+
+
+def _rank_out_of_range() -> int:
+    """そのスロットの top-N に載っていないときの仮想順位（N+1）。"""
+    return _snapshot_top_n() + 1
 
 
 def _char_x_weight(ch: str) -> int:
@@ -243,16 +257,23 @@ def _agg_primary_display(agg: dict[str, Any]) -> str:
 def rank_jump_score(ranks: dict[str, int]) -> float:
     """
     順位は数値が小さいほど上位。07→13→19 で順位が下がれば（数値が減れば）プラス。
-    13 が無い場合は 07→19 のNetのみ。
+
+    前スロットに未出現（top-N 圏外）のときは ``_rank_out_of_range()``（N+1）を
+    07 または 13 の順位として扱う。07・19 のみで 13 が無いときは 07→19 の Net。
     """
+    oor = _rank_out_of_range()
     r7 = ranks.get("07")
     r13 = ranks.get("13")
     r19 = ranks.get("19")
     s = 0.0
-    if r7 is not None and r13 is not None:
-        s += max(0.0, float(r7 - r13))
-    if r13 is not None and r19 is not None:
-        s += max(0.0, float(r13 - r19))
+    if r13 is not None:
+        r7_eff = r7 if r7 is not None else oor
+        s += max(0.0, float(r7_eff - r13))
+    if r19 is not None:
+        if r13 is not None:
+            s += max(0.0, float(r13 - r19))
+        elif r7 is None:
+            s += max(0.0, float(oor - r19))
     if r7 is not None and r19 is not None and r13 is None:
         s += max(0.0, float(r7 - r19))
     return s

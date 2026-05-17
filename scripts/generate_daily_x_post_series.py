@@ -24,7 +24,7 @@ Env:
   DATABASE_URL             直接 PostgreSQL から 07/13/19 を読む（``--from-api`` なしのとき）
   TREND_DASHBOARD_BASE_URL ``--from-api`` またはレガシー HTTP 用ベース URL（既定: https://trends-dashboard.fly.dev）
 
-JP / US ともデフォルトで X 無料枠（加重カウント合計 280 相当）に収める。
+夜の X 文案は **急上昇3つ**（07→13→19 で順位が上がった話題を全ソースから最大3件）。JP / US とも X 無料枠（加重 280 相当）に収める。
 JP は east_asian_width の Wide/Full を 2、その他を 1 とする近似。末尾 URL は 23 相当。
 長めのコピー用（JP の加重チェックなし・US は生文字数）の例:
   python scripts/generate_daily_x_post_series.py --jp-max-x-weighted 0 --max-us-chars 500
@@ -61,10 +61,63 @@ X_FREE_CHARACTER_LIMIT = 280
 DEFAULT_MAX_US_CHARS = X_FREE_CHARACTER_LIMIT
 X_FREE_URL_WEIGHT = 23
 POST_FOOTER_URL = "https://trends-dashboard.fly.dev/"
+POST_FOOTER_URL_US = "https://trends-dashboard.fly.dev/us"
 JP_LIST_LINE = f"一覧: {POST_FOOTER_URL}"
+US_LIST_LINE = f"一覧: {POST_FOOTER_URL_US}"
 
 JP_CATEGORY_TAILS = ("（検索）", "（動画）", "（ニュース）", "（IT）", "（エンタメ）")
 US_CATEGORY_TAILS = (" (Search)", " (Video)", " (News)", " (IT)", " (Entertainment)")
+
+# 夜の X 投稿: 07→13→19 で順位が上がったラベルを全ソース横断で最大3件
+RISING_PICK_COUNT = 3
+RISING_MARKERS = ("①", "②", "③")
+
+JP_SERIES_KEYS = (
+    "google_trends_jp",
+    "youtube_trends_jp",
+    "nhk_jp",
+    "worldnews_jp",
+    "zenn_jp",
+    "jpcert_jp",
+    "music_trends_jp",
+    "movie_jp",
+)
+US_SERIES_KEYS = (
+    "google_trends_us",
+    "youtube_trends_us",
+    "cnn_us",
+    "cisa_kev_us",
+    "devto_us",
+    "thehackernews_us",
+    "music_trends_us",
+    "movie_us",
+)
+
+SERIES_CATEGORY_JP: dict[str, str] = {
+    "google_trends_jp": "検索",
+    "youtube_trends_jp": "動画",
+    "nhk_jp": "ニュース",
+    "worldnews_jp": "ニュース",
+    "zenn_jp": "IT",
+    "jpcert_jp": "IT",
+    "music_trends_jp": "エンタメ",
+    "movie_jp": "エンタメ",
+}
+SERIES_CATEGORY_US: dict[str, str] = {
+    "google_trends_us": "Search",
+    "youtube_trends_us": "Video",
+    "cnn_us": "News",
+    "cisa_kev_us": "IT",
+    "devto_us": "IT",
+    "thehackernews_us": "IT",
+    "music_trends_us": "Entertainment",
+    "movie_us": "Entertainment",
+}
+
+_WEAK_RISING_LABEL = re.compile(
+    r"^(pickup|official|news|video|動画|ニュース|…+)$",
+    re.I,
+)
 
 # スケジューラ 7時・13時・19時（JST）のスナップショットだけをマージして選定する
 SNAPSHOT_SLOTS_DAYTIME = ("07", "13", "19")
@@ -83,6 +136,25 @@ def _jp_body_x_weight(body: str) -> int:
         return sum(_char_x_weight(c) for c in body)
     base = body.replace(POST_FOOTER_URL, "")
     return sum(_char_x_weight(c) for c in base) + X_FREE_URL_WEIGHT
+
+
+def _us_body_x_weight(body: str) -> int:
+    if US_LIST_LINE in body:
+        base = body.replace(US_LIST_LINE, "")
+        return sum(_char_x_weight(c) for c in base) + X_FREE_URL_WEIGHT
+    if POST_FOOTER_URL_US in body:
+        base = body.replace(POST_FOOTER_URL_US, "")
+        return sum(_char_x_weight(c) for c in base) + X_FREE_URL_WEIGHT
+    if POST_FOOTER_URL in body:
+        base = body.replace(POST_FOOTER_URL, "")
+        return sum(_char_x_weight(c) for c in base) + X_FREE_URL_WEIGHT
+    return sum(_char_x_weight(c) for c in body)
+
+
+def _us_footer_line_cost(*, x_free_counting: bool) -> int:
+    if x_free_counting:
+        return _us_body_x_weight(US_LIST_LINE)
+    return len(US_LIST_LINE)
 
 
 def _fr_q(force_refresh: bool) -> str:
@@ -292,6 +364,116 @@ def pick_single_line(
     return s
 
 
+def _postprocess_series_display(series_key: str, display: str) -> str:
+    if series_key == "jpcert_jp":
+        return re.sub(r"^Weekly Report:\s*", "WR ", display, flags=re.I)
+    return display
+
+
+def clean_rising_display(display: str) -> str:
+    """欄名・【動画】などの前置きを除き、ツイート向けに短くする。"""
+    s = re.sub(r"^【[^】]{1,16}】\s*", "", str(display).strip())
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def is_weak_rising_label(display: str) -> bool:
+    s = clean_rising_display(display)
+    if not s or s == "…":
+        return True
+    if len(s) < 4:
+        return True
+    if _WEAK_RISING_LABEL.match(s.strip()):
+        return True
+    return False
+
+
+def _best_rank_in_agg(agg: dict[str, Any]) -> int:
+    ranks = agg.get("ranks") or {}
+    for slot in ("19", "13", "07"):
+        if slot in ranks:
+            return int(ranks[slot])
+    return 999
+
+
+def iter_rising_candidates(
+    series_by_slot: dict[str, dict[str, list[Any]]],
+    series_keys: tuple[str, ...],
+    *,
+    category_by_series: dict[str, str],
+) -> list[dict[str, Any]]:
+    """全 series を横断し、ラベルキーごとに最も jump が大きい候補を1つ残す。"""
+    best: dict[str, dict[str, Any]] = {}
+    for series_key in series_keys:
+        aggs = aggregate_labels_for_series(series_by_slot, series_key)
+        tail = category_by_series.get(series_key, "他")
+        for nk, agg in aggs.items():
+            ranks = agg.get("ranks") or {}
+            jump = rank_jump_score(ranks)
+            display = clean_rising_display(
+                _postprocess_series_display(series_key, _agg_primary_display(agg))
+            )
+            if is_weak_rising_label(display):
+                continue
+            freq = len(set(ranks.keys()) & set(SNAPSHOT_SLOTS_DAYTIME))
+            r_best = _best_rank_in_agg(agg)
+            cand = {
+                "nk": nk,
+                "display": display,
+                "tail": tail,
+                "jump": jump,
+                "freq": freq,
+                "r_best": r_best,
+                "series_key": series_key,
+            }
+            prev = best.get(nk)
+            if prev is None or (cand["jump"], cand["freq"], -cand["r_best"]) > (
+                prev["jump"],
+                prev["freq"],
+                -prev["r_best"],
+            ):
+                best[nk] = cand
+    return list(best.values())
+
+
+def pick_rising_topics(
+    series_by_slot: dict[str, dict[str, list[Any]]],
+    series_keys: tuple[str, ...],
+    *,
+    category_by_series: dict[str, str],
+    count: int = RISING_PICK_COUNT,
+) -> list[tuple[str, str]]:
+    """
+    急上昇（07→13→19 で順位改善）を優先して count 件。
+    足りないときだけ jump=0 の候補で埋める。
+    """
+    candidates = iter_rising_candidates(
+        series_by_slot, series_keys, category_by_series=category_by_series
+    )
+    candidates.sort(
+        key=lambda c: (-c["jump"], -c["freq"], c["r_best"], c["display"])
+    )
+    with_jump = [c for c in candidates if c["jump"] > 0]
+    if len(with_jump) < count:
+        print(
+            f"NOTE: only {len(with_jump)} label(s) with rank jump > 0 (target {count})",
+            file=sys.stderr,
+        )
+    out: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for c in with_jump:
+        if c["nk"] in seen:
+            continue
+        seen.add(c["nk"])
+        out.append((c["display"], c["tail"]))
+        if len(out) >= count:
+            break
+    fallback_tail = next(iter(category_by_series.values()), "他")
+    while len(out) < count:
+        out.append(("…", fallback_tail))
+    return out[:count]
+
+
 def load_snapshots_daytime_slots(
     database_url: str,
     business_day: date,
@@ -436,6 +618,35 @@ def _compose_jp_body(
     return body
 
 
+def _compose_jp_rising_body(
+    d: str,
+    picks: list[tuple[str, str]],
+    *,
+    inner_max: int,
+    max_jp_x_weighted: int,
+) -> str:
+    def ln(marker: str, inner: str, tail: str, lim: int) -> str:
+        return f"{marker} {clip(inner, lim)}（{tail}）"
+
+    im = max(12, inner_max)
+    body = ""
+    while im >= 8:
+        lines = [f"【{d}】今日の急上昇3つ（JP）"]
+        for marker, (inner, tail) in zip(RISING_MARKERS, picks):
+            lines.append(ln(marker, inner, tail, im))
+        lines.append(JP_LIST_LINE)
+        body = "\n".join(lines)
+        if max_jp_x_weighted <= 0 or _jp_body_x_weight(body) <= max_jp_x_weighted:
+            break
+        im -= 2
+    if max_jp_x_weighted > 0 and _jp_body_x_weight(body) > max_jp_x_weighted:
+        print(
+            "WARNING: JP rising block still exceeds X weighted budget",
+            file=sys.stderr,
+        )
+    return body
+
+
 def build_jp_block_from_snapshots(
     series_by_slot: dict[str, dict[str, list[Any]]],
     d: str,
@@ -443,32 +654,15 @@ def build_jp_block_from_snapshots(
     *,
     max_jp_x_weighted: int = X_FREE_CHARACTER_LIMIT,
 ) -> str:
-    g_line = google_line_from_slots(series_by_slot, "google_trends_jp", sep="／")
-
-    yt = pick_single_line(series_by_slot, "youtube_trends_jp")
-    nh_t = pick_single_line(series_by_slot, "nhk_jp")
-    wn_t = pick_single_line(series_by_slot, "worldnews_jp")
-    news_line = f"{nh_t}／{wn_t}"
-
-    zt = pick_single_line(series_by_slot, "zenn_jp")
-    jt = pick_single_line(
+    picks = pick_rising_topics(
         series_by_slot,
-        "jpcert_jp",
-        postprocess=lambda s: re.sub(r"^Weekly Report:\s*", "WR ", s, flags=re.I),
+        JP_SERIES_KEYS,
+        category_by_series=SERIES_CATEGORY_JP,
+        count=RISING_PICK_COUNT,
     )
-    tech_line = f"{zt}／{jt}"
-
-    mt = pick_single_line(series_by_slot, "music_trends_jp")
-    movie_t = pick_single_line(series_by_slot, "movie_jp")
-    ent_line = f"{mt}／{movie_t}"
-
-    return _compose_jp_body(
+    return _compose_jp_rising_body(
         d,
-        g_line=g_line,
-        yt=yt,
-        news_line=news_line,
-        tech_line=tech_line,
-        ent_line=ent_line,
+        picks,
         inner_max=inner_max,
         max_jp_x_weighted=max_jp_x_weighted,
     )
@@ -532,6 +726,10 @@ def build_jp_block(
     )
 
 
+def _us_rising_header(d: str) -> str:
+    return f"Today's rising 3 (US) {d} · 8pm JST"
+
+
 def _us_header(d: str, compact: bool) -> str:
     if compact:
         return f"Today's 5 (US) {d} · 8pm JST\n"
@@ -541,14 +739,12 @@ def _us_header(d: str, compact: bool) -> str:
 def _us_body_weight(body: str, *, x_free_counting: bool) -> int:
     if not x_free_counting:
         return len(body)
-    if POST_FOOTER_URL not in body:
-        return len(body)
-    return len(body) - len(POST_FOOTER_URL) + X_FREE_URL_WEIGHT
+    return _us_body_x_weight(body)
 
 
 def _us_fixed_overhead(d: str, compact_header: bool, *, x_free_counting: bool) -> int:
     header = _us_header(d, compact_header).rstrip("\n")
-    url_cost = X_FREE_URL_WEIGHT if x_free_counting else len(POST_FOOTER_URL)
+    url_cost = _us_footer_line_cost(x_free_counting=x_free_counting)
     parts = [
         ("① ", US_CATEGORY_TAILS[0]),
         ("② ", US_CATEGORY_TAILS[1]),
@@ -587,7 +783,7 @@ def _compose_us_body(
             ln("③ ", cnn_t, US_CATEGORY_TAILS[2], inner_limits[2]),
             ln("④ ", tech_core, US_CATEGORY_TAILS[3], inner_limits[3]),
             ln("⑤ ", ent_line, US_CATEGORY_TAILS[4], inner_limits[4]),
-            POST_FOOTER_URL,
+            US_LIST_LINE,
         ]
 
     if max_chars <= 0:
@@ -621,36 +817,65 @@ def _compose_us_body(
     return body
 
 
+def _compose_us_rising_body(
+    d: str,
+    picks: list[tuple[str, str]],
+    *,
+    max_chars: int,
+) -> str:
+    x_free_counting = max_chars <= X_FREE_CHARACTER_LIMIT
+    header = _us_rising_header(d)
+    url_cost = _us_footer_line_cost(x_free_counting=x_free_counting)
+    fixed = len(header) + 2 + url_cost  # newlines + markers
+    for _m, tail in zip(RISING_MARKERS, picks):
+        fixed += 2 + len(tail) + 3  # "① " + " (Search)" style — US uses space paren
+
+    def assemble(inner_limits: list[int]) -> str:
+        lines = [header]
+        for marker, (inner, tail), lim in zip(RISING_MARKERS, picks, inner_limits):
+            lines.append(f"{marker} {clip(inner, lim)} ({tail})")
+        lines.append(US_LIST_LINE)
+        return "\n".join(lines)
+
+    if max_chars <= 0:
+        return assemble([80] * RISING_PICK_COUNT)
+
+    remaining = max_chars - fixed
+    if remaining < 30:
+        raise ValueError(f"max_us_chars={max_chars} too small for US rising template (~{fixed})")
+
+    base_each = max(28, remaining // RISING_PICK_COUNT)
+    limits = [base_each + (1 if i < (remaining % RISING_PICK_COUNT) else 0) for i in range(RISING_PICK_COUNT)]
+    body = assemble(limits)
+
+    def over_budget(b: str) -> int:
+        if not x_free_counting:
+            return len(b) - max_chars
+        return _us_body_x_weight(b) - max_chars
+
+    guard = 0
+    while over_budget(body) > 0 and guard < 200:
+        guard += 1
+        idx = max(range(RISING_PICK_COUNT), key=lambda i: limits[i])
+        if limits[idx] <= 16:
+            break
+        limits[idx] = max(16, limits[idx] - max(1, min(over_budget(body), 6)))
+        body = assemble(limits)
+    return body
+
+
 def build_us_block_from_snapshots(
     series_by_slot: dict[str, dict[str, list[Any]]],
     d: str,
     max_chars: int = DEFAULT_MAX_US_CHARS,
 ) -> str:
-    g_line = google_line_from_slots(series_by_slot, "google_trends_us", sep=" / ")
-
-    yt_us = pick_single_line(series_by_slot, "youtube_trends_us")
-    cnn_t = pick_single_line(series_by_slot, "cnn_us")
-
-    cve = pick_single_line(series_by_slot, "cisa_kev_us")
-    dev_t = pick_single_line(series_by_slot, "devto_us")
-    th_short = pick_single_line(series_by_slot, "thehackernews_us")
-    core_a = f"{cve} · DEV · {dev_t}".strip()
-    core_b = f"{cve} · THN · {th_short}".strip()
-    tech_core = core_a if len(core_a) <= len(core_b) else core_b
-
-    mt = pick_single_line(series_by_slot, "music_trends_us")
-    mv = pick_single_line(series_by_slot, "movie_us")
-    ent_line = f"{mt} / {mv}"
-
-    return _compose_us_body(
-        d,
-        g_line=g_line,
-        yt_us=yt_us,
-        cnn_t=cnn_t,
-        tech_core=tech_core,
-        ent_line=ent_line,
-        max_chars=max_chars,
+    picks = pick_rising_topics(
+        series_by_slot,
+        US_SERIES_KEYS,
+        category_by_series=SERIES_CATEGORY_US,
+        count=RISING_PICK_COUNT,
     )
+    return _compose_us_rising_body(d, picks, max_chars=max_chars)
 
 
 def build_us_block(
@@ -715,9 +940,9 @@ def compose_daily_markdown(date_str: str, jp_inner: str, us_inner: str) -> str:
     lines = [
         f"# 日次 X ツイート案 — {date_str}",
         "",
-        "`docs/x_post_samples/daily_guide.md` で固めた型のまま、**その日の JP / US「今日の5つ」**です。",
+        "`docs/x_post_samples/daily_guide.md` の **夜用・急上昇3つ** 型。**朝の読み物は AI 日次サマリー**（`docs/summaries/daily/`）のみ。",
         "",
-        "- **自動投入:** `scripts/generate_daily_x_post_series.py --write` が **`trend_daily_snapshots`** の **7時・13時・19時（スロット 07/13/19）**を読み、ラベルごとに「複数スロットへの登場」と「順位の上がり（07→13→19）」をスコアにして①〜⑤を選びます。入力は **`DATABASE_URL` で直接 DB** か、**`--from-api`** で本番の **`GET /api/summaries/daily-snapshots?business_day=…`**（AI 日次サマリーと同じ行）。ソース別の `/api/google-trends` 等は使いません。",
+        "- **自動投入:** `scripts/generate_daily_x_post_series.py --write` が **`trend_daily_snapshots`** の **07 / 13 / 19** を読み、**全ソース横断で順位が上がったラベル**を最大3件（JP/US 各ブロック）選びます。入力は **`DATABASE_URL`** か **`--from-api`**（`GET /api/summaries/daily-snapshots`）。",
         "- **GitHub Actions:** `.github/workflows/daily-x-post-series.yml` が **JST 20:10 前後（UTC 11:10）** に **`docs/x_post_samples/daily/{日付}.md`** を更新します。",
         "- 一覧: https://trends-dashboard.fly.dev/",
         "- 鮮度: https://trends-dashboard.fly.dev/data-status",
@@ -732,13 +957,13 @@ def compose_daily_markdown(date_str: str, jp_inner: str, us_inner: str) -> str:
         "",
         f"## {date_str}",
         "",
-        "### JP — 今日の5つ",
+        "### JP — 今日の急上昇3つ",
         "",
         "```",
         jp_inner,
         "```",
         "",
-        "### US — 今日の5つ（英語・同時刻前提）",
+        "### US — 今日の急上昇3つ（英語）",
         "",
         "```",
         us_inner,

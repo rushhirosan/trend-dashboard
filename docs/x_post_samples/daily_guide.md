@@ -7,7 +7,8 @@ Trend Dashboard 向け **1日1ツイート（20時 JST）** の運用メモ・�
 - トレンド一括取得は **1 / 7 / 13 / 19 時（JST）** のスケジューラ実行がベース。
 - **20時投稿**なら、本文の「反映」は例として **「当日 13:00・19:00 更新を中心に反映」** のように書くと誤解が少ない。
 - **JP / US を同じ JST 20:00** に出す運用にすると、US 向け英語ポストは現地ではだいたい**朝**になる。**US 投稿の冒頭（または返信）にその前提**を書いておくと時差の誤解が減る（このファイル内「同時刻運用」参照）。
-- **日次の本文投入:** `DATABASE_URL` ありで `scripts/generate_daily_x_post_series.py --write`（既定は `docs/x_post_samples/daily/{日付}.md`）、または GitHub Actions `Daily X post series`（JST 20:10 前後、`--from-api` で本番の `/api/summaries/daily-snapshots` と同じ行を読む）。DB も HTTP も無いときだけ、スクリプトを引数なしで叩くとレガシーなソース別 `/api/*` 経路になる。
+- **夜（X）と朝（AI）の分担:** **20時 JST 前後**の X 文案は **急上昇3つ**のみ（`07→13→19` で順位が上がった話題を全ソースから最大3件・OpenAI なし）。**朝 6:50 JST** の **AI 日次サマリー**（`docs/summaries/daily/`）が読み物の本体。
+- **日次の本文投入:** `scripts/generate_daily_x_post_series.py --write`（`docs/x_post_samples/daily/{日付}.md`）または GitHub Actions `Daily X post series`（JST 20:10 前後、`--from-api`）。DB も HTTP も無いときだけレガシーなソース別 `/api/*`（5カテゴリ・単一時点）になる。
 
 ## ファイルの置き場
 
@@ -64,7 +65,23 @@ US: ・ハイテク決算・AI関連 ・選挙・政策ニュース ・エンタ
 
 ---
 
-### 1ポスト＝「今日の3つ」（合計3件）
+### 1ポスト＝「今日の急上昇3つ」（夜の自動生成・推奨）
+
+GitHub Actions / `generate_daily_x_post_series.py` の **既定出力**。スナップショット **07 / 13 / 19** を突き合わせ、**順位が上がったラベル**を全ソースから最大3件。出典は括弧1語（検索・動画・ニュース・IT・エンタメ）。
+
+```
+【YYYY-MM-DD】今日の急上昇3つ（JP）
+① …（検索）
+② …（動画）
+③ …（ニュース）
+一覧: https://trends-dashboard.fly.dev/
+```
+
+US 英語ブロックは `Today's rising 3 (US) YYYY-MM-DD · 8pm JST` 見出し。末尾は **`一覧: https://trends-dashboard.fly.dev/us`**（JP はルート URL）。欄名だけのラベル（`Pickup` 等）は選定から除外する。
+
+---
+
+### 1ポスト＝「今日の3つ」（手書き・3件）
 
 カテゴリ一覧ではなく **入口だけ** に絞る日向け。JP だけ / US だけでもよい。
 

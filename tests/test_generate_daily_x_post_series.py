@@ -95,33 +95,36 @@ def test_google_line_snapshot_pair_and_single(gx):
     assert gx._google_line_snapshot(single, sep=" / ") == "Only"
 
 
-def test_build_blocks_from_snapshots_match_expected_lines(gx):
-    flat = {
-        "google_trends_jp": [{"t": "g1"}, {"t": "g2"}],
-        "youtube_trends_jp": [{"t": "yt"}],
-        "nhk_jp": [{"t": "nh"}],
-        "worldnews_jp": [{"t": "wn"}],
-        "zenn_jp": [{"t": "z"}],
-        "jpcert_jp": [{"t": "Weekly Report: WRX"}],
-        "music_trends_jp": [{"t": "mu"}],
-        "movie_jp": [{"t": "mv"}],
-        "google_trends_us": [{"t": "ug1"}, {"t": "ug2"}],
-        "youtube_trends_us": [{"t": "uyt"}],
-        "cnn_us": [{"t": "cnn"}],
-        "cisa_kev_us": [{"t": "CVE-2026-1"}],
-        "devto_us": [{"t": "dev"}],
-        "thehackernews_us": [{"t": "thn"}],
-        "music_trends_us": [{"t": "umu"}],
-        "movie_us": [{"t": "umv"}],
+def test_build_blocks_from_snapshots_rising_format(gx):
+    bundle = {
+        "07": {
+            "google_trends_jp": [{"t": "FlatJP", "r": 1}],
+            "youtube_trends_jp": [{"t": "ClimberJP", "r": 18}],
+            "google_trends_us": [{"t": "FlatUS", "r": 1}],
+            "youtube_trends_us": [{"t": "ClimberUS", "r": 20}],
+        },
+        "13": {
+            "google_trends_jp": [{"t": "FlatJP", "r": 1}],
+            "youtube_trends_jp": [{"t": "ClimberJP", "r": 9}],
+            "google_trends_us": [{"t": "FlatUS", "r": 1}],
+            "youtube_trends_us": [{"t": "ClimberUS", "r": 11}],
+        },
+        "19": {
+            "google_trends_jp": [{"t": "FlatJP", "r": 1}],
+            "youtube_trends_jp": [{"t": "ClimberJP", "r": 2}],
+            "google_trends_us": [{"t": "FlatUS", "r": 1}],
+            "youtube_trends_us": [{"t": "ClimberUS", "r": 3}],
+        },
     }
-    bundle = _triple_flat(flat)
     jp = gx.build_jp_block_from_snapshots(bundle, "2026-05-12", max_jp_x_weighted=0)
-    assert "g1／g2" in jp
-    assert "nh／wn" in jp
-    assert "z／WR WRX" in jp
+    assert "急上昇3つ" in jp
+    assert "ClimberJP" in jp
+    assert "① ClimberJP" in jp
+    assert "② FlatJP" not in jp
     us = gx.build_us_block_from_snapshots(bundle, "2026-05-12", max_chars=0)
-    assert "ug1 / ug2" in us
-    assert "CVE-2026-1" in us
+    assert "Today's rising 3" in us
+    assert "ClimberUS" in us
+    assert gx.US_LIST_LINE in us
 
 
 def test_pick_prefers_label_in_more_slots(gx):
@@ -146,13 +149,44 @@ def test_pick_prefers_rank_jump_when_freq_equal(gx):
     assert top[0] == "Climber"
 
 
+def test_pick_rising_topics_prefers_rank_jump_across_series(gx):
+    bundle = {
+        "07": {
+            "google_trends_jp": [{"t": "Slow", "r": 5}],
+            "zenn_jp": [{"t": "Fast", "r": 30}],
+        },
+        "13": {
+            "google_trends_jp": [{"t": "Slow", "r": 4}],
+            "zenn_jp": [{"t": "Fast", "r": 8}],
+        },
+        "19": {
+            "google_trends_jp": [{"t": "Slow", "r": 3}],
+            "zenn_jp": [{"t": "Fast", "r": 1}],
+        },
+    }
+    picks = gx.pick_rising_topics(
+        bundle,
+        gx.JP_SERIES_KEYS,
+        category_by_series=gx.SERIES_CATEGORY_JP,
+        count=2,
+    )
+    assert picks[0][0] == "Fast"
+    assert picks[0][1] == "IT"
+
+
+def test_is_weak_rising_label_filters_pickup(gx):
+    assert gx.is_weak_rising_label("Pickup")
+    assert gx.is_weak_rising_label("【動画】")
+    assert not gx.is_weak_rising_label("イラン船舶攻撃")
+
+
 def test_compose_daily_markdown_includes_date_and_fenced_blocks(gx):
     md = gx.compose_daily_markdown("2026-05-20", "【2026-05-20】jp", "us body")
     assert "# 日次 X ツイート案 — 2026-05-20" in md
     assert "## 2026-05-20" in md
-    assert "### JP — 今日の5つ" in md
+    assert "### JP — 今日の急上昇3つ" in md
     assert "【2026-05-20】jp" in md
-    assert "### US — 今日の5つ（英語・同時刻前提）" in md
+    assert "### US — 今日の急上昇3つ（英語）" in md
     assert "us body" in md
 
 

@@ -117,6 +117,57 @@ def test_compact_rows_by_category_groups_series(gads):
     assert slot07["series"][0]["series_key"] == "google_trends_jp"
 
 
+def test_build_rising_highlights_picks_rank_jump(gads):
+    rows = [
+        {
+            "slot": "07",
+            "series_key": "youtube_trends_jp",
+            "items": [{"t": "Climber", "r": 18}],
+            "captured_at": "2026-05-18T07:00:00+09:00",
+        },
+        {
+            "slot": "13",
+            "series_key": "youtube_trends_jp",
+            "items": [{"t": "Climber", "r": 8}],
+            "captured_at": "2026-05-18T13:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "youtube_trends_jp",
+            "items": [{"t": "Climber", "r": 2}],
+            "captured_at": "2026-05-18T19:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "google_trends_jp",
+            "items": [{"t": "Flat", "r": 1}],
+            "captured_at": "2026-05-18T19:00:00+09:00",
+        },
+    ]
+    rising = gads.build_rising_highlights(rows, count=2)
+    assert len(rising) >= 1
+    assert rising[0]["label"] == "Climber"
+    assert rising[0]["jump"] == 16.0
+    assert rising[0]["category"] == "検索・動画"
+
+
+def test_build_llm_payload_omits_empty_categories(gads):
+    rows = [
+        {
+            "slot": "07",
+            "series_key": "nhk_jp",
+            "items": [{"t": "headline", "r": 1}],
+            "captured_at": "2026-05-18T07:00:00+09:00",
+        },
+    ]
+    payload = gads.build_llm_payload(rows, date(2026, 5, 18))
+    assert payload["business_day"] == "2026-05-18"
+    assert "reader_context" in payload
+    cats = [c["category"] for c in payload["categories"]]
+    assert cats == ["ニュース"]
+    assert "テック・開発" in payload["quiet_categories"]
+
+
 def test_write_generation_status_json(tmp_path, gads):
     bd = date(2026, 6, 1)
     daily_dir = tmp_path / "daily"

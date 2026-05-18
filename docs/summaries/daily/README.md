@@ -4,8 +4,27 @@
 
 | ファイル | 内容 |
 |----------|------|
-| `YYYY-MM-DD.md` | OpenAI で生成した Markdown（成功時のみ上書き。**`generator: openai`** がフロントマターにあるのが AI 生成の目印）。論点は **ニュース / 検索・動画 / テック・開発 / マーケット / エンタメ / 行政** の6カテゴリ固定 |
+| `YYYY-MM-DD.md` | OpenAI で生成した Markdown（成功時のみ上書き。**`generator: openai`** がフロントマターにあるのが AI 生成の目印）。構成は **昨日の一行結論 → 昨日いちばん動いた3つ → 今日の見方**（観測日＝ファイル名、読者は通常翌朝に受け取る） |
 | `YYYY-MM-DD.generation.json` | その回の **成否ログ**（成功なら `ok: true` と行数・モデル、失敗なら `ok: false` と `error` / `phase`） |
 
+## ファイル名の日付（観測日 = `business_day`）
+
+**`YYYY-MM-DD` は「届いた日」ではなく、その日のトレンドをまとめた観測日（`business_day`）** です。
+
+| 例 | 意味 |
+|----|------|
+| `2026-05-18.md` | **5/18 一日分**のトレンドサマリー（07/13/19/01 スナップショット） |
+| `generated_at: 2026-05-19 07:43 JST` | **5/19 朝**に生成・コミットされた（正常） |
+
+- フロントマターの `business_day` / `summary_date` とファイル名は **同じ日付** に揃える。
+- 見出し `# 日次サマリー — YYYY-MM-DD` と **対象** 行も同じ日付にする（モデルがずれたら `--force` で再生成）。
+- 入力データは `trend_daily_snapshots` の **`business_day`**（[`docs/summaries/README.md`](../README.md) のタイムライン参照）。
+
+**X 投稿案**（`docs/x_post_samples/daily/`）も、夜の投稿は **その暦日** のファイル名です。日次サマリーと **同じ `YYYY-MM-DD` なら同じ「一日」の話題** を指します（サマリーは翌朝に届く）。
+
+## 運用
+
 - **スキャフォルドだけ**の `.md`（テンプレ文言のまま）は `generator` 行が無く、`.generation.json` も無いことが多いです。差分はここで判別できます。使わないプレースホルダは **削除してよい**（あとから `generate_ai_daily_summary.py --write --force --business-day …` で再生成できる）。
-- GitHub Actions **AI daily summary** は生成ステップ後に **`docs/summaries/daily/` 以下をまとめてコミット**し、スクリプトが失敗しても `.generation.json` が残れば記録されます。
+- GitHub Actions **AI daily summary**（JST **06:50** 前後）は、既定で **JST 昨日** を `business_day` にして `docs/summaries/daily/` を更新します。失敗時も `.generation.json` をコミットしてからジョブを失敗扱いにします。
+
+親ドキュメント: [`docs/summaries/README.md`](../README.md)

@@ -1,5 +1,6 @@
-# JST 06:50 ≒ UTC 21:50 (previous calendar day in UTC) — before the 07:00 JST bulk refresh;
-# slot 01 for the summarized business_day is written by the 01:00 job on the next calendar day.
+# JST 06:50 ≒ UTC 21:50 (previous calendar day in UTC) — before the 07:00 JST bulk refresh.
+# Writes docs/summaries/daily/{yesterday JST}.md (business_day = observation date, not run date).
+# slot 01 for that business_day is written by the 01:00 job on the next calendar day.
 name: AI daily summary
 
 on:

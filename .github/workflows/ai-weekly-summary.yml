@@ -1,5 +1,5 @@
-# After the last daily of the ISO week is generated (Mon 06:50 JST for Sun business_day ≈ Sun 21:50 UTC),
-# run once on Monday UTC so the repo contains all seven daily files.
+# Reads docs/summaries/daily/{Mon..Sun business_day}.md for the prior ISO week.
+# Sun's file (e.g. 2026-05-18.md) lands Mon 06:50 JST; this job runs Mon 23:15 UTC ≈ Tue AM JST.
 name: AI weekly summary
 
 on:

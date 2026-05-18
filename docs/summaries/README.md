@@ -18,20 +18,39 @@
 |------|------|
 | `daily_template.md` | 日次のひな形（フロントマター付き） |
 | `weekly_hot_bundle_template.md` | 週次＋ホットを1ファイルにまとめるひな形 |
-| `daily/` | 日次サマリー（**1日1組**）。`YYYY-MM-DD.md` と **成否用** `YYYY-MM-DD.generation.json`（[`daily/README.md`](daily/README.md)） |
-| `weekly/` | 週次サマリーと週のホットトピックを **1ファイルにまとめる** |
+| `daily/` | 日次サマリー（**1日1組**・観測日ファイル名）。[`daily/README.md`](daily/README.md) |
+| `weekly/` | 週次サマリーと週のホットトピックを **1ファイルにまとめる**。[`weekly/README.md`](weekly/README.md) |
 
 ---
 
 ## 命名規則
 
-| 種別 | 形式 | 例 |
-|------|------|-----|
-| 日次 | `daily/YYYY-MM-DD.md`（掲題の観測日／発行日を **JST** のカレンダー日で表す） | `daily/2026-05-06.md` |
-| 日次（成否ログ） | `daily/YYYY-MM-DD.generation.json`（[`daily/README.md`](daily/README.md)） | `daily/2026-05-06.generation.json` |
-| 週次（＋ホット） | `weekly/YYYY-Www.md`（**ISO 週番号**・その週の月曜を含む ISO 年） | `weekly/2026-W19.md` |
+| 種別 | 形式 | 日付の意味 |
+|------|------|------------|
+| 日次 | `daily/YYYY-MM-DD.md` | **観測日（`business_day`）** — その JST 暦日のトレンドをまとめた1本。ファイル名は **届いた日ではない**（詳細は [`daily/README.md`](daily/README.md)） |
+| 日次（成否ログ） | `daily/YYYY-MM-DD.generation.json` | 上と同じ `business_day` |
+| 週次（＋ホット） | `weekly/YYYY-Www.md` | **ISO 週**（月曜〜日曜）。入力はその7日分の日次ファイル名（観測日） |
 
-日付の解釈で迷ったら、各ファイル先頭のフロントマターと見出しの「対象」「対象週」を正とする。
+日付の解釈で迷ったら、各ファイル先頭のフロントマター（`business_day` / `week_range_jst`）と見出しの「対象」「対象週」を正とする。
+
+### 日次サマリーのタイムライン（JST）
+
+| 観測日（`business_day`・ファイル名） | スナップショット | 日次サマリーが届く目安 |
+|--------------------------------------|------------------|-------------------------|
+| 5/18（日） | 5/18 の 07 / 13 / 19、翌暦日 01 で前日を閉じる | **5/19 06:50** 前後（Actions **AI daily summary**） |
+| 5/19（月） | 同上 | **5/20 06:50** 前後 |
+
+- スクリプト既定: `generate_ai_daily_summary.py` は **JST の昨日** を `business_day` にする（`--business-day` で上書き可）。
+- **夜の X 投稿案**（`docs/x_post_samples/daily/YYYY-MM-DD.md`）は **その暦日の 20:10 前後** に同じ日付で出る。サマリーと **同じ `YYYY-MM-DD` なら同じ「一日」** の話題（サマリーは翌朝）。
+
+### 週次のタイムライン（JST）
+
+直前週（例: 月 5/12 〜 日 5/18）をまとめるとき:
+
+1. 日曜 `2026-05-18.md` が **月曜 5/19 朝** に揃う。
+2. **火曜 5/20 朝** 前後に **AI weekly summary**（UTC 月曜夜）が `weekly/2026-W20.md` を生成。
+
+詳細: [`weekly/README.md`](weekly/README.md)
 
 ---
 
@@ -86,7 +105,7 @@ python scripts/scaffold_summary_drafts.py --today --weekly-for-date 2026-05-11
 
 ## AI 日次サマリー（DB スナップショット → OpenAI）
 
-`scripts/generate_ai_daily_summary.py` が `trend_daily_snapshots` の **前日 `business_day`** × スロット **07 → 13 → 19 → 01**（`01` は翌暦日 1 時ジョブで前日を閉じる）を読み、`gpt-4o-mini`（`OPENAI_SUMMARY_MODEL` で変更可）で `docs/summaries/daily/YYYY-MM-DD.md` を生成する。
+`scripts/generate_ai_daily_summary.py` が `trend_daily_snapshots` の **前日 `business_day`** × スロット **07 → 13 → 19 → 01**（`01` は翌暦日 1 時ジョブで前日を閉じる）を読み、`gpt-4o-mini`（`OPENAI_SUMMARY_MODEL` で変更可）で **`docs/summaries/daily/{business_day}.md`** を生成する（**ファイル名 = 観測日**、生成実行日ではない）。
 
 **`--write` 時は同じディレクトリに `YYYY-MM-DD.generation.json` を必ず書き**（成功・失敗・キー欠如・スナップショット空・OpenAI エラー）— X 投稿の `daily/*.md` と同様に、**日付ごとに結果を追いやすくする**ため。
 
@@ -109,17 +128,17 @@ python scripts/generate_ai_daily_summary.py --write --force --business-day 2026-
 python scripts/generate_ai_daily_summary.py --from-api --write --force
 ```
 
-生成ファイルはフロントマターに `generator: openai` を付ける。成否は **`daily/README.md`** のとおり **`*.generation.json`** で確認。**レビュー後に `approved` にするまで配信に使わない。**
+生成ファイルはフロントマターに `generator: openai` を付ける。本文は **観測日（昨日）の要約** と **読者が受け取った日の見方**（空の6カテゴリ枠は出さない）。07→13→19 の急上昇ラベルを入力に含める。成否は **`daily/README.md`** のとおり **`*.generation.json`** で確認。**レビュー後に `approved` にするまで配信に使わない。**
 
 ---
 
 ## AI 週次サマリー（日次 Markdown ×7 → OpenAI）
 
-`scripts/generate_ai_weekly_summary.py` は **`docs/summaries/daily/YYYY-MM-DD.md` を最大7件読むだけ**で、DB や公開トレンド API・スナップショットには触れない。入力はその週の日次本文（フロントマター除く）の積み上げ。`gpt-4o-mini`（`OPENAI_SUMMARY_MODEL` で変更可）で `docs/summaries/weekly/YYYY-Www.md`（週次＋週のホットトピックを1ファイル）を生成する。
+`scripts/generate_ai_weekly_summary.py` は **対象週の月〜日それぞれ** `docs/summaries/daily/{YYYY-MM-DD}.md` を探して最大7件読むだけで、DB や公開トレンド API・スナップショットには触れない。日次の `YYYY-MM-DD` は **観測日（business_day）**（[`weekly/README.md`](weekly/README.md)）。`gpt-4o-mini`（`OPENAI_SUMMARY_MODEL` で変更可）で `docs/summaries/weekly/YYYY-Www.md`（週次＋週のホットトピックを1ファイル）を生成する。
 
-- **既定の対象週**: JST の「今週の月曜」から7日前の月曜が始まる **直前に終了した ISO 週**（日次が揃いきっていない日は欠損としてプロンプトに渡し、モデルに前提を書かせる）。
+- **既定の対象週**: JST の **直前に終了した ISO 週**（月曜始まり7日分の観測日ファイルを期待）。
 - **`--weekly-for-date YYYY-MM-DD`**: その日を含む ISO 週をまとめる（`scaffold_summary_drafts.py --weekly-for-date` と同じ週の取り方）。
-- **Secrets（GHA）**: `OPENAI_API_KEY` のみ（`DATABASE_URL` は不要）。GitHub Actions: `.github/workflows/ai-weekly-summary.yml`（UTC 月曜 `15 23 * * 1` ≒ 翌 JST 火曜朝。日曜分の日次ジョブのあと想定）。
+- **Secrets（GHA）**: `OPENAI_API_KEY` のみ（`DATABASE_URL` は不要）。GitHub Actions: `.github/workflows/ai-weekly-summary.yml`（タイムラインは上記「週次のタイムライン」）。
 - **手元**: `.env` に `OPENAI_API_KEY`。`--dry-run` でキーなしのときは読み込みマニフェストとロールアップ先頭のみ（課金なし）。
 
 ```bash

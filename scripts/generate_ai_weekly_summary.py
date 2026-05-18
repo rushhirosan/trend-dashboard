@@ -4,12 +4,16 @@
 OpenAI Chat Completions で週次サマリー＋週のホットトピックを1ファイルに生成する。
 
 入力は ``docs/summaries/daily/YYYY-MM-DD.md`` のみ（DB・公開トレンド API は使わない）。
+日次の ``YYYY-MM-DD`` は **観測日（business_day）**（ファイル名 = トレンド対象の暦日。
+翌朝 06:50 JST 前後に生成されても、日曜分は ``…/2026-05-18.md`` のように日曜の日付）。
+週次は対象週の月曜〜日曜について ``{mon}..{sun}.md`` を順に探す。詳細は
+``docs/summaries/weekly/README.md``。
 
   export OPENAI_API_KEY=sk-...
   python scripts/generate_ai_weekly_summary.py --dry-run
   python scripts/generate_ai_weekly_summary.py --write --force
 
-既定の対象週: JST の「今週の月曜」から7日前の月曜が始まる週（= 直前に終了した ISO 週）。
+既定の対象週: JST の直前に終了した ISO 週（= 今週月曜の7日前が週の月曜）。
 ``--weekly-for-date YYYY-MM-DD`` で、その日を含む ISO 週を指定可。
 
   python scripts/generate_ai_weekly_summary.py --weekly-for-date 2026-05-14 --dry-run
@@ -88,7 +92,7 @@ def load_daily_markdown(daily_path: Path) -> Optional[str]:
 def build_rollups(
     mon: date, sun: date, daily_dir: Path
 ) -> Tuple[str, Dict[str, Any]]:
-    """LLM 用テキストとメタ（欠損日など）。"""
+    """LLM 用テキストとメタ（欠損日など）。各 ``d`` は business_day（観測日）のファイル名。"""
     meta: Dict[str, Any] = {
         "week_mon": mon.isoformat(),
         "week_sun": sun.isoformat(),
@@ -195,6 +199,8 @@ generated_at: "{gen_at}"
 
 SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ。入力は、ある1週間（ISO 週・月曜始まり）
 の各日について、すでにリポジトリに存在する「日次サマリー」Markdown の本文だけである。
+各日の見出し日付（YYYY-MM-DD）は **その日のトレンド観測日（business_day）** であり、
+ファイルが週のあとに生成されたこととは無関係に扱う。
 新たに Web やトレンド API を参照したり、スナップショットを読んだりしない。
 
 次を厳守すること:
@@ -236,6 +242,7 @@ def run_generate(
             "iso_week": stem,
             "week_mon_jst": week_mon.isoformat(),
             "week_sun_jst": week_sun.isoformat(),
+            "daily_file_dates_are_business_days": True,
             "missing_daily_dates": meta.get("missing_dates", []),
         },
         ensure_ascii=False,

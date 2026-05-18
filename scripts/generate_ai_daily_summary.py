@@ -21,6 +21,8 @@ GitHub Actions 等 Fly 外では ``DATABASE_URL`` の ``*.flycast`` が解決で
   python scripts/generate_ai_daily_summary.py --from-api --write --force
 
 既定の対象日: JST の「昨日」（--business-day で上書き可）。
+``--write`` 時の **``daily/{business_day}.md``** のファイル名は **観測日**（生成を実行した暦日ではない）。
+例: 5/19 朝の GHA 実行 → ``2026-05-18.md``。詳細は ``docs/summaries/daily/README.md``。
 HTTP モードのベース URL: ``TREND_DASHBOARD_BASE_URL``（既定 https://trends-dashboard.fly.dev）。
 
 ``--write`` 時、その ``business_day`` 向けに **``daily/YYYY-MM-DD.generation.json``** を必ず書く（成功 /
@@ -50,6 +52,13 @@ DAILY_DIR = REPO_ROOT / "docs" / "summaries" / "daily"
 BASE_DEFAULT = "https://trends-dashboard.fly.dev"
 
 SLOT_ORDER = ("07", "13", "19", "01")
+# 一日の中での順位変化（07→13→19）。01 は締め用で jump には使わない。
+DAYTIME_SLOTS = ("07", "13", "19")
+RISING_HIGHLIGHT_COUNT = 3
+_WEAK_RISING_LABEL = re.compile(
+    r"^(pickup|official|news|video|動画|ニュース|…+)$",
+    re.I,
+)
 SLOT_LABELS = {
     "07": "07時台ジョブ後",
     "13": "13時台ジョブ後",
@@ -330,6 +339,174 @@ def compact_rows_by_category(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     return {"categories": categories}
 
 
+def _snapshot_top_n() -> int:
+    try:
+        return max(1, min(25, int(os.getenv("TREND_SNAPSHOT_TOP_N", "10"))))
+    except (TypeError, ValueError):
+        return 10
+
+
+def _rank_out_of_range() -> int:
+    return _snapshot_top_n() + 1
+
+
+def _normalize_label_key(t: str) -> str:
+    return re.sub(r"\s+", " ", str(t).strip()).lower()[:600]
+
+
+def _clean_rising_display(display: str) -> str:
+    s = re.sub(r"^【[^】]{1,16}】\s*", "", str(display).strip())
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _is_weak_rising_label(display: str) -> bool:
+    s = _clean_rising_display(display)
+    if not s or s == "…" or len(s) < 4:
+        return True
+    return bool(_WEAK_RISING_LABEL.match(s))
+
+
+def _rank_jump_score(ranks: dict[str, int]) -> float:
+    oor = _rank_out_of_range()
+    r7 = ranks.get("07")
+    r13 = ranks.get("13")
+    r19 = ranks.get("19")
+    s = 0.0
+    if r13 is not None:
+        r7_eff = r7 if r7 is not None else oor
+        s += max(0.0, float(r7_eff - r13))
+    if r19 is not None:
+        if r13 is not None:
+            s += max(0.0, float(r13 - r19))
+        elif r7 is None:
+            s += max(0.0, float(oor - r19))
+    if r7 is not None and r19 is not None and r13 is None:
+        s += max(0.0, float(r7 - r19))
+    return s
+
+
+def rows_to_series_by_slot(rows: List[Dict[str, Any]]) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
+    """``{ slot: { series_key: items } }``（items は thin）。"""
+    out: Dict[str, Dict[str, List[Dict[str, Any]]]] = {s: {} for s in SLOT_ORDER}
+    for row in rows:
+        slot, series_key, thin, _cap = _thin_items_from_row(row)
+        if slot not in out or not thin:
+            continue
+        out[slot][series_key] = thin
+    return out
+
+
+def _aggregate_labels_for_series(
+    series_by_slot: Dict[str, Dict[str, List[Dict[str, Any]]]],
+    series_key: str,
+) -> Dict[str, Dict[str, Any]]:
+    out: Dict[str, Dict[str, Any]] = {}
+    for slot in DAYTIME_SLOTS:
+        items = (series_by_slot.get(slot) or {}).get(series_key) or []
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            raw_t = it.get("t")
+            if raw_t is None or not str(raw_t).strip():
+                continue
+            display = str(raw_t).strip()
+            nk = _normalize_label_key(display)
+            try:
+                r = int(it.get("r"))
+            except (TypeError, ValueError):
+                r = 999
+            agg = out.get(nk)
+            if agg is None:
+                agg = {"display_by_slot": {}, "ranks": {}, "series_key": series_key}
+                out[nk] = agg
+            agg["display_by_slot"][slot] = display
+            prev = agg["ranks"].get(slot)
+            if prev is None or r < prev:
+                agg["ranks"][slot] = r
+    return out
+
+
+def build_rising_highlights(
+    rows: List[Dict[str, Any]],
+    *,
+    count: int = RISING_HIGHLIGHT_COUNT,
+) -> List[Dict[str, Any]]:
+    """
+    全 series 横断で 07→13→19 の順位改善が大きいラベルを最大 count 件。
+    日次サマリーの「昨日いちばん動いた3つ」のたたき台。
+    """
+    series_by_slot = rows_to_series_by_slot(rows)
+    series_keys: set[str] = set()
+    for slot in DAYTIME_SLOTS:
+        series_keys |= set((series_by_slot.get(slot) or {}).keys())
+
+    best: Dict[str, Dict[str, Any]] = {}
+    for series_key in series_keys:
+        aggs = _aggregate_labels_for_series(series_by_slot, series_key)
+        category = categorize_series_key(series_key)
+        for nk, agg in aggs.items():
+            ranks = agg.get("ranks") or {}
+            jump = _rank_jump_score(ranks)
+            display = _clean_rising_display(
+                str((agg.get("display_by_slot") or {}).get("19")
+                    or (agg.get("display_by_slot") or {}).get("13")
+                    or (agg.get("display_by_slot") or {}).get("07")
+                    or "")
+            )
+            if jump <= 0 or _is_weak_rising_label(display):
+                continue
+            freq = len(set(ranks.keys()) & set(DAYTIME_SLOTS))
+            r_best = min(ranks.get(s, 999) for s in DAYTIME_SLOTS if s in ranks) if ranks else 999
+            cand = {
+                "label": display,
+                "category": category,
+                "series_key": series_key,
+                "jump": round(jump, 1),
+                "freq_slots": freq,
+                "r_best": r_best,
+                "best_rank_19": ranks.get("19"),
+            }
+            prev = best.get(nk)
+            if prev is None or (cand["jump"], cand["freq_slots"], -cand["r_best"]) > (
+                prev["jump"],
+                prev["freq_slots"],
+                -prev["r_best"],
+            ):
+                best[nk] = cand
+
+    items = sorted(
+        best.values(),
+        key=lambda c: (-c["jump"], -c["freq_slots"], c.get("best_rank_19") or 999, c["label"]),
+    )
+    return items[:count]
+
+
+def _category_has_items(cat_block: Dict[str, Any]) -> bool:
+    for slot in cat_block.get("slots") or []:
+        for ser in slot.get("series") or []:
+            if ser.get("items"):
+                return True
+    return False
+
+
+def build_llm_payload(rows: List[Dict[str, Any]], business_day: date) -> Dict[str, Any]:
+    """OpenAI 用: 観測日・急上昇・中身のあるカテゴリのみ。"""
+    full = compact_rows_by_category(rows)
+    categories = [c for c in full["categories"] if _category_has_items(c)]
+    quiet = [c["category"] for c in full["categories"] if not _category_has_items(c)]
+    rising = build_rising_highlights(rows, count=RISING_HIGHLIGHT_COUNT)
+    return {
+        "business_day": business_day.isoformat(),
+        "reader_context": (
+            "観測日（business_day）のトレンドをまとめる。読者は通常、観測日の翌朝に受け取る。"
+            "「昨日」= business_day。「今日の見方」= 読者が受け取った日の見方（1〜2文）。"
+        ),
+        "rising_highlights": rising,
+        "categories": categories,
+        "quiet_categories": quiet,
+    }
+
+
 def build_user_payload(payload: Dict[str, Any]) -> str:
     text = json.dumps(payload, ensure_ascii=False, indent=2)
     if len(text) > MAX_USER_CHARS:
@@ -405,37 +582,33 @@ generated_at: "{gen_at}"
     return fm + body
 
 
-SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ。入力は、ある1日（business_day）の
-日本時間基準で 07→13→19→翌01 時台の定期ジョブ後に保存されたスナップショットを、
-**カテゴリ別**（ニュース／検索・動画／テック・開発／マーケット／エンタメ／行政）に整理した JSON である。
-各系列は series_key とキーワード／タイトル（items）だけ。Web記事の本文やURLは含まれない。
+SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ。入力 JSON の business_day は
+**観測日（その日のトレンド）**。読者は通常 **翌朝** に本文を受け取る。
+キーワード／タイトル（items）と rising_highlights（07→13→19 で順位が上がったラベル）だけ。
+Web 記事の本文や URL は含まれない。
 
-次を厳守すること:
-- 出力は日本語のMarkdownのみ（YAMLフロントマターは書かない。先頭から # 見出しでよい）。
-- **BUSINESS_DAY** はユーザー指示と JSON の business_day に一致させる（見出し・対象行の日付を絶対にずらさない）。
-- 構成は次の見出しをこの順で**すべて**含めること:
-  1. `# 日次サマリー — BUSINESS_DAY（JST）`
-  2. `- **対象**:` に BUSINESS_DAY（例: 2026年5月17日）
-  3. `- **生成・送信完了**:`（不明なら「自動生成（時刻未入力）」）
-  4. `## 今日の一行結論`（2〜3文。カテゴリ横断の要約）
-  5. `## 論点（カテゴリ別）` の下に、**次の6見出しをこの順・この文言で必ず書く**:
-     - `### ニュース`
-     - `### 検索・動画`
-     - `### テック・開発`
-     - `### マーケット`
-     - `### エンタメ`
-     - `### 行政`
-  6. `## データ前提メモ`（欠損スロット・薄いカテゴリに触れる）
+出力は日本語 Markdown のみ（YAML フロントマターは書かない）。**BUSINESS_DAY** は JSON の
+business_day と必ず一致させる（見出し・対象行をずらさない）。
 
-各 `###` カテゴリでは:
-- 入力に当該カテゴリの items がある場合: **2〜4文**で動きを述べ、代表キーワードを具体的に挙げる。
-- 全スロットで items が空に近い場合: 「スナップショット上、当該カテゴリで目立つ変化は少ない。」と1文でよい。
-- 各カテゴリの末尾に **1行**: `- **ソース**: (系列: …)（スロット: …）`（複数系列・スロットを列挙してよい）。
+構成（この順・見出し文言を厳守）:
+1. `# 日次サマリー — BUSINESS_DAY（JST）`
+2. `- **対象（観測日）**:` BUSINESS_DAY（例: 2026年5月18日）
+3. `- **生成・送信完了**:`（不明なら「自動生成（時刻未入力）」）
+4. `## 昨日（BUSINESS_DAY）の一行結論` — 観測日の空気を2〜3文。未来の予測はしない。
+5. `## 昨日いちばん動いた3つ` — **rising_highlights** を中心に `### 1.` `### 2.` `### 3.`
+   各項目: 短い見出し、本文2〜3文（具体的な固有名詞）、`- **カテゴリ**:`、`- **ソース系列**:` series_key。
+   highlights が3件未満なら categories の具体語で埋める。同じ固有名詞を3項目で繰り返さない。
+6. `## 今日の見方` — **1〜2文だけ**。読者が受け取った日向け。「昨日の動きを踏まえ、今日は…」
+7. `## 補足` — **任意**。quiet_categories があるときだけ、静かだった領域を **1文でまとめる**。
+   無ければこの見出しごと書かない。
 
-事実・リンクについて:
-- 入力にURLが無いので、**架空のURLや存在しない記事タイトルへのリンクを作らない**。
-- 憶測・未確認の断定は避け、「スナップショット上は…」と書く。
-- 複数スロットで語が動いていれば変化に言及してよい。"""
+禁止:
+- `### ニュース` など **6カテゴリ固定の見出し**を並べること
+- 「特に目立った変化は見られません」「スナップショット上、当該カテゴリで」等の定型を繰り返すこと
+- 架空の URL やリンク
+- 観測日と違う日付を見出しに書くこと
+
+事実: 入力に無いことは断定しない。複数スロットで動いた語は「一日のうちで目立った」と書いてよい。"""
 
 
 def run_generate(
@@ -452,12 +625,11 @@ def run_generate(
         meta["error"] = "no_snapshot_rows"
         return "", meta
 
-    payload = compact_rows_by_category(rows)
-    payload["business_day"] = business_day.isoformat()
+    payload = build_llm_payload(rows, business_day)
     bd = business_day.isoformat()
     user = (
-        f"business_day={bd}。トップ見出し `# 日次サマリー — {bd}（JST）` と **対象** 行の日付も "
-        f"必ず {bd} にすること。\n\n"
+        f"business_day={bd}。観測日は {bd}。「昨日」= {bd}。"
+        f"見出し `# 日次サマリー — {bd}（JST）` と **対象（観測日）** も必ず {bd}。\n\n"
         + build_user_payload(payload)
     )
     inner = call_openai(SYSTEM_PROMPT, user, api_key, model)
@@ -563,8 +735,7 @@ def main() -> int:
             return 1
 
     if args.dry_run and not api_key:
-        payload = compact_rows_by_category(rows)
-        payload["business_day"] = bd.isoformat()
+        payload = build_llm_payload(rows, bd)
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         print(
             f"\n# rows={len(rows)} (set OPENAI_API_KEY to generate summary text)",

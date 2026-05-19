@@ -1,10 +1,10 @@
-# Reads docs/summaries/daily/{Mon..Sun business_day}.md for the prior ISO week.
-# Sun's file (e.g. 2026-05-18.md) lands Mon 06:50 JST; this job runs Mon 23:15 UTC ≈ Tue AM JST.
+# Reads docs/summaries/daily/{Mon..Sun business_day}.md for the prior ISO week (W1).
+# Sun's file lands Mon 06:50 JST (ai-daily-summary); this job runs Mon 07:30 JST (W2 delivery week).
 name: AI weekly summary
 
 on:
   schedule:
-    - cron: "15 23 * * 1"
+    - cron: "30 22 * * 0"
   workflow_dispatch:
 
 permissions:

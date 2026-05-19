@@ -13,7 +13,8 @@ OpenAI Chat Completions で週次サマリー＋週のホットトピックを1�
   python scripts/generate_ai_weekly_summary.py --dry-run
   python scripts/generate_ai_weekly_summary.py --write --force
 
-既定の対象週: JST の直前に終了した ISO 週（= 今週月曜の7日前が週の月曜）。
+既定の対象週: JST の直前に終了した ISO 週（W1: 月曜〜日曜）。
+W2 月曜朝の GHA 実行時は「今週月曜の7日前」が W1 の月曜になる。
 ``--weekly-for-date YYYY-MM-DD`` で、その日を含む ISO 週を指定可。
 
   python scripts/generate_ai_weekly_summary.py --weekly-for-date 2026-05-14 --dry-run

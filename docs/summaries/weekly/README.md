@@ -26,11 +26,11 @@ docs/summaries/daily/2026-05-18.md  … 日曜の business_day
 
 ## 既定の対象週
 
-- **引数なし**: JST の **直前に終了した ISO 週**（今週月曜の7日前が週の月曜）。
+- **引数なし**: JST の **直前に終了した ISO 週**（= **W1**: 月曜〜日曜）。W2 の月曜朝にジョブが走るとき、対象はその直前の月曜が週の始まり。
 - **`--weekly-for-date YYYY-MM-DD`**: その日を含む ISO 週（`scaffold_summary_drafts.py --weekly-for-date` と同じ）。
 
 ## 自動化
 
-- GitHub Actions: `.github/workflows/ai-weekly-summary.yml`（UTC 月曜 `15 23 * * 1` ≒ **翌 JST 火曜朝**）。日曜 `business_day` の日次（月曜 06:50 JST 生成）のあとを想定。
+- GitHub Actions: `.github/workflows/ai-weekly-summary.yml`（UTC 日曜 `30 22 * * 0` ≒ **JST 月曜 07:30**）。W1 日曜 `business_day` の日次（月曜 06:50 JST）のあと。原稿コミット後、配信目標はパターンAの **月曜 11:00 JST**（[`summary_pattern_a_phase1.md`](../../summary_pattern_a_phase1.md)）。
 
 親ドキュメント: [`docs/summaries/README.md`](../README.md)

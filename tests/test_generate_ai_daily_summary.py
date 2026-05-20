@@ -151,6 +151,82 @@ def test_build_rising_highlights_picks_rank_jump(gads):
     assert rising[0]["category"] == "検索・動画"
 
 
+def test_is_noisy_label_filters_procurement(gads):
+    assert gads._is_noisy_label(
+        "SIEMENS STAR CCM+ LICENSE RENEWAL (POP: 7/1/2026-6/30/2027)",
+        "usaspending_us",
+    )
+    assert not gads._is_noisy_label("豊臣秀長", "wikipedia_jp")
+
+
+def test_build_cross_source_highlights_finds_overlap(gads):
+    rows = [
+        {
+            "slot": "19",
+            "series_key": "wikipedia_jp",
+            "items": [{"t": "豊臣秀長", "r": 1}],
+            "captured_at": "2026-05-20T19:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "google_trends_jp",
+            "items": [{"t": "豊臣秀長", "r": 3}],
+            "captured_at": "2026-05-20T19:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "devto_us",
+            "items": [{"t": "Only Dev", "r": 1}],
+            "captured_at": "2026-05-20T19:00:00+09:00",
+        },
+    ]
+    cross = gads.build_cross_source_highlights(rows, count=3)
+    assert len(cross) == 1
+    assert cross[0]["label"] == "豊臣秀長"
+    assert "wikipedia_jp" in cross[0]["series_keys"]
+    assert "google_trends_jp" in cross[0]["series_keys"]
+
+
+def test_build_category_top1_picks_per_category(gads):
+    rows = [
+        {
+            "slot": "19",
+            "series_key": "nhk_jp",
+            "items": [{"t": "NHK headline", "r": 1}],
+            "captured_at": "2026-05-20T19:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "zenn_jp",
+            "items": [{"t": "Zenn article", "r": 1}],
+            "captured_at": "2026-05-20T19:00:00+09:00",
+        },
+    ]
+    top1 = gads.build_category_top1(rows)
+    by_cat = {c["category"]: c for c in top1}
+    assert by_cat["ニュース"]["label"] == "NHK headline"
+    assert by_cat["テック・開発"]["label"] == "Zenn article"
+    assert by_cat["エンタメ"].get("quiet") is True
+
+
+def test_build_llm_payload_includes_cross_and_top1(gads):
+    rows = [
+        {
+            "slot": "19",
+            "series_key": "nhk_jp",
+            "items": [{"t": "headline", "r": 1}],
+            "captured_at": "2026-05-18T07:00:00+09:00",
+        },
+    ]
+    payload = gads.build_llm_payload(rows, date(2026, 5, 18))
+    assert "cross_source_highlights" in payload
+    assert "category_top1" in payload
+    assert "notable_hints" in payload
+    assert "rising_highlights_fallback" in payload
+    assert "reader_context" in payload
+    assert "今日の見方" not in payload["reader_context"]
+
+
 def test_build_llm_payload_omits_empty_categories(gads):
     rows = [
         {

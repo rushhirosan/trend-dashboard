@@ -55,8 +55,21 @@ SLOT_ORDER = ("07", "13", "19", "01")
 # 一日の中での順位変化（07→13→19）。01 は締め用で jump には使わない。
 DAYTIME_SLOTS = ("07", "13", "19")
 RISING_HIGHLIGHT_COUNT = 3
+CROSS_SOURCE_HIGHLIGHT_COUNT = 3
+# 配信向けカテゴリ別トップ1（行政はノイズが多いため digest から除外可）
+CATEGORY_DIGEST_ORDER: tuple[str, ...] = (
+    "ニュース",
+    "検索・動画",
+    "テック・開発",
+    "マーケット",
+    "エンタメ",
+)
 _WEAK_RISING_LABEL = re.compile(
     r"^(pickup|official|news|video|動画|ニュース|…+)$",
+    re.I,
+)
+_NOISY_PROCUREMENT = re.compile(
+    r"(LICENSE\s+RENEWAL|POP:\s*\d|INFINIBAND|FIBRE\s+OPTIC|usaspending|調達|契約番号)",
     re.I,
 )
 SLOT_LABELS = {
@@ -366,6 +379,67 @@ def _is_weak_rising_label(display: str) -> bool:
     return bool(_WEAK_RISING_LABEL.match(s))
 
 
+def _ascii_ratio(text: str) -> float:
+    if not text:
+        return 0.0
+    ascii_chars = sum(1 for c in text if ord(c) < 128)
+    return ascii_chars / len(text)
+
+
+def _series_pref_score(series_key: str) -> int:
+    """JP 向け読者向け系列を優先（大きいほど良い）。"""
+    sk = (series_key or "").lower()
+    if sk.endswith("_jp") or "_jp_" in sk:
+        return 3
+    if sk.endswith("_us") or "_us_" in sk:
+        return 0
+    return 1
+
+
+def _is_noisy_label(display: str, series_key: str = "") -> bool:
+    """調達行・英語長文など、一般読者向けサマリーから除外するラベル。"""
+    if _is_weak_rising_label(display):
+        return True
+    s = _clean_rising_display(display)
+    sk = (series_key or "").lower()
+    if len(s) > 100:
+        return True
+    if _NOISY_PROCUREMENT.search(s):
+        return True
+    if any(p in sk for p in ("usaspending_", "kkj_", "estat_", "bls_")) and len(s) > 45:
+        return True
+    if _ascii_ratio(s) > 0.88 and len(s) > 50 and _series_pref_score(series_key) < 2:
+        return True
+    return False
+
+
+def _format_rank_evidence(ranks: dict[str, int]) -> str:
+    parts: List[str] = []
+    for slot in DAYTIME_SLOTS:
+        r = ranks.get(slot)
+        if r is not None:
+            parts.append(f"{slot}時#{r}")
+    return " → ".join(parts) if parts else "順位データなし"
+
+
+def _pick_display_from_agg(agg: Dict[str, Any]) -> str:
+    by_slot = agg.get("display_by_slot") or {}
+    for slot in ("19", "13", "07"):
+        d = by_slot.get(slot)
+        if d:
+            return _clean_rising_display(str(d))
+    return ""
+
+
+def _merge_rank_maps(a: dict[str, int], b: dict[str, int]) -> dict[str, int]:
+    out = dict(a)
+    for slot, r in b.items():
+        prev = out.get(slot)
+        if prev is None or r < prev:
+            out[slot] = r
+    return out
+
+
 def _rank_jump_score(ranks: dict[str, int]) -> float:
     oor = _rank_out_of_range()
     r7 = ranks.get("07")
@@ -453,7 +527,7 @@ def build_rising_highlights(
                     or (agg.get("display_by_slot") or {}).get("07")
                     or "")
             )
-            if jump <= 0 or _is_weak_rising_label(display):
+            if jump <= 0 or _is_noisy_label(display, series_key):
                 continue
             freq = len(set(ranks.keys()) & set(DAYTIME_SLOTS))
             r_best = min(ranks.get(s, 999) for s in DAYTIME_SLOTS if s in ranks) if ranks else 999
@@ -481,6 +555,179 @@ def build_rising_highlights(
     return items[:count]
 
 
+def _collect_label_index(
+    rows: List[Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+    """正規化ラベル → 系列横断の集約（クロスソース検出用）。"""
+    series_by_slot = rows_to_series_by_slot(rows)
+    series_keys: set[str] = set()
+    for slot in DAYTIME_SLOTS:
+        series_keys |= set((series_by_slot.get(slot) or {}).keys())
+
+    index: Dict[str, Dict[str, Any]] = {}
+    for series_key in series_keys:
+        aggs = _aggregate_labels_for_series(series_by_slot, series_key)
+        category = categorize_series_key(series_key)
+        for nk, agg in aggs.items():
+            display = _pick_display_from_agg(agg)
+            if not display or _is_noisy_label(display, series_key):
+                continue
+            ranks = agg.get("ranks") or {}
+            jump = _rank_jump_score(ranks)
+            r19 = ranks.get("19")
+            entry = index.get(nk)
+            if entry is None:
+                entry = {
+                    "label": display,
+                    "series": {},
+                }
+                index[nk] = entry
+            elif len(display) > len(str(entry.get("label") or "")):
+                entry["label"] = display
+            entry["series"][series_key] = {
+                "series_key": series_key,
+                "category": category,
+                "ranks": ranks,
+                "rank_evidence": _format_rank_evidence(ranks),
+                "jump": round(jump, 1),
+                "best_rank_19": r19,
+                "series_pref": _series_pref_score(series_key),
+            }
+    return index
+
+
+def build_cross_source_highlights(
+    rows: List[Dict[str, Any]],
+    *,
+    count: int = CROSS_SOURCE_HIGHLIGHT_COUNT,
+) -> List[Dict[str, Any]]:
+    """異なる series_key に同一ラベル（正規化一致）が現れたものを優先。"""
+    index = _collect_label_index(rows)
+    candidates: List[Dict[str, Any]] = []
+    for nk, entry in index.items():
+        series_map = entry.get("series") or {}
+        if len(series_map) < 2:
+            continue
+        series_list = list(series_map.values())
+        categories = sorted({s["category"] for s in series_list})
+        series_keys = sorted(series_map.keys())
+        jp_pref = max(s.get("series_pref", 0) for s in series_list)
+        best_r19 = min(
+            (s.get("best_rank_19") or 999 for s in series_list),
+            default=999,
+        )
+        max_jump = max(s.get("jump", 0.0) for s in series_list)
+        candidates.append(
+            {
+                "label": entry["label"],
+                "series_keys": series_keys,
+                "categories": categories,
+                "source_count": len(series_keys),
+                "rank_evidence": series_list[0].get("rank_evidence", ""),
+                "jump": max_jump,
+                "best_rank_19": best_r19,
+                "jp_series_pref": jp_pref,
+            }
+        )
+
+    candidates.sort(
+        key=lambda c: (
+            -c["source_count"],
+            -c["jp_series_pref"],
+            c.get("best_rank_19") or 999,
+            -c["jump"],
+            c["label"],
+        ),
+    )
+    return candidates[:count]
+
+
+def _best_item_in_series_at_slot(
+    series_by_slot: Dict[str, Dict[str, List[Dict[str, Any]]]],
+    series_key: str,
+    slot: str,
+) -> Optional[Dict[str, Any]]:
+    items = (series_by_slot.get(slot) or {}).get(series_key) or []
+    best: Optional[Dict[str, Any]] = None
+    for it in items:
+        if not isinstance(it, dict) or not it.get("t"):
+            continue
+        try:
+            r = int(it.get("r"))
+        except (TypeError, ValueError):
+            r = 999
+        display = _clean_rising_display(str(it.get("t")))
+        if _is_noisy_label(display, series_key):
+            continue
+        if best is None or r < best["rank"]:
+            best = {"label": display, "rank": r, "slot": slot, "series_key": series_key}
+    return best
+
+
+def build_category_top1(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """カテゴリごとに 19→13→07 の最良1件（JP 系列優先）。"""
+    series_by_slot = rows_to_series_by_slot(rows)
+    all_series: set[str] = set()
+    for slot in SLOT_ORDER:
+        all_series |= set((series_by_slot.get(slot) or {}).keys())
+
+    slot_weight = {"19": 3, "13": 2, "07": 1}
+    out: List[Dict[str, Any]] = []
+    for category in CATEGORY_DIGEST_ORDER:
+        cat_series = sorted(
+            [sk for sk in all_series if categorize_series_key(sk) == category],
+            key=lambda sk: (-_series_pref_score(sk), sk),
+        )
+        picked: Optional[Dict[str, Any]] = None
+        for series_key in cat_series:
+            best_for_series: Optional[Dict[str, Any]] = None
+            for slot in ("19", "13", "07"):
+                cand = _best_item_in_series_at_slot(series_by_slot, series_key, slot)
+                if cand is None:
+                    continue
+                score = (-cand["rank"], slot_weight.get(slot, 0))
+                if best_for_series is None or score > best_for_series["_score"]:
+                    best_for_series = {**cand, "_score": score}
+            if best_for_series is None:
+                continue
+            full_score = (best_for_series["_score"], _series_pref_score(series_key))
+            if picked is None or full_score > picked["_full_score"]:
+                del best_for_series["_score"]
+                picked = {**best_for_series, "category": category, "_full_score": full_score}
+        if picked:
+            del picked["_full_score"]
+            out.append(picked)
+        else:
+            out.append({"category": category, "label": None, "quiet": True})
+    return out
+
+
+def build_notable_hints(
+    cross_source: List[Dict[str, Any]],
+    category_top1: List[Dict[str, Any]],
+    quiet_categories: List[str],
+) -> List[str]:
+    """LLM が「昨日特異だったこと」を書くための機械的ヒント。"""
+    hints: List[str] = []
+    if cross_source:
+        labels = "、".join(c["label"][:24] for c in cross_source[:2])
+        hints.append(
+            f"複数ソース重複が{len(cross_source)}件（例: {labels}）— クロスソース欄で説明する"
+        )
+    active = [c for c in category_top1 if c.get("label") and not c.get("quiet")]
+    if len(active) <= 2 and quiet_categories:
+        hints.append(
+            f"動きが限定的: 主に {', '.join(c['category'] for c in active)} のみ（静か: {', '.join(quiet_categories[:3])}）"
+        )
+    ent = next((c for c in category_top1 if c.get("category") == "エンタメ" and c.get("label")), None)
+    search = next(
+        (c for c in category_top1 if c.get("category") == "検索・動画" and c.get("label")), None
+    )
+    if ent and search and ent["label"] == search["label"]:
+        hints.append("エンタメと検索・動画のトップ1が同一ラベル")
+    return hints
+
+
 def _category_has_items(cat_block: Dict[str, Any]) -> bool:
     for slot in cat_block.get("slots") or []:
         for ser in slot.get("series") or []:
@@ -490,18 +737,23 @@ def _category_has_items(cat_block: Dict[str, Any]) -> bool:
 
 
 def build_llm_payload(rows: List[Dict[str, Any]], business_day: date) -> Dict[str, Any]:
-    """OpenAI 用: 観測日・急上昇・中身のあるカテゴリのみ。"""
+    """OpenAI 用: クロスソース・カテゴリ別トップ1・カテゴリ詳細。"""
     full = compact_rows_by_category(rows)
     categories = [c for c in full["categories"] if _category_has_items(c)]
     quiet = [c["category"] for c in full["categories"] if not _category_has_items(c)]
+    cross = build_cross_source_highlights(rows, count=CROSS_SOURCE_HIGHLIGHT_COUNT)
+    top1 = build_category_top1(rows)
     rising = build_rising_highlights(rows, count=RISING_HIGHLIGHT_COUNT)
     return {
         "business_day": business_day.isoformat(),
         "reader_context": (
             "観測日（business_day）のトレンドをまとめる。読者は通常、観測日の翌朝に受け取る。"
-            "「昨日」= business_day。「今日の見方」= 読者が受け取った日の見方（1〜2文）。"
+            "「昨日」= business_day。推測や「今日は〜でしょう」は書かない。"
         ),
-        "rising_highlights": rising,
+        "cross_source_highlights": cross,
+        "category_top1": top1,
+        "notable_hints": build_notable_hints(cross, top1, quiet),
+        "rising_highlights_fallback": rising,
         "categories": categories,
         "quiet_categories": quiet,
     }
@@ -584,31 +836,38 @@ generated_at: "{gen_at}"
 
 SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ。入力 JSON の business_day は
 **観測日（その日のトレンド）**。読者は通常 **翌朝** に本文を受け取る。
-キーワード／タイトル（items）と rising_highlights（07→13→19 で順位が上がったラベル）だけ。
-Web 記事の本文や URL は含まれない。
+Web 記事の本文や URL は含まれない。入力の cross_source_highlights / category_top1 /
+notable_hints / categories はスナップショット由来の事実のみ。
 
 出力は日本語 Markdown のみ（YAML フロントマターは書かない）。**BUSINESS_DAY** は JSON の
-business_day と必ず一致させる（見出し・対象行をずらさない）。
+business_day と必ず一致させる。
 
 構成（この順・見出し文言を厳守）:
 1. `# 日次サマリー — BUSINESS_DAY（JST）`
-2. `- **対象（観測日）**:` BUSINESS_DAY（例: 2026年5月18日）
+2. `- **対象（観測日）**:` BUSINESS_DAY（例: 2026年5月20日）
 3. `- **生成・送信完了**:`（不明なら「自動生成（時刻未入力）」）
-4. `## 昨日（BUSINESS_DAY）の一行結論` — 観測日の空気を2〜3文。未来の予測はしない。
-5. `## 昨日いちばん動いた3つ` — **rising_highlights** を中心に `### 1.` `### 2.` `### 3.`
-   各項目: 短い見出し、本文2〜3文（具体的な固有名詞）、`- **カテゴリ**:`、`- **ソース系列**:` series_key。
-   highlights が3件未満なら categories の具体語で埋める。同じ固有名詞を3項目で繰り返さない。
-6. `## 今日の見方` — **1〜2文だけ**。読者が受け取った日向け。「昨日の動きを踏まえ、今日は…」
-7. `## 補足` — **任意**。quiet_categories があるときだけ、静かだった領域を **1文でまとめる**。
-   無ければこの見出しごと書かない。
+4. `## 昨日のクロスソースハイライト — BUSINESS_DAY`
+5. `### 🔥 複数ソースで話題になったもの` — **cross_source_highlights** を最大3件。
+   0件なら「該当なし（同一ラベルが複数系列に出たものはありませんでした）」と1行だけ書き、
+   rising_highlights_fallback から **JP 向けに読みやすい1件**を補足してもよい（根拠行必須）。
+   各 `### 1.` …: 短い見出し（label）、本文2〜3文（**なぜ複数ソースに出たか**を推測しすぎず、
+   ドラマ・事件・製品発表など **ありうる文脈**を「〜の可能性」と書く）、
+   `- **登場ソース**:` series_keys をカンマ区切り、
+   `- **根拠**:` rank_evidence または入力の rank_evidence をそのまま要約。
+6. `## 📊 カテゴリ別トップ1` — **category_top1** の順（ニュース→検索・動画→テック→マーケット→エンタメ）。
+   各行 `- **カテゴリ名**:` label（ソース: series_key · slot時#rank）。quiet なら「（データなし）」。
+7. `## 💡 昨日特異だったこと` — **1文のみ**。notable_hints と category_top1 / cross_source を踏まえ、
+   観測日に特徴的だったパターン（例: クロスソースが多い、特定カテゴリだけ動いた）を書く。
+   未来予測・「今日は〜」は禁止。
 
 禁止:
-- `### ニュース` など **6カテゴリ固定の見出し**を並べること
-- 「特に目立った変化は見られません」「スナップショット上、当該カテゴリで」等の定型を繰り返すこと
-- 架空の URL やリンク
-- 観測日と違う日付を見出しに書くこと
+- `## 今日の見方` / `## 昨日いちばん動いた3つ`（旧フォーマット）
+- 「〜でしょう」「注目が集まる見込み」等の汎用予測
+- 調達・英語長文タイトルの羅列をそのまま見出しにすること（入力にあっても要約・日本語化）
+- 架空の URL
+- 入力に無い事実の断定
 
-事実: 入力に無いことは断定しない。複数スロットで動いた語は「一日のうちで目立った」と書いてよい。"""
+事実: 入力に無いことは断定しない。クロスソースは「なぜ今」の手がかりとして最優先で説明する。"""
 
 
 def run_generate(

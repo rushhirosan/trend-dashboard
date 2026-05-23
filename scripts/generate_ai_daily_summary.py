@@ -396,6 +396,26 @@ def _series_pref_score(series_key: str) -> int:
     return 1
 
 
+def _series_provider(series_key: str) -> str:
+    """クロスソース判定用: 同一 API の別フィード（openalex_* 等）を1プロバイダにまとめる。"""
+    sk = (series_key or "").strip().lower()
+    if not sk:
+        return ""
+    if sk.startswith("openalex_"):
+        return "openalex"
+    if sk.startswith("globenewswire"):
+        return "globenewswire"
+    if sk.endswith("_jp"):
+        return sk[:-3]
+    if sk.endswith("_us"):
+        return sk[:-3]
+    return sk
+
+
+def _format_slot_rank(slot: str, rank: int) -> str:
+    return f"{slot}時スナップショット{rank}位"
+
+
 def _is_noisy_label(display: str, series_key: str = "") -> bool:
     """調達行・英語長文など、一般読者向けサマリーから除外するラベル。"""
     if _is_weak_rising_label(display):
@@ -418,7 +438,7 @@ def _format_rank_evidence(ranks: dict[str, int]) -> str:
     for slot in DAYTIME_SLOTS:
         r = ranks.get(slot)
         if r is not None:
-            parts.append(f"{slot}時#{r}")
+            parts.append(_format_slot_rank(slot, r))
     return " → ".join(parts) if parts else "順位データなし"
 
 
@@ -611,6 +631,8 @@ def build_cross_source_highlights(
         series_list = list(series_map.values())
         categories = sorted({s["category"] for s in series_list})
         series_keys = sorted(series_map.keys())
+        if len({_series_provider(k) for k in series_keys}) < 2:
+            continue
         jp_pref = max(s.get("series_pref", 0) for s in series_list)
         best_r19 = min(
             (s.get("best_rank_19") or 999 for s in series_list),
@@ -696,10 +718,95 @@ def build_category_top1(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 picked = {**best_for_series, "category": category, "_full_score": full_score}
         if picked:
             del picked["_full_score"]
+            picked["rank_display"] = _format_slot_rank(
+                str(picked.get("slot") or ""),
+                int(picked.get("rank") or 0),
+            )
             out.append(picked)
         else:
             out.append({"category": category, "label": None, "quiet": True})
     return out
+
+
+def _short_label(label: str, max_len: int = 32) -> str:
+    s = _clean_rising_display(str(label or "")).strip()
+    if len(s) <= max_len:
+        return s
+    return s[: max_len - 1] + "…"
+
+
+def build_notable_summary(
+    cross_source: List[Dict[str, Any]],
+    category_top1: List[Dict[str, Any]],
+    quiet_categories: List[str],
+) -> Dict[str, Any]:
+    """「昨日特異だったこと」用: クロスソースと5区分トップ1の両方から推奨1文を組み立てる。"""
+    cross_items: List[Dict[str, Any]] = []
+    for c in cross_source[:CROSS_SOURCE_HIGHLIGHT_COUNT]:
+        keys = list(c.get("series_keys") or [])
+        cross_items.append(
+            {
+                "label": c.get("label"),
+                "series_keys": keys,
+                "rank_evidence": c.get("rank_evidence") or "",
+            }
+        )
+
+    top1_items: List[Dict[str, Any]] = []
+    for c in category_top1:
+        if c.get("quiet") or not c.get("label"):
+            continue
+        top1_items.append(
+            {
+                "category": c.get("category"),
+                "label": c.get("label"),
+                "series_key": c.get("series_key"),
+                "rank_display": c.get("rank_display") or "",
+            }
+        )
+
+    hints: List[str] = []
+    clauses: List[str] = []
+
+    if cross_items:
+        bits: List[str] = []
+        for item in cross_items:
+            label = _short_label(str(item.get("label") or ""))
+            keys = item.get("series_keys") or []
+            src = "・".join(keys[:3])
+            if len(keys) > 3:
+                src = f"{src} 他{len(keys) - 3}"
+            bits.append(f"「{label}」（{src}）" if src else f"「{label}」")
+        tail = f"{len(cross_items)}件" if len(cross_items) > 1 else "1件"
+        clauses.append(f"複数ソースで重なったのは{'、'.join(bits)}の{tail}")
+    else:
+        clauses.append("異なるデータ源をまたいだ同一トピックの重複はなかった")
+
+    if top1_items:
+        top_bits = [
+            f"{it['category']}「{_short_label(str(it.get('label') or ''))}」"
+            for it in top1_items
+        ]
+        clauses.append(f"5区分の代表は{'、'.join(top_bits)}")
+    elif quiet_categories:
+        clauses.append(f"5区分はいずれもデータが薄い（{', '.join(quiet_categories[:3])}）")
+
+    if len(top1_items) <= 2 and quiet_categories and top1_items:
+        hints.append(f"動きが限定的（静か: {', '.join(quiet_categories[:3])}）")
+    ent = next((c for c in category_top1 if c.get("category") == "エンタメ" and c.get("label")), None)
+    search = next(
+        (c for c in category_top1 if c.get("category") == "検索・動画" and c.get("label")), None
+    )
+    if ent and search and ent["label"] == search["label"]:
+        hints.append("エンタメと検索・動画のトップ1が同一ラベル")
+
+    recommended = "。".join(clauses) + "。"
+    return {
+        "cross_source_items": cross_items,
+        "category_top1_items": top1_items,
+        "recommended_sentence": recommended,
+        "hints": hints,
+    }
 
 
 def build_notable_hints(
@@ -707,25 +814,10 @@ def build_notable_hints(
     category_top1: List[Dict[str, Any]],
     quiet_categories: List[str],
 ) -> List[str]:
-    """LLM が「昨日特異だったこと」を書くための機械的ヒント。"""
-    hints: List[str] = []
-    if cross_source:
-        labels = "、".join(c["label"][:24] for c in cross_source[:2])
-        hints.append(
-            f"複数ソース重複が{len(cross_source)}件（例: {labels}）— クロスソース欄で説明する"
-        )
-    active = [c for c in category_top1 if c.get("label") and not c.get("quiet")]
-    if len(active) <= 2 and quiet_categories:
-        hints.append(
-            f"動きが限定的: 主に {', '.join(c['category'] for c in active)} のみ（静か: {', '.join(quiet_categories[:3])}）"
-        )
-    ent = next((c for c in category_top1 if c.get("category") == "エンタメ" and c.get("label")), None)
-    search = next(
-        (c for c in category_top1 if c.get("category") == "検索・動画" and c.get("label")), None
+    """後方互換: notable_summary の hints リスト。"""
+    return build_notable_summary(cross_source, category_top1, quiet_categories).get(
+        "hints", []
     )
-    if ent and search and ent["label"] == search["label"]:
-        hints.append("エンタメと検索・動画のトップ1が同一ラベル")
-    return hints
 
 
 def _category_has_items(cat_block: Dict[str, Any]) -> bool:
@@ -743,6 +835,7 @@ def build_llm_payload(rows: List[Dict[str, Any]], business_day: date) -> Dict[st
     quiet = [c["category"] for c in full["categories"] if not _category_has_items(c)]
     cross = build_cross_source_highlights(rows, count=CROSS_SOURCE_HIGHLIGHT_COUNT)
     top1 = build_category_top1(rows)
+    notable = build_notable_summary(cross, top1, quiet)
     rising = build_rising_highlights(rows, count=RISING_HIGHLIGHT_COUNT)
     return {
         "business_day": business_day.isoformat(),
@@ -752,7 +845,8 @@ def build_llm_payload(rows: List[Dict[str, Any]], business_day: date) -> Dict[st
         ),
         "cross_source_highlights": cross,
         "category_top1": top1,
-        "notable_hints": build_notable_hints(cross, top1, quiet),
+        "notable_summary": notable,
+        "notable_hints": notable.get("hints", []),
         "rising_highlights_fallback": rising,
         "categories": categories,
         "quiet_categories": quiet,
@@ -837,7 +931,7 @@ generated_at: "{gen_at}"
 SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ。入力 JSON の business_day は
 **観測日（その日のトレンド）**。読者は通常 **翌朝** に本文を受け取る。
 Web 記事の本文や URL は含まれない。入力の cross_source_highlights / category_top1 /
-notable_hints / categories はスナップショット由来の事実のみ。
+notable_summary / categories はスナップショット由来の事実のみ。
 
 出力は日本語 Markdown のみ（YAML フロントマターは書かない）。**BUSINESS_DAY** は JSON の
 business_day と必ず一致させる。
@@ -855,9 +949,11 @@ business_day と必ず一致させる。
    `- **登場ソース**:` series_keys をカンマ区切り、
    `- **根拠**:` rank_evidence または入力の rank_evidence をそのまま要約。
 6. `## 📊 カテゴリ別トップ1` — **category_top1** の順（ニュース→検索・動画→テック→マーケット→エンタメ）。
-   各行 `- **カテゴリ名**:` label（ソース: series_key · slot時#rank）。quiet なら「（データなし）」。
-7. `## 💡 昨日特異だったこと` — **1文のみ**。notable_hints と category_top1 / cross_source を踏まえ、
-   観測日に特徴的だったパターン（例: クロスソースが多い、特定カテゴリだけ動いた）を書く。
+   各行は `- **ニュース**:` のように **区分名だけ**（見出しの「カテゴリ」を繰り返さない。「カテゴリ名」という文字は書かない）。
+   label（ソース: series_key · rank_display）。rank_display は入力のとおり（例: 19時スナップショット1位）。quiet なら「（データなし）」。
+7. `## 💡 昨日特異だったこと` — **1文のみ**。**notable_summary.recommended_sentence** を
+   **そのまま1文として出力**（語句の言い換え・省略・抽象化は禁止。入力に無いカテゴリ総括も禁止）。
+   この文は cross_source_items（クロスソース）と category_top1_items（5区分代表）の両方を含む。
    未来予測・「今日は〜」は禁止。
 
 禁止:
@@ -868,6 +964,22 @@ business_day と必ず一致させる。
 - 入力に無い事実の断定
 
 事実: 入力に無いことは断定しない。クロスソースは「なぜ今」の手がかりとして最優先で説明する。"""
+
+_NOTABLE_HEADING = "## 💡 昨日特異だったこと"
+
+
+def inject_notable_sentence(markdown: str, sentence: str) -> str:
+    """LLM 出力の「昨日特異」節を機械生成の1文で上書きする。"""
+    s = (sentence or "").strip()
+    if not s:
+        return markdown
+    pattern = re.compile(
+        rf"({_NOTABLE_HEADING}\s*\n)(?:.*?\n)*?(?=\n## |\Z)",
+        re.DOTALL,
+    )
+    if pattern.search(markdown):
+        return pattern.sub(rf"\1{s}\n\n", markdown, count=1)
+    return markdown.rstrip() + f"\n\n{_NOTABLE_HEADING}\n\n{s}\n"
 
 
 def run_generate(
@@ -892,7 +1004,12 @@ def run_generate(
         + build_user_payload(payload)
     )
     inner = call_openai(SYSTEM_PROMPT, user, api_key, model)
+    notable = payload.get("notable_summary") or {}
+    recommended = notable.get("recommended_sentence")
+    if recommended:
+        inner = inject_notable_sentence(inner, str(recommended))
     meta["model"] = model
+    meta["notable_recommended_sentence"] = recommended
     full = merge_front_matter(business_day, model, inner)
     return full, meta
 

@@ -159,6 +159,30 @@ def test_is_noisy_label_filters_procurement(gads):
     assert not gads._is_noisy_label("豊臣秀長", "wikipedia_jp")
 
 
+def test_format_rank_evidence_uses_snapshot_wording(gads):
+    assert gads._format_rank_evidence({"07": 8, "13": 3, "19": 1}) == (
+        "07時スナップショット8位 → 13時スナップショット3位 → 19時スナップショット1位"
+    )
+
+
+def test_build_cross_source_excludes_same_provider_openalex(gads):
+    rows = [
+        {
+            "slot": "19",
+            "series_key": "openalex_ai_us",
+            "items": [{"t": "Paper A", "r": 1}],
+            "captured_at": "2026-05-22T19:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "openalex_nlp_us",
+            "items": [{"t": "Paper A", "r": 1}],
+            "captured_at": "2026-05-22T19:00:00+09:00",
+        },
+    ]
+    assert gads.build_cross_source_highlights(rows, count=3) == []
+
+
 def test_build_cross_source_highlights_finds_overlap(gads):
     rows = [
         {
@@ -205,8 +229,56 @@ def test_build_category_top1_picks_per_category(gads):
     top1 = gads.build_category_top1(rows)
     by_cat = {c["category"]: c for c in top1}
     assert by_cat["ニュース"]["label"] == "NHK headline"
+    assert by_cat["ニュース"]["rank_display"] == "19時スナップショット1位"
     assert by_cat["テック・開発"]["label"] == "Zenn article"
     assert by_cat["エンタメ"].get("quiet") is True
+
+
+def test_build_notable_summary_includes_cross_and_top1(gads):
+    cross = [
+        {
+            "label": "豊臣秀長",
+            "series_keys": ["wikipedia_jp", "google_trends_jp"],
+            "rank_evidence": "07時スナップショット8位 → 19時スナップショット2位",
+        }
+    ]
+    top1 = [
+        {
+            "category": "ニュース",
+            "label": "NHK headline",
+            "series_key": "nhk_jp",
+            "rank_display": "19時スナップショット1位",
+        },
+        {"category": "エンタメ", "label": None, "quiet": True},
+    ]
+    summary = gads.build_notable_summary(cross, top1, ["エンタメ"])
+    assert "豊臣秀長" in summary["recommended_sentence"]
+    assert "wikipedia_jp" in summary["recommended_sentence"]
+    assert "ニュース" in summary["recommended_sentence"]
+    assert "NHK headline" in summary["recommended_sentence"]
+    assert len(summary["cross_source_items"]) == 1
+    assert len(summary["category_top1_items"]) == 1
+
+
+def test_build_notable_summary_without_cross(gads):
+    top1 = [
+        {
+            "category": "ニュース",
+            "label": "事件ヘッド",
+            "series_key": "nhk_jp",
+            "rank_display": "19時スナップショット1位",
+        },
+    ]
+    summary = gads.build_notable_summary([], top1, ["エンタメ"])
+    assert "重複はなかった" in summary["recommended_sentence"]
+    assert "事件ヘッド" in summary["recommended_sentence"]
+
+
+def test_inject_notable_sentence_replaces_section(gads):
+    md = "# 日次\n\n## 💡 昨日特異だったこと\n\n古い抽象文。\n\n## 他\n"
+    out = gads.inject_notable_sentence(md, "新しい具体文。")
+    assert "新しい具体文。" in out
+    assert "古い抽象文" not in out
 
 
 def test_build_llm_payload_includes_cross_and_top1(gads):
@@ -221,6 +293,8 @@ def test_build_llm_payload_includes_cross_and_top1(gads):
     payload = gads.build_llm_payload(rows, date(2026, 5, 18))
     assert "cross_source_highlights" in payload
     assert "category_top1" in payload
+    assert "notable_summary" in payload
+    assert "recommended_sentence" in payload["notable_summary"]
     assert "notable_hints" in payload
     assert "rising_highlights_fallback" in payload
     assert "reader_context" in payload

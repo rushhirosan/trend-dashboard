@@ -201,6 +201,80 @@ def test_build_cross_source_excludes_same_provider_prtimes(gads):
     assert gads.build_cross_source_highlights(rows, count=3) == []
 
 
+def test_build_cross_source_excludes_same_provider_book_us(gads):
+    rows = [
+        {
+            "slot": "19",
+            "series_key": "book_us_all",
+            "items": [{"t": "The Odyssey of Homer", "r": 1}],
+            "captured_at": "2026-05-24T19:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "book_us_fiction",
+            "items": [{"t": "The Odyssey of Homer", "r": 1}],
+            "captured_at": "2026-05-24T19:00:00+09:00",
+        },
+    ]
+    assert gads.build_cross_source_highlights(rows, count=3) == []
+
+
+def test_build_cross_source_excludes_same_provider_wikipedia(gads):
+    rows = [
+        {
+            "slot": "19",
+            "series_key": "wikipedia_ja",
+            "items": [{"t": "Topic", "r": 1}],
+            "captured_at": "2026-05-24T19:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "wikipedia_en",
+            "items": [{"t": "Topic", "r": 1}],
+            "captured_at": "2026-05-24T19:00:00+09:00",
+        },
+    ]
+    assert gads.build_cross_source_highlights(rows, count=3) == []
+
+
+def test_build_cross_source_excludes_same_provider_google_trends_regions(gads):
+    rows = [
+        {
+            "slot": "19",
+            "series_key": "google_trends_jp",
+            "items": [{"t": "同じキーワード", "r": 1}],
+            "captured_at": "2026-05-24T19:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "google_trends_us",
+            "items": [{"t": "同じキーワード", "r": 3}],
+            "captured_at": "2026-05-24T19:00:00+09:00",
+        },
+    ]
+    assert gads.build_cross_source_highlights(rows, count=3) == []
+
+
+@pytest.mark.parametrize(
+    "series_key,expected",
+    [
+        ("book_us_all", "book_us"),
+        ("book_jp_fiction", "book_jp"),
+        ("wikipedia_ja", "wikipedia"),
+        ("wikipedia_en", "wikipedia"),
+        ("google_trends_jp", "google_trends"),
+        ("openalex_ai_jp", "openalex"),
+        ("prtimes_hatena_jp", "prtimes"),
+        ("globenewswire_market_us", "globenewswire"),
+        ("nhk_jp", "nhk"),
+        ("hatena_jp", "hatena"),
+        ("zenn_jp", "zenn"),
+    ],
+)
+def test_series_provider_groups_same_upstream(gads, series_key, expected):
+    assert gads._series_provider(series_key) == expected
+
+
 def test_build_cross_source_highlights_finds_overlap(gads):
     rows = [
         {
@@ -314,6 +388,14 @@ def test_inject_notable_sentence_dedupes_duplicate_sections(gads):
     assert "機械生成の1文。" in out
     assert "LLMの長い文" not in out
     assert "別の重複文" not in out
+    assert "## 📊 カテゴリ別トップ1" in out
+
+
+def test_inject_notable_sentence_appends_when_missing(gads):
+    md = "# 日次\n\n## 📊 カテゴリ別トップ1\n\n- item\n"
+    out = gads.inject_notable_sentence(md, "機械生成の1文。")
+    assert out.count("## 💡 昨日特異だったこと") == 1
+    assert out.endswith("機械生成の1文。\n")
     assert "## 📊 カテゴリ別トップ1" in out
 
 

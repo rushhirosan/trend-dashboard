@@ -397,21 +397,28 @@ def _series_pref_score(series_key: str) -> int:
 
 
 def _series_provider(series_key: str) -> str:
-    """クロスソース判定用: 同一 API の別フィード（openalex_* 等）を1プロバイダにまとめる。"""
+    """クロスソース判定用: 同一取得元（API・マネージャ・別カテゴリ/地域）を1プロバイダにまとめる。
+
+    「複数ソース」は _series_provider が異なる系列同士のラベル一致のみ（完全に別の取得元同士）。
+    """
     sk = (series_key or "").strip().lower()
     if not sk:
         return ""
+    # 別カテゴリ・別ランキング軸の複数 series_key（同一マネージャ）
     if sk.startswith("openalex_"):
         return "openalex"
     if sk.startswith("globenewswire"):
         return "globenewswire"
-    # PR TIMES RSS と PR TIMES×はてブは同一上流（別ランキング軸のみ）
     if sk.startswith("prtimes"):
         return "prtimes"
-    if sk.endswith("_jp"):
-        return sk[:-3]
-    if sk.endswith("_us"):
-        return sk[:-3]
+    if sk.startswith("book_jp_"):
+        return "book_jp"
+    if sk.startswith("book_us_"):
+        return "book_us"
+    # 標準形 {source}_{region} — 地域違いは同一プロバイダ
+    for suffix in ("_jp", "_us", "_ja", "_en", "_global"):
+        if sk.endswith(suffix):
+            return sk[: -len(suffix)]
     return sk
 
 
@@ -624,7 +631,7 @@ def build_cross_source_highlights(
     *,
     count: int = CROSS_SOURCE_HIGHLIGHT_COUNT,
 ) -> List[Dict[str, Any]]:
-    """異なる series_key に同一ラベル（正規化一致）が現れたものを優先。"""
+    """独立した取得元（_series_provider が2種以上）をまたいだ同一ラベル（正規化一致）を優先。"""
     index = _collect_label_index(rows)
     candidates: List[Dict[str, Any]] = []
     for nk, entry in index.items():
@@ -945,7 +952,7 @@ business_day と必ず一致させる。
 3. `- **生成・送信完了**:`（不明なら「自動生成（時刻未入力）」）
 4. `## 昨日のクロスソースハイライト — BUSINESS_DAY`
 5. `### 🔥 複数ソースで話題になったもの` — **cross_source_highlights** を最大3件。
-   0件なら「該当なし（同一ラベルが複数系列に出たものはありませんでした）」と1行だけ書き、
+   0件なら「該当なし（独立した取得元を2つ以上またいだ同一トピックはありませんでした）」と1行だけ書き、
    rising_highlights_fallback から **JP 向けに読みやすい1件**を補足してもよい（根拠行必須）。
    各 `### 1.` …: 短い見出し（label）、本文2〜3文（**なぜ複数ソースに出たか**を推測しすぎず、
    ドラマ・事件・製品発表など **ありうる文脈**を「〜の可能性」と書く）、
@@ -954,10 +961,9 @@ business_day と必ず一致させる。
 6. `## 📊 カテゴリ別トップ1` — **category_top1** の順（ニュース→検索・動画→テック→マーケット→エンタメ）。
    各行は `- **ニュース**:` のように **区分名だけ**（見出しの「カテゴリ」を繰り返さない。「カテゴリ名」という文字は書かない）。
    label（ソース: series_key · rank_display）。rank_display は入力のとおり（例: 19時スナップショット1位）。quiet なら「（データなし）」。
-7. `## 💡 昨日特異だったこと` — **1文のみ**。**notable_summary.recommended_sentence** を
-   **そのまま1文として出力**（語句の言い換え・省略・抽象化は禁止。入力に無いカテゴリ総括も禁止）。
-   この文は cross_source_items（クロスソース）と category_top1_items（5区分代表）の両方を含む。
-   未来予測・「今日は〜」は禁止。
+
+**「昨日特異だったこと」節は出力しない**（システムが末尾に機械生成文を1回だけ付与する）。
+未来予測・「今日は〜」は禁止。
 
 禁止:
 - `## 今日の見方` / `## 昨日いちばん動いた3つ`（旧フォーマット）
@@ -972,7 +978,7 @@ _NOTABLE_HEADING = "## 💡 昨日特異だったこと"
 
 
 def inject_notable_sentence(markdown: str, sentence: str) -> str:
-    """LLM 出力の「昨日特異」節を機械生成の1文に統一する（重複節はすべて除去）。"""
+    """LLM 出力から「昨日特異」節をすべて除去し、機械生成の1文を末尾に1回だけ付与する。"""
     s = (sentence or "").strip()
     if not s:
         return markdown
@@ -982,7 +988,10 @@ def inject_notable_sentence(markdown: str, sentence: str) -> str:
     )
     cleaned = section_pattern.sub("", markdown).rstrip()
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
-    return cleaned + f"\n\n{_NOTABLE_HEADING}\n\n{s}\n"
+    out = cleaned + f"\n\n{_NOTABLE_HEADING}\n\n{s}\n"
+    if out.count(_NOTABLE_HEADING) != 1:
+        raise RuntimeError("inject_notable_sentence: expected exactly one notable heading")
+    return out
 
 
 def run_generate(

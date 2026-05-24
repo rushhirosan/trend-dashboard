@@ -405,6 +405,9 @@ def _series_provider(series_key: str) -> str:
         return "openalex"
     if sk.startswith("globenewswire"):
         return "globenewswire"
+    # PR TIMES RSS と PR TIMES×はてブは同一上流（別ランキング軸のみ）
+    if sk.startswith("prtimes"):
+        return "prtimes"
     if sk.endswith("_jp"):
         return sk[:-3]
     if sk.endswith("_us"):
@@ -969,17 +972,17 @@ _NOTABLE_HEADING = "## 💡 昨日特異だったこと"
 
 
 def inject_notable_sentence(markdown: str, sentence: str) -> str:
-    """LLM 出力の「昨日特異」節を機械生成の1文で上書きする。"""
+    """LLM 出力の「昨日特異」節を機械生成の1文に統一する（重複節はすべて除去）。"""
     s = (sentence or "").strip()
     if not s:
         return markdown
-    pattern = re.compile(
-        rf"({_NOTABLE_HEADING}\s*\n)(?:.*?\n)*?(?=\n## |\Z)",
+    section_pattern = re.compile(
+        rf"(?:\n|^){re.escape(_NOTABLE_HEADING)}\s*\n(?:.*?\n)*?(?=\n## |\Z)",
         re.DOTALL,
     )
-    if pattern.search(markdown):
-        return pattern.sub(rf"\1{s}\n\n", markdown, count=1)
-    return markdown.rstrip() + f"\n\n{_NOTABLE_HEADING}\n\n{s}\n"
+    cleaned = section_pattern.sub("", markdown).rstrip()
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned + f"\n\n{_NOTABLE_HEADING}\n\n{s}\n"
 
 
 def run_generate(

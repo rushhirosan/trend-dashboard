@@ -183,6 +183,24 @@ def test_build_cross_source_excludes_same_provider_openalex(gads):
     assert gads.build_cross_source_highlights(rows, count=3) == []
 
 
+def test_build_cross_source_excludes_same_provider_prtimes(gads):
+    rows = [
+        {
+            "slot": "19",
+            "series_key": "prtimes_jp",
+            "items": [{"t": "同じプレスリリース", "r": 6}],
+            "captured_at": "2026-05-23T19:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "prtimes_hatena_jp",
+            "items": [{"t": "同じプレスリリース", "r": 8}],
+            "captured_at": "2026-05-23T19:00:00+09:00",
+        },
+    ]
+    assert gads.build_cross_source_highlights(rows, count=3) == []
+
+
 def test_build_cross_source_highlights_finds_overlap(gads):
     rows = [
         {
@@ -277,8 +295,26 @@ def test_build_notable_summary_without_cross(gads):
 def test_inject_notable_sentence_replaces_section(gads):
     md = "# 日次\n\n## 💡 昨日特異だったこと\n\n古い抽象文。\n\n## 他\n"
     out = gads.inject_notable_sentence(md, "新しい具体文。")
+    assert out.count("## 💡 昨日特異だったこと") == 1
     assert "新しい具体文。" in out
     assert "古い抽象文" not in out
+    assert "## 他\n" in out
+
+
+def test_inject_notable_sentence_dedupes_duplicate_sections(gads):
+    md = (
+        "# 日次\n\n## 📊 カテゴリ別トップ1\n\n- item\n\n"
+        "## 💡 昨日特異だったこと\n\n"
+        "LLMの長い文。\n\n"
+        "## 💡 昨日特異だったこと\n\n"
+        "別の重複文。\n"
+    )
+    out = gads.inject_notable_sentence(md, "機械生成の1文。")
+    assert out.count("## 💡 昨日特異だったこと") == 1
+    assert "機械生成の1文。" in out
+    assert "LLMの長い文" not in out
+    assert "別の重複文" not in out
+    assert "## 📊 カテゴリ別トップ1" in out
 
 
 def test_build_llm_payload_includes_cross_and_top1(gads):

@@ -255,6 +255,58 @@ def test_build_cross_source_excludes_same_provider_google_trends_regions(gads):
     assert gads.build_cross_source_highlights(rows, count=3) == []
 
 
+def test_build_cross_source_excludes_generic_sports_label(gads):
+    rows = [
+        {
+            "slot": "19",
+            "series_key": "google_trends_us",
+            "items": [{"t": "Sports", "r": 10}],
+            "captured_at": "2026-05-25T19:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "twitch_jp",
+            "items": [{"t": "Sports", "r": 5}],
+            "captured_at": "2026-05-25T19:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "twitch_us",
+            "items": [{"t": "Sports", "r": 6}],
+            "captured_at": "2026-05-25T19:00:00+09:00",
+        },
+    ]
+    assert gads.build_cross_source_highlights(rows, count=3) == []
+
+
+def test_build_cross_source_dedupes_twitch_provider_keys(gads):
+    rows = [
+        {
+            "slot": "19",
+            "series_key": "hatena_jp",
+            "items": [{"t": "具体的な技術記事タイトル", "r": 2}],
+            "captured_at": "2026-05-25T19:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "twitch_jp",
+            "items": [{"t": "具体的な技術記事タイトル", "r": 4}],
+            "captured_at": "2026-05-25T19:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "twitch_us",
+            "items": [{"t": "具体的な技術記事タイトル", "r": 5}],
+            "captured_at": "2026-05-25T19:00:00+09:00",
+        },
+    ]
+    cross = gads.build_cross_source_highlights(rows, count=3)
+    assert len(cross) == 1
+    assert cross[0]["series_keys"] == ["hatena_jp", "twitch_jp"]
+    assert "Twitch" in cross[0]["sources_display"]
+    assert "twitch_us" not in cross[0]["series_keys"]
+
+
 @pytest.mark.parametrize(
     "series_key,expected",
     [
@@ -326,77 +378,44 @@ def test_build_category_top1_picks_per_category(gads):
     assert by_cat["エンタメ"].get("quiet") is True
 
 
-def test_build_notable_summary_includes_cross_and_top1(gads):
-    cross = [
+def test_build_category_top3_includes_links(gads):
+    rows = [
         {
-            "label": "豊臣秀長",
-            "series_keys": ["wikipedia_jp", "google_trends_jp"],
-            "rank_evidence": "07時スナップショット8位 → 19時スナップショット2位",
-        }
-    ]
-    top1 = [
-        {
-            "category": "ニュース",
-            "label": "NHK headline",
+            "slot": "19",
             "series_key": "nhk_jp",
-            "rank_display": "19時スナップショット1位",
+            "items": [
+                {"t": "Head A", "r": 1, "u": "https://www3.nhk.or.jp/news/a"},
+                {"t": "Head B", "r": 2},
+            ],
+            "captured_at": "2026-05-25T19:00:00+09:00",
         },
-        {"category": "エンタメ", "label": None, "quiet": True},
-    ]
-    summary = gads.build_notable_summary(cross, top1, ["エンタメ"])
-    assert "豊臣秀長" in summary["recommended_sentence"]
-    assert "wikipedia_jp" in summary["recommended_sentence"]
-    assert "ニュース" in summary["recommended_sentence"]
-    assert "NHK headline" in summary["recommended_sentence"]
-    assert len(summary["cross_source_items"]) == 1
-    assert len(summary["category_top1_items"]) == 1
-
-
-def test_build_notable_summary_without_cross(gads):
-    top1 = [
         {
-            "category": "ニュース",
-            "label": "事件ヘッド",
-            "series_key": "nhk_jp",
-            "rank_display": "19時スナップショット1位",
+            "slot": "19",
+            "series_key": "zenn_jp",
+            "items": [{"t": "Zenn post", "r": 1, "u": "https://zenn.dev/a/b"}],
+            "captured_at": "2026-05-25T19:00:00+09:00",
         },
     ]
-    summary = gads.build_notable_summary([], top1, ["エンタメ"])
-    assert "重複はなかった" in summary["recommended_sentence"]
-    assert "事件ヘッド" in summary["recommended_sentence"]
+    top3 = gads.build_category_top3(rows, count=3)
+    news = next(b for b in top3 if b["category"] == "ニュース")
+    assert len(news["items"]) == 2
+    assert "https://www3.nhk.or.jp/news/a" in news["items"][0]["link_line"]
+    tech = next(b for b in top3 if b["category"] == "テック・開発")
+    assert "https://zenn.dev/a/b" in tech["items"][0]["link_line"]
 
 
-def test_inject_notable_sentence_replaces_section(gads):
-    md = "# 日次\n\n## 💡 昨日特異だったこと\n\n古い抽象文。\n\n## 他\n"
-    out = gads.inject_notable_sentence(md, "新しい具体文。")
-    assert out.count("## 💡 昨日特異だったこと") == 1
-    assert "新しい具体文。" in out
-    assert "古い抽象文" not in out
-    assert "## 他\n" in out
-
-
-def test_inject_notable_sentence_dedupes_duplicate_sections(gads):
+def test_inject_category_top3_replaces_notable_and_appends(gads):
     md = (
         "# 日次\n\n## 📊 カテゴリ別トップ1\n\n- item\n\n"
         "## 💡 昨日特異だったこと\n\n"
-        "LLMの長い文。\n\n"
-        "## 💡 昨日特異だったこと\n\n"
-        "別の重複文。\n"
+        "繰り返しだけの文。\n"
     )
-    out = gads.inject_notable_sentence(md, "機械生成の1文。")
-    assert out.count("## 💡 昨日特異だったこと") == 1
-    assert "機械生成の1文。" in out
-    assert "LLMの長い文" not in out
-    assert "別の重複文" not in out
-    assert "## 📊 カテゴリ別トップ1" in out
-
-
-def test_inject_notable_sentence_appends_when_missing(gads):
-    md = "# 日次\n\n## 📊 カテゴリ別トップ1\n\n- item\n"
-    out = gads.inject_notable_sentence(md, "機械生成の1文。")
-    assert out.count("## 💡 昨日特異だったこと") == 1
-    assert out.endswith("機械生成の1文。\n")
-    assert "## 📊 カテゴリ別トップ1" in out
+    top3 = "### ニュース\n1. [例](https://example.com)（nhk_jp · 19時スナップショット1位）\n"
+    out = gads.inject_category_top3(md, f"## 📊 カテゴリ別トップ3\n\n{top3}")
+    assert out.count("## 📊 カテゴリ別トップ3") == 1
+    assert "## 💡 昨日特異だったこと" not in out
+    assert "繰り返しだけの文" not in out
+    assert "https://example.com" in out
 
 
 def test_build_llm_payload_includes_cross_and_top1(gads):
@@ -411,9 +430,8 @@ def test_build_llm_payload_includes_cross_and_top1(gads):
     payload = gads.build_llm_payload(rows, date(2026, 5, 18))
     assert "cross_source_highlights" in payload
     assert "category_top1" in payload
-    assert "notable_summary" in payload
-    assert "recommended_sentence" in payload["notable_summary"]
-    assert "notable_hints" in payload
+    assert "category_top3" in payload
+    assert "notable_summary" not in payload
     assert "rising_highlights_fallback" in payload
     assert "reader_context" in payload
     assert "今日の見方" not in payload["reader_context"]

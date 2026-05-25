@@ -110,7 +110,16 @@ def _label_from_item(item: Any, idx: int) -> Optional[Dict[str, Any]]:
         rank = int(rank)
     except (TypeError, ValueError):
         rank = idx + 1
-    return {"t": text, "r": rank}
+    out: Dict[str, Any] = {"t": text, "r": rank}
+    for uk in ("url", "link", "html_url", "news_url"):
+        raw_u = item.get(uk)
+        if raw_u is None:
+            continue
+        u = str(raw_u).strip()
+        if u.startswith("http://") or u.startswith("https://"):
+            out["u"] = u[:2000]
+            break
+    return out
 
 
 def _items_from_data_list(data: Any, limit: int) -> List[Dict[str, Any]]:

@@ -22,6 +22,10 @@ primary_region = "nrt"
   TREND_REFRESH_BATCH_DELAY_SECONDS = "3"
   # スケジューラ一括取得の開始時に Discord へ1通（完了通知と切り分け用）
   DISCORD_NOTIFY_SCHEDULER_START = "true"
+  # 1ソースあたりの最大待ち（秒）。ハング時にバッチが止まらないよう上限
+  TREND_REFRESH_TASK_TIMEOUT_SECONDS = "600"
+  # ジョブ全体の上限（秒）。DBロック(90分)より短くし、フラグ解放と完了通知を保証
+  TRENDS_SCHEDULER_JOB_TIMEOUT_SECONDS = "5100"
 
 [http_service]
   internal_port = 8080

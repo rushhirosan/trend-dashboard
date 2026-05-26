@@ -355,29 +355,6 @@ def test_build_cross_source_highlights_finds_overlap(gads):
     assert "google_trends_jp" in cross[0]["series_keys"]
 
 
-def test_build_category_top1_picks_per_category(gads):
-    rows = [
-        {
-            "slot": "19",
-            "series_key": "nhk_jp",
-            "items": [{"t": "NHK headline", "r": 1}],
-            "captured_at": "2026-05-20T19:00:00+09:00",
-        },
-        {
-            "slot": "19",
-            "series_key": "zenn_jp",
-            "items": [{"t": "Zenn article", "r": 1}],
-            "captured_at": "2026-05-20T19:00:00+09:00",
-        },
-    ]
-    top1 = gads.build_category_top1(rows)
-    by_cat = {c["category"]: c for c in top1}
-    assert by_cat["ニュース"]["label"] == "NHK headline"
-    assert by_cat["ニュース"]["rank_display"] == "19時スナップショット1位"
-    assert by_cat["テック・開発"]["label"] == "Zenn article"
-    assert by_cat["エンタメ"].get("quiet") is True
-
-
 def test_build_category_top3_includes_links(gads):
     rows = [
         {
@@ -413,12 +390,13 @@ def test_inject_category_top3_replaces_notable_and_appends(gads):
     top3 = "### ニュース\n1. [例](https://example.com)（nhk_jp · 19時スナップショット1位）\n"
     out = gads.inject_category_top3(md, f"## 📊 カテゴリ別トップ3\n\n{top3}")
     assert out.count("## 📊 カテゴリ別トップ3") == 1
+    assert "## 📊 カテゴリ別トップ1" not in out
     assert "## 💡 昨日特異だったこと" not in out
     assert "繰り返しだけの文" not in out
     assert "https://example.com" in out
 
 
-def test_build_llm_payload_includes_cross_and_top1(gads):
+def test_build_llm_payload_includes_cross_and_top3(gads):
     rows = [
         {
             "slot": "19",
@@ -429,7 +407,7 @@ def test_build_llm_payload_includes_cross_and_top1(gads):
     ]
     payload = gads.build_llm_payload(rows, date(2026, 5, 18))
     assert "cross_source_highlights" in payload
-    assert "category_top1" in payload
+    assert "category_top1" not in payload
     assert "category_top3" in payload
     assert "notable_summary" not in payload
     assert "rising_highlights_fallback" in payload

@@ -59,8 +59,9 @@ RISING_HIGHLIGHT_COUNT = 3
 CROSS_SOURCE_HIGHLIGHT_COUNT = 3
 CATEGORY_TOP_N = 3
 _TOP3_HEADING = "## 📊 カテゴリ別トップ3"
+_TOP1_HEADING = "## 📊 カテゴリ別トップ1"
 _NOTABLE_HEADING = "## 💡 昨日特異だったこと"
-# 配信向けカテゴリ別トップ1（行政はノイズが多いため digest から除外可）
+# 配信向けカテゴリ（行政はノイズが多いため digest から除外可）
 CATEGORY_DIGEST_ORDER: tuple[str, ...] = (
     "ニュース",
     "検索・動画",
@@ -830,82 +831,6 @@ def build_cross_source_highlights(
     return candidates[:count]
 
 
-def _best_item_in_series_at_slot(
-    series_by_slot: Dict[str, Dict[str, List[Dict[str, Any]]]],
-    series_key: str,
-    slot: str,
-) -> Optional[Dict[str, Any]]:
-    items = (series_by_slot.get(slot) or {}).get(series_key) or []
-    best: Optional[Dict[str, Any]] = None
-    for it in items:
-        if not isinstance(it, dict) or not it.get("t"):
-            continue
-        try:
-            r = int(it.get("r"))
-        except (TypeError, ValueError):
-            r = 999
-        display = _clean_rising_display(str(it.get("t")))
-        if _is_noisy_label(display, series_key):
-            continue
-        if best is None or r < best["rank"]:
-            best = {
-                "label": display,
-                "rank": r,
-                "slot": slot,
-                "series_key": series_key,
-                "url": _url_from_thin_item(it),
-            }
-    return best
-
-
-def build_category_top1(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """カテゴリごとに 19→13→07 の最良1件（JP 系列優先）。"""
-    series_by_slot = rows_to_series_by_slot(rows)
-    all_series: set[str] = set()
-    for slot in SLOT_ORDER:
-        all_series |= set((series_by_slot.get(slot) or {}).keys())
-
-    slot_weight = {"19": 3, "13": 2, "07": 1}
-    out: List[Dict[str, Any]] = []
-    for category in CATEGORY_DIGEST_ORDER:
-        cat_series = sorted(
-            [sk for sk in all_series if categorize_series_key(sk) == category],
-            key=lambda sk: (-_series_pref_score(sk), sk),
-        )
-        picked: Optional[Dict[str, Any]] = None
-        for series_key in cat_series:
-            best_for_series: Optional[Dict[str, Any]] = None
-            for slot in ("19", "13", "07"):
-                cand = _best_item_in_series_at_slot(series_by_slot, series_key, slot)
-                if cand is None:
-                    continue
-                score = (-cand["rank"], slot_weight.get(slot, 0))
-                if best_for_series is None or score > best_for_series["_score"]:
-                    best_for_series = {**cand, "_score": score}
-            if best_for_series is None:
-                continue
-            full_score = (best_for_series["_score"], _series_pref_score(series_key))
-            if picked is None or full_score > picked["_full_score"]:
-                del best_for_series["_score"]
-                picked = {**best_for_series, "category": category, "_full_score": full_score}
-        if picked:
-            del picked["_full_score"]
-            picked["rank_display"] = _format_slot_rank(
-                str(picked.get("slot") or ""),
-                int(picked.get("rank") or 0),
-            )
-            picked["link_line"] = _format_digest_link_line(
-                str(picked.get("label") or ""),
-                str(picked.get("series_key") or ""),
-                picked["rank_display"],
-                picked.get("url"),
-            )
-            out.append(picked)
-        else:
-            out.append({"category": category, "label": None, "quiet": True})
-    return out
-
-
 def build_category_top3(
     rows: List[Dict[str, Any]],
     *,
@@ -1007,12 +932,11 @@ def _category_has_items(cat_block: Dict[str, Any]) -> bool:
 
 
 def build_llm_payload(rows: List[Dict[str, Any]], business_day: date) -> Dict[str, Any]:
-    """OpenAI 用: クロスソース・カテゴリ別トップ1・カテゴリ詳細。"""
+    """OpenAI 用: クロスソース・カテゴリ別トップ3・カテゴリ詳細。"""
     full = compact_rows_by_category(rows)
     categories = [c for c in full["categories"] if _category_has_items(c)]
     quiet = [c["category"] for c in full["categories"] if not _category_has_items(c)]
     cross = build_cross_source_highlights(rows, count=CROSS_SOURCE_HIGHLIGHT_COUNT)
-    top1 = build_category_top1(rows)
     top3 = build_category_top3(rows, count=CATEGORY_TOP_N)
     rising = build_rising_highlights(rows, count=RISING_HIGHLIGHT_COUNT)
     return {
@@ -1022,7 +946,6 @@ def build_llm_payload(rows: List[Dict[str, Any]], business_day: date) -> Dict[st
             "「昨日」= business_day。推測や「今日は〜でしょう」は書かない。"
         ),
         "cross_source_highlights": cross,
-        "category_top1": top1,
         "category_top3": top3,
         "rising_highlights_fallback": rising,
         "categories": categories,
@@ -1107,8 +1030,8 @@ generated_at: "{gen_at}"
 
 SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ。入力 JSON の business_day は
 **観測日（その日のトレンド）**。読者は通常 **翌朝** に本文を受け取る。
-入力の cross_source_highlights / category_top1 / category_top3 / categories は
-スナップショット由来の事実のみ。category_top1・category_top3 の link_line / url は入力のものだけ使う。
+入力の cross_source_highlights / category_top3 / categories は
+スナップショット由来の事実のみ。category_top3 の link_line / url は入力のものだけ使う。
 
 出力は日本語 Markdown のみ（YAML フロントマターは書かない）。**BUSINESS_DAY** は JSON の
 business_day と必ず一致させる。
@@ -1126,11 +1049,8 @@ business_day と必ず一致させる。
    ドラマ・事件・製品発表など **ありうる文脈**を「〜の可能性」と書く）、
    `- **登場ソース**:` **sources_display** をそのまま（series_keys の羅列はしない）、
    `- **根拠**:` rank_evidence または入力の rank_evidence をそのまま要約。
-6. `## 📊 カテゴリ別トップ1` — **category_top1** の順（ニュース→検索・動画→テック→マーケット→エンタメ）。
-   各行は `- **ニュース**:` のように **区分名だけ**。
-   **link_line** があればその1行をそのまま使う（リンク・ソース・順位を改変しない）。無ければ label（ソース: series_key · rank_display）。quiet なら「（データなし）」。
 
-**`## 📊 カテゴリ別トップ3` と `## 💡 昨日特異だったこと` は出力しない**（システムが末尾にトップ3を付与）。
+**`## 📊 カテゴリ別トップ1` / `## 📊 カテゴリ別トップ3` / `## 💡 昨日特異だったこと` は出力しない**（システムが末尾にトップ3を付与）。
 未来予測・「今日は〜」は禁止。
 
 禁止:
@@ -1142,7 +1062,7 @@ business_day と必ず一致させる。
 
 事実: 入力に無いことは断定しない。クロスソースは「なぜ今」の手がかりとして最優先で説明する。"""
 
-_MACHINE_DIGEST_HEADINGS = (_TOP3_HEADING, _NOTABLE_HEADING)
+_MACHINE_DIGEST_HEADINGS = (_TOP1_HEADING, _TOP3_HEADING, _NOTABLE_HEADING)
 
 
 def _strip_machine_digest_sections(markdown: str) -> str:

@@ -5,6 +5,7 @@ import socket
 import threading
 import time
 import signal
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from datetime import datetime, timezone
 try:
     import fcntl
@@ -56,6 +57,14 @@ try:
     )
 except (TypeError, ValueError):
     SCHEDULER_LOW_MEMORY_BATCH_DELAY_SECONDS = 1.0
+# ジョブ全体の上限（秒）。DBロック(TRENDS_SCHEDULER_LOCK_MINUTES)より短めにし、finallyでフラグ解放を保証
+try:
+    SCHEDULER_JOB_TIMEOUT_SECONDS = max(
+        600, min(7200, int(os.environ.get("TRENDS_SCHEDULER_JOB_TIMEOUT_SECONDS", "5100")))
+    )
+except (TypeError, ValueError):
+    SCHEDULER_JOB_TIMEOUT_SECONDS = 5100
+
 
 class TrendsScheduler:
     """トレンド自動取得スケジューラークラス"""
@@ -439,6 +448,55 @@ class TrendsScheduler:
                 logger.info("🛑 スケジューラー停止完了")
             except Exception as e:
                 logger.error(f"❌ スケジューラー停止エラー: {e}")
+
+    def _run_refresh_all_trends_with_job_timeout(self, low_memory_mode, job_timeout_seconds):
+        """refresh_all_trends を別スレッドで実行し、上限超過時も呼び出し元へ制御を返す。"""
+        result_holder = {}
+
+        def _run():
+            with self.app.app_context():
+                from managers.trend_managers import refresh_all_trends
+
+                managers = self.app.config.get('TREND_MANAGERS')
+                if not managers:
+                    result_holder['result'] = {'success': False, 'results': {}}
+                    return
+                if low_memory_mode:
+                    logger.info(
+                        "🔄 refresh_all_trends実行開始 (force_refresh=True, low_memory: max_concurrent=%s, batch_delay=%s)",
+                        SCHEDULER_LOW_MEMORY_MAX_CONCURRENT,
+                        SCHEDULER_LOW_MEMORY_BATCH_DELAY_SECONDS,
+                    )
+                    result_holder['result'] = refresh_all_trends(
+                        managers,
+                        force_refresh=True,
+                        max_concurrent=SCHEDULER_LOW_MEMORY_MAX_CONCURRENT,
+                        batch_delay_seconds=SCHEDULER_LOW_MEMORY_BATCH_DELAY_SECONDS,
+                    )
+                else:
+                    logger.info("🔄 refresh_all_trends実行開始 (force_refresh=True)")
+                    result_holder['result'] = refresh_all_trends(managers, force_refresh=True)
+
+        job_timed_out = False
+        executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='scheduler-refresh')
+        try:
+            future = executor.submit(_run)
+            future.result(timeout=job_timeout_seconds)
+        except FuturesTimeoutError:
+            job_timed_out = True
+            logger.error(
+                "❌ refresh_all_trends がジョブ上限 %s 秒を超過しました",
+                job_timeout_seconds,
+            )
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
+
+        result = result_holder.get('result') or {'success': False, 'results': {}}
+        if job_timed_out:
+            result = dict(result)
+            result['job_timed_out'] = True
+            result['success'] = False
+        return result, job_timed_out
     
     def _fetch_all_trends(self, force=False, trigger_source='scheduler', low_memory_mode=False):
         """全プラットフォームのトレンドを取得（既存のrefresh_all_trends()を使用）
@@ -455,6 +513,10 @@ class TrendsScheduler:
         # 同時実行防止: 既に実行中の場合はスキップ（同一プロセス内）
         if self._fetching_in_progress:
             logger.warning("⚠️ データ取得処理が既に実行中です。重複実行をスキップします")
+            self._send_scheduler_skip_notification(
+                trigger_source=trigger_source,
+                reason="同一プロセスで既にトレンド取得が実行中のためスキップしました。",
+            )
             return
 
         # 分散ロック取得（DB優先→ファイルロック、複数マシン・二重Discord通知を防ぐ）
@@ -464,6 +526,10 @@ class TrendsScheduler:
             logger.warning(
                 "⏭️ [二重実行防止] 他プロセス/他マシンがスケジューラを実行中のためスキップ host=%s pid=%s",
                 host_short, pid,
+            )
+            self._send_scheduler_skip_notification(
+                trigger_source=trigger_source,
+                reason="他プロセス/他マシンでトレンド取得が実行中のためスキップしました。",
             )
             return
 
@@ -478,6 +544,10 @@ class TrendsScheduler:
             if not force and slot_key and self.db and hasattr(self.db, 'has_slot_completed_recently'):
                 if self.db.has_slot_completed_recently(slot_key, window_minutes=25):
                     logger.info("⏰ 同一スロットが既に完了済みのためスキップします（slot=%s）", slot_key)
+                    self._send_scheduler_skip_notification(
+                        trigger_source=trigger_source,
+                        reason=f"同一スロット({slot_key})が直近に完了済みのためスキップしました。",
+                    )
                     self._release_scheduler_lock(lock_handle)
                     self._fetching_in_progress = False
                     return
@@ -490,12 +560,20 @@ class TrendsScheduler:
                     time_diff = (now_jst - self.last_night_execution_time).total_seconds()
                     if time_diff < 3600:  # 1時間以内
                         logger.info(f"⏰ 当日の1時のジョブは既に実行済みです（{time_diff:.0f}秒前）。重複実行をスキップします。")
+                        self._send_scheduler_skip_notification(
+                            trigger_source=trigger_source,
+                            reason=f"当日の1時ジョブが{time_diff:.0f}秒前に実行済みのためスキップしました。",
+                        )
                         self._release_scheduler_lock(lock_handle)
                         self._fetching_in_progress = False
                         return
                 # 7時前後（6:00-8:00）の実行の場合、当日の7時ジョブが既に実行済みかチェック
                 if 6 <= now_jst.hour < 8 and self.last_daily_execution_date == today:
                     logger.info(f"⏰ 当日の7時のジョブは既に実行済みです（{today}）。重複実行をスキップします。")
+                    self._send_scheduler_skip_notification(
+                        trigger_source=trigger_source,
+                        reason=f"当日の7時ジョブが実行済み（{today}）のためスキップしました。",
+                    )
                     self._release_scheduler_lock(lock_handle)
                     self._fetching_in_progress = False
                     return
@@ -504,6 +582,10 @@ class TrendsScheduler:
                     time_diff = (now_jst - self.last_afternoon_execution_time).total_seconds()
                     if time_diff < 3600:  # 1時間以内
                         logger.info(f"⏰ 当日の13時のジョブは既に実行済みです（{time_diff:.0f}秒前）。重複実行をスキップします。")
+                        self._send_scheduler_skip_notification(
+                            trigger_source=trigger_source,
+                            reason=f"当日の13時ジョブが{time_diff:.0f}秒前に実行済みのためスキップしました。",
+                        )
                         self._release_scheduler_lock(lock_handle)
                         self._fetching_in_progress = False
                         return
@@ -512,6 +594,10 @@ class TrendsScheduler:
                     time_diff = (now_jst - self.last_evening_execution_time).total_seconds()
                     if time_diff < 3600:  # 1時間以内
                         logger.info(f"⏰ 当日の19時のジョブは既に実行済みです（{time_diff:.0f}秒前）。重複実行をスキップします。")
+                        self._send_scheduler_skip_notification(
+                            trigger_source=trigger_source,
+                            reason=f"当日の19時ジョブが{time_diff:.0f}秒前に実行済みのためスキップしました。",
+                        )
                         self._release_scheduler_lock(lock_handle)
                         self._fetching_in_progress = False
                         return
@@ -552,35 +638,42 @@ class TrendsScheduler:
             except Exception as e:
                 logger.warning(f"⚠️ 古いキャッシュデータ削除エラー（処理は継続）: {e}", exc_info=True)
             
-            # app.configからマネージャーを取得
-            with self.app.app_context():
-                managers = self.app.config.get('TREND_MANAGERS')
-                if not managers:
-                    logger.error("❌ トレンドマネージャーが初期化されていません")
-                    self._release_scheduler_lock(lock_handle)
-                    self._fetching_in_progress = False
-                    return
-                
-                # 既存のrefresh_all_trends()関数を使用
-                # スケジューラー実行時（7時・13時）は強制更新（force_refresh=True）で実行
-                # これにより、既存のキャッシュがあっても最新データを取得する
-                from managers.trend_managers import refresh_all_trends
-                if low_memory_mode:
-                    logger.info(
-                        "🔄 refresh_all_trends実行開始 (force_refresh=True, low_memory: max_concurrent=%s, batch_delay=%s)",
-                        SCHEDULER_LOW_MEMORY_MAX_CONCURRENT,
-                        SCHEDULER_LOW_MEMORY_BATCH_DELAY_SECONDS,
-                    )
-                    result = refresh_all_trends(
-                        managers, force_refresh=True,
-                        max_concurrent=SCHEDULER_LOW_MEMORY_MAX_CONCURRENT,
-                        batch_delay_seconds=SCHEDULER_LOW_MEMORY_BATCH_DELAY_SECONDS,
-                    )
-                else:
-                    logger.info("🔄 refresh_all_trends実行開始 (force_refresh=True)")
-                    result = refresh_all_trends(managers, force_refresh=True)
-                logger.info(f"🔄 refresh_all_trends実行完了: success={result.get('success')}")
+            # app.configからマネージャーを取得し refresh_all_trends をジョブ全体タイムアウト付きで実行
+            managers = self.app.config.get('TREND_MANAGERS')
+            if not managers:
+                logger.error("❌ トレンドマネージャーが初期化されていません")
+                self._release_scheduler_lock(lock_handle)
+                self._fetching_in_progress = False
+                return
 
+            result, job_timed_out = self._run_refresh_all_trends_with_job_timeout(
+                low_memory_mode=low_memory_mode,
+                job_timeout_seconds=SCHEDULER_JOB_TIMEOUT_SECONDS,
+            )
+            logger.info(
+                "🔄 refresh_all_trends実行完了: success=%s job_timed_out=%s",
+                result.get('success'),
+                job_timed_out,
+            )
+            if job_timed_out:
+                self._send_alert(
+                    "critical",
+                    "トレンド取得ジョブ全体タイムアウト",
+                    (
+                        f"一括取得が {SCHEDULER_JOB_TIMEOUT_SECONDS} 秒以内に終わりませんでした。"
+                        " _fetching_in_progress は解放済みです。未完了タスクのスレッドはプロセス再起動まで残る可能性があります。"
+                    ),
+                    {
+                        "実行ID": execution_id,
+                        "トリガー": self._trigger_label(trigger_source),
+                        "ジョブ上限（秒）": str(SCHEDULER_JOB_TIMEOUT_SECONDS),
+                        "ホスト": host_short,
+                        "PID": str(pid),
+                    },
+                )
+
+            with self.app.app_context():
+                managers = self.app.config.get('TREND_MANAGERS') or managers
                 # 7時起点 business_day の薄いスナップショット（キャッシュから Top タイトル等）
                 try:
                     from services.trend_snapshot_service import write_snapshots_for_scheduler_run
@@ -607,7 +700,13 @@ class TrendsScheduler:
             
             # 失敗したトレンドをログに詳細出力し、エラー詳細を収集
             failed_trends = []
-            failed_trends_details = []  # エラー詳細情報を格納
+            failed_trends_details = []
+            if result.get('job_timed_out'):
+                failed_trends_details.append({
+                    'source': '_job',
+                    'error': f'job_timeout after {SCHEDULER_JOB_TIMEOUT_SECONDS}s',
+                    'status': 'timeout',
+                })
             for key, result_data in results.items():
                 success = result_data.get('success', False)
                 if not success:
@@ -828,7 +927,12 @@ class TrendsScheduler:
             # 重要: トリガー時刻のスロットを記録する。完了時刻で判定すると、7:00開始のジョブが12:04に終わった場合に
             # 1pm が記録され、13:00の本来の実行が「既に完了済み」と誤判定されてスキップされる不具合を防ぐ。
             completed_slot = slot_key  # 開始時に判定したスロット（トリガー時刻ベース）
-            if completed_slot and self.db and hasattr(self.db, 'mark_slot_completed'):
+            if result.get('job_timed_out'):
+                logger.warning(
+                    "⏭️ ジョブ全体タイムアウトのためスロット完了は記録しません（slot=%s）",
+                    completed_slot,
+                )
+            elif completed_slot and self.db and hasattr(self.db, 'mark_slot_completed'):
                 self.db.mark_slot_completed(completed_slot)
 
             # データ保存完了後、メール自動送信を実行
@@ -1037,6 +1141,22 @@ class TrendsScheduler:
             'api': 'API（手動/外部）',
         }
         return labels.get(trigger_source, trigger_source or '不明')
+
+    def _send_scheduler_skip_notification(self, trigger_source: str, reason: str) -> None:
+        """スケジューラ実行がスキップされた理由をDiscord通知する。"""
+        if trigger_source != 'scheduler' or not self.alert_service:
+            return
+        host_short, pid = _process_identity()
+        self._send_alert(
+            "warning",
+            "⏭️ トレンド取得ジョブをスキップ",
+            reason,
+            {
+                "トリガー": self._trigger_label(trigger_source),
+                "ホスト": host_short,
+                "PID": str(pid),
+            },
+        )
     
     def _format_error_details(self, failed_trends_details: list) -> str:
         """エラー詳細をフォーマットして文字列として返す"""

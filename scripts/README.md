@@ -113,7 +113,7 @@ python scripts/scaffold_summary_drafts.py --today --weekly-for-date 2026-05-11 -
 
 ### generate_ai_daily_summary.py
 `DATABASE_URL` の `trend_daily_snapshots`（前日 × スロット 07/13/19/01）から OpenAI で日次サマリーを書く。
-出力形式: **クロスソース上位3** + **カテゴリ別トップ1** + **昨日特異だったこと（1行）**（調達行などはノイズ除去）。**`--write`** 時は **`docs/summaries/daily/{business_day}.md`**（**ファイル名 = 観測日**、翌朝生成でも前日の日付）と成否ログ **`YYYY-MM-DD.generation.json`**。GitHub Actions では **`--from-api`**（本番 `/api/summaries/daily-snapshots`）。`GITHUB_ACTIONS` で Fly-private `DATABASE_URL` が注入されていても `--from-api` と同様に HTTP で読める。
+出力形式: **クロスソース上位3** + **カテゴリ別トップ3**（調達行などはノイズ除去）。**`--write`** 時は **`docs/summaries/daily/{business_day}.md`**（**ファイル名 = 観測日**、翌朝生成でも前日の日付）と成否ログ **`YYYY-MM-DD.generation.json`**。GitHub Actions では **`--from-api`**（本番 `/api/summaries/daily-snapshots`）。`GITHUB_ACTIONS` で Fly-private `DATABASE_URL` が注入されていても `--from-api` と同様に HTTP で読める。
 
 **環境変数:** `DATABASE_URL`（ローカル直読み時）、`OPENAI_API_KEY`（`--dry-run` でキーなしのときは JSON のみで可）、`OPENAI_SUMMARY_MODEL`（省略時 `gpt-4o-mini`）、CI の HTTP 読みでは `TREND_DASHBOARD_BASE_URL`。
 
@@ -129,7 +129,7 @@ python scripts/generate_ai_daily_summary.py --from-api --write --force
 詳細は `docs/summaries/README.md` を参照。
 
 ### generate_ai_weekly_summary.py
-`docs/summaries/daily/{business_day}.md`（クロスソース・カテゴリ別トップ1形式）を入力に OpenAI で週次＋ホットトピックを1ファイル生成する。日次ファイル名は観測日（[`docs/summaries/weekly/README.md`](../docs/summaries/weekly/README.md)）。DB・トレンド API は使わない。GHA は W1 日曜の日次のあと **W2 月曜 07:30 JST** 前後（`ai-weekly-summary.yml`）。
+`docs/summaries/daily/{business_day}.md`（クロスソース・カテゴリ別トップ3形式）を入力に OpenAI で週次＋ホットトピックを1ファイル生成する。日次ファイル名は観測日（[`docs/summaries/weekly/README.md`](../docs/summaries/weekly/README.md)）。DB・トレンド API は使わない。GHA は W1 日曜の日次のあと **W2 月曜 07:30 JST** 前後（`ai-weekly-summary.yml`）。
 
 **環境変数:** `OPENAI_API_KEY`（必須）、`OPENAI_SUMMARY_MODEL`（省略時 `gpt-4o-mini`）。
 

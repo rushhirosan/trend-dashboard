@@ -58,6 +58,8 @@ DAYTIME_SLOTS = ("07", "13", "19")
 RISING_HIGHLIGHT_COUNT = 3
 CROSS_SOURCE_HIGHLIGHT_COUNT = 3
 CATEGORY_TOP_N = 3
+_RISING_HEADING = "## 📈 昨日いちばん動いた3つ"
+_CROSS_HEADING_PREFIX = "## 複数ソースで重なった話題"
 _TOP3_HEADING = "## 📊 カテゴリ別トップ3"
 _TOP1_HEADING = "## 📊 カテゴリ別トップ1"
 _NOTABLE_HEADING = "## 💡 昨日特異だったこと"
@@ -680,6 +682,33 @@ def _aggregate_labels_for_series(
     return out
 
 
+def _url_for_rising_item(
+    series_by_slot: Dict[str, Dict[str, List[Dict[str, Any]]]],
+    series_key: str,
+    label: str,
+    ranks: dict[str, int],
+) -> Optional[str]:
+    nk = _normalize_label_key(label)
+    for slot in ("19", "13", "07"):
+        if slot not in ranks:
+            continue
+        for it in (series_by_slot.get(slot) or {}).get(series_key) or []:
+            if not isinstance(it, dict):
+                continue
+            if _normalize_label_key(str(it.get("t") or "")) == nk:
+                u = _url_from_thin_item(it)
+                if u:
+                    return u
+    return None
+
+
+def _rank_display_for_rising(ranks: dict[str, int]) -> str:
+    for slot in ("19", "13", "07"):
+        if slot in ranks:
+            return _format_slot_rank(slot, int(ranks[slot]))
+    return "順位データなし"
+
+
 def build_rising_highlights(
     rows: List[Dict[str, Any]],
     *,
@@ -719,6 +748,7 @@ def build_rising_highlights(
                 "freq_slots": freq,
                 "r_best": r_best,
                 "best_rank_19": ranks.get("19"),
+                "ranks": dict(ranks),
             }
             prev = best.get(nk)
             if prev is None or (cand["jump"], cand["freq_slots"], -cand["r_best"]) > (
@@ -732,7 +762,28 @@ def build_rising_highlights(
         best.values(),
         key=lambda c: (-c["jump"], -c["freq_slots"], c.get("best_rank_19") or 999, c["label"]),
     )
-    return items[:count]
+    out: List[Dict[str, Any]] = []
+    for cand in items[:count]:
+        ranks = cand.pop("ranks", {})
+        rank_evidence = _format_rank_evidence(ranks)
+        rank_display = _rank_display_for_rising(ranks)
+        url = _url_for_rising_item(series_by_slot, str(cand["series_key"]), str(cand["label"]), ranks)
+        link_line = _format_digest_link_line(
+            str(cand["label"]),
+            str(cand["series_key"]),
+            rank_display,
+            url,
+        )
+        out.append(
+            {
+                **cand,
+                "rank_evidence": rank_evidence,
+                "rank_display": rank_display,
+                "url": url,
+                "link_line": link_line,
+            }
+        )
+    return out
 
 
 def _collect_label_index(
@@ -907,6 +958,26 @@ def build_category_top3(
     return out
 
 
+def render_rising_highlights_markdown(items: List[Dict[str, Any]]) -> str:
+    """昨日いちばん動いた3つ（07→13→19 の順位改善・機械生成）。"""
+    lines: List[str] = [_RISING_HEADING, ""]
+    if not items:
+        lines.append(
+            "（07→13→19 のスナップショットの間で、順位が大きく上がった話題はありませんでした）"
+        )
+        return "\n".join(lines).rstrip() + "\n"
+    for i, it in enumerate(items, 1):
+        lines.append(f"{i}. {it.get('link_line') or it.get('label')}")
+        ev = it.get("rank_evidence")
+        if ev:
+            lines.append(f"   - **根拠**: {ev}")
+        cat = it.get("category")
+        if cat:
+            lines.append(f"   - **区分**: {cat}")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def render_category_top3_markdown(blocks: List[Dict[str, Any]]) -> str:
     """カテゴリ別トップ3の Markdown 本文（機械生成・リンク付き）。"""
     lines: List[str] = [_TOP3_HEADING, ""]
@@ -932,22 +1003,19 @@ def _category_has_items(cat_block: Dict[str, Any]) -> bool:
 
 
 def build_llm_payload(rows: List[Dict[str, Any]], business_day: date) -> Dict[str, Any]:
-    """OpenAI 用: クロスソース・カテゴリ別トップ3・カテゴリ詳細。"""
+    """OpenAI 用: 複数ソース重なり（急上昇・カテゴリ別トップ3は機械付与）。"""
     full = compact_rows_by_category(rows)
     categories = [c for c in full["categories"] if _category_has_items(c)]
     quiet = [c["category"] for c in full["categories"] if not _category_has_items(c)]
     cross = build_cross_source_highlights(rows, count=CROSS_SOURCE_HIGHLIGHT_COUNT)
-    top3 = build_category_top3(rows, count=CATEGORY_TOP_N)
-    rising = build_rising_highlights(rows, count=RISING_HIGHLIGHT_COUNT)
     return {
         "business_day": business_day.isoformat(),
         "reader_context": (
             "観測日（business_day）のトレンドをまとめる。読者は通常、観測日の翌朝に受け取る。"
             "「昨日」= business_day。推測や「今日は〜でしょう」は書かない。"
+            "急上昇3つ・カテゴリ別トップ3はシステムが別途付与する。"
         ),
         "cross_source_highlights": cross,
-        "category_top3": top3,
-        "rising_highlights_fallback": rising,
         "categories": categories,
         "quiet_categories": quiet,
     }
@@ -1030,8 +1098,7 @@ generated_at: "{gen_at}"
 
 SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ。入力 JSON の business_day は
 **観測日（その日のトレンド）**。読者は通常 **翌朝** に本文を受け取る。
-入力の cross_source_highlights / category_top3 / categories は
-スナップショット由来の事実のみ。category_top3 の link_line / url は入力のものだけ使う。
+入力の cross_source_highlights / categories はスナップショット由来の事実のみ。
 
 出力は日本語 Markdown のみ（YAML フロントマターは書かない）。**BUSINESS_DAY** は JSON の
 business_day と必ず一致させる。
@@ -1040,33 +1107,40 @@ business_day と必ず一致させる。
 1. `# 日次サマリー — BUSINESS_DAY（JST）`
 2. `- **対象（観測日）**:` BUSINESS_DAY（例: 2026年5月20日）
 3. `- **生成・送信完了**:`（不明なら「自動生成（時刻未入力）」）
-4. `## 昨日のクロスソースハイライト — BUSINESS_DAY`
-5. `### 🔥 複数ソースで話題になったもの` — **cross_source_highlights** を最大3件。
-   0件なら「該当なし（独立した取得元を2つ以上またいだ同一トピックはありませんでした）」と1行だけ書き、
-   rising_highlights_fallback から **JP 向けに読みやすい1件**を補足してもよい（根拠行必須）。
+4. `## 複数ソースで重なった話題 — BUSINESS_DAY` — **cross_source_highlights** を最大3件。
+   0件なら「該当なし（独立した取得元を2つ以上またいだ同一トピックはありませんでした）」と1行だけ。
    各 `### 1.` …: 短い見出し（label。Sports 等の汎用ジャンル名だけの見出しは書かない）、
    本文2〜3文（**なぜ複数ソースに出たか**を推測しすぎず、
    ドラマ・事件・製品発表など **ありうる文脈**を「〜の可能性」と書く）、
    `- **登場ソース**:` **sources_display** をそのまま（series_keys の羅列はしない）、
-   `- **根拠**:` rank_evidence または入力の rank_evidence をそのまま要約。
+   `- **根拠**:` rank_evidence をそのまま要約。
 
-**`## 📊 カテゴリ別トップ1` / `## 📊 カテゴリ別トップ3` / `## 💡 昨日特異だったこと` は出力しない**（システムが末尾にトップ3を付与）。
+**次はシステムが機械付与するため出力しない:**
+- `## 📈 昨日いちばん動いた3つ`
+- `## 📊 カテゴリ別トップ1` / `## 📊 カテゴリ別トップ3`
+- `## 💡 昨日特異だったこと` / `## 昨日のクロスソースハイライト`（旧見出し）
 未来予測・「今日は〜」は禁止。
 
 禁止:
-- `## 今日の見方` / `## 昨日いちばん動いた3つ`（旧フォーマット）
+- `## 今日の見方`（旧フォーマット）
 - 「〜でしょう」「注目が集まる見込み」等の汎用予測
 - 調達・英語長文タイトルの羅列をそのまま見出しにすること（入力にあっても要約・日本語化）
 - 架空の URL
 - 入力に無い事実の断定
 
-事実: 入力に無いことは断定しない。クロスソースは「なぜ今」の手がかりとして最優先で説明する。"""
+事実: 入力に無いことは断定しない。"""
 
-_MACHINE_DIGEST_HEADINGS = (_TOP1_HEADING, _TOP3_HEADING, _NOTABLE_HEADING)
+_MACHINE_DIGEST_HEADINGS = (
+    _RISING_HEADING,
+    _TOP1_HEADING,
+    _TOP3_HEADING,
+    _NOTABLE_HEADING,
+)
+_OLD_CROSS_HEADING = "## 昨日のクロスソースハイライト"
 
 
 def _strip_machine_digest_sections(markdown: str) -> str:
-    """LLM が書いた機械付与セクション（トップ3・旧・昨日特異）を除去。"""
+    """LLM が書いた機械付与セクション（急上昇・トップ3・旧）を除去。"""
     cleaned = markdown
     for heading in _MACHINE_DIGEST_HEADINGS:
         pattern = re.compile(
@@ -1074,7 +1148,37 @@ def _strip_machine_digest_sections(markdown: str) -> str:
             re.DOTALL,
         )
         cleaned = pattern.sub("", cleaned)
+    old_cross = re.compile(
+        rf"(?:\n|^){re.escape(_OLD_CROSS_HEADING)}[^\n]*\s*\n(?:.*?\n)*?(?=\n## |\Z)",
+        re.DOTALL,
+    )
+    cleaned = old_cross.sub("", cleaned)
     return re.sub(r"\n{3,}", "\n\n", cleaned.rstrip())
+
+
+def inject_rising_highlights(markdown: str, rising_body: str) -> str:
+    """ヘッダ直後（複数ソース見出しの前）に急上昇3つを1回だけ付与する。"""
+    body = (rising_body or "").strip()
+    if not body:
+        return markdown
+    cleaned = _strip_machine_digest_sections(markdown)
+    cross_re = re.compile(
+        rf"(\n)({re.escape(_CROSS_HEADING_PREFIX)}[^\n]*\n)",
+    )
+    m = cross_re.search(cleaned)
+    if m:
+        out = cleaned[: m.start(1)] + f"\n\n{body}\n" + cleaned[m.start(1) :]
+    else:
+        meta_re = re.compile(r"(- \*\*生成・送信完了\*\*:[^\n]*\n)")
+        m2 = meta_re.search(cleaned)
+        if m2:
+            pos = m2.end()
+            out = cleaned[:pos] + f"\n\n{body}\n" + cleaned[pos:].lstrip("\n")
+        else:
+            out = cleaned + f"\n\n{body}\n"
+    if out.count(_RISING_HEADING) != 1:
+        raise RuntimeError("inject_rising_highlights: expected exactly one rising heading")
+    return out
 
 
 def inject_category_top3(markdown: str, top3_body: str) -> str:
@@ -1113,10 +1217,14 @@ def run_generate(
         + build_user_payload(payload)
     )
     inner = call_openai(SYSTEM_PROMPT, user, api_key, model)
-    top3_blocks = payload.get("category_top3") or build_category_top3(rows, count=CATEGORY_TOP_N)
+    rising_items = build_rising_highlights(rows, count=RISING_HIGHLIGHT_COUNT)
+    rising_md = render_rising_highlights_markdown(rising_items)
+    inner = inject_rising_highlights(inner, rising_md)
+    top3_blocks = build_category_top3(rows, count=CATEGORY_TOP_N)
     top3_md = render_category_top3_markdown(top3_blocks)
     inner = inject_category_top3(inner, top3_md)
     meta["model"] = model
+    meta["rising_highlights_count"] = len(rising_items)
     meta["category_top3_injected"] = True
     full = merge_front_matter(business_day, model, inner)
     return full, meta

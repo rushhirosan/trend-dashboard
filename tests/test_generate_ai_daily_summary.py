@@ -149,6 +149,8 @@ def test_build_rising_highlights_picks_rank_jump(gads):
     assert rising[0]["label"] == "Climber"
     assert rising[0]["jump"] == 16.0
     assert rising[0]["category"] == "検索・動画"
+    assert "07時スナップショット" in rising[0]["rank_evidence"]
+    assert rising[0]["link_line"]
 
 
 def test_is_noisy_label_filters_procurement(gads):
@@ -381,6 +383,38 @@ def test_build_category_top3_includes_links(gads):
     assert "https://zenn.dev/a/b" in tech["items"][0]["link_line"]
 
 
+def test_render_rising_highlights_markdown_empty(gads):
+    md = gads.render_rising_highlights_markdown([])
+    assert "## 📈 昨日いちばん動いた3つ" in md
+    assert "順位が大きく上がった" in md
+
+
+def test_render_rising_highlights_markdown_lists_items(gads):
+    items = [
+        {
+            "link_line": "[Climber](https://example.com)（youtube_jp · 19時スナップショット2位）",
+            "rank_evidence": "07時スナップショット18位 → 19時スナップショット2位",
+            "category": "検索・動画",
+        },
+    ]
+    md = gads.render_rising_highlights_markdown(items)
+    assert "1. [Climber]" in md
+    assert "**根拠**" in md
+    assert "**区分**: 検索・動画" in md
+
+
+def test_inject_rising_highlights_before_cross_section(gads):
+    md = (
+        "# 日次\n\n- **対象（観測日）**: 2026-05-26\n"
+        "- **生成・送信完了**: 自動\n\n"
+        "## 複数ソースで重なった話題 — 2026-05-26\n\n### 1. 例\n"
+    )
+    rising = "## 📈 昨日いちばん動いた3つ\n\n1. [例](https://example.com)（nhk_jp · 19時スナップショット1位）\n"
+    out = gads.inject_rising_highlights(md, rising)
+    assert out.index("昨日いちばん動いた3つ") < out.index("複数ソースで重なった話題")
+    assert out.count("昨日いちばん動いた3つ") == 1
+
+
 def test_inject_category_top3_replaces_notable_and_appends(gads):
     md = (
         "# 日次\n\n## 📊 カテゴリ別トップ1\n\n- item\n\n"
@@ -396,7 +430,7 @@ def test_inject_category_top3_replaces_notable_and_appends(gads):
     assert "https://example.com" in out
 
 
-def test_build_llm_payload_includes_cross_and_top3(gads):
+def test_build_llm_payload_includes_cross_only_for_llm(gads):
     rows = [
         {
             "slot": "19",
@@ -408,11 +442,11 @@ def test_build_llm_payload_includes_cross_and_top3(gads):
     payload = gads.build_llm_payload(rows, date(2026, 5, 18))
     assert "cross_source_highlights" in payload
     assert "category_top1" not in payload
-    assert "category_top3" in payload
+    assert "category_top3" not in payload
+    assert "rising_highlights" not in payload
     assert "notable_summary" not in payload
-    assert "rising_highlights_fallback" in payload
     assert "reader_context" in payload
-    assert "今日の見方" not in payload["reader_context"]
+    assert "急上昇3つ" in payload["reader_context"]
 
 
 def test_build_llm_payload_omits_empty_categories(gads):

@@ -12,6 +12,11 @@ from services.trends.base_trends_manager import BaseTrendsManager
 # ロガーの初期化
 logger = get_logger(__name__)
 
+# はてなブックマーク 一括件数取得API（最大50URL/1リクエスト）
+HATENA_COUNT_BATCH_URL = "http://api.b.st-hatena.com/entry.counts"
+HATENA_BATCH_SIZE = 50
+
+
 class HatenaTrendsManager(BaseTrendsManager):
     """はてなブックマークトレンド管理クラス（公式RSS + API使用）"""
     
@@ -19,10 +24,14 @@ class HatenaTrendsManager(BaseTrendsManager):
         """初期化"""
         # ベースクラスを初期化（rate_limiterも自動的に初期化される）
         super().__init__(service_name='hatena', max_requests=10, window_seconds=60)
-        
+
         self.base_url = "https://b.hatena.ne.jp"
         self.count_api_url = "https://bookmark.hatenaapis.com/count/entry"
         self.entry_api_url = "https://b.hatena.ne.jp/entry/json"
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'TrendDashboard/1.0 (trend detection; link-out only)',
+        })
         
         logger.info(f"はてなブックマーク Trends Manager初期化:")
         logger.info(f"  ホットエントリーRSS: {self.base_url}/hotentry.rss")
@@ -202,20 +211,21 @@ class HatenaTrendsManager(BaseTrendsManager):
                 entry_url = entry.get('link', '')
                 entry_id = hashlib.md5(entry_url.encode('utf-8')).hexdigest() if entry_url else ''
                 
-                item = {
+                items.append({
                     'entry_id': entry_id,
                     'title': entry.get('title', ''),
                     'url': entry.get('link', ''),
                     'description': entry.get('summary', ''),
                     'published': published,
                     'author': entry.get('author', ''),
-                    'category': category
-                }
-                
-                # ブックマーク数を取得（キャッシュデータの場合はスキップ）
-                item['bookmark_count'] = self._get_bookmark_count(item['url'])
-                items.append(item)
-            
+                    'category': category,
+                })
+
+            url_list = [(i.get('url') or '').strip() for i in items if (i.get('url') or '').strip()]
+            counts = self._get_bookmark_counts_batch(url_list)
+            for item in items:
+                item['bookmark_count'] = counts.get((item.get('url') or '').strip(), 0)
+
             # ブックマーク数でソート（降順）
             items.sort(key=lambda x: x.get('bookmark_count', 0), reverse=True)
             
@@ -254,31 +264,41 @@ class HatenaTrendsManager(BaseTrendsManager):
                 'success': False
             }
     
-    def _get_bookmark_count(self, url):
-        """はてなブックマークCount APIでブックマーク数を取得"""
-        try:
-            params = {'url': url}
-            # レート制限をチェック
+    def _get_bookmark_counts_batch(self, url_list):
+        """はてなブックマーク一括Count APIで複数URLのブクマ数を取得（最大50URL/リクエスト）"""
+        result = {}
+        for i in range(0, len(url_list), HATENA_BATCH_SIZE):
+            chunk = url_list[i:i + HATENA_BATCH_SIZE]
             self.rate_limiter.wait_if_needed()
-            
-            response = requests.get(self.count_api_url, params=params, timeout=5)
-            
-            if response.status_code == 200:
-                # 返り値は数値 or "null"（存在しない場合）
-                try:
-                    count_text = response.text.strip()
-                    if count_text.isdigit():
-                        return int(count_text)
-                    else:
-                        return 0
-                except:
-                    return 0
-            else:
-                return 0
-                
-        except Exception as e:
-            logger.error(f"ブックマーク数取得エラー: {e}", exc_info=True)
+            try:
+                resp = self.session.get(
+                    HATENA_COUNT_BATCH_URL,
+                    params={'url': chunk},
+                    timeout=15,
+                )
+                if resp.status_code != 200:
+                    logger.warning("はてな一括Count API status: %s", resp.status_code)
+                    for u in chunk:
+                        result[u] = 0
+                    continue
+                data = resp.json()
+                if isinstance(data, dict):
+                    for u in chunk:
+                        result[u] = int(data.get(u, 0) or 0)
+                else:
+                    for u in chunk:
+                        result[u] = 0
+            except Exception as e:
+                logger.warning("はてな一括Count API エラー: %s", e)
+                for u in chunk:
+                    result[u] = 0
+        return result
+
+    def _get_bookmark_count(self, url):
+        """単一URLのブックマーク数（後方互換・Entry詳細など用）"""
+        if not url:
             return 0
+        return self._get_bookmark_counts_batch([url]).get(url.strip(), 0)
     
     def get_entry_details(self, url):
         """はてなブックマークEntry APIでエントリー詳細を取得"""

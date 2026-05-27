@@ -403,6 +403,63 @@ def test_render_rising_highlights_markdown_lists_items(gads):
     assert "**区分**: 検索・動画" in md
 
 
+def test_render_cross_source_highlights_markdown_empty(gads):
+    md = gads.render_cross_source_highlights_markdown([], date(2026, 5, 27))
+    assert "## 複数ソースで重なった話題 — 2026-05-27" in md
+    assert gads._CROSS_NONE_LINE in md
+    assert "### 1." not in md
+
+
+def test_render_cross_source_highlights_markdown_lists_items(gads):
+    highlights = [
+        {
+            "label": "豊臣秀長",
+            "sources_display": "Wikipedia (JA), Google Trends (JP)",
+            "rank_evidence": "07時スナップショット8位 → 19時スナップショット2位",
+        },
+    ]
+    md = gads.render_cross_source_highlights_markdown(highlights, date(2026, 5, 20))
+    assert "### 1. 豊臣秀長" in md
+    assert "Wikipedia (JA), Google Trends (JP)" in md
+    assert gads._CROSS_NONE_LINE not in md
+
+
+def test_inject_cross_source_strips_llm_none_when_items_present(gads):
+    llm = (
+        "# 日次\n\n- **対象（観測日）**: 2026-05-27\n"
+        "- **生成・送信完了**: 自動\n\n"
+        "## 複数ソースで重なった話題 — 2026-05-27\n\n"
+        "### 1. 例\n\n本文\n\n"
+        f"{gads._CROSS_NONE_LINE}\n\n"
+        "## 📊 カテゴリ別トップ3\n\n### ニュース\n"
+    )
+    cross = gads.render_cross_source_highlights_markdown(
+        [
+            {
+                "label": "豊臣秀長",
+                "sources_display": "Wikipedia (JA), Google Trends (JP)",
+                "rank_evidence": "19時スナップショット1位",
+            },
+        ],
+        date(2026, 5, 27),
+    )
+    out = gads.inject_cross_source_highlights(llm, cross)
+    assert out.count(gads._CROSS_NONE_LINE) == 0
+    assert "### 1. 豊臣秀長" in out
+    assert "### 1. 例" not in out
+
+
+def test_inject_cross_source_after_rising_section(gads):
+    md = (
+        "# 日次\n\n- **対象（観測日）**: 2026-05-26\n"
+        "- **生成・送信完了**: 自動\n\n"
+        "## 📈 昨日いちばん動いた3つ\n\n1. [例](https://example.com)\n"
+    )
+    cross = "## 複数ソースで重なった話題 — 2026-05-26\n\n" + gads._CROSS_NONE_LINE + "\n"
+    out = gads.inject_cross_source_highlights(md, cross)
+    assert out.index("昨日いちばん動いた3つ") < out.index("複数ソースで重なった話題")
+
+
 def test_inject_rising_highlights_before_cross_section(gads):
     md = (
         "# 日次\n\n- **対象（観測日）**: 2026-05-26\n"
@@ -430,7 +487,7 @@ def test_inject_category_top3_replaces_notable_and_appends(gads):
     assert "https://example.com" in out
 
 
-def test_build_llm_payload_includes_cross_only_for_llm(gads):
+def test_build_llm_payload_omits_machine_digest_fields(gads):
     rows = [
         {
             "slot": "19",
@@ -440,7 +497,7 @@ def test_build_llm_payload_includes_cross_only_for_llm(gads):
         },
     ]
     payload = gads.build_llm_payload(rows, date(2026, 5, 18))
-    assert "cross_source_highlights" in payload
+    assert "cross_source_highlights" not in payload
     assert "category_top1" not in payload
     assert "category_top3" not in payload
     assert "rising_highlights" not in payload

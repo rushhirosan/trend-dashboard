@@ -60,6 +60,9 @@ CROSS_SOURCE_HIGHLIGHT_COUNT = 3
 CATEGORY_TOP_N = 3
 _RISING_HEADING = "## 📈 昨日いちばん動いた3つ"
 _CROSS_HEADING_PREFIX = "## 複数ソースで重なった話題"
+_CROSS_NONE_LINE = (
+    "該当なし（独立した取得元を2つ以上またいだ同一トピックはありませんでした）"
+)
 _TOP3_HEADING = "## 📊 カテゴリ別トップ3"
 _TOP1_HEADING = "## 📊 カテゴリ別トップ1"
 _NOTABLE_HEADING = "## 💡 昨日特異だったこと"
@@ -978,6 +981,78 @@ def render_rising_highlights_markdown(items: List[Dict[str, Any]]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def render_cross_source_highlights_markdown(
+    highlights: List[Dict[str, Any]],
+    business_day: date,
+) -> str:
+    """複数ソース重なり（機械生成・スナップショット事実のみ）。"""
+    heading = f"{_CROSS_HEADING_PREFIX} — {business_day.isoformat()}"
+    lines: List[str] = [heading, ""]
+    if not highlights:
+        lines.append(_CROSS_NONE_LINE)
+        return "\n".join(lines).rstrip() + "\n"
+    for i, h in enumerate(highlights, 1):
+        label = str(h.get("label") or "").strip() or "（ラベル不明）"
+        lines.append(f"### {i}. {label}")
+        lines.append("")
+        lines.append("異なる取得元のスナップショットで同じ話題が観測されました。")
+        sources = h.get("sources_display")
+        if sources:
+            lines.append(f"- **登場ソース**: {sources}")
+        ev = h.get("rank_evidence")
+        if ev:
+            lines.append(f"- **根拠**: {ev}")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _section_end_after_heading(markdown: str, heading: str) -> Optional[int]:
+    """見出し行の直後から次の `## ` 見出し（または文末）までの終端インデックス。"""
+    idx = markdown.find(heading)
+    if idx < 0:
+        return None
+    start = idx + len(heading)
+    rest = markdown[start:]
+    m = re.search(r"\n## ", rest)
+    if m:
+        return start + m.start()
+    return len(markdown)
+
+
+def _strip_cross_source_section(markdown: str) -> str:
+    """LLM が書いた複数ソース見出しブロックを除去（日付付き見出し含む）。"""
+    pattern = re.compile(
+        rf"(?:\n|^){re.escape(_CROSS_HEADING_PREFIX)}[^\n]*\s*\n(?:.*?\n)*?(?=\n## |\Z)",
+        re.DOTALL,
+    )
+    cleaned = pattern.sub("", markdown)
+    return re.sub(r"\n{3,}", "\n\n", cleaned.rstrip())
+
+
+def inject_cross_source_highlights(markdown: str, cross_body: str) -> str:
+    """急上昇の直後（なければメタ直後）に複数ソースブロックを1回だけ付与する。"""
+    body = (cross_body or "").strip()
+    if not body:
+        return markdown
+    cleaned = _strip_cross_source_section(markdown)
+    rising_end = _section_end_after_heading(cleaned, _RISING_HEADING)
+    if rising_end is not None:
+        out = cleaned[:rising_end] + f"\n\n{body}\n" + cleaned[rising_end:].lstrip("\n")
+    else:
+        meta_re = re.compile(r"(- \*\*生成・送信完了\*\*:[^\n]*\n)")
+        m2 = meta_re.search(cleaned)
+        if m2:
+            pos = m2.end()
+            out = cleaned[:pos] + f"\n\n{body}\n" + cleaned[pos:].lstrip("\n")
+        else:
+            out = cleaned + f"\n\n{body}\n"
+    if body.count(_CROSS_HEADING_PREFIX) != 1:
+        raise RuntimeError(
+            "inject_cross_source_highlights: expected exactly one cross-source heading"
+        )
+    return out
+
+
 def render_category_top3_markdown(blocks: List[Dict[str, Any]]) -> str:
     """カテゴリ別トップ3の Markdown 本文（機械生成・リンク付き）。"""
     lines: List[str] = [_TOP3_HEADING, ""]
@@ -1003,19 +1078,17 @@ def _category_has_items(cat_block: Dict[str, Any]) -> bool:
 
 
 def build_llm_payload(rows: List[Dict[str, Any]], business_day: date) -> Dict[str, Any]:
-    """OpenAI 用: 複数ソース重なり（急上昇・カテゴリ別トップ3は機械付与）。"""
+    """OpenAI 用（急上昇・複数ソース・カテゴリ別トップ3は機械付与）。"""
     full = compact_rows_by_category(rows)
     categories = [c for c in full["categories"] if _category_has_items(c)]
     quiet = [c["category"] for c in full["categories"] if not _category_has_items(c)]
-    cross = build_cross_source_highlights(rows, count=CROSS_SOURCE_HIGHLIGHT_COUNT)
     return {
         "business_day": business_day.isoformat(),
         "reader_context": (
             "観測日（business_day）のトレンドをまとめる。読者は通常、観測日の翌朝に受け取る。"
             "「昨日」= business_day。推測や「今日は〜でしょう」は書かない。"
-            "急上昇3つ・カテゴリ別トップ3はシステムが別途付与する。"
+            "急上昇3つ・複数ソース重なり・カテゴリ別トップ3はシステムが別途付与する。"
         ),
-        "cross_source_highlights": cross,
         "categories": categories,
         "quiet_categories": quiet,
     }
@@ -1098,7 +1171,7 @@ generated_at: "{gen_at}"
 
 SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ。入力 JSON の business_day は
 **観測日（その日のトレンド）**。読者は通常 **翌朝** に本文を受け取る。
-入力の cross_source_highlights / categories はスナップショット由来の事実のみ。
+入力の categories はスナップショット由来の事実のみ。
 
 出力は日本語 Markdown のみ（YAML フロントマターは書かない）。**BUSINESS_DAY** は JSON の
 business_day と必ず一致させる。
@@ -1107,15 +1180,9 @@ business_day と必ず一致させる。
 1. `# 日次サマリー — BUSINESS_DAY（JST）`
 2. `- **対象（観測日）**:` BUSINESS_DAY（例: 2026年5月20日）
 3. `- **生成・送信完了**:`（不明なら「自動生成（時刻未入力）」）
-4. `## 複数ソースで重なった話題 — BUSINESS_DAY` — **cross_source_highlights** を最大3件。
-   0件なら「該当なし（独立した取得元を2つ以上またいだ同一トピックはありませんでした）」と1行だけ。
-   各 `### 1.` …: 短い見出し（label。Sports 等の汎用ジャンル名だけの見出しは書かない）、
-   本文2〜3文（**なぜ複数ソースに出たか**を推測しすぎず、
-   ドラマ・事件・製品発表など **ありうる文脈**を「〜の可能性」と書く）、
-   `- **登場ソース**:` **sources_display** をそのまま（series_keys の羅列はしない）、
-   `- **根拠**:` rank_evidence をそのまま要約。
 
 **次はシステムが機械付与するため出力しない:**
+- `## 複数ソースで重なった話題`（見出しごと書かない）
 - `## 📈 昨日いちばん動いた3つ`
 - `## 📊 カテゴリ別トップ1` / `## 📊 カテゴリ別トップ3`
 - `## 💡 昨日特異だったこと` / `## 昨日のクロスソースハイライト`（旧見出し）
@@ -1220,11 +1287,16 @@ def run_generate(
     rising_items = build_rising_highlights(rows, count=RISING_HIGHLIGHT_COUNT)
     rising_md = render_rising_highlights_markdown(rising_items)
     inner = inject_rising_highlights(inner, rising_md)
+    cross_items = build_cross_source_highlights(rows, count=CROSS_SOURCE_HIGHLIGHT_COUNT)
+    cross_md = render_cross_source_highlights_markdown(cross_items, business_day)
+    inner = inject_cross_source_highlights(inner, cross_md)
     top3_blocks = build_category_top3(rows, count=CATEGORY_TOP_N)
     top3_md = render_category_top3_markdown(top3_blocks)
     inner = inject_category_top3(inner, top3_md)
     meta["model"] = model
     meta["rising_highlights_count"] = len(rising_items)
+    meta["cross_source_highlights_count"] = len(cross_items)
+    meta["cross_source_injected"] = True
     meta["category_top3_injected"] = True
     full = merge_front_matter(business_day, model, inner)
     return full, meta

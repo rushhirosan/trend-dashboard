@@ -12,6 +12,13 @@ try:
 except ImportError:
     fcntl = None  # Windows等では未使用（複数ワーカー時は二重実行の可能性あり）
 
+import pytz
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+from database_config import TrendsCache
+from services.subscription.subscription_manager import SubscriptionManager
+from utils.scheduler_lock import is_local_holder_process_dead, parse_scheduler_lock_holder
+
 
 def _process_identity():
     """二重実行の原因調査用: ホスト名とプロセスIDを返す"""
@@ -23,12 +30,6 @@ def _process_identity():
     except Exception:
         return "unknown", os.getpid()
 
-
-import pytz
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
-from database_config import TrendsCache
-from services.subscription.subscription_manager import SubscriptionManager
 
 # ログ設定
 logging.basicConfig(level=logging.INFO)
@@ -108,6 +109,50 @@ class TrendsScheduler:
             logger.error(f"関数実行エラー: {e}")
             raise e
 
+    def _try_recover_stale_scheduler_lock(self) -> bool:
+        """OOM 等で holder プロセスが死んだまま残った DB ロックを解放する（同一ホストのみ）。"""
+        if not self.db or not hasattr(self.db, "get_scheduler_lock_status"):
+            return False
+        try:
+            lock_status = self.db.get_scheduler_lock_status()
+        except Exception as e:
+            logger.warning("⚠️ スケジューラーDBロック状態取得エラー（回収スキップ）: %s", e)
+            return False
+        if not lock_status or not lock_status.get("holder_id"):
+            return False
+        stale_holder = lock_status["holder_id"]
+        if not is_local_holder_process_dead(stale_holder):
+            return False
+        parsed = parse_scheduler_lock_holder(stale_holder)
+        dead_pid = parsed[1] if parsed else None
+        logger.warning(
+            "🔓 [OOM回復] スケジューラーDBロックが終了済みプロセスに残っています。"
+            " holder=%s dead_pid=%s lock_status=%s → ロックを解放します",
+            stale_holder,
+            dead_pid,
+            lock_status,
+        )
+        if not hasattr(self.db, "clear_scheduler_lock_db"):
+            return False
+        if not self.db.clear_scheduler_lock_db():
+            return False
+        if self.alert_service:
+            host_short, pid = _process_identity()
+            try:
+                self._send_alert(
+                    "warning",
+                    "スケジューラロック回収（OOM回復）",
+                    "前回のトレンド取得プロセスが異常終了したため、DBロックを解放しました。このプロセスで取得を再開します。",
+                    {
+                        "解放した holder": stale_holder,
+                        "ホスト": host_short,
+                        "PID": str(pid),
+                    },
+                )
+            except Exception as e:
+                logger.warning("⚠️ ロック回収Discord送信スキップ: %s", e)
+        return True
+
     def _try_acquire_scheduler_lock(self):
         """分散ロックを取得（非ブロッキング）。
         
@@ -127,6 +172,11 @@ class TrendsScheduler:
                     if self.db.try_acquire_scheduler_lock_db(holder_id, SCHEDULER_LOCK_MINUTES):
                         logger.debug("🔒 スケジューラーDB分散ロックを取得しました")
                         return ('db', holder_id)
+                    # OOM 等で holder が死んでいればロックを回収して1回だけ再試行
+                    if self._try_recover_stale_scheduler_lock():
+                        if self.db.try_acquire_scheduler_lock_db(holder_id, SCHEDULER_LOCK_MINUTES):
+                            logger.info("🔒 スケジューラーDB分散ロックを取得しました（stale lock 回収後）")
+                            return ('db', holder_id)
                     # DBロックが「他が保持中」の場合はここで終了。ファイルロックにフォールバックしない
                     lock_status = None
                     if hasattr(self.db, 'get_scheduler_lock_status'):
@@ -431,7 +481,11 @@ class TrendsScheduler:
                 def _run_catchup():
                     try:
                         logger.info("🔄 起動時補完: 遅延実行を開始します")
-                        self._fetch_all_trends(force=True, low_memory_mode=True)
+                        self._fetch_all_trends(
+                            force=True,
+                            low_memory_mode=True,
+                            trigger_source="startup_catchup",
+                        )
                     except Exception as e:
                         logger.error(f"❌ 起動時補完エラー: {e}", exc_info=True)
                 threading.Timer(delay_sec, _run_catchup).start()
@@ -1138,6 +1192,7 @@ class TrendsScheduler:
         """トリガー元をDiscord表示用のラベルに変換"""
         labels = {
             'scheduler': 'スケジューラ(定期)',
+            'startup_catchup': '起動時補完',
             'api': 'API（手動/外部）',
         }
         return labels.get(trigger_source, trigger_source or '不明')

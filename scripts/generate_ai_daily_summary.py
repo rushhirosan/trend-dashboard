@@ -36,7 +36,7 @@ import json
 import os
 import re
 import sys
-from urllib.parse import quote_plus
+from urllib.parse import parse_qs, quote_plus, urlparse
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -561,6 +561,69 @@ def _url_from_thin_item(item: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def _normalize_article_url(url: str) -> Optional[str]:
+    """記事同一性の比較用。Google 検索 URL など記事を指さないものは None。"""
+    s = str(url or "").strip()
+    if not s.startswith(("http://", "https://")):
+        return None
+    try:
+        p = urlparse(s)
+    except ValueError:
+        return None
+    host = (p.hostname or "").lower()
+    if not host:
+        return None
+    if host.startswith("www."):
+        host = host[4:]
+    path = (p.path or "/").rstrip("/") or "/"
+    if host == "google.com" and path == "/search":
+        return None
+    if host in ("youtu.be",):
+        vid = path.lstrip("/").split("/")[0]
+        return f"youtube:{vid}" if vid else None
+    if host in ("youtube.com", "m.youtube.com"):
+        vid = (parse_qs(p.query).get("v") or [None])[0]
+        return f"youtube:{vid}" if vid else None
+    return f"{host}{path}".lower()
+
+
+def _url_for_label_in_series(
+    series_by_slot: Dict[str, Dict[str, List[Dict[str, Any]]]],
+    series_key: str,
+    label: str,
+) -> Optional[str]:
+    """系列内でラベルに対応する記事 URL（19→13→07→01 の順）。"""
+    nk = _normalize_label_key(label)
+    for slot in ("19", "13", "07", "01"):
+        for it in (series_by_slot.get(slot) or {}).get(series_key) or []:
+            if not isinstance(it, dict):
+                continue
+            if _normalize_label_key(str(it.get("t") or "")) == nk:
+                u = _url_from_thin_item(it)
+                if u:
+                    return u
+    return None
+
+
+def _cross_source_is_same_article(
+    series_by_slot: Dict[str, Dict[str, List[Dict[str, Any]]]],
+    series_keys: List[str],
+    label: str,
+) -> bool:
+    """2系列以上で正規化 URL が一致 → 同一記事の再掲載とみなす。"""
+    normalized: List[str] = []
+    for sk in series_keys:
+        u = _url_for_label_in_series(series_by_slot, sk, label)
+        if not u:
+            continue
+        nu = _normalize_article_url(u)
+        if nu:
+            normalized.append(nu)
+    if len(normalized) < 2:
+        return False
+    return len(set(normalized)) == 1
+
+
 def _fallback_search_url(label: str) -> str:
     return f"https://www.google.com/search?q={quote_plus(_clean_rising_display(label))}"
 
@@ -839,8 +902,12 @@ def build_cross_source_highlights(
     *,
     count: int = CROSS_SOURCE_HIGHLIGHT_COUNT,
 ) -> List[Dict[str, Any]]:
-    """独立した取得元（_series_provider が2種以上）をまたいだ同一ラベル（正規化一致）を優先。"""
+    """独立した取得元（_series_provider が2種以上）をまたいだ同一ラベル（正規化一致）を優先。
+
+    タイトル一致でも URL が同一記事を指す場合は除外する（例: Zenn 記事のはてブ再掲載）。
+    """
     index = _collect_label_index(rows)
+    series_by_slot = rows_to_series_by_slot(rows)
     candidates: List[Dict[str, Any]] = []
     for nk, entry in index.items():
         series_map = entry.get("series") or {}
@@ -850,6 +917,9 @@ def build_cross_source_highlights(
         categories = sorted({s["category"] for s in series_list})
         series_keys = sorted(series_map.keys())
         if len({_series_provider(k) for k in series_keys}) < 2:
+            continue
+        label = str(entry.get("label") or "")
+        if _cross_source_is_same_article(series_by_slot, series_keys, label):
             continue
         deduped_keys = _dedupe_series_keys_by_provider(series_keys)
         jp_pref = max(s.get("series_pref", 0) for s in series_list)

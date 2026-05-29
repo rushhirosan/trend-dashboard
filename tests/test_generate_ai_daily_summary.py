@@ -357,6 +357,59 @@ def test_build_cross_source_highlights_finds_overlap(gads):
     assert "google_trends_jp" in cross[0]["series_keys"]
 
 
+def test_build_cross_source_excludes_same_article_hatena_zenn(gads):
+    article_url = "https://zenn.dev/user/articles/claude-code-tips"
+    rows = [
+        {
+            "slot": "13",
+            "series_key": "hatena_jp",
+            "items": [{"t": "Claude Code の使い方", "r": 3, "u": article_url}],
+            "captured_at": "2026-05-29T13:00:00+09:00",
+        },
+        {
+            "slot": "13",
+            "series_key": "zenn_jp",
+            "items": [{"t": "Claude Code の使い方", "r": 4, "u": article_url}],
+            "captured_at": "2026-05-29T13:00:00+09:00",
+        },
+    ]
+    assert gads.build_cross_source_highlights(rows, count=3) == []
+
+
+def test_build_cross_source_keeps_different_urls_same_title(gads):
+    rows = [
+        {
+            "slot": "19",
+            "series_key": "nhk_jp",
+            "items": [
+                {
+                    "t": "台風接近",
+                    "r": 1,
+                    "u": "https://www3.nhk.or.jp/news/html/20260529/k100.html",
+                }
+            ],
+            "captured_at": "2026-05-29T19:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "google_trends_jp",
+            "items": [{"t": "台風接近", "r": 2}],
+            "captured_at": "2026-05-29T19:00:00+09:00",
+        },
+    ]
+    cross = gads.build_cross_source_highlights(rows, count=3)
+    assert len(cross) == 1
+    assert cross[0]["label"] == "台風接近"
+
+
+def test_normalize_article_url_ignores_google_search(gads):
+    assert gads._normalize_article_url("https://www.google.com/search?q=foo") is None
+    assert (
+        gads._normalize_article_url("https://zenn.dev/a/articles/abc")
+        == "zenn.dev/a/articles/abc"
+    )
+
+
 def test_build_category_top3_includes_links(gads):
     rows = [
         {

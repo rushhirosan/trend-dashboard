@@ -2438,6 +2438,22 @@ class TrendsCache:
             logger.warning(f"⚠️ スケジューラーDBロック解放エラー: {e}", exc_info=True)
             return False
 
+    def clear_scheduler_lock_db(self) -> bool:
+        """スケジューラー分散ロックを強制解放（OOM 後の stale holder 回収用）。"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        UPDATE scheduler_lock
+                        SET holder_id = NULL, locked_at = NULL, lock_until = NULL
+                        WHERE id = 1
+                    """)
+                    conn.commit()
+                    return cursor.rowcount == 1
+        except Exception as e:
+            logger.warning("⚠️ スケジューラーDBロック強制解放エラー: %s", e, exc_info=True)
+            return False
+
     def has_slot_completed(self, slot_key: str) -> bool:
         """指定スロットが「完了済み」として記録されているか（時間制限なし）。
         起動時補完の二重実行防止: 他プロセスが既に完了していれば True（補完をスキップする）。

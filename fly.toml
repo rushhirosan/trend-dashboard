@@ -16,10 +16,13 @@ primary_region = "nrt"
   SKIP_EMAIL_ON_UPDATE = "false"
   # DB分散ロックの保持時間（分）。一括取得が長時間でも期限切れで二重実行されないよう、想定最長ジョブより長めに
   TRENDS_SCHEDULER_LOCK_MINUTES = "90"
-  # トレンド取得の同時実行数（OOM対策。768MB VM でも低負荷モード concurrent=2）
-  TREND_REFRESH_MAX_CONCURRENT = "3"
+  # トレンド取得の同時実行数（手動/API用。スケジューラは TRENDS_SCHEDULER_LOW_MEMORY_* を使用）
+  TREND_REFRESH_MAX_CONCURRENT = "2"
+  # スケジューラ定期実行: 同時1本で OOM 回避（2026-05-30: 768MB+concurrent=2 で anon-rss~600MB→SIGKILL）
+  TRENDS_SCHEDULER_LOW_MEMORY_MAX_CONCURRENT = "1"
+  TRENDS_SCHEDULER_LOW_MEMORY_BATCH_DELAY_SECONDS = "2"
   # memory_watchdog の fallback 上限（cgroup と揃える）
-  MEMORY_LIMIT_MB = "768"
+  MEMORY_LIMIT_MB = "1024"
   # バッチ間待機秒数（メモリ・接続の解放を待つ、OOM対策）
   TREND_REFRESH_BATCH_DELAY_SECONDS = "3"
   # スケジューラ一括取得の開始時に Discord へ1通（完了通知と切り分け用）
@@ -52,5 +55,5 @@ primary_region = "nrt"
 [[vm]]
   cpu_kind = "shared"
   cpus = 1
-  # 実験: 768MB（2026-05-29〜 1:00/7:00 実行を監視。以前 512MB で OOM → 1024MB）
-  memory_mb = 768
+  # 2026-05-30: 768MB で 7:00 ジョブ中に OOM（anon-rss~601MB）→ 1024MB に戻す
+  memory_mb = 1024

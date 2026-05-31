@@ -314,6 +314,31 @@ class IPATrendsManager(BaseTrendsManager):
                 logger.debug(f"重複除去: '{normalized_title}' から {len(items)}件中1件を選択")
         
         return result
+
+    def _publication_date(self, item):
+        """初出記事のソート用公開日"""
+        return item.get('original_published_date') or item.get('published_date') or ''
+
+    def _is_update_item(self, item):
+        """更新記事かどうか（キャッシュには is_updated が無い場合はタイトルで判定）"""
+        if item.get('is_updated') is not None:
+            return bool(item.get('is_updated'))
+        return self._is_updated_alert(item.get('title', ''))
+
+    def _sort_ipa_items(self, data):
+        """新規注意喚起を先に、更新記事を後に、各グループ内は日付の新しい順"""
+        if not data:
+            return data
+
+        new_items = [x for x in data if not self._is_update_item(x)]
+        update_items = [x for x in data if self._is_update_item(x)]
+
+        new_items.sort(key=self._publication_date, reverse=True)
+        update_items.sort(
+            key=lambda x: x.get('last_updated_date') or self._publication_date(x),
+            reverse=True,
+        )
+        return new_items + update_items
     
     def _get_cache_key(self, *args, **kwargs):
         """キャッシュキーを返す"""
@@ -348,7 +373,7 @@ class IPATrendsManager(BaseTrendsManager):
             return False
 
     def get_trends(self, limit=25, force_refresh=False):
-        """IPA注意喚起トレンドを取得（キャッシュ優先、最終更新日を優先してソート）"""
+        """IPA注意喚起トレンドを取得（キャッシュ優先、新規を更新より先にソート）"""
         # ベースクラスのget_trendsを使用（sort_keyはNoneにして、後でカスタムソートを適用）
         result = super().get_trends(
             limit=limit * 2,  # ソートのために少し多めに取得
@@ -358,7 +383,6 @@ class IPATrendsManager(BaseTrendsManager):
             sort_reverse=True  # 降順（新しい順）
         )
         
-        # 最終更新日を優先してソート
         if result.get('success') and result.get('data'):
             data = result['data']
             # 重複除去を実行（ソートの前に行う）
@@ -367,13 +391,7 @@ class IPATrendsManager(BaseTrendsManager):
             removed_count = original_count - len(data)
             if removed_count > 0:
                 logger.info(f"✅ IPA: キャッシュから取得したデータから {removed_count}件の重複記事を除去しました（{original_count}件 → {len(data)}件）")
-            # 最終更新日を優先してソート（最終更新日がある場合はそれでソート、ない場合は公開日でソート）
-            data.sort(
-                key=lambda x: (
-                    x.get('last_updated_date') or x.get('original_published_date') or x.get('published_date') or ''
-                ),
-                reverse=True
-            )
+            data = self._sort_ipa_items(data)
             # 制限数まで取得
             data = data[:limit]
             # rankを再設定（1から始まる）
@@ -463,9 +481,6 @@ class IPATrendsManager(BaseTrendsManager):
                     # 実際の公開日を優先（取得できた場合）
                     published_date = original_published_date if original_published_date else rss_published_date
                     
-                    # ソート用の日付：最終更新日がある場合はそれを使用、ない場合は公開日を使用
-                    sort_date = last_updated_date if last_updated_date else published_date
-                    
                     # 説明文を取得
                     description = ''
                     if hasattr(entry, 'description'):
@@ -484,8 +499,6 @@ class IPATrendsManager(BaseTrendsManager):
                         'description': description,
                         'author': entry.get('author', ''),
                         'source': 'IPA',
-                        # ソート用の日付（最終更新日を優先）
-                        'sort_date': sort_date.isoformat() if sort_date else None
                     }
                     formatted_data.append(formatted_item)
                 except Exception as e:
@@ -499,20 +512,10 @@ class IPATrendsManager(BaseTrendsManager):
             if removed_count > 0:
                 logger.info(f"✅ IPA: {removed_count}件の重複記事を除去しました（{original_count}件 → {len(formatted_data)}件）")
             
-            # 最終更新日を優先してソート（最終更新日がある場合はそれでソート、ない場合は公開日でソート）
-            formatted_data.sort(
-                key=lambda x: (
-                    x.get('sort_date') or x.get('last_updated_date') or x.get('original_published_date') or x.get('published_date') or ''
-                ),
-                reverse=True
-            )
+            formatted_data = self._sort_ipa_items(formatted_data)
             
             # 制限数まで取得
             formatted_data = formatted_data[:limit]
-            
-            # sort_dateは内部用なので削除
-            for item in formatted_data:
-                item.pop('sort_date', None)
             
             # rankを設定（1から始まる）
             for i, item in enumerate(formatted_data, 1):

@@ -66,6 +66,31 @@ _CROSS_NONE_LINE = (
 _TOP3_HEADING = "## 📊 カテゴリ別トップ3"
 _TOP1_HEADING = "## 📊 カテゴリ別トップ1"
 _NOTABLE_HEADING = "## 💡 昨日特異だったこと"
+_ONE_LINER_HEADING = "## 今日の一行結論"
+_SPOTLIGHTS_HEADING = "## 昨日の見どころ（3〜5）"
+EDITORIAL_CANDIDATE_MAX = 12
+SPOTLIGHT_MAX = 5
+# 連日上位の定番（編集候補・一行結論から除外。トップ3根拠リストには残す）
+_KNOWN_STALE_LABEL_KEYS = frozenset(
+    {
+        "build-your-own-x",
+        "chatgpt",
+        "ジハンピ",
+        "canva（キャンバ） - 信じられないほど、素晴らしく",
+        "canva",
+    }
+)
+_KNOWN_STALE_LABEL_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"windows\s*10.*サポート終了", re.I),
+    re.compile(r"twig.*脆弱性", re.I),
+    re.compile(r"31club|サーティワン公式アプリ", re.I),
+)
+# 一行結論の抽象語（後処理警告用）
+_VAGUE_EDITORIAL_PHRASES = re.compile(
+    r"(SNS投稿|定番アプリ|定番のGitHub|セキュリティ注意|App Storeの定番|"
+    r"定番リポジトリ|いつも通り|各ソース)",
+    re.I,
+)
 # 配信向けカテゴリ（行政はノイズが多いため digest から除外可）
 CATEGORY_DIGEST_ORDER: tuple[str, ...] = (
     "ニュース",
@@ -644,6 +669,34 @@ def _format_slot_rank(slot: str, rank: int) -> str:
     return f"{slot}時スナップショット{rank}位"
 
 
+def _is_stale_label(display: str) -> bool:
+    """連日上位の定番ラベル（編集価値が低い）。"""
+    s = _clean_rising_display(display)
+    if not s:
+        return False
+    nk = _normalize_label_key(s)
+    if nk in _KNOWN_STALE_LABEL_KEYS:
+        return True
+    return any(p.search(s) for p in _KNOWN_STALE_LABEL_PATTERNS)
+
+
+def _label_slot_coverage(
+    series_by_slot: Dict[str, Dict[str, List[Dict[str, Any]]]],
+    series_key: str,
+    label: str,
+) -> int:
+    """07/13/19 のうち同一ラベルが観測されたスロット数。"""
+    nk = _normalize_label_key(label)
+    found: set[str] = set()
+    for slot in DAYTIME_SLOTS:
+        for it in (series_by_slot.get(slot) or {}).get(series_key) or []:
+            if not isinstance(it, dict):
+                continue
+            if _normalize_label_key(str(it.get("t") or "")) == nk:
+                found.add(slot)
+    return len(found)
+
+
 def _is_noisy_label(display: str, series_key: str = "") -> bool:
     """調達行・英語長文など、一般読者向けサマリーから除外するラベル。"""
     if _is_weak_rising_label(display):
@@ -989,6 +1042,8 @@ def build_category_top3(
                     except (TypeError, ValueError):
                         r = 999
                     rank_display = _format_slot_rank(slot, r)
+                    coverage = _label_slot_coverage(series_by_slot, series_key, display)
+                    stale = _is_stale_label(display)
                     pool.append(
                         {
                             "label": display,
@@ -997,7 +1052,15 @@ def build_category_top3(
                             "series_key": series_key,
                             "url": _url_from_thin_item(it),
                             "rank_display": rank_display,
-                            "_sort": (-slot_weight.get(slot, 0), -_series_pref_score(series_key), r),
+                            "slot_coverage": coverage,
+                            "stale": stale,
+                            "_sort": (
+                                1 if stale else 0,
+                                -coverage,
+                                r,
+                                -slot_weight.get(slot, 0),
+                                -_series_pref_score(series_key),
+                            ),
                         }
                     )
         pool.sort(key=lambda x: x["_sort"])
@@ -1031,8 +1094,296 @@ def build_category_top3(
     return out
 
 
-def render_rising_highlights_markdown(items: List[Dict[str, Any]]) -> str:
-    """昨日いちばん動いた3つ（07→13→19 の順位改善・機械生成）。"""
+def detect_quiet_editorial_categories(top3_blocks: List[Dict[str, Any]]) -> List[str]:
+    """編集向けに「今日は静か」とみなす区分（トップ3がすべて定番など）。"""
+    quiet: List[str] = []
+    for block in top3_blocks:
+        cat = str(block.get("category") or "")
+        items = block.get("items") or []
+        if block.get("quiet") or not items:
+            quiet.append(cat)
+            continue
+        if all(_is_stale_label(str(it.get("label") or "")) for it in items):
+            quiet.append(cat)
+    return quiet
+
+
+def quiet_category_examples(top3_blocks: List[Dict[str, Any]]) -> Dict[str, List[str]]:
+    """静かな区分向け: 定番ラベル例（一行結論で具体名を1つ出す用）。"""
+    out: Dict[str, List[str]] = {}
+    quiet = set(detect_quiet_editorial_categories(top3_blocks))
+    for block in top3_blocks:
+        cat = str(block.get("category") or "")
+        if cat not in quiet:
+            continue
+        labels = [
+            _clean_rising_display(str(it.get("label") or ""))
+            for it in (block.get("items") or [])[:2]
+            if str(it.get("label") or "").strip()
+        ]
+        if labels:
+            out[cat] = labels
+    return out
+
+
+def build_editorial_candidates(
+    rising_items: List[Dict[str, Any]],
+    cross_items: List[Dict[str, Any]],
+    top3_blocks: List[Dict[str, Any]],
+    rows: Optional[List[Dict[str, Any]]] = None,
+    *,
+    max_count: int = EDITORIAL_CANDIDATE_MAX,
+) -> List[Dict[str, Any]]:
+    """LLM 一行結論・見どころ用。定番除外・クロス/急上昇優先。"""
+    out: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def add(
+        label: str,
+        *,
+        category: str,
+        series_key: str,
+        reason: str,
+        priority: int,
+        rank_evidence: str = "",
+        sources_display: str = "",
+    ) -> None:
+        display = _clean_rising_display(label)
+        if not display or _is_noisy_label(display, series_key) or _is_stale_label(display):
+            return
+        nk = _normalize_label_key(display)
+        if nk in seen:
+            return
+        seen.add(nk)
+        out.append(
+            {
+                "label": display,
+                "category": category,
+                "series_key": series_key,
+                "reason": reason,
+                "priority": priority,
+                "rank_evidence": rank_evidence,
+                "sources_display": sources_display,
+            }
+        )
+
+    for h in cross_items:
+        series_keys = h.get("series_keys") or []
+        sk = str(series_keys[0]) if series_keys else ""
+        add(
+            str(h.get("label") or ""),
+            category="",
+            series_key=sk,
+            reason="cross_source",
+            priority=0,
+            rank_evidence=str(h.get("rank_evidence") or ""),
+            sources_display=str(h.get("sources_display") or ""),
+        )
+    if rows:
+        for leader in build_category_leaders_from_rows(rows):
+            add(
+                str(leader.get("label") or ""),
+                category=str(leader.get("category") or ""),
+                series_key=str(leader.get("series_key") or ""),
+                reason="category_leader",
+                priority=1,
+                rank_evidence=str(leader.get("rank_display") or ""),
+            )
+    else:
+        for block in top3_blocks:
+            cat = str(block.get("category") or "")
+            for it in block.get("items") or []:
+                add(
+                    str(it.get("label") or ""),
+                    category=cat,
+                    series_key=str(it.get("series_key") or ""),
+                    reason="category_leader",
+                    priority=1,
+                    rank_evidence=str(it.get("rank_display") or ""),
+                )
+                break
+    for r in rising_items:
+        add(
+            str(r.get("label") or ""),
+            category=str(r.get("category") or ""),
+            series_key=str(r.get("series_key") or ""),
+            reason="rising",
+            priority=2,
+            rank_evidence=str(r.get("rank_evidence") or ""),
+        )
+    for block in top3_blocks:
+        cat = str(block.get("category") or "")
+        for it in block.get("items") or []:
+            add(
+                str(it.get("label") or ""),
+                category=cat,
+                series_key=str(it.get("series_key") or ""),
+                reason="category_top",
+                priority=3,
+                rank_evidence=str(it.get("rank_display") or ""),
+            )
+
+    out.sort(
+        key=lambda c: (
+            c["priority"],
+            c.get("rank_evidence") or "",
+            c["label"],
+        )
+    )
+    return out[:max_count]
+
+
+def build_category_leaders_from_rows(
+    rows: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """区分ごとに 19時スナップショット1位（定番除外・JP系列優先）を1件。"""
+    series_by_slot = rows_to_series_by_slot(rows)
+    all_series: set[str] = set()
+    for slot in SLOT_ORDER:
+        all_series |= set((series_by_slot.get(slot) or {}).keys())
+
+    leaders: List[Dict[str, Any]] = []
+    for category in CATEGORY_DIGEST_ORDER:
+        cat_series = sorted(
+            [sk for sk in all_series if categorize_series_key(sk) == category],
+            key=lambda sk: (-_series_pref_score(sk), sk),
+        )
+        best: Optional[Dict[str, Any]] = None
+        for series_key in cat_series:
+            for it in (series_by_slot.get("19") or {}).get(series_key) or []:
+                if not isinstance(it, dict) or not it.get("t"):
+                    continue
+                display = _clean_rising_display(str(it.get("t")))
+                if _is_noisy_label(display, series_key) or _is_stale_label(display):
+                    continue
+                try:
+                    r = int(it.get("r"))
+                except (TypeError, ValueError):
+                    continue
+                if r != 1:
+                    continue
+                cand = {
+                    "label": display,
+                    "category": category,
+                    "series_key": series_key,
+                    "rank_display": _format_slot_rank("19", r),
+                    "url": _url_from_thin_item(it),
+                }
+                if best is None or _series_pref_score(series_key) > _series_pref_score(
+                    str(best.get("series_key") or "")
+                ):
+                    best = cand
+        if best:
+            leaders.append(best)
+    return leaders
+
+
+def build_label_link_index(
+    rows: List[Dict[str, Any]],
+    rising_items: List[Dict[str, Any]],
+    cross_items: List[Dict[str, Any]],
+    top3_blocks: List[Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+    """正規化ラベル → リンク行・区分（spotlight の source_labels 解決用）。"""
+    index: Dict[str, Dict[str, Any]] = {}
+    series_by_slot = rows_to_series_by_slot(rows)
+
+    def register(
+        label: str,
+        link_line: Optional[str],
+        *,
+        category: str = "",
+        series_key: str = "",
+    ) -> None:
+        display = _clean_rising_display(label)
+        if not display:
+            return
+        nk = _normalize_label_key(display)
+        if nk in index:
+            return
+        href_line = link_line
+        if not href_line:
+            url = _url_for_label_in_series(series_by_slot, series_key, display) if series_key else None
+            href_line = _format_digest_link_line(
+                display,
+                series_key or "?",
+                "スナップショット参照",
+                url,
+            )
+        index[nk] = {
+            "label": display,
+            "link_line": href_line,
+            "category": category,
+            "series_key": series_key,
+        }
+
+    for r in rising_items:
+        register(
+            str(r.get("label") or ""),
+            r.get("link_line"),
+            category=str(r.get("category") or ""),
+            series_key=str(r.get("series_key") or ""),
+        )
+    for block in top3_blocks:
+        cat = str(block.get("category") or "")
+        for it in block.get("items") or []:
+            register(
+                str(it.get("label") or ""),
+                it.get("link_line"),
+                category=cat,
+                series_key=str(it.get("series_key") or ""),
+            )
+    for h in cross_items:
+        label = str(h.get("label") or "")
+        keys = h.get("series_keys") or []
+        sk = str(keys[0]) if keys else ""
+        url = _url_for_label_in_series(series_by_slot, sk, label) if sk else None
+        line = _format_digest_link_line(label, sk or "?", "スナップショット参照", url) if label else None
+        register(label, line, series_key=sk)
+
+    return index
+
+
+def _resolve_source_labels(
+    source_labels: List[Any],
+    label_index: Dict[str, Dict[str, Any]],
+) -> List[str]:
+    """LLM の source_labels を link_line に解決（未知ラベルはスキップ）。"""
+    lines: List[str] = []
+    seen: set[str] = set()
+    for raw in source_labels or []:
+        if not isinstance(raw, str) or not raw.strip():
+            continue
+        nk = _normalize_label_key(raw)
+        entry = label_index.get(nk)
+        if entry is None:
+            for key, ent in label_index.items():
+                if nk in key or key in nk:
+                    entry = ent
+                    break
+        if entry is None:
+            continue
+        line = str(entry.get("link_line") or entry.get("label") or "")
+        if line and line not in seen:
+            seen.add(line)
+            lines.append(line)
+    return lines
+
+
+def render_rising_highlights_markdown(
+    items: List[Dict[str, Any]],
+    rising_notes: Optional[List[Dict[str, Any]]] = None,
+) -> str:
+    """昨日いちばん動いた3つ（07→13→19 の順位改善・機械生成 + AI 補足）。"""
+    notes_by_label: Dict[str, str] = {}
+    for n in rising_notes or []:
+        if not isinstance(n, dict):
+            continue
+        ml = str(n.get("match_label") or "").strip()
+        note = str(n.get("note") or "").strip()
+        if ml and note:
+            notes_by_label[_normalize_label_key(ml)] = note
+
     lines: List[str] = [_RISING_HEADING, ""]
     if not items:
         lines.append(
@@ -1041,6 +1392,10 @@ def render_rising_highlights_markdown(items: List[Dict[str, Any]]) -> str:
         return "\n".join(lines).rstrip() + "\n"
     for i, it in enumerate(items, 1):
         lines.append(f"{i}. {it.get('link_line') or it.get('label')}")
+        label_nk = _normalize_label_key(str(it.get("label") or ""))
+        note = notes_by_label.get(label_nk)
+        if note:
+            lines.append(f"   - **補足**: {note}")
         ev = it.get("rank_evidence")
         if ev:
             lines.append(f"   - **根拠**: {ev}")
@@ -1054,13 +1409,18 @@ def render_rising_highlights_markdown(items: List[Dict[str, Any]]) -> str:
 def render_cross_source_highlights_markdown(
     highlights: List[Dict[str, Any]],
     business_day: date,
+    cross_intro: Optional[str] = None,
 ) -> str:
-    """複数ソース重なり（機械生成・スナップショット事実のみ）。"""
+    """複数ソース重なり（機械生成・スナップショット事実 + 任意の AI 導入）。"""
     heading = f"{_CROSS_HEADING_PREFIX} — {business_day.isoformat()}"
     lines: List[str] = [heading, ""]
     if not highlights:
         lines.append(_CROSS_NONE_LINE)
         return "\n".join(lines).rstrip() + "\n"
+    intro = (cross_intro or "").strip()
+    if intro:
+        lines.append(intro)
+        lines.append("")
     for i, h in enumerate(highlights, 1):
         label = str(h.get("label") or "").strip() or "（ラベル不明）"
         lines.append(f"### {i}. {label}")
@@ -1123,16 +1483,24 @@ def inject_cross_source_highlights(markdown: str, cross_body: str) -> str:
     return out
 
 
-def render_category_top3_markdown(blocks: List[Dict[str, Any]]) -> str:
-    """カテゴリ別トップ3の Markdown 本文（機械生成・リンク付き）。"""
+def render_category_top3_markdown(
+    blocks: List[Dict[str, Any]],
+    category_intros: Optional[Dict[str, str]] = None,
+) -> str:
+    """カテゴリ別トップ3の Markdown 本文（機械生成・リンク付き + 区分1文）。"""
+    intros = category_intros or {}
     lines: List[str] = [_TOP3_HEADING, ""]
     for block in blocks:
         cat = block.get("category") or ""
         items = block.get("items") or []
+        intro = (intros.get(cat) or "").strip() if isinstance(intros, dict) else ""
         if block.get("quiet") or not items:
             lines.append(f"- **{cat}**: （データなし）")
             continue
         lines.append(f"### {cat}")
+        if intro:
+            lines.append(f"**今日の傾向**: {intro}")
+            lines.append("")
         for i, it in enumerate(items, 1):
             lines.append(f"{i}. {it.get('link_line') or it.get('label')}")
         lines.append("")
@@ -1147,20 +1515,108 @@ def _category_has_items(cat_block: Dict[str, Any]) -> bool:
     return False
 
 
-def build_llm_payload(rows: List[Dict[str, Any]], business_day: date) -> Dict[str, Any]:
-    """OpenAI 用（急上昇・複数ソース・カテゴリ別トップ3は機械付与）。"""
-    full = compact_rows_by_category(rows)
-    categories = [c for c in full["categories"] if _category_has_items(c)]
-    quiet = [c["category"] for c in full["categories"] if not _category_has_items(c)]
+def _format_business_day_ja(business_day: date) -> str:
+    return f"{business_day.year}年{business_day.month}月{business_day.day}日"
+
+
+def render_header_markdown(business_day: date) -> str:
+    bd = business_day.isoformat()
+    ja = _format_business_day_ja(business_day)
+    return "\n".join(
+        [
+            f"# 日次サマリー — {bd}（JST）",
+            f"- **対象（観測日）**: {ja}",
+            "- **生成・送信完了**: 自動生成（時刻未入力）",
+        ]
+    )
+
+
+def render_editorial_markdown(
+    editorial: Dict[str, Any],
+    label_index: Dict[str, Dict[str, Any]],
+) -> str:
+    """一行結論 + 見どころ（リンクは機械 index からのみ）。"""
+    lines: List[str] = []
+    one_liner = str(editorial.get("one_liner") or "").strip()
+    if one_liner:
+        lines.extend([_ONE_LINER_HEADING, "", one_liner, ""])
+
+    spotlights = editorial.get("spotlights") or []
+    if spotlights:
+        lines.append(_SPOTLIGHTS_HEADING)
+        lines.append("")
+        n = 0
+        for sp in spotlights:
+            if not isinstance(sp, dict):
+                continue
+            title = str(sp.get("title") or "").strip()
+            body = str(sp.get("body") or "").strip()
+            if not title or not body:
+                continue
+            source_lines = _resolve_source_labels(sp.get("source_labels") or [], label_index)
+            if not source_lines:
+                continue
+            n += 1
+            lines.append(f"### {n}. {title}")
+            lines.append("")
+            lines.append(f"- **なにが起きているか**: {body}")
+            lines.append("- **ソース**: " + " · ".join(source_lines))
+            caveat = str(sp.get("caveat") or "").strip()
+            if caveat:
+                lines.append(f"- **注意**: {caveat}")
+            lines.append("")
+        if n == 0:
+            lines.pop()
+            if lines and lines[-1] == "":
+                lines.pop()
+            if lines and lines[-1] == _SPOTLIGHTS_HEADING:
+                lines.pop()
+
+    return "\n".join(lines).rstrip()
+
+
+def build_llm_payload(
+    rows: List[Dict[str, Any]],
+    business_day: date,
+    *,
+    rising_items: List[Dict[str, Any]],
+    cross_items: List[Dict[str, Any]],
+    top3_blocks: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """OpenAI 編集 JSON 用ペイロード（機械ファクト + 編集候補）。"""
+    editorial_candidates = build_editorial_candidates(
+        rising_items, cross_items, top3_blocks, rows
+    )
+    quiet_editorial = detect_quiet_editorial_categories(top3_blocks)
     return {
         "business_day": business_day.isoformat(),
         "reader_context": (
-            "観測日（business_day）のトレンドをまとめる。読者は通常、観測日の翌朝に受け取る。"
-            "「昨日」= business_day。推測や「今日は〜でしょう」は書かない。"
-            "急上昇3つ・複数ソース重なり・カテゴリ別トップ3はシステムが別途付与する。"
+            "観測日（business_day）のトレンドを編集する。読者は通常翌朝に受け取る。"
+            "「昨日」= business_day。未来予測は禁止。"
+            "一行結論は editorial_candidates の固有ラベルを優先し、全区分を無理に埋めない。"
+            "quiet_editorial_categories は「新規の大きな動きが限定的」等と短く述べてよい。"
+            "URL は出力しない（source_labels のみ）。"
         ),
-        "categories": categories,
-        "quiet_categories": quiet,
+        "editorial_candidates": editorial_candidates,
+        "quiet_editorial_categories": quiet_editorial,
+        "quiet_category_examples": quiet_category_examples(top3_blocks),
+        "rising_highlights": [
+            {
+                "label": r.get("label"),
+                "category": r.get("category"),
+                "rank_evidence": r.get("rank_evidence"),
+            }
+            for r in rising_items
+        ],
+        "cross_source_highlights": [
+            {
+                "label": h.get("label"),
+                "sources_display": h.get("sources_display"),
+                "rank_evidence": h.get("rank_evidence"),
+            }
+            for h in cross_items
+        ],
+        "spotlight_max": SPOTLIGHT_MAX,
     }
 
 
@@ -1177,22 +1633,27 @@ def call_openai(
     api_key: str,
     model: str,
     timeout: int = 120,
+    *,
+    json_mode: bool = False,
 ) -> str:
+    body: Dict[str, Any] = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        "temperature": 0.35,
+        "max_tokens": 4096,
+    }
+    if json_mode:
+        body["response_format"] = {"type": "json_object"}
     r = requests.post(
         OPENAI_URL,
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         },
-        json={
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            "temperature": 0.35,
-            "max_tokens": 4096,
-        },
+        json=body,
         timeout=timeout,
     )
     if not r.ok:
@@ -1206,6 +1667,80 @@ def call_openai(
     if not content or not isinstance(content, str):
         raise RuntimeError("OpenAI response missing message.content")
     return content.strip()
+
+
+def parse_editorial_json(raw: str) -> Dict[str, Any]:
+    """LLM 編集 JSON をパース・正規化。"""
+    text = strip_wrapping_fences(raw)
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"editorial JSON parse error: {e}") from e
+    if not isinstance(data, dict):
+        raise RuntimeError("editorial JSON must be an object")
+
+    out: Dict[str, Any] = {
+        "one_liner": str(data.get("one_liner") or "").strip(),
+        "spotlights": [],
+        "rising_notes": [],
+        "cross_intro": data.get("cross_intro"),
+        "category_intros": {},
+    }
+    if out["cross_intro"] is not None:
+        out["cross_intro"] = str(out["cross_intro"]).strip() or None
+
+    for sp in data.get("spotlights") or []:
+        if isinstance(sp, dict):
+            out["spotlights"].append(sp)
+    out["spotlights"] = out["spotlights"][:SPOTLIGHT_MAX]
+
+    for n in data.get("rising_notes") or []:
+        if isinstance(n, dict) and n.get("match_label") and n.get("note"):
+            out["rising_notes"].append(
+                {
+                    "match_label": str(n.get("match_label")),
+                    "note": str(n.get("note")).strip(),
+                }
+            )
+
+    ci = data.get("category_intros")
+    if isinstance(ci, dict):
+        for k, v in ci.items():
+            if v and str(v).strip():
+                out["category_intros"][str(k)] = str(v).strip()
+
+    return out
+
+
+def _warn_vague_one_liner(one_liner: str) -> Optional[str]:
+    if not one_liner:
+        return None
+    if _VAGUE_EDITORIAL_PHRASES.search(one_liner):
+        return "one_liner_contains_vague_phrase"
+    return None
+
+
+def assemble_daily_markdown(
+    business_day: date,
+    editorial: Dict[str, Any],
+    label_index: Dict[str, Dict[str, Any]],
+    rising_items: List[Dict[str, Any]],
+    cross_items: List[Dict[str, Any]],
+    top3_blocks: List[Dict[str, Any]],
+) -> str:
+    """ヘッダ + 編集 + 機械根拠セクションを合成。"""
+    parts = [
+        render_header_markdown(business_day),
+        render_editorial_markdown(editorial, label_index),
+        render_rising_highlights_markdown(rising_items, editorial.get("rising_notes")),
+        render_cross_source_highlights_markdown(
+            cross_items,
+            business_day,
+            editorial.get("cross_intro") if cross_items else None,
+        ),
+        render_category_top3_markdown(top3_blocks, editorial.get("category_intros")),
+    ]
+    return "\n\n".join(p.strip() for p in parts if p and p.strip()) + "\n"
 
 
 def strip_wrapping_fences(text: str) -> str:
@@ -1240,30 +1775,28 @@ generated_at: "{gen_at}"
 
 
 SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ。入力 JSON の business_day は
-**観測日（その日のトレンド）**。読者は通常 **翌朝** に本文を受け取る。
-入力の categories はスナップショット由来の事実のみ。
+**観測日**。読者は通常 **翌朝** に受け取る。「昨日」= business_day。
 
-出力は日本語 Markdown のみ（YAML フロントマターは書かない）。**BUSINESS_DAY** は JSON の
-business_day と必ず一致させる。
+**出力は JSON オブジェクトのみ**（Markdown 不可）。次のキーを含める:
 
-構成（この順・見出し文言を厳守）:
-1. `# 日次サマリー — BUSINESS_DAY（JST）`
-2. `- **対象（観測日）**:` BUSINESS_DAY（例: 2026年5月20日）
-3. `- **生成・送信完了**:`（不明なら「自動生成（時刻未入力）」）
-
-**次はシステムが機械付与するため出力しない:**
-- `## 複数ソースで重なった話題`（見出しごと書かない）
-- `## 📈 昨日いちばん動いた3つ`
-- `## 📊 カテゴリ別トップ1` / `## 📊 カテゴリ別トップ3`
-- `## 💡 昨日特異だったこと` / `## 昨日のクロスソースハイライト`（旧見出し）
-未来予測・「今日は〜」は禁止。
+- `one_liner` (string): 最大3文。editorial_candidates の固有ラベルを引用して「今日の空気」を要約。
+  全カテゴリを無理に埋めない。quiet_editorial_categories は
+  「新規の大きな動きは限定的」等1文でよい。quiet_category_examples があれば定番名を1つだけ引用可。
+- `spotlights` (array, 最大 spotlight_max 件): 各要素は
+  `{ "title", "body", "source_labels": [入力に存在するラベル文字列], "caveat": 任意 }`
+  source_labels は editorial_candidates の label と一致させる。リンクは書かない。
+- `rising_notes` (array): `{ "match_label", "note" }` — rising_highlights の label に対応する1文補足。
+  rising_highlights が空なら []。
+- `cross_intro` (string|null): cross_source_highlights が1件以上あるときのみ導入1〜2文。0件なら null。
+- `category_intros` (object): キーは区分名、値は1文。quiet_editorial_categories 以外を優先。
+  静かな区分は省略可。抽象語のみ（「定番アプリ」「SNS投稿」等）は禁止。
 
 禁止:
-- `## 今日の見方`（旧フォーマット）
-- 「〜でしょう」「注目が集まる見込み」等の汎用予測
-- 調達・英語長文タイトルの羅列をそのまま見出しにすること（入力にあっても要約・日本語化）
-- 架空の URL
-- 入力に無い事実の断定
+- 入力 editorial_candidates / rising_highlights / cross_source_highlights に無いラベル・事実の捏造
+- URL・Markdown 見出し
+- 「〜でしょう」「今日は〜になる見込み」等の未来予測
+- 「SNS投稿」「定番アプリ」「セキュリティ注意」等、具体ラベル無しの抽象カテゴリ語だけの記述
+- cross_source_highlights が空なのに「複数ソースで重なった」と書くこと
 
 事実: 入力に無いことは断定しない。"""
 
@@ -1346,28 +1879,43 @@ def run_generate(
         meta["error"] = "no_snapshot_rows"
         return "", meta
 
-    payload = build_llm_payload(rows, business_day)
+    rising_items = build_rising_highlights(rows, count=RISING_HIGHLIGHT_COUNT)
+    cross_items = build_cross_source_highlights(rows, count=CROSS_SOURCE_HIGHLIGHT_COUNT)
+    top3_blocks = build_category_top3(rows, count=CATEGORY_TOP_N)
+    label_index = build_label_link_index(rows, rising_items, cross_items, top3_blocks)
+
+    payload = build_llm_payload(
+        rows,
+        business_day,
+        rising_items=rising_items,
+        cross_items=cross_items,
+        top3_blocks=top3_blocks,
+    )
     bd = business_day.isoformat()
     user = (
-        f"business_day={bd}。観測日は {bd}。「昨日」= {bd}。"
-        f"見出し `# 日次サマリー — {bd}（JST）` と **対象（観測日）** も必ず {bd}。\n\n"
+        f"business_day={bd}。観測日は {bd}。「昨日」= {bd}。\n\n"
         + build_user_payload(payload)
     )
-    inner = call_openai(SYSTEM_PROMPT, user, api_key, model)
-    rising_items = build_rising_highlights(rows, count=RISING_HIGHLIGHT_COUNT)
-    rising_md = render_rising_highlights_markdown(rising_items)
-    inner = inject_rising_highlights(inner, rising_md)
-    cross_items = build_cross_source_highlights(rows, count=CROSS_SOURCE_HIGHLIGHT_COUNT)
-    cross_md = render_cross_source_highlights_markdown(cross_items, business_day)
-    inner = inject_cross_source_highlights(inner, cross_md)
-    top3_blocks = build_category_top3(rows, count=CATEGORY_TOP_N)
-    top3_md = render_category_top3_markdown(top3_blocks)
-    inner = inject_category_top3(inner, top3_md)
+    raw_editorial = call_openai(SYSTEM_PROMPT, user, api_key, model, json_mode=True)
+    editorial = parse_editorial_json(raw_editorial)
+    vague_warn = _warn_vague_one_liner(str(editorial.get("one_liner") or ""))
+
+    inner = assemble_daily_markdown(
+        business_day,
+        editorial,
+        label_index,
+        rising_items,
+        cross_items,
+        top3_blocks,
+    )
     meta["model"] = model
     meta["rising_highlights_count"] = len(rising_items)
     meta["cross_source_highlights_count"] = len(cross_items)
-    meta["cross_source_injected"] = True
-    meta["category_top3_injected"] = True
+    meta["editorial_candidates_count"] = len(payload.get("editorial_candidates") or [])
+    meta["spotlights_count"] = len(editorial.get("spotlights") or [])
+    meta["quiet_editorial_categories"] = payload.get("quiet_editorial_categories") or []
+    if vague_warn:
+        meta["editorial_warning"] = vague_warn
     full = merge_front_matter(business_day, model, inner)
     return full, meta
 
@@ -1469,7 +2017,16 @@ def main() -> int:
             return 1
 
     if args.dry_run and not api_key:
-        payload = build_llm_payload(rows, bd)
+        rising_items = build_rising_highlights(rows, count=RISING_HIGHLIGHT_COUNT)
+        cross_items = build_cross_source_highlights(rows, count=CROSS_SOURCE_HIGHLIGHT_COUNT)
+        top3_blocks = build_category_top3(rows, count=CATEGORY_TOP_N)
+        payload = build_llm_payload(
+            rows,
+            bd,
+            rising_items=rising_items,
+            cross_items=cross_items,
+            top3_blocks=top3_blocks,
+        )
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         print(
             f"\n# rows={len(rows)} (set OPENAI_API_KEY to generate summary text)",

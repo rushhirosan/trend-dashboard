@@ -540,7 +540,7 @@ def test_inject_category_top3_replaces_notable_and_appends(gads):
     assert "https://example.com" in out
 
 
-def test_build_llm_payload_omits_machine_digest_fields(gads):
+def test_build_llm_payload_includes_editorial_fields(gads):
     rows = [
         {
             "slot": "19",
@@ -549,17 +549,265 @@ def test_build_llm_payload_omits_machine_digest_fields(gads):
             "captured_at": "2026-05-18T07:00:00+09:00",
         },
     ]
-    payload = gads.build_llm_payload(rows, date(2026, 5, 18))
-    assert "cross_source_highlights" not in payload
+    rising = gads.build_rising_highlights(rows, count=3)
+    cross = gads.build_cross_source_highlights(rows, count=3)
+    top3 = gads.build_category_top3(rows, count=3)
+    payload = gads.build_llm_payload(
+        rows, date(2026, 5, 18), rising_items=rising, cross_items=cross, top3_blocks=top3
+    )
+    assert "editorial_candidates" in payload
+    assert "quiet_editorial_categories" in payload
+    assert "rising_highlights" in payload
+    assert "cross_source_highlights" in payload
+    assert "spotlight_max" in payload
+    assert "急上昇" not in payload["reader_context"] or "editorial_candidates" in payload["reader_context"]
+
+
+def test_build_llm_payload_marks_quiet_tech_when_all_stale(gads):
+    rows = [
+        {
+            "slot": "19",
+            "series_key": "github_jp",
+            "items": [{"t": "build-your-own-x", "r": 1, "u": "https://github.com/a/b"}],
+            "captured_at": "2026-05-18T19:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "ipa_jp",
+            "items": [
+                {
+                    "t": "更新：Windows 10のサポート終了に伴う注意喚起",
+                    "r": 1,
+                    "u": "https://www.ipa.go.jp/x",
+                }
+            ],
+            "captured_at": "2026-05-18T19:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "jpcert_jp",
+            "items": [
+                {
+                    "t": "Weekly Report: Twigに複数の脆弱性",
+                    "r": 1,
+                    "u": "https://www.jpcert.or.jp/x",
+                }
+            ],
+            "captured_at": "2026-05-18T19:00:00+09:00",
+        },
+    ]
+    rising = gads.build_rising_highlights(rows, count=3)
+    cross = gads.build_cross_source_highlights(rows, count=3)
+    top3 = gads.build_category_top3(rows, count=3)
+    payload = gads.build_llm_payload(
+        rows, date(2026, 5, 18), rising_items=rising, cross_items=cross, top3_blocks=top3
+    )
+    assert "テック・開発" in payload["quiet_editorial_categories"]
+    assert payload["editorial_candidates"] == []
+
+
+def test_is_stale_label(gads):
+    assert gads._is_stale_label("build-your-own-x")
+    assert gads._is_stale_label("更新：Windows 10のサポート終了に伴う注意喚起")
+    assert not gads._is_stale_label("沖縄・奄美にあすから接近")
+
+
+def test_build_category_top3_deprioritizes_stale(gads):
+    rows = [
+        {
+            "slot": "19",
+            "series_key": "github_jp",
+            "items": [{"t": "build-your-own-x", "r": 1, "u": "https://github.com/a/b"}],
+            "captured_at": "2026-05-18T19:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "zenn_jp",
+            "items": [{"t": "Fresh Zenn Article", "r": 2, "u": "https://zenn.dev/a/b"}],
+            "captured_at": "2026-05-18T19:00:00+09:00",
+        },
+    ]
+    top3 = gads.build_category_top3(rows, count=3)
+    tech = next(b for b in top3 if b["category"] == "テック・開発")
+    assert tech["items"][0]["label"] == "Fresh Zenn Article"
+
+
+def test_build_editorial_candidates_includes_category_leader(gads):
+    rows = [
+        {
+            "slot": "19",
+            "series_key": "nhk_jp",
+            "items": [{"t": "台風接近ニュース", "r": 1, "u": "https://www3.nhk.or.jp/news/a"}],
+            "captured_at": "2026-05-18T19:00:00+09:00",
+        },
+        {
+            "slot": "07",
+            "series_key": "youtube_trends_jp",
+            "items": [{"t": "Rising Video", "r": 5}],
+            "captured_at": "2026-05-18T07:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "youtube_trends_jp",
+            "items": [{"t": "Rising Video", "r": 1}],
+            "captured_at": "2026-05-18T19:00:00+09:00",
+        },
+    ]
+    rising = gads.build_rising_highlights(rows, count=3)
+    cross = gads.build_cross_source_highlights(rows, count=3)
+    top3 = gads.build_category_top3(rows, count=3)
+    cands = gads.build_editorial_candidates(rising, cross, top3, rows)
+    labels = [c["label"] for c in cands]
+    assert "台風接近ニュース" in labels
+    assert any(c["reason"] == "category_leader" for c in cands)
+
+
+def test_build_editorial_candidates_excludes_stale(gads):
+    rows = [
+        {
+            "slot": "19",
+            "series_key": "nhk_jp",
+            "items": [{"t": "台風接近", "r": 1, "u": "https://www3.nhk.or.jp/news/a"}],
+            "captured_at": "2026-05-18T19:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "github_jp",
+            "items": [{"t": "build-your-own-x", "r": 1}],
+            "captured_at": "2026-05-18T19:00:00+09:00",
+        },
+    ]
+    rising = gads.build_rising_highlights(rows, count=3)
+    cross = gads.build_cross_source_highlights(rows, count=3)
+    top3 = gads.build_category_top3(rows, count=3)
+    cands = gads.build_editorial_candidates(rising, cross, top3, rows)
+    labels = [c["label"] for c in cands]
+    assert "台風接近" in labels
+    assert "build-your-own-x" not in labels
+
+
+def test_parse_editorial_json(gads):
+    raw = json.dumps(
+        {
+            "one_liner": "台風と dazn が目立った。",
+            "spotlights": [
+                {
+                    "title": "台風",
+                    "body": "接近が報じられた。",
+                    "source_labels": ["台風接近"],
+                }
+            ],
+            "rising_notes": [{"match_label": "Climber", "note": "順位上昇。"}],
+            "cross_intro": None,
+            "category_intros": {"ニュース": "気象系。"},
+        },
+        ensure_ascii=False,
+    )
+    data = gads.parse_editorial_json(raw)
+    assert data["one_liner"].startswith("台風")
+    assert len(data["spotlights"]) == 1
+    assert data["cross_intro"] is None
+
+
+def test_render_editorial_markdown_resolves_links(gads):
+    editorial = {
+        "one_liner": "テスト一行。",
+        "spotlights": [
+            {
+                "title": "台風",
+                "body": "接近。",
+                "source_labels": ["台風接近"],
+            }
+        ],
+    }
+    index = {
+        gads._normalize_label_key("台風接近"): {
+            "label": "台風接近",
+            "link_line": "[台風接近](https://example.com)（nhk_jp · 19時スナップショット1位）",
+        }
+    }
+    md = gads.render_editorial_markdown(editorial, index)
+    assert gads._ONE_LINER_HEADING in md
+    assert "https://example.com" in md
+    assert "### 1. 台風" in md
+
+
+def test_render_rising_highlights_includes_notes(gads):
+    items = [
+        {
+            "link_line": "[Climber](https://example.com)（youtube_jp · 19時スナップショット2位）",
+            "rank_evidence": "07時18位 → 19時2位",
+            "category": "検索・動画",
+            "label": "Climber",
+        },
+    ]
+    md = gads.render_rising_highlights_markdown(
+        items, [{"match_label": "Climber", "note": "日中に順位が大きく上昇。"}]
+    )
+    assert "**補足**" in md
+    assert "順位が大きく上昇" in md
+
+
+def test_render_cross_source_includes_intro(gads):
+    md = gads.render_cross_source_highlights_markdown(
+        [{"label": "豊臣秀長", "sources_display": "Wiki", "rank_evidence": "19時1位"}],
+        date(2026, 5, 20),
+        cross_intro="複数ソースで同名が観測された。",
+    )
+    assert "複数ソースで同名が観測された。" in md
+
+
+def test_render_category_top3_includes_intro(gads):
+    blocks = [
+        {
+            "category": "ニュース",
+            "items": [
+                {
+                    "label": "Head A",
+                    "link_line": "[Head A](https://example.com)（nhk_jp · 19時1位）",
+                }
+            ],
+        }
+    ]
+    md = gads.render_category_top3_markdown(blocks, {"ニュース": "気象関連が中心。"})
+    assert "**今日の傾向**" in md
+    assert "気象関連が中心。" in md
+
+
+def test_assemble_daily_markdown_structure(gads):
+    bd = date(2026, 5, 31)
+    editorial = {"one_liner": "一行。", "spotlights": [], "rising_notes": [], "category_intros": {}}
+    md = gads.assemble_daily_markdown(bd, editorial, {}, [], [], [])
+    assert "# 日次サマリー — 2026-05-31" in md
+    assert gads._ONE_LINER_HEADING in md
+    assert gads._RISING_HEADING in md
+    assert "複数ソースで重なった話題" in md
+    assert gads._TOP3_HEADING in md
+
+
+def test_build_llm_payload_no_legacy_category_list(gads):
+    rows = [
+        {
+            "slot": "19",
+            "series_key": "nhk_jp",
+            "items": [{"t": "headline", "r": 1}],
+            "captured_at": "2026-05-18T07:00:00+09:00",
+        },
+    ]
+    rising = gads.build_rising_highlights(rows, count=3)
+    cross = gads.build_cross_source_highlights(rows, count=3)
+    top3 = gads.build_category_top3(rows, count=3)
+    payload = gads.build_llm_payload(
+        rows, date(2026, 5, 18), rising_items=rising, cross_items=cross, top3_blocks=top3
+    )
+    assert "categories" not in payload
     assert "category_top1" not in payload
     assert "category_top3" not in payload
-    assert "rising_highlights" not in payload
     assert "notable_summary" not in payload
-    assert "reader_context" in payload
-    assert "急上昇3つ" in payload["reader_context"]
+    assert "editorial_candidates" in payload
 
 
-def test_build_llm_payload_omits_empty_categories(gads):
+def test_build_llm_payload_news_candidate_when_only_nhk(gads):
     rows = [
         {
             "slot": "07",
@@ -568,12 +816,15 @@ def test_build_llm_payload_omits_empty_categories(gads):
             "captured_at": "2026-05-18T07:00:00+09:00",
         },
     ]
-    payload = gads.build_llm_payload(rows, date(2026, 5, 18))
+    rising = gads.build_rising_highlights(rows, count=3)
+    cross = gads.build_cross_source_highlights(rows, count=3)
+    top3 = gads.build_category_top3(rows, count=3)
+    payload = gads.build_llm_payload(
+        rows, date(2026, 5, 18), rising_items=rising, cross_items=cross, top3_blocks=top3
+    )
     assert payload["business_day"] == "2026-05-18"
-    assert "reader_context" in payload
-    cats = [c["category"] for c in payload["categories"]]
-    assert cats == ["ニュース"]
-    assert "テック・開発" in payload["quiet_categories"]
+    assert any(c["label"] == "headline" for c in payload["editorial_candidates"])
+    assert "テック・開発" in payload["quiet_editorial_categories"]
 
 
 def test_write_generation_status_json(tmp_path, gads):

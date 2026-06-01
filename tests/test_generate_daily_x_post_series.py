@@ -1,8 +1,9 @@
 """Tests for scripts/generate_daily_x_post_series.py."""
 
 import importlib.util
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 from unittest.mock import MagicMock
 
 import pytest
@@ -238,6 +239,15 @@ def test_load_snapshots_daytime_slots_from_api_parses_payload(gx, monkeypatch):
     assert "01" not in out
 
 
+def test_default_business_day_evening_post_anchor(gx):
+    tz = ZoneInfo("Asia/Tokyo")
+    fn = gx.default_business_day_for_evening_x_post_jst
+    assert fn(datetime(2026, 6, 1, 20, 10, tzinfo=tz)) == date(2026, 6, 1)
+    assert fn(datetime(2026, 6, 2, 1, 45, tzinfo=tz)) == date(2026, 6, 1)
+    assert fn(datetime(2026, 6, 2, 8, 0, tzinfo=tz)) == date(2026, 6, 1)
+    assert fn(datetime(2026, 6, 2, 20, 10, tzinfo=tz)) == date(2026, 6, 2)
+
+
 def test_load_snapshots_daytime_slots_from_api_empty_raises(gx, monkeypatch):
     def fake_get(url, **_kwargs):
         return _mk_resp({"success": True, "data": []})
@@ -245,6 +255,52 @@ def test_load_snapshots_daytime_slots_from_api_empty_raises(gx, monkeypatch):
     monkeypatch.setattr(gx.requests, "get", fake_get)
     with pytest.raises(ValueError, match="No trend_daily_snapshots"):
         gx.load_snapshots_daytime_slots_from_api("https://example.com", date(2026, 5, 12))
+
+
+def test_load_snapshots_daytime_slots_from_api_require_slots_raises(gx, monkeypatch):
+    api_rows = [
+        {"slot": "07", "series_key": "google_trends_jp", "items": [{"t": "a", "r": 1}]},
+    ]
+
+    def fake_get(url, **_kwargs):
+        return _mk_resp({"success": True, "data": api_rows})
+
+    monkeypatch.setattr(gx.requests, "get", fake_get)
+    with pytest.raises(ValueError, match="missing slot\\(s\\) 13, 19"):
+        gx.load_snapshots_daytime_slots_from_api(
+            "https://example.com",
+            date(2026, 5, 12),
+            required_slots=("07", "13", "19"),
+        )
+
+
+def test_load_snapshots_daytime_slots_from_api_wait_until_complete(gx, monkeypatch):
+    calls = {"n": 0}
+    partial = [{"slot": "07", "series_key": "google_trends_jp", "items": [{"t": "a", "r": 1}]}]
+    complete = partial + [
+        {"slot": "13", "series_key": "google_trends_jp", "items": [{"t": "a", "r": 1}]},
+        {"slot": "19", "series_key": "google_trends_jp", "items": [{"t": "a", "r": 1}]},
+    ]
+
+    def fake_get(url, **_kwargs):
+        calls["n"] += 1
+        data = partial if calls["n"] == 1 else complete
+        return _mk_resp({"success": True, "data": data})
+
+    sleeps: list[int] = []
+
+    monkeypatch.setattr(gx.requests, "get", fake_get)
+    monkeypatch.setattr(gx.time, "sleep", lambda s: sleeps.append(s))
+    out = gx.load_snapshots_daytime_slots_from_api(
+        "https://example.com",
+        date(2026, 5, 12),
+        required_slots=("07", "13", "19"),
+        wait_timeout_seconds=120,
+        poll_interval_seconds=5,
+    )
+    assert out["19"]["google_trends_jp"][0]["t"] == "a"
+    assert calls["n"] == 2
+    assert sleeps == [5]
 
 
 def test_load_snapshots_daytime_merges_slots(gx, monkeypatch):

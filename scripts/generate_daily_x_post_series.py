@@ -12,6 +12,9 @@ better). No extra upstream API traffic from this script.
 ``GET /api/summaries/daily-snapshots?business_day=…`` (``trend_daily_snapshots``, slots 07/13/19),
 then composes JP/US blocks. No per-source ``/api/google-trends`` traffic.
 
+**business_day (default):** JST ``now − 12h`` の暦日（夕方 X 投稿向け）。GHA schedule が
+翌未明まで遅れても **実行日ではなく観測日** の 07/13/19 を読む。上書きは ``--date YYYY-MM-DD``。
+
 **Legacy per-source HTTP** (no ``DATABASE_URL`` and **without** ``--from-api``): each
 ``/api/*`` with ``force_refresh`` (default false).
 
@@ -38,7 +41,8 @@ import json
 import os
 import re
 import sys
-from datetime import date, datetime
+import time
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable
 from unicodedata import east_asian_width
@@ -540,28 +544,68 @@ def load_snapshots_daytime_slots(
     return out
 
 
+def _parse_snapshot_rows_into_bundle(
+    rows: list[Any],
+) -> dict[str, dict[str, list[Any]]]:
+    out: dict[str, dict[str, list[Any]]] = {s: {} for s in SNAPSHOT_SLOTS_DAYTIME}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        slot = str(row.get("slot") or "")
+        if slot not in out:
+            continue
+        sk = row.get("series_key")
+        if sk is None or not str(sk).strip():
+            continue
+        items = row.get("items")
+        if isinstance(items, str):
+            try:
+                items = json.loads(items)
+            except json.JSONDecodeError:
+                items = []
+        if not isinstance(items, list):
+            items = []
+        out[slot][str(sk)] = items
+    return out
+
+
+def _missing_snapshot_slots(
+    out: dict[str, dict[str, list[Any]]],
+    required_slots: tuple[str, ...],
+) -> list[str]:
+    return [s for s in required_slots if len(out.get(s, {})) == 0]
+
+
 def _validate_daytime_snapshot_bundle(
-    out: dict[str, dict[str, list[Any]]], business_day: date
+    out: dict[str, dict[str, list[Any]]],
+    business_day: date,
+    *,
+    required_slots: tuple[str, ...] | None = None,
 ) -> None:
     if all(len(out[s]) == 0 for s in SNAPSHOT_SLOTS_DAYTIME):
         raise ValueError(
             f"No trend_daily_snapshots for business_day={business_day.isoformat()} "
             f"in slots {', '.join(SNAPSHOT_SLOTS_DAYTIME)}"
         )
+    if not required_slots:
+        return
+    missing = _missing_snapshot_slots(out, required_slots)
+    if not missing:
+        return
+    have = [s for s in SNAPSHOT_SLOTS_DAYTIME if len(out.get(s, {})) > 0]
+    suffix = f" (have: {', '.join(have)})" if have else ""
+    raise ValueError(
+        f"Incomplete trend_daily_snapshots for business_day={business_day.isoformat()}: "
+        f"missing slot(s) {', '.join(missing)}{suffix}"
+    )
 
 
-def load_snapshots_daytime_slots_from_api(
+def _fetch_snapshots_daytime_bundle_from_api(
     base_url: str,
     business_day: date,
     *,
     timeout: int = 120,
 ) -> dict[str, dict[str, list[Any]]]:
-    """
-    ``/api/summaries/daily-snapshots`` から DB と同形の行を取り、
-    ``load_snapshots_daytime_slots`` と同じ ``{ slot: { series_key: items } }`` を返す。
-    スロット 01 は無視し 07/13/19 のみ詰める（DB 読みと一致）。
-    """
-    out: dict[str, dict[str, list[Any]]] = {s: {} for s in SNAPSHOT_SLOTS_DAYTIME}
     url = (
         f"{base_url.rstrip('/')}/api/summaries/daily-snapshots"
         f"?business_day={business_day.isoformat()}"
@@ -579,26 +623,46 @@ def load_snapshots_daytime_slots_from_api(
     rows = payload.get("data")
     if not isinstance(rows, list):
         raise RuntimeError("snapshot API: expected data array")
+    return _parse_snapshot_rows_into_bundle(rows)
 
-    for row in rows:
-        slot = str(row.get("slot") or "")
-        if slot not in out:
-            continue
-        sk = row.get("series_key")
-        if sk is None or not str(sk).strip():
-            continue
-        items = row.get("items")
-        if isinstance(items, str):
-            try:
-                items = json.loads(items)
-            except json.JSONDecodeError:
-                items = []
-        if not isinstance(items, list):
-            items = []
-        out[slot][str(sk)] = items
 
-    _validate_daytime_snapshot_bundle(out, business_day)
-    return out
+def load_snapshots_daytime_slots_from_api(
+    base_url: str,
+    business_day: date,
+    *,
+    timeout: int = 120,
+    required_slots: tuple[str, ...] | None = None,
+    wait_timeout_seconds: int = 0,
+    poll_interval_seconds: int = 60,
+) -> dict[str, dict[str, list[Any]]]:
+    """
+    ``/api/summaries/daily-snapshots`` から DB と同形の行を取り、
+    ``load_snapshots_daytime_slots`` と同じ ``{ slot: { series_key: items } }`` を返す。
+    スロット 01 は無視し 07/13/19 のみ詰める（DB 読みと一致）。
+
+    ``required_slots`` 指定時は各スロットに1件以上の series があるまで待てる
+    （``wait_timeout_seconds`` > 0 のときポーリング）。
+    """
+    required = required_slots or ()
+    deadline = (
+        time.monotonic() + max(0, wait_timeout_seconds)
+        if wait_timeout_seconds > 0
+        else None
+    )
+    while True:
+        out = _fetch_snapshots_daytime_bundle_from_api(
+            base_url, business_day, timeout=timeout
+        )
+        try:
+            _validate_daytime_snapshot_bundle(
+                out, business_day, required_slots=required or None
+            )
+            return out
+        except ValueError as e:
+            if deadline is None or time.monotonic() >= deadline:
+                raise
+            print(f"WAIT: {e}; retry in {poll_interval_seconds}s", file=sys.stderr)
+            time.sleep(max(1, poll_interval_seconds))
 
 
 def _compose_jp_body(
@@ -994,15 +1058,39 @@ def compose_daily_markdown(date_str: str, jp_inner: str, us_inner: str) -> str:
     return "\n".join(lines)
 
 
-def default_date_jst() -> str:
-    return datetime.now(ZoneInfo("Asia/Tokyo")).date().isoformat()
+JST = ZoneInfo("Asia/Tokyo")
+# Nominal ~20:00 JST X post. Anchor avoids using run-date when GHA schedule slips past midnight.
+EVENING_X_POST_ANCHOR_HOURS = 12
+
+
+def default_business_day_for_evening_x_post_jst(
+    now: datetime | None = None,
+) -> date:
+    """JST 20時前後の X 投稿向け business_day（観測日 = 07/13/19 が揃う暦日）。
+
+    実行時刻の暦日ではなく ``now - 12h`` の日付を使う。GitHub Actions の schedule 遅延で
+    翌未明（例: 01:45 JST）に走っても、前日のスナップショットを取りに行く。
+    """
+    if now is None:
+        now = datetime.now(JST)
+    elif now.tzinfo is None:
+        now = now.replace(tzinfo=JST)
+    else:
+        now = now.astimezone(JST)
+    return (now - timedelta(hours=EVENING_X_POST_ANCHOR_HOURS)).date()
 
 
 def main() -> int:
     load_dotenv()
 
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--date", help="YYYY-MM-DD (default: today JST) — business_day for snapshots")
+    p.add_argument(
+        "--date",
+        help=(
+            "YYYY-MM-DD — business_day for snapshots "
+            f"(default: JST evening-post anchor, now−{EVENING_X_POST_ANCHOR_HOURS}h calendar date)"
+        ),
+    )
     p.add_argument(
         "--output-dir",
         default=DEFAULT_OUTPUT_DIR,
@@ -1024,6 +1112,29 @@ def main() -> int:
         "--from-api",
         action="store_true",
         help="Read /api/summaries/daily-snapshots (07/13/19 for --date); same rows as AI daily summary",
+    )
+    p.add_argument(
+        "--require-slots",
+        default="",
+        metavar="SLOTS",
+        help=(
+            "Comma-separated daytime slots that must all be present (default: any one of 07/13/19). "
+            "CI uses 07,13,19."
+        ),
+    )
+    p.add_argument(
+        "--wait-for-slots",
+        type=int,
+        default=0,
+        metavar="SECONDS",
+        help="With --from-api: poll until --require-slots are satisfied or timeout (0=disabled)",
+    )
+    p.add_argument(
+        "--poll-interval",
+        type=int,
+        default=60,
+        metavar="SECONDS",
+        help="Seconds between snapshot API polls when --wait-for-slots > 0 (default: 60)",
     )
     p.add_argument("--dry-run", action="store_true", help="Print blocks only; do not write")
     p.add_argument("--write", action="store_true", help="Write docs/x_post_samples/daily/{date}.md")
@@ -1066,7 +1177,23 @@ def main() -> int:
     )
     args = p.parse_args()
 
-    d = args.date or default_date_jst()
+    required_slots: tuple[str, ...] = ()
+    if (args.require_slots or "").strip():
+        parsed_slots = tuple(
+            s.strip()
+            for s in str(args.require_slots).split(",")
+            if s.strip()
+        )
+        invalid = [s for s in parsed_slots if s not in SNAPSHOT_SLOTS_DAYTIME]
+        if invalid:
+            print(
+                f"ERROR: invalid --require-slots {invalid!r} (allowed: {', '.join(SNAPSHOT_SLOTS_DAYTIME)})",
+                file=sys.stderr,
+            )
+            return 1
+        required_slots = parsed_slots
+
+    d = args.date or default_business_day_for_evening_x_post_jst().isoformat()
     try:
         business_day = date.fromisoformat(d)
     except ValueError:
@@ -1106,7 +1233,13 @@ def main() -> int:
             file=sys.stderr,
         )
         try:
-            series_by_slot = load_snapshots_daytime_slots_from_api(base, business_day)
+            series_by_slot = load_snapshots_daytime_slots_from_api(
+                base,
+                business_day,
+                required_slots=required_slots or None,
+                wait_timeout_seconds=max(0, args.wait_for_slots),
+                poll_interval_seconds=max(1, args.poll_interval),
+            )
             jp = build_jp_block_from_snapshots(
                 series_by_slot,
                 d,

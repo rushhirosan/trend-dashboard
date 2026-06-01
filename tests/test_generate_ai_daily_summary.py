@@ -117,6 +117,89 @@ def test_compact_rows_by_category_groups_series(gads):
     assert slot07["series"][0]["series_key"] == "google_trends_jp"
 
 
+def test_build_rising_link_line_shows_day_evidence(gads):
+    rows = [
+        {
+            "slot": "07",
+            "series_key": "youtube_trends_jp",
+            "items": [{"t": "Climber", "r": 18}],
+            "captured_at": "2026-05-18T07:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "youtube_trends_jp",
+            "items": [{"t": "Climber", "r": 2}],
+            "captured_at": "2026-05-18T19:00:00+09:00",
+        },
+    ]
+    rising = gads.build_rising_highlights(rows, count=1)
+    assert "→" in rising[0]["rank_display"]
+    assert "→" in rising[0]["link_line"]
+
+
+def test_build_category_top3_prefers_intraday_jump_over_19_only_stale(gads):
+    rows = [
+        {
+            "slot": "07",
+            "series_key": "nhk_jp",
+            "items": [
+                {"t": "Morning Typhoon Alert", "r": 12, "u": "https://www3.nhk.or.jp/news/a"}
+            ],
+            "captured_at": "2026-05-18T07:00:00+09:00",
+        },
+        {
+            "slot": "13",
+            "series_key": "nhk_jp",
+            "items": [{"t": "Morning Typhoon Alert", "r": 4}],
+            "captured_at": "2026-05-18T13:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "nhk_jp",
+            "items": [{"t": "Morning Typhoon Alert", "r": 1}],
+            "captured_at": "2026-05-18T19:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "github_jp",
+            "items": [{"t": "build-your-own-x", "r": 1, "u": "https://github.com/a/b"}],
+            "captured_at": "2026-05-18T19:00:00+09:00",
+        },
+    ]
+    top3 = gads.build_category_top3(rows, count=3)
+    news = next(b for b in top3 if b["category"] == "ニュース")
+    assert news["items"][0]["label"] == "Morning Typhoon Alert"
+    assert "07時スナップショット" in news["items"][0]["rank_display"]
+    assert "19時スナップショット" in news["items"][0]["rank_display"]
+
+
+def test_build_category_leader_prefers_day_jump(gads):
+    rows = [
+        {
+            "slot": "07",
+            "series_key": "nhk_jp",
+            "items": [{"t": "Day Story", "r": 10, "u": "https://www3.nhk.or.jp/news/a"}],
+            "captured_at": "2026-05-18T07:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "nhk_jp",
+            "items": [{"t": "Day Story", "r": 1}],
+            "captured_at": "2026-05-18T19:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "github_jp",
+            "items": [{"t": "build-your-own-x", "r": 1}],
+            "captured_at": "2026-05-18T19:00:00+09:00",
+        },
+    ]
+    leaders = gads.build_category_leaders_from_rows(rows)
+    news = next(l for l in leaders if l["category"] == "ニュース")
+    assert news["label"] == "Day Story"
+    assert "07時スナップショット" in news["rank_display"]
+
+
 def test_build_rising_highlights_picks_rank_jump(gads):
     rows = [
         {

@@ -723,9 +723,46 @@ def _format_rank_evidence(ranks: dict[str, int]) -> str:
     return " → ".join(parts) if parts else "順位データなし"
 
 
+def _daytime_best_rank(ranks: dict[str, int]) -> int:
+    """07/13/19 のうち最良（最小）順位。スロット横断の一日評価用。"""
+    vals = [int(ranks[s]) for s in DAYTIME_SLOTS if s in ranks]
+    return min(vals) if vals else 999
+
+
+def _daytime_label_sort_key(
+    ranks: dict[str, int],
+    *,
+    jump: float = 0.0,
+    coverage: int = 0,
+    stale: bool = False,
+    series_pref: int = 0,
+) -> tuple:
+    """一日評価: 定番除外 → 順位改善 → 複数スロット観測 → 最良順位 → 系列優先。"""
+    return (
+        1 if stale else 0,
+        -jump,
+        -coverage,
+        _daytime_best_rank(ranks),
+        -series_pref,
+    )
+
+
 def _pick_display_from_agg(agg: Dict[str, Any]) -> str:
+    """表示ラベルは一日の最良順位が出たスロットの表記を優先（19固定ではない）。"""
+    ranks = agg.get("ranks") or {}
     by_slot = agg.get("display_by_slot") or {}
-    for slot in ("19", "13", "07"):
+    best_slot: Optional[str] = None
+    best_r = 999
+    for slot in DAYTIME_SLOTS:
+        r = ranks.get(slot)
+        if r is not None and int(r) < best_r:
+            best_r = int(r)
+            best_slot = slot
+    if best_slot:
+        d = by_slot.get(best_slot)
+        if d:
+            return _clean_rising_display(str(d))
+    for slot in DAYTIME_SLOTS:
         d = by_slot.get(slot)
         if d:
             return _clean_rising_display(str(d))
@@ -822,10 +859,8 @@ def _url_for_rising_item(
 
 
 def _rank_display_for_rising(ranks: dict[str, int]) -> str:
-    for slot in ("19", "13", "07"):
-        if slot in ranks:
-            return _format_slot_rank(slot, int(ranks[slot]))
-    return "順位データなし"
+    """リンク行用: 07→13→19 の一日推移（単一スロットだけにしない）。"""
+    return _format_rank_evidence(ranks)
 
 
 def build_rising_highlights(
@@ -849,16 +884,11 @@ def build_rising_highlights(
         for nk, agg in aggs.items():
             ranks = agg.get("ranks") or {}
             jump = _rank_jump_score(ranks)
-            display = _clean_rising_display(
-                str((agg.get("display_by_slot") or {}).get("19")
-                    or (agg.get("display_by_slot") or {}).get("13")
-                    or (agg.get("display_by_slot") or {}).get("07")
-                    or "")
-            )
+            display = _pick_display_from_agg(agg)
             if jump <= 0 or _is_noisy_label(display, series_key):
                 continue
             freq = len(set(ranks.keys()) & set(DAYTIME_SLOTS))
-            r_best = min(ranks.get(s, 999) for s in DAYTIME_SLOTS if s in ranks) if ranks else 999
+            r_best = _daytime_best_rank(ranks)
             cand = {
                 "label": display,
                 "category": category,
@@ -866,7 +896,6 @@ def build_rising_highlights(
                 "jump": round(jump, 1),
                 "freq_slots": freq,
                 "r_best": r_best,
-                "best_rank_19": ranks.get("19"),
                 "ranks": dict(ranks),
             }
             prev = best.get(nk)
@@ -879,7 +908,7 @@ def build_rising_highlights(
 
     items = sorted(
         best.values(),
-        key=lambda c: (-c["jump"], -c["freq_slots"], c.get("best_rank_19") or 999, c["label"]),
+        key=lambda c: (-c["jump"], -c["freq_slots"], c["r_best"], c["label"]),
     )
     out: List[Dict[str, Any]] = []
     for cand in items[:count]:
@@ -928,7 +957,7 @@ def _collect_label_index(
                 continue
             ranks = agg.get("ranks") or {}
             jump = _rank_jump_score(ranks)
-            r19 = ranks.get("19")
+            r_day_best = _daytime_best_rank(ranks)
             entry = index.get(nk)
             if entry is None:
                 entry = {
@@ -944,7 +973,7 @@ def _collect_label_index(
                 "ranks": ranks,
                 "rank_evidence": _format_rank_evidence(ranks),
                 "jump": round(jump, 1),
-                "best_rank_19": r19,
+                "best_daytime_rank": r_day_best,
                 "series_pref": _series_pref_score(series_key),
             }
     return index
@@ -976,8 +1005,8 @@ def build_cross_source_highlights(
             continue
         deduped_keys = _dedupe_series_keys_by_provider(series_keys)
         jp_pref = max(s.get("series_pref", 0) for s in series_list)
-        best_r19 = min(
-            (s.get("best_rank_19") or 999 for s in series_list),
+        best_daytime_rank = min(
+            (s.get("best_daytime_rank") or 999 for s in series_list),
             default=999,
         )
         max_jump = max(s.get("jump", 0.0) for s in series_list)
@@ -991,7 +1020,7 @@ def build_cross_source_highlights(
                 "source_count": len(deduped_keys),
                 "rank_evidence": series_list[0].get("rank_evidence", ""),
                 "jump": max_jump,
-                "best_rank_19": best_r19,
+                "best_daytime_rank": best_daytime_rank,
                 "jp_series_pref": jp_pref,
             }
         )
@@ -1000,7 +1029,7 @@ def build_cross_source_highlights(
         key=lambda c: (
             -c["source_count"],
             -c["jp_series_pref"],
-            c.get("best_rank_19") or 999,
+            c.get("best_daytime_rank") or 999,
             -c["jump"],
             c["label"],
         ),
@@ -1013,13 +1042,12 @@ def build_category_top3(
     *,
     count: int = CATEGORY_TOP_N,
 ) -> List[Dict[str, Any]]:
-    """カテゴリごとに 19→13→07 の上位 N 件（ラベル重複除去・JP 系列優先）。"""
+    """カテゴリごとに 07/13/19 を横断した上位 N 件（順位改善・観測幅・最良順位）。"""
     series_by_slot = rows_to_series_by_slot(rows)
     all_series: set[str] = set()
     for slot in SLOT_ORDER:
         all_series |= set((series_by_slot.get(slot) or {}).keys())
 
-    slot_weight = {"19": 3, "13": 2, "07": 1}
     out: List[Dict[str, Any]] = []
     for category in CATEGORY_DIGEST_ORDER:
         cat_series = sorted(
@@ -1029,40 +1057,33 @@ def build_category_top3(
         seen: set[str] = set()
         pool: List[Dict[str, Any]] = []
         for series_key in cat_series:
-            for slot in ("19", "13", "07"):
-                items = (series_by_slot.get(slot) or {}).get(series_key) or []
-                for it in items:
-                    if not isinstance(it, dict) or not it.get("t"):
-                        continue
-                    display = _clean_rising_display(str(it.get("t")))
-                    if _is_noisy_label(display, series_key):
-                        continue
-                    try:
-                        r = int(it.get("r"))
-                    except (TypeError, ValueError):
-                        r = 999
-                    rank_display = _format_slot_rank(slot, r)
-                    coverage = _label_slot_coverage(series_by_slot, series_key, display)
-                    stale = _is_stale_label(display)
-                    pool.append(
-                        {
-                            "label": display,
-                            "rank": r,
-                            "slot": slot,
-                            "series_key": series_key,
-                            "url": _url_from_thin_item(it),
-                            "rank_display": rank_display,
-                            "slot_coverage": coverage,
-                            "stale": stale,
-                            "_sort": (
-                                1 if stale else 0,
-                                -coverage,
-                                r,
-                                -slot_weight.get(slot, 0),
-                                -_series_pref_score(series_key),
-                            ),
-                        }
-                    )
+            aggs = _aggregate_labels_for_series(series_by_slot, series_key)
+            for _nk, agg in aggs.items():
+                ranks = agg.get("ranks") or {}
+                if not ranks:
+                    continue
+                display = _pick_display_from_agg(agg)
+                if _is_noisy_label(display, series_key):
+                    continue
+                jump = _rank_jump_score(ranks)
+                coverage = len(set(ranks.keys()) & set(DAYTIME_SLOTS))
+                stale = _is_stale_label(display)
+                pool.append(
+                    {
+                        "label": display,
+                        "series_key": series_key,
+                        "url": _url_for_label_in_series(series_by_slot, series_key, display),
+                        "rank_display": _format_rank_evidence(ranks),
+                        "stale": stale,
+                        "_sort": _daytime_label_sort_key(
+                            ranks,
+                            jump=jump,
+                            coverage=coverage,
+                            stale=stale,
+                            series_pref=_series_pref_score(series_key),
+                        ),
+                    }
+                )
         pool.sort(key=lambda x: x["_sort"])
         picked: List[Dict[str, Any]] = []
         for cand in pool:
@@ -1236,7 +1257,7 @@ def build_editorial_candidates(
 def build_category_leaders_from_rows(
     rows: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
-    """区分ごとに 19時スナップショット1位（定番除外・JP系列優先）を1件。"""
+    """区分ごとに 07/13/19 を総合した代表1件（定番除外・順位改善・JP系列優先）。"""
     series_by_slot = rows_to_series_by_slot(rows)
     all_series: set[str] = set()
     for slot in SLOT_ORDER:
@@ -1250,31 +1271,35 @@ def build_category_leaders_from_rows(
         )
         best: Optional[Dict[str, Any]] = None
         for series_key in cat_series:
-            for it in (series_by_slot.get("19") or {}).get(series_key) or []:
-                if not isinstance(it, dict) or not it.get("t"):
+            aggs = _aggregate_labels_for_series(series_by_slot, series_key)
+            for _nk, agg in aggs.items():
+                ranks = agg.get("ranks") or {}
+                display = _pick_display_from_agg(agg)
+                if (
+                    not display
+                    or _is_noisy_label(display, series_key)
+                    or _is_stale_label(display)
+                ):
                     continue
-                display = _clean_rising_display(str(it.get("t")))
-                if _is_noisy_label(display, series_key) or _is_stale_label(display):
-                    continue
-                try:
-                    r = int(it.get("r"))
-                except (TypeError, ValueError):
-                    continue
-                if r != 1:
-                    continue
+                jump = _rank_jump_score(ranks)
+                coverage = len(set(ranks.keys()) & set(DAYTIME_SLOTS))
                 cand = {
                     "label": display,
                     "category": category,
                     "series_key": series_key,
-                    "rank_display": _format_slot_rank("19", r),
-                    "url": _url_from_thin_item(it),
+                    "rank_display": _format_rank_evidence(ranks),
+                    "url": _url_for_label_in_series(series_by_slot, series_key, display),
+                    "_sort": _daytime_label_sort_key(
+                        ranks,
+                        jump=jump,
+                        coverage=coverage,
+                        series_pref=_series_pref_score(series_key),
+                    ),
                 }
-                if best is None or _series_pref_score(series_key) > _series_pref_score(
-                    str(best.get("series_key") or "")
-                ):
+                if best is None or cand["_sort"] < best["_sort"]:
                     best = cand
         if best:
-            leaders.append(best)
+            leaders.append({k: v for k, v in best.items() if k != "_sort"})
     return leaders
 
 
@@ -1593,6 +1618,8 @@ def build_llm_payload(
         "reader_context": (
             "観測日（business_day）のトレンドを編集する。読者は通常翌朝に受け取る。"
             "「昨日」= business_day。未来予測は禁止。"
+            "候補の rank_evidence は 07→13→19 の一日推移。単一スロット（特に19時だけ）に"
+            "偏った表現は避け、日中の動きを要約する。"
             "一行結論は editorial_candidates の固有ラベルを優先し、全区分を無理に埋めない。"
             "quiet_editorial_categories は「新規の大きな動きが限定的」等と短く述べてよい。"
             "URL は出力しない（source_labels のみ）。"

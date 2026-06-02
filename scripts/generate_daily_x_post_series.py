@@ -27,8 +27,8 @@ Env:
   DATABASE_URL             直接 PostgreSQL から 07/13/19 を読む（``--from-api`` なしのとき）
   TREND_DASHBOARD_BASE_URL ``--from-api`` またはレガシー HTTP 用ベース URL（既定: https://trends-dashboard.fly.dev）
 
-夜の X 文案は **急上昇3つ**（07→13→19 で順位が上がった話題を全ソースから最大3件。
-前スロット未出現は top-N 圏外として N+1 相当で jump 計算）。JP / US とも X 無料枠（加重 280 相当）に収める。
+夜の X 文案は **急上昇3つ**（07→13→19・AI 日次サマリーと同じ jump / 資格 / ノイズ判定。
+全ソースから最大3件）。JP / US とも X 無料枠（加重 280 相当）に収める。
 JP は east_asian_width の Wide/Full を 2、その他を 1 とする近似。末尾 URL は 23 相当。
 長めのコピー用（JP の加重チェックなし・US は生文字数）の例:
   python scripts/generate_daily_x_post_series.py --jp-max-x-weighted 0 --max-us-chars 500
@@ -58,6 +58,11 @@ except ImportError:
     def load_dotenv() -> None:
         return None
 
+_SCRIPT_DIR = Path(__file__).resolve().parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
+
+import snapshot_rising as sr
 
 BASE_DEFAULT = "https://trends-dashboard.fly.dev"
 DEFAULT_OUTPUT_DIR = "docs/x_post_samples/daily"
@@ -119,30 +124,22 @@ SERIES_CATEGORY_US: dict[str, str] = {
     "movie_us": "Entertainment",
 }
 
-_WEAK_RISING_LABEL = re.compile(
-    r"^(pickup|official|news|video|動画|ニュース|…+)$",
-    re.I,
-)
-
 # スケジューラ 7時・13時・19時（JST）のスナップショットだけをマージして選定する
-SNAPSHOT_SLOTS_DAYTIME = ("07", "13", "19")
+SNAPSHOT_SLOTS_DAYTIME = sr.DAYTIME_SLOTS
 
 # 選定スコア: 複数スロットに出たラベルを優先し、順位が上がった（数値が小さくなった）ほど加点
 FREQ_WEIGHT = 10.0
 JUMP_WEIGHT = 1.0
 
 
-def _snapshot_top_n() -> int:
-    """``trend_snapshot_service._top_n`` と同じ（スナップショットの圏外判定用）。"""
-    try:
-        return max(1, min(25, int(os.getenv("TREND_SNAPSHOT_TOP_N", "10"))))
-    except (TypeError, ValueError):
-        return 10
-
-
-def _rank_out_of_range() -> int:
-    """そのスロットの top-N に載っていないときの仮想順位（N+1）。"""
-    return _snapshot_top_n() + 1
+_snapshot_top_n = sr.snapshot_top_n
+_rank_out_of_range = sr.rank_out_of_range
+rank_jump_score = sr.rank_jump_score
+rising_qualifies = sr.rising_qualifies
+normalize_label_key = sr.normalize_label_key
+clean_rising_display = sr.clean_rising_display
+is_weak_rising_label = sr.is_weak_rising_label
+is_noisy_label = sr.is_noisy_label
 
 
 def _char_x_weight(ch: str) -> int:
@@ -245,11 +242,6 @@ def _google_line_snapshot(items: list[Any], *, sep: str) -> str:
     return f"{k1}{sep}{k2}" if k2 else k1
 
 
-def normalize_label_key(t: str) -> str:
-    """同一トレンド判定用のざっくり正規化（完全一致に寄せつつ空白は潰す）。"""
-    return re.sub(r"\s+", " ", str(t).strip()).lower()[:600]
-
-
 def _agg_primary_display(agg: dict[str, Any]) -> str:
     dbs = agg.get("display_by_slot") or {}
     for sp in ("19", "13", "07"):
@@ -258,62 +250,11 @@ def _agg_primary_display(agg: dict[str, Any]) -> str:
     return "…"
 
 
-def rank_jump_score(ranks: dict[str, int]) -> float:
-    """
-    順位は数値が小さいほど上位。07→13→19 で順位が下がれば（数値が減れば）プラス。
-
-    前スロットに未出現（top-N 圏外）のときは ``_rank_out_of_range()``（N+1）を
-    07 または 13 の順位として扱う。07・19 のみで 13 が無いときは 07→19 の Net。
-    """
-    oor = _rank_out_of_range()
-    r7 = ranks.get("07")
-    r13 = ranks.get("13")
-    r19 = ranks.get("19")
-    s = 0.0
-    if r13 is not None:
-        r7_eff = r7 if r7 is not None else oor
-        s += max(0.0, float(r7_eff - r13))
-    if r19 is not None:
-        if r13 is not None:
-            s += max(0.0, float(r13 - r19))
-        elif r7 is None:
-            s += max(0.0, float(oor - r19))
-    if r7 is not None and r19 is not None and r13 is None:
-        s += max(0.0, float(r7 - r19))
-    return s
-
-
 def aggregate_labels_for_series(
     series_by_slot: dict[str, dict[str, list[Any]]],
     series_key: str,
 ) -> dict[str, dict[str, Any]]:
-    """同一 series の全スロット items をラベルキーでまとめる。"""
-    out: dict[str, dict[str, Any]] = {}
-    for slot in SNAPSHOT_SLOTS_DAYTIME:
-        bucket = series_by_slot.get(slot) or {}
-        items = bucket.get(series_key) or []
-        for it in items:
-            if not isinstance(it, dict):
-                continue
-            raw_t = it.get("t")
-            if raw_t is None or not str(raw_t).strip():
-                continue
-            display = str(raw_t).strip()
-            nk = normalize_label_key(display)
-            r_raw = it.get("r")
-            try:
-                r = int(r_raw)
-            except (TypeError, ValueError):
-                r = 999
-            agg = out.get(nk)
-            if agg is None:
-                agg = {"display_by_slot": {}, "ranks": {}}
-                out[nk] = agg
-            agg["display_by_slot"][slot] = display
-            prev = agg["ranks"].get(slot)
-            if prev is None or r < prev:
-                agg["ranks"][slot] = r
-    return out
+    return sr.aggregate_labels_for_series(series_by_slot, series_key)
 
 
 def combined_label_score(agg: dict[str, Any]) -> float:
@@ -395,72 +336,6 @@ def _postprocess_series_display(series_key: str, display: str) -> str:
     return display
 
 
-def clean_rising_display(display: str) -> str:
-    """欄名・【動画】などの前置きを除き、ツイート向けに短くする。"""
-    s = re.sub(r"^【[^】]{1,16}】\s*", "", str(display).strip())
-    s = re.sub(r"\s+", " ", s).strip()
-    return s
-
-
-def is_weak_rising_label(display: str) -> bool:
-    s = clean_rising_display(display)
-    if not s or s == "…":
-        return True
-    if len(s) < 4:
-        return True
-    if _WEAK_RISING_LABEL.match(s.strip()):
-        return True
-    return False
-
-
-def _best_rank_in_agg(agg: dict[str, Any]) -> int:
-    ranks = agg.get("ranks") or {}
-    for slot in ("19", "13", "07"):
-        if slot in ranks:
-            return int(ranks[slot])
-    return 999
-
-
-def iter_rising_candidates(
-    series_by_slot: dict[str, dict[str, list[Any]]],
-    series_keys: tuple[str, ...],
-    *,
-    category_by_series: dict[str, str],
-) -> list[dict[str, Any]]:
-    """全 series を横断し、ラベルキーごとに最も jump が大きい候補を1つ残す。"""
-    best: dict[str, dict[str, Any]] = {}
-    for series_key in series_keys:
-        aggs = aggregate_labels_for_series(series_by_slot, series_key)
-        tail = category_by_series.get(series_key, "他")
-        for nk, agg in aggs.items():
-            ranks = agg.get("ranks") or {}
-            jump = rank_jump_score(ranks)
-            display = clean_rising_display(
-                _postprocess_series_display(series_key, _agg_primary_display(agg))
-            )
-            if is_weak_rising_label(display):
-                continue
-            freq = len(set(ranks.keys()) & set(SNAPSHOT_SLOTS_DAYTIME))
-            r_best = _best_rank_in_agg(agg)
-            cand = {
-                "nk": nk,
-                "display": display,
-                "tail": tail,
-                "jump": jump,
-                "freq": freq,
-                "r_best": r_best,
-                "series_key": series_key,
-            }
-            prev = best.get(nk)
-            if prev is None or (cand["jump"], cand["freq"], -cand["r_best"]) > (
-                prev["jump"],
-                prev["freq"],
-                -prev["r_best"],
-            ):
-                best[nk] = cand
-    return list(best.values())
-
-
 def pick_rising_topics(
     series_by_slot: dict[str, dict[str, list[Any]]],
     series_keys: tuple[str, ...],
@@ -469,30 +344,25 @@ def pick_rising_topics(
     count: int = RISING_PICK_COUNT,
 ) -> list[tuple[str, str]]:
     """
-    急上昇（07→13→19 で順位改善）を優先して count 件。
-    足りないときだけ jump=0 の候補で埋める。
+    急上昇（AI 日次サマリーと同じ jump / 資格 / ノイズ判定）を最大 count 件。
+    足りないときは「…」で埋める（X テンプレ用）。
     """
-    candidates = iter_rising_candidates(
-        series_by_slot, series_keys, category_by_series=category_by_series
+    candidates = sr.collect_rising_candidates(
+        series_by_slot,
+        series_keys,
+        display_postprocess=_postprocess_series_display,
+        tail_for_series=lambda sk: category_by_series.get(sk, "他"),
     )
-    candidates.sort(
-        key=lambda c: (-c["jump"], -c["freq"], c["r_best"], c["display"])
-    )
-    with_jump = [c for c in candidates if c["jump"] > 0]
-    if len(with_jump) < count:
+    items = sr.pick_top_rising(candidates, count=count)
+    if len(items) < count:
         print(
-            f"NOTE: only {len(with_jump)} label(s) with rank jump > 0 (target {count})",
+            f"NOTE: only {len(items)} qualified rising label(s) (target {count})",
             file=sys.stderr,
         )
-    out: list[tuple[str, str]] = []
-    seen: set[str] = set()
-    for c in with_jump:
-        if c["nk"] in seen:
-            continue
-        seen.add(c["nk"])
-        out.append((c["display"], c["tail"]))
-        if len(out) >= count:
-            break
+    out: list[tuple[str, str]] = [
+        (str(c["display"]), str(c.get("tail") or category_by_series.get(str(c.get("series_key")), "他")))
+        for c in items
+    ]
     fallback_tail = next(iter(category_by_series.values()), "他")
     while len(out) < count:
         out.append(("…", fallback_tail))
@@ -1027,7 +897,7 @@ def compose_daily_markdown(date_str: str, jp_inner: str, us_inner: str) -> str:
         "",
         "`docs/x_post_samples/daily_guide.md` の **夜用・急上昇3つ** 型。**朝の読み物は AI 日次サマリー**（`docs/summaries/daily/`）のみ。",
         "",
-        "- **自動投入:** `scripts/generate_daily_x_post_series.py --write` が **`trend_daily_snapshots`** の **07 / 13 / 19** を読み、**全ソース横断で順位が上がったラベル**を最大3件（JP/US 各ブロック）選びます。入力は **`DATABASE_URL`** か **`--from-api`**（`GET /api/summaries/daily-snapshots`）。",
+        "- **自動投入:** `scripts/generate_daily_x_post_series.py --write` が **`trend_daily_snapshots`** の **07 / 13 / 19** を読み、**AI 日次サマリーと同じ急上昇判定**で全ソース横断・最大3件（JP/US 各ブロック）選びます。入力は **`DATABASE_URL`** か **`--from-api`**（`GET /api/summaries/daily-snapshots`）。",
         "- **GitHub Actions:** `.github/workflows/daily-x-post-series.yml` が **JST 20:10 前後（UTC 11:10）** に **`docs/x_post_samples/daily/{日付}.md`** を更新します。",
         "- 一覧: https://trends-dashboard.fly.dev/",
         "- 鮮度: https://trends-dashboard.fly.dev/data-status",

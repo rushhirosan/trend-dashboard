@@ -47,6 +47,12 @@ import requests
 from dotenv import load_dotenv
 from psycopg2.extras import RealDictCursor
 
+_SCRIPT_DIR = Path(__file__).resolve().parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
+
+import snapshot_rising as sr
+
 JST = ZoneInfo("Asia/Tokyo")
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DAILY_DIR = REPO_ROOT / "docs" / "summaries" / "daily"
@@ -54,7 +60,7 @@ BASE_DEFAULT = "https://trends-dashboard.fly.dev"
 
 SLOT_ORDER = ("07", "13", "19", "01")
 # 一日の中での順位変化（07→13→19）。01 は締め用で jump には使わない。
-DAYTIME_SLOTS = ("07", "13", "19")
+DAYTIME_SLOTS = sr.DAYTIME_SLOTS
 RISING_HIGHLIGHT_COUNT = 3
 CROSS_SOURCE_HIGHLIGHT_COUNT = 3
 CATEGORY_TOP_N = 3
@@ -98,10 +104,6 @@ CATEGORY_DIGEST_ORDER: tuple[str, ...] = (
     "テック・開発",
     "マーケット",
     "エンタメ",
-)
-_WEAK_RISING_LABEL = re.compile(
-    r"^(pickup|official|news|video|動画|ニュース|…+)$",
-    re.I,
 )
 # クロスソースに使わない汎用カテゴリ名（「Sports」等は中身が分からない）
 _GENERIC_CROSS_LABELS = frozenset(
@@ -172,10 +174,6 @@ _PROVIDER_DISPLAY: Dict[str, str] = {
     "music_trends": "Spotify",
     "podcast": "Podcast",
 }
-_NOISY_PROCUREMENT = re.compile(
-    r"(LICENSE\s+RENEWAL|POP:\s*\d|INFINIBAND|FIBRE\s+OPTIC|usaspending|調達|契約番号)",
-    re.I,
-)
 SLOT_LABELS = {
     "07": "07時台ジョブ後",
     "13": "13時台ジョブ後",
@@ -460,31 +458,23 @@ def compact_rows_by_category(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     return {"categories": categories}
 
 
-def _snapshot_top_n() -> int:
-    try:
-        return max(1, min(25, int(os.getenv("TREND_SNAPSHOT_TOP_N", "10"))))
-    except (TypeError, ValueError):
-        return 10
+_snapshot_top_n = sr.snapshot_top_n
+_rank_out_of_range = sr.rank_out_of_range
+_normalize_label_key = sr.normalize_label_key
+_clean_rising_display = sr.clean_rising_display
+_is_weak_rising_label = sr.is_weak_rising_label
+_rank_jump_score = sr.rank_jump_score
+_rising_qualifies = sr.rising_qualifies
+_daytime_best_rank = sr.daytime_best_rank
+_pick_display_from_agg = sr.pick_display_from_agg
+_is_noisy_label = sr.is_noisy_label
 
 
-def _rank_out_of_range() -> int:
-    return _snapshot_top_n() + 1
-
-
-def _normalize_label_key(t: str) -> str:
-    return re.sub(r"\s+", " ", str(t).strip()).lower()[:600]
-
-
-def _clean_rising_display(display: str) -> str:
-    s = re.sub(r"^【[^】]{1,16}】\s*", "", str(display).strip())
-    return re.sub(r"\s+", " ", s).strip()
-
-
-def _is_weak_rising_label(display: str) -> bool:
-    s = _clean_rising_display(display)
-    if not s or s == "…" or len(s) < 4:
-        return True
-    return bool(_WEAK_RISING_LABEL.match(s))
+def _aggregate_labels_for_series(
+    series_by_slot: Dict[str, Dict[str, List[Dict[str, Any]]]],
+    series_key: str,
+) -> Dict[str, Dict[str, Any]]:
+    return sr.aggregate_labels_for_series(series_by_slot, series_key)
 
 
 def _ascii_ratio(text: str) -> float:
@@ -705,32 +695,9 @@ def _label_slot_coverage(
     return len(found)
 
 
-def _is_noisy_label(display: str, series_key: str = "") -> bool:
-    """調達行・英語長文など、一般読者向けサマリーから除外するラベル。"""
-    if _is_weak_rising_label(display):
-        return True
-    s = _clean_rising_display(display)
-    sk = (series_key or "").lower()
-    if len(s) > 100:
-        return True
-    if _NOISY_PROCUREMENT.search(s):
-        return True
-    if any(p in sk for p in ("usaspending_", "kkj_", "estat_", "bls_")) and len(s) > 45:
-        return True
-    if _ascii_ratio(s) > 0.88 and len(s) > 50 and _series_pref_score(series_key) < 2:
-        return True
-    return False
-
-
 def _format_rank_evidence(ranks: dict[str, int]) -> str:
     """07→13→19 を常に3段表示（未掲載は圏外）。"""
     return " → ".join(_format_slot_rank_or_oob(slot, ranks) for slot in DAYTIME_SLOTS)
-
-
-def _daytime_best_rank(ranks: dict[str, int]) -> int:
-    """07/13/19 のうち最良（最小）順位。スロット横断の一日評価用。"""
-    vals = [int(ranks[s]) for s in DAYTIME_SLOTS if s in ranks]
-    return min(vals) if vals else 999
 
 
 def _daytime_label_sort_key(
@@ -751,28 +718,6 @@ def _daytime_label_sort_key(
     )
 
 
-def _pick_display_from_agg(agg: Dict[str, Any]) -> str:
-    """表示ラベルは一日の最良順位が出たスロットの表記を優先（19固定ではない）。"""
-    ranks = agg.get("ranks") or {}
-    by_slot = agg.get("display_by_slot") or {}
-    best_slot: Optional[str] = None
-    best_r = 999
-    for slot in DAYTIME_SLOTS:
-        r = ranks.get(slot)
-        if r is not None and int(r) < best_r:
-            best_r = int(r)
-            best_slot = slot
-    if best_slot:
-        d = by_slot.get(best_slot)
-        if d:
-            return _clean_rising_display(str(d))
-    for slot in DAYTIME_SLOTS:
-        d = by_slot.get(slot)
-        if d:
-            return _clean_rising_display(str(d))
-    return ""
-
-
 def _merge_rank_maps(a: dict[str, int], b: dict[str, int]) -> dict[str, int]:
     out = dict(a)
     for slot, r in b.items():
@@ -780,31 +725,6 @@ def _merge_rank_maps(a: dict[str, int], b: dict[str, int]) -> dict[str, int]:
         if prev is None or r < prev:
             out[slot] = r
     return out
-
-
-def _rank_jump_score(ranks: dict[str, int]) -> float:
-    """07→13→19 の隣接差分合計（上昇は加点、下落は減点）。未掲載スロットは圏外順位。"""
-    oor = _rank_out_of_range()
-    prev_eff: Optional[int] = None
-    s = 0.0
-    for slot in DAYTIME_SLOTS:
-        cur = int(ranks[slot]) if slot in ranks else oor
-        if prev_eff is not None:
-            s += float(prev_eff - cur)
-        prev_eff = cur
-    return s
-
-
-def _rising_qualifies(ranks: dict[str, int], jump: float) -> bool:
-    """急上昇候補: 正の net jump、2スロット以上掲載、実観測で一日の終わりが始まりより悪化のみは除外。"""
-    if jump <= 0:
-        return False
-    observed = [(s, int(ranks[s])) for s in DAYTIME_SLOTS if s in ranks]
-    if len(observed) < 2:
-        return False
-    if observed[-1][1] > observed[0][1]:
-        return False
-    return True
 
 
 def rows_to_series_by_slot(rows: List[Dict[str, Any]]) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
@@ -815,36 +735,6 @@ def rows_to_series_by_slot(rows: List[Dict[str, Any]]) -> Dict[str, Dict[str, Li
         if slot not in out or not thin:
             continue
         out[slot][series_key] = thin
-    return out
-
-
-def _aggregate_labels_for_series(
-    series_by_slot: Dict[str, Dict[str, List[Dict[str, Any]]]],
-    series_key: str,
-) -> Dict[str, Dict[str, Any]]:
-    out: Dict[str, Dict[str, Any]] = {}
-    for slot in DAYTIME_SLOTS:
-        items = (series_by_slot.get(slot) or {}).get(series_key) or []
-        for it in items:
-            if not isinstance(it, dict):
-                continue
-            raw_t = it.get("t")
-            if raw_t is None or not str(raw_t).strip():
-                continue
-            display = str(raw_t).strip()
-            nk = _normalize_label_key(display)
-            try:
-                r = int(it.get("r"))
-            except (TypeError, ValueError):
-                r = 999
-            agg = out.get(nk)
-            if agg is None:
-                agg = {"display_by_slot": {}, "ranks": {}, "series_key": series_key}
-                out[nk] = agg
-            agg["display_by_slot"][slot] = display
-            prev = agg["ranks"].get(slot)
-            if prev is None or r < prev:
-                agg["ranks"][slot] = r
     return out
 
 
@@ -887,54 +777,37 @@ def build_rising_highlights(
     for slot in DAYTIME_SLOTS:
         series_keys |= set((series_by_slot.get(slot) or {}).keys())
 
-    best: Dict[str, Dict[str, Any]] = {}
-    for series_key in series_keys:
-        aggs = _aggregate_labels_for_series(series_by_slot, series_key)
-        category = categorize_series_key(series_key)
-        for nk, agg in aggs.items():
-            ranks = agg.get("ranks") or {}
-            jump = _rank_jump_score(ranks)
-            display = _pick_display_from_agg(agg)
-            if not _rising_qualifies(ranks, jump) or _is_noisy_label(display, series_key):
-                continue
-            freq = len(set(ranks.keys()) & set(DAYTIME_SLOTS))
-            r_best = _daytime_best_rank(ranks)
-            cand = {
-                "label": display,
-                "category": category,
-                "series_key": series_key,
-                "jump": round(jump, 1),
-                "freq_slots": freq,
-                "r_best": r_best,
-                "ranks": dict(ranks),
-            }
-            prev = best.get(nk)
-            if prev is None or (cand["jump"], cand["freq_slots"], -cand["r_best"]) > (
-                prev["jump"],
-                prev["freq_slots"],
-                -prev["r_best"],
-            ):
-                best[nk] = cand
-
-    items = sorted(
-        best.values(),
-        key=lambda c: (-c["jump"], -c["freq_slots"], c["r_best"], c["label"]),
+    pool = sr.collect_rising_candidates(
+        series_by_slot,
+        sorted(series_keys),
     )
+    items = sr.pick_top_rising(pool, count=count)
     out: List[Dict[str, Any]] = []
-    for cand in items[:count]:
-        ranks = cand.pop("ranks", {})
+    for raw in items:
+        ranks = dict(raw.get("ranks") or {})
+        category = categorize_series_key(str(raw.get("series_key") or ""))
+        picked = {
+            "label": raw["display"],
+            "category": category,
+            "series_key": raw.get("series_key"),
+            "jump": round(float(raw.get("jump") or 0), 1),
+            "freq_slots": raw.get("freq"),
+            "r_best": raw.get("r_best"),
+            "ranks": ranks,
+        }
+        ranks = picked.pop("ranks", {})
         rank_evidence = _format_rank_evidence(ranks)
         rank_display = _rank_display_for_rising(ranks)
-        url = _url_for_rising_item(series_by_slot, str(cand["series_key"]), str(cand["label"]), ranks)
+        url = _url_for_rising_item(series_by_slot, str(picked["series_key"]), str(picked["label"]), ranks)
         link_line = _format_digest_link_line(
-            str(cand["label"]),
-            str(cand["series_key"]),
+            str(picked["label"]),
+            str(picked["series_key"]),
             rank_display,
             url,
         )
         out.append(
             {
-                **cand,
+                **picked,
                 "rank_evidence": rank_evidence,
                 "rank_display": rank_display,
                 "url": url,

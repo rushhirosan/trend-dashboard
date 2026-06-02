@@ -151,22 +151,23 @@ def test_pick_prefers_rank_jump_when_freq_equal(gx):
 
 
 def test_rank_jump_score_treats_missing_early_slot_as_out_of_range(gx):
-    """07 未出現・13 で1位・19 で2位 → (N+1)-1 の jump（13→19 は微下落で 0）。"""
+    """07 未出現・13 で1位・19 で2位 → 圏外→1→2（13→19 の下落で net は AI と同じ）。"""
     oor = gx._rank_out_of_range()
-    assert gx.rank_jump_score({"13": 1, "19": 2}) == float(oor - 1)
-    assert gx.rank_jump_score({"13": 1, "19": 2}) > 0
+    assert gx.rank_jump_score({"13": 1, "19": 2}) == float((oor - 1) + (1 - 2))
+    assert gx.rising_qualifies({"13": 1, "19": 2}, gx.rank_jump_score({"13": 1, "19": 2})) is False
 
 
 def test_rank_jump_score_07_19_without_13_no_double_count(gx):
     assert gx.rank_jump_score({"07": 20, "19": 5}) == 15.0
 
 
-def test_pick_rising_topics_includes_first_seen_at_13(gx):
+def test_pick_rising_topics_excludes_peak_then_fade(gx):
+    """13→19 で順位が悪化するだけのラベルは AI サマリーと同様に選ばない。"""
     bundle = {
         "07": {"google_trends_jp": [{"t": "Always", "r": 1}]},
-        "13": {"google_trends_jp": [{"t": "Always", "r": 1}, {"t": "NewAt13", "r": 1}]},
+        "13": {"google_trends_jp": [{"t": "Always", "r": 1}, {"t": "FadeAt19", "r": 1}]},
         "19": {
-            "google_trends_jp": [{"t": "Always", "r": 1}, {"t": "NewAt13", "r": 2}],
+            "google_trends_jp": [{"t": "Always", "r": 1}, {"t": "FadeAt19", "r": 2}],
         },
     }
     picks = gx.pick_rising_topics(
@@ -176,7 +177,7 @@ def test_pick_rising_topics_includes_first_seen_at_13(gx):
         count=2,
     )
     labels = [p[0] for p in picks]
-    assert "NewAt13" in labels
+    assert "FadeAt19" not in labels
 
 
 def test_pick_rising_topics_prefers_rank_jump_across_series(gx):

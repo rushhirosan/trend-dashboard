@@ -250,6 +250,63 @@ def test_format_rank_evidence_uses_snapshot_wording(gads):
     )
 
 
+def test_format_rank_evidence_shows_oob_for_missing_slots(gads):
+    assert gads._format_rank_evidence({"13": 1}) == (
+        "07時圏外 → 13時スナップショット1位 → 19時圏外"
+    )
+
+
+def test_rank_jump_score_penalizes_decline(gads):
+    assert gads._rank_jump_score({"13": 1, "19": 5}) == 6.0
+    assert gads._rank_jump_score({"13": 5, "19": 1}) == 10.0
+
+
+def test_rising_qualifies_excludes_peak_then_fade(gads):
+    assert not gads._rising_qualifies({"13": 1, "19": 5}, 6.0)
+    assert gads._rising_qualifies({"13": 5, "19": 1}, 10.0)
+
+
+def test_build_rising_excludes_single_slot_and_fade(gads):
+    rows = [
+        {
+            "slot": "13",
+            "series_key": "podcast_us",
+            "items": [{"t": "Only Afternoon", "r": 1}],
+            "captured_at": "2026-06-01T13:00:00+09:00",
+        },
+        {
+            "slot": "13",
+            "series_key": "zenn_jp",
+            "items": [{"t": "Fade Article", "r": 1}],
+            "captured_at": "2026-06-01T13:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "zenn_jp",
+            "items": [{"t": "Fade Article", "r": 5}],
+            "captured_at": "2026-06-01T19:00:00+09:00",
+        },
+        {
+            "slot": "13",
+            "series_key": "youtube_trends_jp",
+            "items": [{"t": "Real Rise", "r": 8}],
+            "captured_at": "2026-06-01T13:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "youtube_trends_jp",
+            "items": [{"t": "Real Rise", "r": 2}],
+            "captured_at": "2026-06-01T19:00:00+09:00",
+        },
+    ]
+    rising = gads.build_rising_highlights(rows, count=3)
+    labels = [r["label"] for r in rising]
+    assert "Only Afternoon" not in labels
+    assert "Fade Article" not in labels
+    assert "Real Rise" in labels
+    assert "07時圏外" in rising[0]["rank_evidence"]
+
+
 def test_build_cross_source_excludes_same_provider_openalex(gads):
     rows = [
         {

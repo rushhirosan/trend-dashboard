@@ -669,6 +669,14 @@ def _format_slot_rank(slot: str, rank: int) -> str:
     return f"{slot}時スナップショット{rank}位"
 
 
+def _format_slot_rank_or_oob(slot: str, ranks: dict[str, int]) -> str:
+    """スナップショット top N に無いスロットは「圏外」。"""
+    r = ranks.get(slot)
+    if r is None:
+        return f"{slot}時圏外"
+    return _format_slot_rank(slot, int(r))
+
+
 def _is_stale_label(display: str) -> bool:
     """連日上位の定番ラベル（編集価値が低い）。"""
     s = _clean_rising_display(display)
@@ -715,12 +723,8 @@ def _is_noisy_label(display: str, series_key: str = "") -> bool:
 
 
 def _format_rank_evidence(ranks: dict[str, int]) -> str:
-    parts: List[str] = []
-    for slot in DAYTIME_SLOTS:
-        r = ranks.get(slot)
-        if r is not None:
-            parts.append(_format_slot_rank(slot, r))
-    return " → ".join(parts) if parts else "順位データなし"
+    """07→13→19 を常に3段表示（未掲載は圏外）。"""
+    return " → ".join(_format_slot_rank_or_oob(slot, ranks) for slot in DAYTIME_SLOTS)
 
 
 def _daytime_best_rank(ranks: dict[str, int]) -> int:
@@ -779,22 +783,28 @@ def _merge_rank_maps(a: dict[str, int], b: dict[str, int]) -> dict[str, int]:
 
 
 def _rank_jump_score(ranks: dict[str, int]) -> float:
+    """07→13→19 の隣接差分合計（上昇は加点、下落は減点）。未掲載スロットは圏外順位。"""
     oor = _rank_out_of_range()
-    r7 = ranks.get("07")
-    r13 = ranks.get("13")
-    r19 = ranks.get("19")
+    prev_eff: Optional[int] = None
     s = 0.0
-    if r13 is not None:
-        r7_eff = r7 if r7 is not None else oor
-        s += max(0.0, float(r7_eff - r13))
-    if r19 is not None:
-        if r13 is not None:
-            s += max(0.0, float(r13 - r19))
-        elif r7 is None:
-            s += max(0.0, float(oor - r19))
-    if r7 is not None and r19 is not None and r13 is None:
-        s += max(0.0, float(r7 - r19))
+    for slot in DAYTIME_SLOTS:
+        cur = int(ranks[slot]) if slot in ranks else oor
+        if prev_eff is not None:
+            s += float(prev_eff - cur)
+        prev_eff = cur
     return s
+
+
+def _rising_qualifies(ranks: dict[str, int], jump: float) -> bool:
+    """急上昇候補: 正の net jump、2スロット以上掲載、実観測で一日の終わりが始まりより悪化のみは除外。"""
+    if jump <= 0:
+        return False
+    observed = [(s, int(ranks[s])) for s in DAYTIME_SLOTS if s in ranks]
+    if len(observed) < 2:
+        return False
+    if observed[-1][1] > observed[0][1]:
+        return False
+    return True
 
 
 def rows_to_series_by_slot(rows: List[Dict[str, Any]]) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
@@ -885,7 +895,7 @@ def build_rising_highlights(
             ranks = agg.get("ranks") or {}
             jump = _rank_jump_score(ranks)
             display = _pick_display_from_agg(agg)
-            if jump <= 0 or _is_noisy_label(display, series_key):
+            if not _rising_qualifies(ranks, jump) or _is_noisy_label(display, series_key):
                 continue
             freq = len(set(ranks.keys()) & set(DAYTIME_SLOTS))
             r_best = _daytime_best_rank(ranks)
@@ -1618,10 +1628,10 @@ def build_llm_payload(
         "reader_context": (
             "観測日（business_day）のトレンドを編集する。読者は通常翌朝に受け取る。"
             "「昨日」= business_day。未来予測は禁止。"
-            "候補の rank_evidence は 07→13→19 の一日推移。単一スロット（特に19時だけ）に"
-            "偏った表現は避け、日中の動きを要約する。"
+            "候補の rank_evidence は 07→13→19 の一日推移（圏外含む）。単一スロットだけの"
+            "言い回しは避け、日中の動きを要約する。"
             "一行結論は editorial_candidates の固有ラベルを優先し、全区分を無理に埋めない。"
-            "quiet_editorial_categories は「新規の大きな動きが限定的」等と短く述べてよい。"
+            "「静かな日」「新規の大きな動きは限定的」等の抽象一文は書かない。"
             "URL は出力しない（source_labels のみ）。"
         ),
         "editorial_candidates": editorial_candidates,
@@ -1807,8 +1817,8 @@ SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ�
 **出力は JSON オブジェクトのみ**（Markdown 不可）。次のキーを含める:
 
 - `one_liner` (string): 最大3文。editorial_candidates の固有ラベルを引用して「今日の空気」を要約。
-  全カテゴリを無理に埋めない。quiet_editorial_categories は
-  「新規の大きな動きは限定的」等1文でよい。quiet_category_examples があれば定番名を1つだけ引用可。
+  全カテゴリを無理に埋めない。「静かな日」「動きは限定的」等の抽象一文は禁止。
+  quiet_category_examples があれば定番名を1つだけ引用可。
 - `spotlights` (array, 最大 spotlight_max 件): 各要素は
   `{ "title", "body", "source_labels": [入力に存在するラベル文字列], "caveat": 任意 }`
   source_labels は editorial_candidates の label と一致させる。リンクは書かない。

@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import re
 from datetime import date, datetime
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -9,6 +10,11 @@ from unittest.mock import MagicMock
 import pytest
 
 _SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "generate_ai_daily_summary.py"
+_SNAPSHOT_SERVICE = Path(__file__).resolve().parents[1] / "services" / "trend_snapshot_service.py"
+
+_BOOK_JP_CATS = ("all", "fiction", "business", "humanities", "practical")
+_BOOK_US_CATS = ("all", "fiction", "business", "biography", "science")
+_OPENALEX_CATS = ("trending", "ai", "nlp", "climate", "biotech", "quantum", "medical")
 
 
 @pytest.fixture(scope="module")
@@ -169,8 +175,8 @@ def test_build_category_top3_prefers_intraday_jump_over_19_only_stale(gads):
     top3 = gads.build_category_top3(rows, count=3)
     news = next(b for b in top3 if b["category"] == "ニュース")
     assert news["items"][0]["label"] == "Morning Typhoon Alert"
-    assert "07時スナップショット" in news["items"][0]["rank_display"]
-    assert "19時スナップショット" in news["items"][0]["rank_display"]
+    assert "07時" in news["items"][0]["rank_display"]
+    assert "19時1位" in news["items"][0]["rank_display"]
 
 
 def test_build_category_leader_prefers_day_jump(gads):
@@ -197,7 +203,7 @@ def test_build_category_leader_prefers_day_jump(gads):
     leaders = gads.build_category_leaders_from_rows(rows)
     news = next(l for l in leaders if l["category"] == "ニュース")
     assert news["label"] == "Day Story"
-    assert "07時スナップショット" in news["rank_display"]
+    assert "07時" in news["rank_display"]
 
 
 def test_build_rising_highlights_picks_rank_jump(gads):
@@ -232,8 +238,8 @@ def test_build_rising_highlights_picks_rank_jump(gads):
     assert rising[0]["label"] == "Climber"
     assert rising[0]["jump"] == 16.0
     assert rising[0]["category"] == "検索・動画"
-    assert "07時スナップショット" in rising[0]["rank_evidence"]
-    assert rising[0]["link_line"]
+    assert "07時" in rising[0]["rank_evidence"]
+    assert "YouTube" in rising[0]["link_line"]
 
 
 def test_is_noisy_label_filters_procurement(gads):
@@ -244,16 +250,89 @@ def test_is_noisy_label_filters_procurement(gads):
     assert not gads._is_noisy_label("豊臣秀長", "wikipedia_jp")
 
 
-def test_format_rank_evidence_uses_snapshot_wording(gads):
+def test_format_rank_evidence_uses_compact_slot_wording(gads):
     assert gads._format_rank_evidence({"07": 8, "13": 3, "19": 1}) == (
-        "07時スナップショット8位 → 13時スナップショット3位 → 19時スナップショット1位"
+        "07時8位 → 13時3位 → 19時1位"
     )
 
 
 def test_format_rank_evidence_shows_oob_for_missing_slots(gads):
     assert gads._format_rank_evidence({"13": 1}) == (
-        "07時圏外 → 13時スナップショット1位 → 19時圏外"
+        "07時圏外 → 13時1位 → 19時圏外"
     )
+
+
+@pytest.mark.parametrize(
+    "series_key,expected",
+    [
+        ("hatena_jp", "はてな"),
+        ("wikipedia_ja", "Wikipedia"),
+        ("wikipedia_jp", "Wikipedia"),
+        ("jpcert_jp", "JPCERT/CC"),
+        ("nhk_jp", "NHK"),
+        ("ebay_us", "eBay (US)"),
+        ("prtimes_hatena_jp", "PR TIMES × はてブ"),
+    ],
+)
+def test_format_series_key_display(gads, series_key, expected):
+    assert gads._format_series_key_display(series_key) == expected
+
+
+def _all_snapshot_series_keys() -> frozenset[str]:
+    """``trend_snapshot_service.collect_series_snapshots`` が返しうる series_key 集合。"""
+    text = _SNAPSHOT_SERVICE.read_text(encoding="utf-8")
+    keys = set(re.findall(r'add\(\s*"([a-z0-9_]+)"', text))
+    keys.update(re.findall(r'out\.append\(\("([a-z0-9_]+)"', text))
+    for cat in _BOOK_JP_CATS:
+        keys.add(f"book_jp_{cat}")
+    for cat in _BOOK_US_CATS:
+        keys.add(f"book_us_{cat}")
+    for cat in _OPENALEX_CATS:
+        keys.add(f"openalex_{cat}_jp")
+        keys.add(f"openalex_{cat}_us")
+    return frozenset(keys)
+
+
+def _provider_display_name(gads, series_key: str) -> str | None:
+    """登録済みなら表示名、未登録なら None（prtimes_hatena_* は専用キー）。"""
+    if series_key.startswith("prtimes_hatena"):
+        return gads._PROVIDER_DISPLAY.get("prtimes_hatena")
+    provider = gads._series_provider(series_key)
+    return gads._PROVIDER_DISPLAY.get(provider)
+
+
+def test_enumerated_keys_cover_static_add_calls_in_snapshot_service():
+    text = _SNAPSHOT_SERVICE.read_text(encoding="utf-8")
+    static = set(re.findall(r'add\(\s*"([a-z0-9_]+)"', text))
+    static |= set(re.findall(r'out\.append\(\("([a-z0-9_]+)"', text))
+    enumerated = _all_snapshot_series_keys()
+    missing = static - enumerated
+    assert not missing, (
+        "Update _all_snapshot_series_keys() for new snapshot series_key patterns: "
+        + ", ".join(sorted(missing))
+    )
+
+
+def test_all_snapshot_series_keys_have_provider_display_names(gads):
+    unmapped: list[str] = []
+    for key in sorted(_all_snapshot_series_keys()):
+        if _provider_display_name(gads, key) is None:
+            unmapped.append(f"{key} → provider={gads._series_provider(key)!r}")
+    assert not unmapped, (
+        "Add _PROVIDER_DISPLAY entries in generate_ai_daily_summary.py for:\n  "
+        + "\n  ".join(unmapped)
+    )
+
+
+def test_all_snapshot_series_keys_avoid_raw_key_in_display(gads):
+    """link_line に series_key 生文字列（hatena_jp 等）が残らない。"""
+    bad: list[str] = []
+    for key in sorted(_all_snapshot_series_keys()):
+        display = gads._format_series_key_display(key)
+        base = display.removesuffix(" (US)").removesuffix(" (EN)")
+        if key in display or base == key:
+            bad.append(f"{key!r} → {display!r}")
+    assert not bad, "Display names should not echo raw series_key:\n  " + "\n  ".join(bad)
 
 
 def test_rank_jump_score_penalizes_decline(gads):
@@ -585,8 +664,8 @@ def test_render_rising_highlights_markdown_empty(gads):
 def test_render_rising_highlights_markdown_lists_items(gads):
     items = [
         {
-            "link_line": "[Climber](https://example.com)（youtube_jp · 19時スナップショット2位）",
-            "rank_evidence": "07時スナップショット18位 → 19時スナップショット2位",
+            "link_line": "[Climber](https://example.com)（YouTube · 19時2位）",
+            "rank_evidence": "07時18位 → 19時2位",
             "category": "検索・動画",
         },
     ]
@@ -608,7 +687,7 @@ def test_render_cross_source_highlights_markdown_lists_items(gads):
         {
             "label": "豊臣秀長",
             "sources_display": "Wikipedia (JA), Google Trends (JP)",
-            "rank_evidence": "07時スナップショット8位 → 19時スナップショット2位",
+            "rank_evidence": "07時8位 → 19時2位",
         },
     ]
     md = gads.render_cross_source_highlights_markdown(highlights, date(2026, 5, 20))
@@ -631,7 +710,7 @@ def test_inject_cross_source_strips_llm_none_when_items_present(gads):
             {
                 "label": "豊臣秀長",
                 "sources_display": "Wikipedia (JA), Google Trends (JP)",
-                "rank_evidence": "19時スナップショット1位",
+                "rank_evidence": "19時1位",
             },
         ],
         date(2026, 5, 27),
@@ -659,7 +738,7 @@ def test_inject_rising_highlights_before_cross_section(gads):
         "- **生成・送信完了**: 自動\n\n"
         "## 複数ソースで重なった話題 — 2026-05-26\n\n### 1. 例\n"
     )
-    rising = "## 📈 昨日いちばん動いた3つ\n\n1. [例](https://example.com)（nhk_jp · 19時スナップショット1位）\n"
+    rising = "## 📈 昨日いちばん動いた3つ\n\n1. [例](https://example.com)（NHK · 19時1位）\n"
     out = gads.inject_rising_highlights(md, rising)
     assert out.index("昨日いちばん動いた3つ") < out.index("複数ソースで重なった話題")
     assert out.count("昨日いちばん動いた3つ") == 1
@@ -671,7 +750,7 @@ def test_inject_category_top3_replaces_notable_and_appends(gads):
         "## 💡 昨日特異だったこと\n\n"
         "繰り返しだけの文。\n"
     )
-    top3 = "### ニュース\n1. [例](https://example.com)（nhk_jp · 19時スナップショット1位）\n"
+    top3 = "### ニュース\n1. [例](https://example.com)（NHK · 19時1位）\n"
     out = gads.inject_category_top3(md, f"## 📊 カテゴリ別トップ3\n\n{top3}")
     assert out.count("## 📊 カテゴリ別トップ3") == 1
     assert "## 📊 カテゴリ別トップ1" not in out
@@ -858,7 +937,7 @@ def test_finalize_editorial_fills_spotlights_and_replaces_one_liner(gads):
             "label": "Climber",
             "category": "検索・動画",
             "rank_evidence": "07時圏外 → 13時3位 → 19時1位",
-            "link_line": "[Climber](https://example.com)（youtube_jp · 19時スナップショット1位）",
+            "link_line": "[Climber](https://example.com)（YouTube · 19時1位）",
         },
     ]
     editorial_candidates = [
@@ -872,7 +951,7 @@ def test_finalize_editorial_fills_spotlights_and_replaces_one_liner(gads):
     index = {
         gads._normalize_label_key("Climber"): {
             "label": "Climber",
-            "link_line": "[Climber](https://example.com)（youtube_jp · 19時スナップショット1位）",
+            "link_line": "[Climber](https://example.com)（YouTube · 19時1位）",
         }
     }
     editorial = {
@@ -933,7 +1012,7 @@ def test_render_editorial_markdown_resolves_links(gads):
     index = {
         gads._normalize_label_key("台風接近"): {
             "label": "台風接近",
-            "link_line": "[台風接近](https://example.com)（nhk_jp · 19時スナップショット1位）",
+            "link_line": "[台風接近](https://example.com)（NHK · 19時1位）",
         }
     }
     md = gads.render_editorial_markdown(editorial, index)
@@ -945,7 +1024,7 @@ def test_render_editorial_markdown_resolves_links(gads):
 def test_render_rising_highlights_includes_notes(gads):
     items = [
         {
-            "link_line": "[Climber](https://example.com)（youtube_jp · 19時スナップショット2位）",
+            "link_line": "[Climber](https://example.com)（YouTube · 19時2位）",
             "rank_evidence": "07時18位 → 19時2位",
             "category": "検索・動画",
             "label": "Climber",
@@ -974,7 +1053,7 @@ def test_render_category_top3_includes_intro(gads):
             "items": [
                 {
                     "label": "Head A",
-                    "link_line": "[Head A](https://example.com)（nhk_jp · 19時1位）",
+                    "link_line": "[Head A](https://example.com)（NHK · 19時1位）",
                 }
             ],
         }

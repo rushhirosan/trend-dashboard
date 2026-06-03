@@ -162,7 +162,7 @@ _PROVIDER_DISPLAY: Dict[str, str] = {
     "google_trends": "Google Trends",
     "youtube_trends": "YouTube",
     "wikipedia": "Wikipedia",
-    "hatena": "はてなブックマーク",
+    "hatena": "はてな",
     "zenn": "Zenn",
     "qiita": "Qiita",
     "note": "note",
@@ -171,6 +171,7 @@ _PROVIDER_DISPLAY: Dict[str, str] = {
     "twitch": "Twitch",
     "bluesky": "Bluesky",
     "prtimes": "PR TIMES",
+    "prtimes_hatena": "PR TIMES × はてブ",
     "book_jp": "楽天ブックス",
     "book_us": "Google Books",
     "openalex": "OpenAlex",
@@ -183,6 +184,21 @@ _PROVIDER_DISPLAY: Dict[str, str] = {
     "movie": "映画",
     "music_trends": "Spotify",
     "podcast": "Podcast",
+    "jpcert": "JPCERT/CC",
+    "ipa": "IPA",
+    "cisa_kev": "CISA KEV",
+    "thehackernews": "The Hacker News",
+    "hackernoon": "Hacker Noon",
+    "hackernews": "Hacker News",
+    "producthunt": "Product Hunt",
+    "devto": "DEV.to",
+    "medium": "Medium",
+    "ebay": "eBay",
+    "globenewswire": "GlobeNewswire",
+    "estat": "e-Stat",
+    "kkj": "官公需",
+    "bls": "BLS",
+    "usaspending": "USAspending",
 }
 SLOT_LABELS = {
     "07": "07時台ジョブ後",
@@ -557,23 +573,26 @@ def _dedupe_series_keys_by_provider(series_keys: List[str]) -> List[str]:
     return sorted(by_prov.values())
 
 
+def _format_series_key_display(series_key: str) -> str:
+    """link_line 用: hatena_jp → はてな、wikipedia_ja → Wikipedia 等。"""
+    sk = (series_key or "").strip()
+    if not sk or sk == "?":
+        return "?"
+    if sk.startswith("prtimes_hatena"):
+        name = _PROVIDER_DISPLAY["prtimes_hatena"]
+    else:
+        provider = _series_provider(sk)
+        name = _PROVIDER_DISPLAY.get(provider) or provider.replace("_", " ")
+    if sk.endswith("_us"):
+        return f"{name} (US)"
+    if sk.endswith("_en"):
+        return f"{name} (EN)"
+    return name
+
+
 def _format_sources_display(series_keys: List[str]) -> str:
-    """読者向けの取得元表示（twitch_jp + twitch_us → Twitch (JP) のみ等）。"""
-    parts: List[str] = []
-    for k in _dedupe_series_keys_by_provider(series_keys):
-        p = _series_provider(k)
-        name = _PROVIDER_DISPLAY.get(p) or p.replace("_", " ")
-        if k.endswith("_jp"):
-            parts.append(f"{name} (JP)")
-        elif k.endswith("_us"):
-            parts.append(f"{name} (US)")
-        elif k.endswith("_ja"):
-            parts.append(f"{name} (JA)")
-        elif k.endswith("_en"):
-            parts.append(f"{name} (EN)")
-        else:
-            parts.append(name)
-    return ", ".join(parts)
+    """読者向けの取得元表示（twitch_jp + twitch_us → Twitch (US) のみ等）。"""
+    return ", ".join(_format_series_key_display(k) for k in _dedupe_series_keys_by_provider(series_keys))
 
 
 def _url_from_thin_item(item: Dict[str, Any]) -> Optional[str]:
@@ -662,15 +681,16 @@ def _format_digest_link_line(
     """カテゴリ digest 用: リンク付き1行。"""
     href = url if url else _fallback_search_url(label)
     title = _clean_rising_display(label).replace("[", "\\[")
-    return f"[{title}]({href})（{series_key} · {rank_display}）"
+    source = _format_series_key_display(series_key)
+    return f"[{title}]({href})（{source} · {rank_display}）"
 
 
 def _format_slot_rank(slot: str, rank: int) -> str:
-    return f"{slot}時スナップショット{rank}位"
+    return f"{slot}時{rank}位"
 
 
 def _format_slot_rank_or_oob(slot: str, ranks: dict[str, int]) -> str:
-    """スナップショット top N に無いスロットは「圏外」。"""
+    """top N に無いスロットは「圏外」。"""
     r = ranks.get(slot)
     if r is None:
         return f"{slot}時圏外"
@@ -1225,7 +1245,7 @@ def build_label_link_index(
             href_line = _format_digest_link_line(
                 display,
                 series_key or "?",
-                "スナップショット参照",
+                "07→13→19",
                 url,
             )
         index[nk] = {
@@ -1256,7 +1276,7 @@ def build_label_link_index(
         keys = h.get("series_keys") or []
         sk = str(keys[0]) if keys else ""
         url = _url_for_label_in_series(series_by_slot, sk, label) if sk else None
-        line = _format_digest_link_line(label, sk or "?", "スナップショット参照", url) if label else None
+        line = _format_digest_link_line(label, sk or "?", "07→13→19", url) if label else None
         register(label, line, series_key=sk)
 
     return index
@@ -1305,7 +1325,7 @@ def render_rising_highlights_markdown(
     lines: List[str] = [_RISING_HEADING, ""]
     if not items:
         lines.append(
-            "（07→13→19 のスナップショットの間で、順位が大きく上がった話題はありませんでした）"
+            "（07→13→19 の間で、順位が大きく上がった話題はありませんでした）"
         )
         return "\n".join(lines).rstrip() + "\n"
     for i, it in enumerate(items, 1):
@@ -1343,7 +1363,7 @@ def render_cross_source_highlights_markdown(
         label = str(h.get("label") or "").strip() or "（ラベル不明）"
         lines.append(f"### {i}. {label}")
         lines.append("")
-        lines.append("異なる取得元のスナップショットで同じ話題が観測されました。")
+        lines.append("異なる取得元で同じ話題が観測されました。")
         sources = h.get("sources_display")
         if sources:
             lines.append(f"- **登場ソース**: {sources}")
@@ -1646,7 +1666,7 @@ def build_mechanical_one_liner(
 
     if not sentences:
         return (
-            "07→13→19 のスナップショットでは、目立った順位の急上昇は限定的でした。"
+            "07→13→19 では、目立った順位の急上昇は限定的でした。"
             "カテゴリ別の上位は下記のとおりです。"
         )
 
@@ -1679,11 +1699,11 @@ def build_mechanical_spotlight(
     title = _clip_editorial_label(display, max_len=40)
     ev = (rank_evidence or "").strip()
     if ev:
-        body = f"スナップショット上、{ev}。"
+        body = f"{ev}。"
     elif category:
-        body = f"{category}のスナップショットで上位に入った。"
+        body = f"{category}で上位に入った。"
     else:
-        body = "スナップショットで順位が動いた。"
+        body = "順位が動いた。"
     return {
         "title": title or display[:40],
         "body": body,
@@ -1772,7 +1792,7 @@ def filter_rising_notes(
         lab = str(r.get("label") or "").strip()
         if not lab or not ev:
             continue
-        out.append({"match_label": lab, "note": f"スナップショット上、{ev}。"})
+        out.append({"match_label": lab, "note": f"{ev}。"})
     return out
 
 

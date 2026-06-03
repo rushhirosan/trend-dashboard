@@ -8,7 +8,7 @@ Trend Dashboard 向け **1日1ツイート（20時 JST）** の運用メモ・�
 - **20時投稿**なら、本文の「反映」は例として **「当日 13:00・19:00 更新を中心に反映」** のように書くと誤解が少ない。
 - **JP / US を同じ JST 20:00** に出す運用にすると、US 向け英語ポストは現地ではだいたい**朝**になる。**US 投稿の冒頭（または返信）にその前提**を書いておくと時差の誤解が減る（このファイル内「同時刻運用」参照）。
 - **夜（X）と朝（AI）の分担:** **20時 JST 前後**の X 文案は **急上昇3つ**のみ（`07→13→19`・**AI サマリーと同じ jump / 資格 / ノイズ判定**で全ソースから最大3件・OpenAI なし）。**朝 6:50 JST** の **AI 日次サマリー**（`docs/summaries/daily/`）が読み物の本体。
-- **日次の本文投入:** `scripts/generate_daily_x_post_series.py --write`（`docs/x_post_samples/daily/{日付}.md`）または GitHub Actions `Daily X post series`（JST 20:10 前後、`--from-api`）。DB も HTTP も無いときだけレガシーなソース別 `/api/*`（5カテゴリ・単一時点）になる。
+- **日次の本文投入:** `scripts/generate_daily_x_post_series.py --write`（`docs/x_post_samples/daily/{日付}.md`）または GitHub Actions `Daily X post series`（JST 20:10 前後、`--from-api`）。**Discord 通知:** 同 workflow で `--discord`（スケジューラ通知と同じ `DISCORD_WEBHOOK_URL` / GitHub Secret `DISCORD_WEBHOOK_URL`）。コードブロックをコピーして X に手動投稿。DB も HTTP も無いときだけレガシーなソース別 `/api/*`（5カテゴリ・単一時点）になる。
 
 ## ファイルの置き場
 

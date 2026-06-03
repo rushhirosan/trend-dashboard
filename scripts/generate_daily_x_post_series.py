@@ -23,9 +23,12 @@ then composes JP/US blocks. No per-source ``/api/google-trends`` traffic.
 
   python scripts/generate_daily_x_post_series.py --from-api --write
 
+  python scripts/generate_daily_x_post_series.py --from-api --write --discord
+
 Env:
   DATABASE_URL             直接 PostgreSQL から 07/13/19 を読む（``--from-api`` なしのとき）
   TREND_DASHBOARD_BASE_URL ``--from-api`` またはレガシー HTTP 用ベース URL（既定: https://trends-dashboard.fly.dev）
+  DISCORD_WEBHOOK_URL       ``--discord`` 用（スケジューラ通知と同じ Webhook）
 
 夜の X 文案は **急上昇3つ**（07→13→19・AI 日次サマリーと同じ jump / 資格 / ノイズ判定。
 全ソースから最大3件）。JP / US とも X 無料枠（加重 280 相当）に収める。
@@ -1008,6 +1011,20 @@ def main() -> int:
     )
     p.add_argument("--dry-run", action="store_true", help="Print blocks only; do not write")
     p.add_argument("--write", action="store_true", help="Write docs/x_post_samples/daily/{date}.md")
+    p.add_argument(
+        "--discord",
+        action="store_true",
+        help=(
+            "Send JP/US blocks to Discord "
+            "(DISCORD_WEBHOOK_URL or --discord-webhook-url)"
+        ),
+    )
+    p.add_argument(
+        "--discord-webhook-url",
+        default=None,
+        metavar="URL",
+        help="Override DISCORD_WEBHOOK_URL",
+    )
     fr = p.add_mutually_exclusive_group()
     fr.add_argument(
         "--force-refresh",
@@ -1169,19 +1186,36 @@ def main() -> int:
 
     if args.dry_run:
         print("\n(dry-run: not writing file)", file=sys.stderr)
-        return 0
-    if not args.write:
-        print("\n(pass --write to save)", file=sys.stderr)
+    elif args.write:
+        if args.output_file:
+            out_path = Path(args.output_file)
+        else:
+            out_path = Path(args.output_dir) / f"{d}.md"
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        body = compose_daily_markdown(d, jp, us)
+        out_path.write_text(body, encoding="utf-8")
+        print(f"\nWrote {out_path}", file=sys.stderr)
+    elif not args.discord:
+        print("\n(pass --write and/or --discord to act)", file=sys.stderr)
         return 0
 
-    if args.output_file:
-        out_path = Path(args.output_file)
-    else:
-        out_path = Path(args.output_dir) / f"{d}.md"
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    body = compose_daily_markdown(d, jp, us)
-    out_path.write_text(body, encoding="utf-8")
-    print(f"\nWrote {out_path}", file=sys.stderr)
+    if args.discord:
+        from daily_x_post_discord import notify_daily_x_post_discord, resolve_discord_webhook_url
+
+        webhook = resolve_discord_webhook_url(args.discord_webhook_url)
+        if not webhook:
+            print(
+                "WARN: --discord 指定ですが DISCORD_WEBHOOK_URL が未設定のためスキップ",
+                file=sys.stderr,
+            )
+        else:
+            try:
+                notify_daily_x_post_discord(webhook, d, jp, us)
+            except (requests.RequestException, RuntimeError) as e:
+                print(f"ERROR: Discord 通知失敗: {e}", file=sys.stderr)
+                return 1
+            print("Discord 通知送信完了", file=sys.stderr)
+
     return 0
 
 

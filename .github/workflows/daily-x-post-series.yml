@@ -29,8 +29,9 @@ jobs:
       - name: Fill today's block (daily-snapshots API)
         env:
           TREND_DASHBOARD_BASE_URL: https://trends-dashboard.fly.dev
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: >-
-          python scripts/generate_daily_x_post_series.py --from-api --write
+          python scripts/generate_daily_x_post_series.py --from-api --write --discord
           --require-slots 07,13,19 --wait-for-slots 600 --poll-interval 60
 
       - name: Commit if changed

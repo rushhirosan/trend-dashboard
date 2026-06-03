@@ -826,6 +826,76 @@ def test_build_editorial_candidates_excludes_stale(gads):
     assert "build-your-own-x" not in labels
 
 
+def test_one_liner_is_acceptable_requires_rising_labels(gads):
+    rising = [
+        {"label": "Ariana Grande MV", "category": "検索・動画"},
+        {"label": "Splatoon 3", "category": "検索・動画"},
+        {"label": "Victor Wembanyama", "category": "検索・動画"},
+    ]
+    news = [
+        {
+            "label": "老舗ホテルのカピピン",
+            "category": "ニュース",
+            "reason": "category_leader",
+        }
+    ]
+    weak = (
+        "「老舗ホテルのカピピン」が注目を集めており、"
+        "特に検索・動画カテゴリでは「Victor Wembanyama」が人気です。"
+    )
+    assert not gads.one_liner_is_acceptable(weak, news, rising)
+    mech = gads.build_mechanical_one_liner(news, rising, [])
+    assert "Ariana Grande MV" in mech or "Ariana" in mech
+    assert "Splatoon 3" in mech
+    assert "Victor Wembanyama" in mech
+    assert "カピピン" in mech
+    assert gads.one_liner_is_acceptable(mech, news, rising)
+
+
+def test_finalize_editorial_fills_spotlights_and_replaces_one_liner(gads):
+    rising = [
+        {
+            "label": "Climber",
+            "category": "検索・動画",
+            "rank_evidence": "07時圏外 → 13時3位 → 19時1位",
+            "link_line": "[Climber](https://example.com)（youtube_jp · 19時スナップショット1位）",
+        },
+    ]
+    editorial_candidates = [
+        {
+            "label": "Climber",
+            "category": "検索・動画",
+            "reason": "rising",
+            "rank_evidence": "07時圏外 → 13時3位 → 19時1位",
+        },
+    ]
+    index = {
+        gads._normalize_label_key("Climber"): {
+            "label": "Climber",
+            "link_line": "[Climber](https://example.com)（youtube_jp · 19時スナップショット1位）",
+        }
+    }
+    editorial = {
+        "one_liner": "動きは限定的でした。",
+        "spotlights": [],
+        "rising_notes": [
+            {"match_label": "Climber", "note": "若い世代の間で話題です。"},
+        ],
+    }
+    out, trace = gads.finalize_editorial(
+        editorial,
+        editorial_candidates=editorial_candidates,
+        rising_items=rising,
+        cross_items=[],
+        label_index=index,
+    )
+    assert trace["one_liner_source"] == "mechanical"
+    assert "Climber" in out["one_liner"]
+    assert trace.get("spotlights_filled")
+    assert len(out["spotlights"]) >= 1
+    assert not any("若い世代" in str(n.get("note") or "") for n in out["rising_notes"])
+
+
 def test_parse_editorial_json(gads):
     raw = json.dumps(
         {

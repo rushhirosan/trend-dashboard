@@ -76,6 +76,16 @@ _ONE_LINER_HEADING = "## 今日の一行結論"
 _SPOTLIGHTS_HEADING = "## 昨日の見どころ（3〜5）"
 EDITORIAL_CANDIDATE_MAX = 12
 SPOTLIGHT_MAX = 5
+SPOTLIGHT_MIN = 2
+_MECHANICAL_ONE_LINER_MAX = 420
+_GENERIC_ONE_LINER = re.compile(
+    r"(注目を集めて|人気です|が話題|盛り上がり|関心が高ま)",
+    re.I,
+)
+_GENERIC_RISING_NOTE = re.compile(
+    r"(若い世代|話題です|盛り上がり|関心が高ま|人気です|特に.*の間で)",
+    re.I,
+)
 # 連日上位の定番（編集候補・一行結論から除外。トップ3根拠リストには残す）
 _KNOWN_STALE_LABEL_KEYS = frozenset(
     {
@@ -1501,10 +1511,10 @@ def build_llm_payload(
         "reader_context": (
             "観測日（business_day）のトレンドを編集する。読者は通常翌朝に受け取る。"
             "「昨日」= business_day。未来予測は禁止。"
-            "候補の rank_evidence は 07→13→19 の一日推移（圏外含む）。単一スロットだけの"
-            "言い回しは避け、日中の動きを要約する。"
-            "一行結論は editorial_candidates の固有ラベルを優先し、全区分を無理に埋めない。"
-            "「静かな日」「新規の大きな動きは限定的」等の抽象一文は書かない。"
+            "候補の rank_evidence は 07→13→19 の一日推移（圏外含む）。"
+            "one_liner は rising_highlights の label を2件以上そのまま含め、"
+            "ニュースの category_leader があればそれも含める（未達なら機械文に差し替えられる）。"
+            "spotlights は source_labels を候補 label と完全一致させ、最低2件。"
             "URL は出力しない（source_labels のみ）。"
         ),
         "editorial_candidates": editorial_candidates,
@@ -1535,6 +1545,297 @@ def build_user_payload(payload: Dict[str, Any]) -> str:
     if len(text) > MAX_USER_CHARS:
         text = text[:MAX_USER_CHARS] + "\n…(truncated)"
     return text
+
+
+def _clip_editorial_label(label: str, max_len: int = 48) -> str:
+    s = _clean_rising_display(str(label or ""))
+    if len(s) <= max_len:
+        return s
+    return s[: max_len - 1].rstrip() + "…"
+
+
+def _label_mentioned_in_text(label: str, text: str) -> bool:
+    s = _clean_rising_display(label)
+    if not s or not text:
+        return False
+    if s in text:
+        return True
+    nk = _normalize_label_key(s)
+    tn = _normalize_label_key(text)
+    if nk and nk in tn:
+        return True
+    probe = nk[: min(28, len(nk))]
+    return len(probe) >= 10 and probe in tn
+
+
+def one_liner_is_acceptable(
+    one_liner: str,
+    editorial_candidates: List[Dict[str, Any]],
+    rising_items: List[Dict[str, Any]],
+) -> bool:
+    """LLM 一行が機械ファクトと整合しているか（自動配信用）。"""
+    s = (one_liner or "").strip()
+    if len(s) < 12 or len(s) > _MECHANICAL_ONE_LINER_MAX:
+        return False
+    if _warn_vague_one_liner(s) or _GENERIC_ONE_LINER.search(s):
+        return False
+    if rising_items:
+        need = min(len(rising_items), 2)
+        hits = sum(
+            1
+            for r in rising_items
+            if _label_mentioned_in_text(str(r.get("label") or ""), s)
+        )
+        if hits < need:
+            return False
+    rising_nks = {_normalize_label_key(str(r.get("label") or "")) for r in rising_items}
+    for c in editorial_candidates:
+        if c.get("reason") != "category_leader" or c.get("category") != "ニュース":
+            continue
+        lab = str(c.get("label") or "")
+        if _normalize_label_key(lab) in rising_nks:
+            continue
+        if not _label_mentioned_in_text(lab, s):
+            return False
+        break
+    return True
+
+
+def build_mechanical_one_liner(
+    editorial_candidates: List[Dict[str, Any]],
+    rising_items: List[Dict[str, Any]],
+    cross_items: List[Dict[str, Any]],
+) -> str:
+    """データだけから組み立てる一行結論（LLM 不整合時のフォールバック）。"""
+    sentences: List[str] = []
+
+    if cross_items:
+        lab = _clip_editorial_label(str(cross_items[0].get("label") or ""))
+        ev = str(cross_items[0].get("rank_evidence") or "").strip()
+        if lab:
+            tail = f"（{ev}）" if ev else ""
+            sentences.append(f"複数の取得元で「{lab}」が重なった{tail}。")
+
+    news_leaders = [
+        c
+        for c in editorial_candidates
+        if c.get("reason") == "category_leader" and c.get("category") == "ニュース"
+    ]
+    if news_leaders:
+        c = news_leaders[0]
+        lab = _clip_editorial_label(str(c.get("label") or ""))
+        ev = str(c.get("rank_evidence") or "").strip()
+        if lab:
+            if ev:
+                sentences.append(f"ニュースでは「{lab}」が一日を通して上位（{ev}）。")
+            else:
+                sentences.append(f"ニュースでは「{lab}」が一日を通して上位。")
+
+    labels = [
+        f"「{_clip_editorial_label(str(r.get('label') or ''))}」"
+        for r in rising_items[:3]
+        if str(r.get("label") or "").strip()
+    ]
+    if labels:
+        if len(labels) == 1:
+            sentences.append(f"順位の動きが大きかったのは{labels[0]}。")
+        else:
+            sentences.append(
+                f"順位の動きが大きかったのは{'、'.join(labels[:-1])}と{labels[-1]}。"
+            )
+
+    if not sentences:
+        return (
+            "07→13→19 のスナップショットでは、目立った順位の急上昇は限定的でした。"
+            "カテゴリ別の上位は下記のとおりです。"
+        )
+
+    out = "".join(sentences)
+    if len(out) > _MECHANICAL_ONE_LINER_MAX:
+        out = out[: _MECHANICAL_ONE_LINER_MAX - 1].rstrip() + "…"
+    return out
+
+
+def _spotlight_will_render(
+    sp: Dict[str, Any],
+    label_index: Dict[str, Dict[str, Any]],
+) -> bool:
+    if not isinstance(sp, dict):
+        return False
+    title = str(sp.get("title") or "").strip()
+    body = str(sp.get("body") or "").strip()
+    if not title or not body:
+        return False
+    return bool(_resolve_source_labels(sp.get("source_labels") or [], label_index))
+
+
+def build_mechanical_spotlight(
+    *,
+    label: str,
+    rank_evidence: str = "",
+    category: str = "",
+) -> Dict[str, Any]:
+    display = _clean_rising_display(label)
+    title = _clip_editorial_label(display, max_len=40)
+    ev = (rank_evidence or "").strip()
+    if ev:
+        body = f"スナップショット上、{ev}。"
+    elif category:
+        body = f"{category}のスナップショットで上位に入った。"
+    else:
+        body = "スナップショットで順位が動いた。"
+    return {
+        "title": title or display[:40],
+        "body": body,
+        "source_labels": [display],
+    }
+
+
+def build_mechanical_spotlights(
+    editorial_candidates: List[Dict[str, Any]],
+    rising_items: List[Dict[str, Any]],
+    cross_items: List[Dict[str, Any]],
+    *,
+    min_count: int = SPOTLIGHT_MIN,
+    max_count: int = SPOTLIGHT_MAX,
+) -> List[Dict[str, Any]]:
+    """見どころが LLM で足りないときの機械生成（リンク解決可能なラベルのみ）。"""
+    out: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def push(label: str, *, rank_evidence: str = "", category: str = "") -> None:
+        if len(out) >= max_count:
+            return
+        display = _clean_rising_display(label)
+        if not display:
+            return
+        nk = _normalize_label_key(display)
+        if nk in seen:
+            return
+        seen.add(nk)
+        out.append(
+            build_mechanical_spotlight(
+                label=display,
+                rank_evidence=rank_evidence,
+                category=category,
+            )
+        )
+
+    for h in cross_items[:1]:
+        push(
+            str(h.get("label") or ""),
+            rank_evidence=str(h.get("rank_evidence") or ""),
+        )
+    for r in rising_items:
+        push(
+            str(r.get("label") or ""),
+            rank_evidence=str(r.get("rank_evidence") or ""),
+            category=str(r.get("category") or ""),
+        )
+    for c in editorial_candidates:
+        if c.get("reason") != "category_leader":
+            continue
+        push(
+            str(c.get("label") or ""),
+            rank_evidence=str(c.get("rank_evidence") or ""),
+            category=str(c.get("category") or ""),
+        )
+        if len(out) >= min_count:
+            break
+
+    return out[:max_count]
+
+
+def filter_rising_notes(
+    notes: List[Dict[str, Any]],
+    rising_items: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """薄い定型補足を除き、必要なら根拠行ベースの機械補足に差し替える。"""
+    allowed = {_normalize_label_key(str(r.get("label") or "")) for r in rising_items}
+    out: List[Dict[str, Any]] = []
+    for n in notes or []:
+        if not isinstance(n, dict):
+            continue
+        ml = str(n.get("match_label") or "").strip()
+        note = str(n.get("note") or "").strip()
+        if not ml or not note or _GENERIC_RISING_NOTE.search(note):
+            continue
+        if _normalize_label_key(ml) not in allowed:
+            continue
+        out.append({"match_label": ml, "note": note})
+
+    if out or not rising_items:
+        return out
+
+    for r in rising_items:
+        ev = str(r.get("rank_evidence") or "").strip()
+        lab = str(r.get("label") or "").strip()
+        if not lab or not ev:
+            continue
+        out.append({"match_label": lab, "note": f"スナップショット上、{ev}。"})
+    return out
+
+
+def finalize_editorial(
+    editorial: Dict[str, Any],
+    *,
+    editorial_candidates: List[Dict[str, Any]],
+    rising_items: List[Dict[str, Any]],
+    cross_items: List[Dict[str, Any]],
+    label_index: Dict[str, Dict[str, Any]],
+) -> tuple[Dict[str, Any], Dict[str, Any]]:
+    """LLM 編集 JSON を検証し、不足分は機械生成で補完（人手なし自動配信向け）。"""
+    trace: Dict[str, Any] = {}
+    mech_one = build_mechanical_one_liner(
+        editorial_candidates, rising_items, cross_items
+    )
+    one = str(editorial.get("one_liner") or "").strip()
+    if one_liner_is_acceptable(one, editorial_candidates, rising_items):
+        trace["one_liner_source"] = "llm"
+    else:
+        editorial["one_liner"] = mech_one
+        trace["one_liner_source"] = "mechanical"
+        if one:
+            trace["one_liner_replaced"] = True
+
+    llm_spots = [
+        sp
+        for sp in (editorial.get("spotlights") or [])
+        if isinstance(sp, dict) and _spotlight_will_render(sp, label_index)
+    ]
+    mech_spots = build_mechanical_spotlights(
+        editorial_candidates, rising_items, cross_items
+    )
+    mech_renderable = sum(
+        1 for sp in mech_spots if _spotlight_will_render(sp, label_index)
+    )
+    target_min = min(SPOTLIGHT_MIN, mech_renderable) if mech_renderable else 0
+
+    if len(llm_spots) < target_min:
+        seen_titles: set[str] = set()
+        merged: List[Dict[str, Any]] = []
+        for sp in llm_spots + mech_spots:
+            if not _spotlight_will_render(sp, label_index):
+                continue
+            title_nk = _normalize_label_key(str(sp.get("title") or ""))
+            if title_nk in seen_titles:
+                continue
+            seen_titles.add(title_nk)
+            merged.append(sp)
+            if len(merged) >= SPOTLIGHT_MAX:
+                break
+        editorial["spotlights"] = merged
+        trace["spotlights_renderable"] = len(merged)
+        if len(llm_spots) < target_min:
+            trace["spotlights_filled"] = True
+    else:
+        editorial["spotlights"] = llm_spots[:SPOTLIGHT_MAX]
+        trace["spotlights_renderable"] = len(editorial["spotlights"])
+
+    editorial["rising_notes"] = filter_rising_notes(
+        editorial.get("rising_notes") or [], rising_items
+    )
+    return editorial, trace
 
 
 def call_openai(
@@ -1689,12 +1990,12 @@ SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ�
 
 **出力は JSON オブジェクトのみ**（Markdown 不可）。次のキーを含める:
 
-- `one_liner` (string): 最大3文。editorial_candidates の固有ラベルを引用して「今日の空気」を要約。
-  全カテゴリを無理に埋めない。「静かな日」「動きは限定的」等の抽象一文は禁止。
-  quiet_category_examples があれば定番名を1つだけ引用可。
-- `spotlights` (array, 最大 spotlight_max 件): 各要素は
-  `{ "title", "body", "source_labels": [入力に存在するラベル文字列], "caveat": 任意 }`
-  source_labels は editorial_candidates の label と一致させる。リンクは書かない。
+- `one_liner` (string): 最大3文。必ず rising_highlights の label を **2件以上**そのまま含める。
+  reason=category_leader かつ category=ニュース の候補が rising に無い場合は、その label も含める。
+  「注目を集めて」「人気です」等の抽象表現は禁止。全カテゴリを無理に埋めない。
+- `spotlights` (array, 最大 spotlight_max 件・**最低2件**): 各要素は
+  `{ "title", "body", "source_labels": [入力の label と完全一致する文字列], "caveat": 任意 }`
+  body は rank_evidence の事実を1文で述べる（憶測・世代論は禁止）。リンクは書かない。
 - `rising_notes` (array): `{ "match_label", "note" }` — rising_highlights の label に対応する1文補足。
   rising_highlights が空なら []。
 - `cross_intro` (string|null): cross_source_highlights が1件以上あるときのみ導入1〜2文。0件なら null。
@@ -1808,6 +2109,13 @@ def run_generate(
     )
     raw_editorial = call_openai(SYSTEM_PROMPT, user, api_key, model, json_mode=True)
     editorial = parse_editorial_json(raw_editorial)
+    editorial, fin_trace = finalize_editorial(
+        editorial,
+        editorial_candidates=list(payload.get("editorial_candidates") or []),
+        rising_items=rising_items,
+        cross_items=cross_items,
+        label_index=label_index,
+    )
     vague_warn = _warn_vague_one_liner(str(editorial.get("one_liner") or ""))
 
     inner = assemble_daily_markdown(
@@ -1824,7 +2132,8 @@ def run_generate(
     meta["editorial_candidates_count"] = len(payload.get("editorial_candidates") or [])
     meta["spotlights_count"] = len(editorial.get("spotlights") or [])
     meta["quiet_editorial_categories"] = payload.get("quiet_editorial_categories") or []
-    if vague_warn:
+    meta.update(fin_trace)
+    if vague_warn and meta.get("one_liner_source") == "llm":
         meta["editorial_warning"] = vague_warn
     full = merge_front_matter(business_day, model, inner)
     return full, meta

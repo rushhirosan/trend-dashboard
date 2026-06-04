@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import re
 from typing import Any, Callable, Optional
+from urllib.parse import parse_qs, quote_plus, urlparse
 
 DAYTIME_SLOTS = ("07", "13", "19")
 
@@ -231,3 +232,75 @@ def pick_top_rising(
         if len(out) >= count:
             break
     return out
+
+
+_SLOTS_URL_ORDER = ("19", "13", "07", "01")
+
+
+def url_from_thin_item(item: dict[str, Any]) -> Optional[str]:
+    u = item.get("u")
+    if u is None:
+        return None
+    s = str(u).strip()
+    if s.startswith("http://") or s.startswith("https://"):
+        return s
+    return None
+
+
+def normalize_article_url(url: str) -> Optional[str]:
+    """記事同一性の比較用。Google 検索 URL など記事を指さないものは None。"""
+    s = str(url or "").strip()
+    if not s.startswith(("http://", "https://")):
+        return None
+    try:
+        p = urlparse(s)
+    except ValueError:
+        return None
+    host = (p.hostname or "").lower()
+    if not host:
+        return None
+    if host.startswith("www."):
+        host = host[4:]
+    path = (p.path or "/").rstrip("/") or "/"
+    if host == "google.com" and path == "/search":
+        return None
+    if host in ("youtu.be",):
+        vid = path.lstrip("/").split("/")[0]
+        return f"youtube:{vid}" if vid else None
+    if host in ("youtube.com", "m.youtube.com"):
+        vid = (parse_qs(p.query).get("v") or [None])[0]
+        return f"youtube:{vid}" if vid else None
+    return f"{host}{path}".lower()
+
+
+def url_for_label_in_series(
+    series_by_slot: dict[str, dict[str, list[Any]]],
+    series_key: str,
+    label: str,
+) -> Optional[str]:
+    """系列内でラベルに対応する記事 URL（19→13→07→01 の順）。"""
+    nk = normalize_label_key(label)
+    for slot in _SLOTS_URL_ORDER:
+        for it in (series_by_slot.get(slot) or {}).get(series_key) or []:
+            if not isinstance(it, dict):
+                continue
+            if normalize_label_key(str(it.get("t") or "")) == nk:
+                u = url_from_thin_item(it)
+                if u:
+                    return u
+    return None
+
+
+def fallback_search_url(label: str) -> str:
+    return f"https://www.google.com/search?q={quote_plus(clean_rising_display(label))}"
+
+
+def article_url_for_rising(
+    series_by_slot: dict[str, dict[str, list[Any]]],
+    series_key: str,
+    display: str,
+) -> str:
+    """急上昇表示用 URL。スナップに u が無ければ Google 検索。"""
+    return url_for_label_in_series(series_by_slot, series_key, display) or fallback_search_url(
+        display
+    )

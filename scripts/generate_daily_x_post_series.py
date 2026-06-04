@@ -345,10 +345,11 @@ def pick_rising_topics(
     *,
     category_by_series: dict[str, str],
     count: int = RISING_PICK_COUNT,
-) -> list[tuple[str, str]]:
+    include_article_links: bool = True,
+) -> list[tuple[str, str, str]]:
     """
     急上昇（AI 日次サマリーと同じ jump / 資格 / ノイズ判定）を最大 count 件。
-    足りないときは「…」で埋める（X テンプレ用）。
+    各要素は (表示ラベル, カテゴリ, 記事URL)。足りないときは「…」で埋める。
     """
     candidates = sr.collect_rising_candidates(
         series_by_slot,
@@ -362,13 +363,20 @@ def pick_rising_topics(
             f"NOTE: only {len(items)} qualified rising label(s) (target {count})",
             file=sys.stderr,
         )
-    out: list[tuple[str, str]] = [
-        (str(c["display"]), str(c.get("tail") or category_by_series.get(str(c.get("series_key")), "他")))
-        for c in items
-    ]
+    out: list[tuple[str, str, str]] = []
+    for c in items:
+        sk = str(c.get("series_key") or "")
+        display = str(c["display"])
+        tail = str(c.get("tail") or category_by_series.get(sk, "他"))
+        url = (
+            sr.article_url_for_rising(series_by_slot, sk, display)
+            if include_article_links
+            else ""
+        )
+        out.append((display, tail, url))
     fallback_tail = next(iter(category_by_series.values()), "他")
     while len(out) < count:
-        out.append(("…", fallback_tail))
+        out.append(("…", fallback_tail, ""))
     return out[:count]
 
 
@@ -578,20 +586,24 @@ def _compose_jp_body(
 
 def _compose_jp_rising_body(
     d: str,
-    picks: list[tuple[str, str]],
+    picks: list[tuple[str, str, str]],
     *,
     inner_max: int,
     max_jp_x_weighted: int,
+    include_article_links: bool = True,
 ) -> str:
-    def ln(marker: str, inner: str, tail: str, lim: int) -> str:
-        return f"{marker} {clip(inner, lim)}（{tail}）"
+    def ln(marker: str, inner: str, tail: str, url: str, lim: int) -> str:
+        head = f"{marker} {clip(inner, lim)}（{tail}）"
+        if include_article_links and url:
+            return f"{head}\n{url}"
+        return head
 
     im = max(12, inner_max)
     body = ""
     while im >= 8:
         lines = [f"【{d}】今日の急上昇3つ（JP）"]
-        for marker, (inner, tail) in zip(RISING_MARKERS, picks):
-            lines.append(ln(marker, inner, tail, im))
+        for marker, (inner, tail, url) in zip(RISING_MARKERS, picks):
+            lines.append(ln(marker, inner, tail, url, im))
         lines.append(JP_LIST_LINE)
         body = "\n".join(lines)
         if max_jp_x_weighted <= 0 or _jp_body_x_weight(body) <= max_jp_x_weighted:
@@ -611,18 +623,21 @@ def build_jp_block_from_snapshots(
     inner_max: int = DEFAULT_JP_INNER_MAX,
     *,
     max_jp_x_weighted: int = X_FREE_CHARACTER_LIMIT,
+    include_article_links: bool = True,
 ) -> str:
     picks = pick_rising_topics(
         series_by_slot,
         JP_SERIES_KEYS,
         category_by_series=SERIES_CATEGORY_JP,
         count=RISING_PICK_COUNT,
+        include_article_links=include_article_links,
     )
     return _compose_jp_rising_body(
         d,
         picks,
         inner_max=inner_max,
         max_jp_x_weighted=max_jp_x_weighted,
+        include_article_links=include_article_links,
     )
 
 
@@ -777,21 +792,28 @@ def _compose_us_body(
 
 def _compose_us_rising_body(
     d: str,
-    picks: list[tuple[str, str]],
+    picks: list[tuple[str, str, str]],
     *,
     max_chars: int,
+    include_article_links: bool = True,
 ) -> str:
     x_free_counting = max_chars <= X_FREE_CHARACTER_LIMIT
     header = _us_rising_header(d)
     url_cost = _us_footer_line_cost(x_free_counting=x_free_counting)
     fixed = len(header) + 2 + url_cost  # newlines + markers
-    for _m, tail in zip(RISING_MARKERS, picks):
+    for _m, (_inner, tail, article_url) in zip(RISING_MARKERS, picks):
         fixed += 2 + len(tail) + 3  # "① " + " (Search)" style — US uses space paren
+        if include_article_links and article_url:
+            fixed += 1 + len(article_url)
 
     def assemble(inner_limits: list[int]) -> str:
         lines = [header]
-        for marker, (inner, tail), lim in zip(RISING_MARKERS, picks, inner_limits):
-            lines.append(f"{marker} {clip(inner, lim)} ({tail})")
+        for marker, (inner, tail, article_url), lim in zip(RISING_MARKERS, picks, inner_limits):
+            head = f"{marker} {clip(inner, lim)} ({tail})"
+            if include_article_links and article_url:
+                lines.append(f"{head}\n{article_url}")
+            else:
+                lines.append(head)
         lines.append(US_LIST_LINE)
         return "\n".join(lines)
 
@@ -826,14 +848,19 @@ def build_us_block_from_snapshots(
     series_by_slot: dict[str, dict[str, list[Any]]],
     d: str,
     max_chars: int = DEFAULT_MAX_US_CHARS,
+    *,
+    include_article_links: bool = True,
 ) -> str:
     picks = pick_rising_topics(
         series_by_slot,
         US_SERIES_KEYS,
         category_by_series=SERIES_CATEGORY_US,
         count=RISING_PICK_COUNT,
+        include_article_links=include_article_links,
     )
-    return _compose_us_rising_body(d, picks, max_chars=max_chars)
+    return _compose_us_rising_body(
+        d, picks, max_chars=max_chars, include_article_links=include_article_links
+    )
 
 
 def build_us_block(

@@ -47,7 +47,8 @@ def build_daily_x_post_discord_payload(date_str: str, jp: str, us: str) -> dict[
                 "title": f"X 投稿案 — {date_str}",
                 "description": (
                     "各コードブロックを長押し（モバイル）または選択してコピー → X に投稿。"
-                    " JP を先、US を後（任意で US 返信文を返信ツイートに）。"
+                    " JP を先、US を後。各急上昇の下に記事 URL（無い場合は Google 検索）。"
+                    " 任意で US 返信文を返信ツイートに。"
                 ),
                 "color": _EMBED_COLOR,
                 "fields": [

@@ -128,6 +128,28 @@ def test_build_blocks_from_snapshots_rising_format(gx):
     assert gx.US_LIST_LINE in us
 
 
+def test_build_blocks_include_article_urls_when_present(gx):
+    article = "https://www3.nhk.or.jp/news/html/20260529/k100.html"
+    bundle = {
+        "07": {
+            "nhk_jp": [{"t": "Typhoon News", "r": 10}],
+            "cnn_us": [{"t": "US Story", "r": 12}],
+        },
+        "13": {
+            "nhk_jp": [{"t": "Typhoon News", "r": 5}],
+            "cnn_us": [{"t": "US Story", "r": 6}],
+        },
+        "19": {
+            "nhk_jp": [{"t": "Typhoon News", "r": 1, "u": article}],
+            "cnn_us": [{"t": "US Story", "r": 2, "u": "https://edition.cnn.com/story"}],
+        },
+    }
+    jp = gx.build_jp_block_from_snapshots(bundle, "2026-06-04", max_jp_x_weighted=0)
+    assert article in jp
+    us = gx.build_us_block_from_snapshots(bundle, "2026-06-04", max_chars=0)
+    assert "https://edition.cnn.com/story" in us
+
+
 def test_pick_prefers_label_in_more_slots(gx):
     """3スロットに同じラベルがあるほどスコアが上がり、Google の②語目に選ばれやすい。"""
     bundle = {

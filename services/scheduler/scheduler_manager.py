@@ -989,6 +989,25 @@ class TrendsScheduler:
             elif completed_slot and self.db and hasattr(self.db, 'mark_slot_completed'):
                 self.db.mark_slot_completed(completed_slot)
 
+            # 19 時スロット完了後: X 投稿案 Discord（07/13/19 スナップ確定直後）
+            if (
+                trigger_source == "scheduler"
+                and not force
+                and completed_slot
+                and str(completed_slot).startswith("7pm_")
+                and not result.get("job_timed_out")
+            ):
+                try:
+                    from services.daily_x_post_notify import schedule_evening_x_post_discord_notify
+
+                    schedule_evening_x_post_discord_notify(self.db)
+                except Exception as xpost_exc:
+                    logger.warning(
+                        "⚠️ X 投稿案 Discord スケジュール失敗: %s",
+                        xpost_exc,
+                        exc_info=True,
+                    )
+
             # データ保存完了後、メール自動送信を実行
             # スケジューラー実行時（深夜1時・朝7時・昼13時・夜19時）のみメール送信
             # デプロイ時や手動実行時は、明示的に指示された場合のみメール送信

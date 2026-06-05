@@ -36,16 +36,37 @@ def test_resolve_discord_webhook_url_rejects_non_discord(dxd, monkeypatch):
 
 
 def test_build_payload_includes_jp_us_code_blocks(dxd):
-    jp = "【2026-06-03】今日の急上昇3つ（JP）\n① foo（検索）"
-    us = "Today's rising 3 (US) 2026-06-03 · 8pm JST\n① bar (News)"
+    jp = (
+        "【2026-06-03】今日の急上昇3つ（JP）\n"
+        "① foo（検索）\n"
+        "https://example.com/jp\n"
+        "一覧: https://trends-dashboard.fly.dev/"
+    )
+    us = (
+        "Today's rising 3 (US) 2026-06-03 · 8pm JST\n"
+        "① bar (News)\n"
+        "https://example.com/us\n"
+        "一覧: https://trends-dashboard.fly.dev/us"
+    )
     payload = dxd.build_daily_x_post_discord_payload("2026-06-03", jp, us)
     assert payload["username"] == "Trend Dashboard"
     embed = payload["embeds"][0]
     assert embed["title"] == "X 投稿案 — 2026-06-03"
     fields = {f["name"]: f["value"] for f in embed["fields"]}
-    assert jp in fields["JP — 今日の急上昇3つ"]
-    assert us in fields["US — Today's rising 3"]
+    assert "[① foo（検索）](<https://example.com/jp>)" in fields["JP — 今日の急上昇3つ"]
+    assert "[一覧](<https://trends-dashboard.fly.dev/>)" in fields["JP — 今日の急上昇3つ"]
+    assert "[① bar (News)](<https://example.com/us>)" in fields["US — Today's rising 3"]
     assert dxd.US_REPLY_SNIPPET in fields["US 返信（任意・英語）"]
+
+
+def test_plain_x_post_to_discord_markdown_leaves_header_lines(dxd):
+    jp = "【2026-06-03】今日の急上昇3つ（JP）\n① only title（検索）"
+    out = dxd.plain_x_post_to_discord_markdown(jp)
+    assert out == jp
+
+
+def test_discord_link_label_escapes_brackets(dxd):
+    assert dxd._discord_link_label("a[b]c") == "a［b］c"
 
 
 def test_code_block_escapes_inner_backticks(dxd):
@@ -71,7 +92,7 @@ def test_notify_posts_json(dxd, monkeypatch):
     call_kw = session.post.call_args
     assert call_kw[0][0] == webhook
     body = call_kw[1]["json"]
-    assert body["embeds"][0]["fields"][0]["value"].count("jp block") == 1
+    assert body["embeds"][0]["fields"][0]["value"] == "jp block"
 
 
 def test_notify_raises_on_http_error(dxd):

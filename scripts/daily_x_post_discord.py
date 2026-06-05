@@ -8,9 +8,13 @@ Webhook URL はスケジューラ通知と同じ ``DISCORD_WEBHOOK_URL``（``uti
 from __future__ import annotations
 
 import os
+import re
 from typing import Any
 
 import requests
+
+_URL_LINE = re.compile(r"^https?://\S+$", re.I)
+_LIST_LINE = re.compile(r"^一覧:\s*(https?://\S+)\s*$")
 
 US_REPLY_SNIPPET = (
     "Dashboard refreshes on a JST schedule (1/7/13/19 JST). "
@@ -38,28 +42,62 @@ def _code_block(text: str) -> str:
     return f"{fence}\n{body}\n{fence}"
 
 
+def _discord_link_label(text: str) -> str:
+    """Discord の [label](url) が壊れないよう角括弧を全角に。"""
+    return text.replace("[", "［").replace("]", "］")
+
+
+def _discord_link(label: str, url: str) -> str:
+    return f"[{_discord_link_label(label)}](<{url}>)"
+
+
+def plain_x_post_to_discord_markdown(text: str) -> str:
+    """
+    X 投稿案（見出し + 次行 URL）を Discord embed 用 Markdown に変換する。
+    コードブロック内では URL がリンク化されないため、embed field ではこちらを使う。
+    """
+    lines = (text or "").strip().split("\n")
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        next_line = lines[i + 1].strip() if i + 1 < len(lines) else ""
+        if next_line and _URL_LINE.match(next_line):
+            out.append(_discord_link(line, next_line))
+            i += 2
+            continue
+        list_match = _LIST_LINE.match(line.strip())
+        if list_match:
+            out.append(_discord_link("一覧", list_match.group(1)))
+            i += 1
+            continue
+        out.append(line)
+        i += 1
+    return "\n".join(out)
+
+
 def build_daily_x_post_discord_payload(date_str: str, jp: str, us: str) -> dict[str, Any]:
-    """Webhook POST 用 JSON（1 embed・JP/US をコードブロックでコピーしやすく）。"""
+    """Webhook POST 用 JSON（1 embed・JP/US はクリック可能な Markdown リンク）。"""
     return {
         "username": "Trend Dashboard",
         "embeds": [
             {
                 "title": f"X 投稿案 — {date_str}",
                 "description": (
-                    "各コードブロックを長押し（モバイル）または選択してコピー → X に投稿。"
-                    " JP を先、US を後。各急上昇の下に記事 URL（無い場合は Google 検索）。"
-                    " 任意で US 返信文を返信ツイートに。"
+                    "各項目はリンク付き（タップで記事へ）。"
+                    " X 投稿用のプレーン文案は `generate_daily_x_post_series.py --write` か GitHub Actions。"
+                    " JP を先、US を後。任意で US 返信文を返信ツイートに。"
                 ),
                 "color": _EMBED_COLOR,
                 "fields": [
                     {
                         "name": "JP — 今日の急上昇3つ",
-                        "value": _code_block(jp),
+                        "value": plain_x_post_to_discord_markdown(jp),
                         "inline": False,
                     },
                     {
                         "name": "US — Today's rising 3",
-                        "value": _code_block(us),
+                        "value": plain_x_post_to_discord_markdown(us),
                         "inline": False,
                     },
                     {

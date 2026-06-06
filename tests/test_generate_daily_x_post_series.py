@@ -128,6 +128,34 @@ def test_build_blocks_from_snapshots_rising_format(gx):
     assert gx.US_LIST_LINE in us
 
 
+def test_us_rising_fits_x_budget_when_article_urls_are_long(gx):
+    """長い記事 URL でも ValueError にせず、必要ならリンク無しで 280 字以内に収める。"""
+    long_url = "https://edition.cnn.com/2026/06/06/politics/example-story-with-a-very-long-path-segment/index.html"
+    bundle = {
+        "07": {
+            "cnn_us": [{"t": "Story A", "r": 10}],
+            "google_trends_us": [{"t": "Trend B", "r": 18}],
+            "youtube_trends_us": [{"t": "Video C", "r": 20}],
+        },
+        "13": {
+            "cnn_us": [{"t": "Story A", "r": 6}],
+            "google_trends_us": [{"t": "Trend B", "r": 9}],
+            "youtube_trends_us": [{"t": "Video C", "r": 11}],
+        },
+        "19": {
+            "cnn_us": [{"t": "Story A", "r": 2, "u": long_url}],
+            "google_trends_us": [{"t": "Trend B", "r": 3, "u": long_url}],
+            "youtube_trends_us": [{"t": "Video C", "r": 4, "u": long_url}],
+        },
+    }
+    us = gx.build_us_block_from_snapshots(
+        bundle, "2026-06-06", max_chars=gx.X_FREE_CHARACTER_LIMIT
+    )
+    assert "Today's rising 3" in us
+    assert gx._us_body_x_weight(us) <= gx.X_FREE_CHARACTER_LIMIT
+    assert long_url not in us
+
+
 def test_build_blocks_include_article_urls_when_present(gx):
     article = "https://www3.nhk.or.jp/news/html/20260529/k100.html"
     bundle = {

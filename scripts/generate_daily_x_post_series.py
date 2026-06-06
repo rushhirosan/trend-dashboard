@@ -798,49 +798,48 @@ def _compose_us_rising_body(
     include_article_links: bool = True,
 ) -> str:
     x_free_counting = max_chars <= X_FREE_CHARACTER_LIMIT
-    header = _us_rising_header(d)
-    url_cost = _us_footer_line_cost(x_free_counting=x_free_counting)
-    fixed = len(header) + 2 + url_cost  # newlines + markers
-    for _m, (_inner, tail, article_url) in zip(RISING_MARKERS, picks):
-        fixed += 2 + len(tail) + 3  # "① " + " (Search)" style — US uses space paren
-        if include_article_links and article_url:
-            fixed += 1 + len(article_url)
 
-    def assemble(inner_limits: list[int]) -> str:
-        lines = [header]
-        for marker, (inner, tail, article_url), lim in zip(RISING_MARKERS, picks, inner_limits):
-            head = f"{marker} {clip(inner, lim)} ({tail})"
-            if include_article_links and article_url:
+    def assemble(inner_limit: int, with_links: bool) -> str:
+        lines = [_us_rising_header(d)]
+        for marker, (inner, tail, article_url) in zip(RISING_MARKERS, picks):
+            head = f"{marker} {clip(inner, inner_limit)} ({tail})"
+            if with_links and article_url:
                 lines.append(f"{head}\n{article_url}")
             else:
                 lines.append(head)
         lines.append(US_LIST_LINE)
         return "\n".join(lines)
 
+    def over_budget(body: str) -> bool:
+        if max_chars <= 0:
+            return False
+        if x_free_counting:
+            return _us_body_x_weight(body) > max_chars
+        return len(body) > max_chars
+
     if max_chars <= 0:
-        return assemble([80] * RISING_PICK_COUNT)
+        return assemble(80, include_article_links)
 
-    remaining = max_chars - fixed
-    if remaining < 30:
-        raise ValueError(f"max_us_chars={max_chars} too small for US rising template (~{fixed})")
+    link_modes = [True, False] if include_article_links else [False]
+    body = assemble(16, False)
+    for with_links in link_modes:
+        inner_limit = 48
+        while inner_limit >= 8:
+            body = assemble(inner_limit, with_links)
+            if not over_budget(body):
+                if include_article_links and not with_links:
+                    print(
+                        "WARNING: US rising block dropped article links to fit X budget",
+                        file=sys.stderr,
+                    )
+                return body
+            inner_limit -= 2
 
-    base_each = max(28, remaining // RISING_PICK_COUNT)
-    limits = [base_each + (1 if i < (remaining % RISING_PICK_COUNT) else 0) for i in range(RISING_PICK_COUNT)]
-    body = assemble(limits)
-
-    def over_budget(b: str) -> int:
-        if not x_free_counting:
-            return len(b) - max_chars
-        return _us_body_x_weight(b) - max_chars
-
-    guard = 0
-    while over_budget(body) > 0 and guard < 200:
-        guard += 1
-        idx = max(range(RISING_PICK_COUNT), key=lambda i: limits[i])
-        if limits[idx] <= 16:
-            break
-        limits[idx] = max(16, limits[idx] - max(1, min(over_budget(body), 6)))
-        body = assemble(limits)
+    if over_budget(body):
+        print(
+            "WARNING: US rising block still exceeds X budget; tighten sources or post as thread",
+            file=sys.stderr,
+        )
     return body
 
 

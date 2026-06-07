@@ -175,7 +175,7 @@ def test_build_category_top3_prefers_intraday_jump_over_19_only_stale(gads):
     top3 = gads.build_category_top3(rows, count=3)
     news = next(b for b in top3 if b["category"] == "ニュース")
     assert news["items"][0]["label"] == "Morning Typhoon Alert"
-    assert "07時" in news["items"][0]["rank_display"]
+    assert "7時" in news["items"][0]["rank_display"]
     assert "19時1位" in news["items"][0]["rank_display"]
 
 
@@ -203,7 +203,7 @@ def test_build_category_leader_prefers_day_jump(gads):
     leaders = gads.build_category_leaders_from_rows(rows)
     news = next(l for l in leaders if l["category"] == "ニュース")
     assert news["label"] == "Day Story"
-    assert "07時" in news["rank_display"]
+    assert "7時" in news["rank_display"]
 
 
 def test_build_rising_highlights_picks_rank_jump(gads):
@@ -238,7 +238,7 @@ def test_build_rising_highlights_picks_rank_jump(gads):
     assert rising[0]["label"] == "Climber"
     assert rising[0]["jump"] == 16.0
     assert rising[0]["category"] == "検索・動画"
-    assert "07時" in rising[0]["rank_evidence"]
+    assert "7時" in rising[0]["rank_evidence"]
     assert "YouTube" in rising[0]["link_line"]
 
 
@@ -250,15 +250,21 @@ def test_is_noisy_label_filters_procurement(gads):
     assert not gads._is_noisy_label("豊臣秀長", "wikipedia_jp")
 
 
+def test_slot_hour_label_strips_leading_zero(gads):
+    assert gads._slot_hour_label("07") == "7"
+    assert gads._slot_hour_label("13") == "13"
+    assert gads.DAYTIME_SLOTS_ARROW == "7→13→19"
+
+
 def test_format_rank_evidence_uses_compact_slot_wording(gads):
     assert gads._format_rank_evidence({"07": 8, "13": 3, "19": 1}) == (
-        "07時8位 → 13時3位 → 19時1位"
+        "7時8位 → 13時3位 → 19時1位"
     )
 
 
 def test_format_rank_evidence_shows_oob_for_missing_slots(gads):
     assert gads._format_rank_evidence({"13": 1}) == (
-        "07時圏外 → 13時1位 → 19時圏外"
+        "7時圏外 → 13時1位 → 19時圏外"
     )
 
 
@@ -383,7 +389,7 @@ def test_build_rising_excludes_single_slot_and_fade(gads):
     assert "Only Afternoon" not in labels
     assert "Fade Article" not in labels
     assert "Real Rise" in labels
-    assert "07時圏外" in rising[0]["rank_evidence"]
+    assert "7時圏外" in rising[0]["rank_evidence"]
 
 
 def test_build_cross_source_excludes_same_provider_openalex(gads):
@@ -665,7 +671,7 @@ def test_render_rising_highlights_markdown_lists_items(gads):
     items = [
         {
             "link_line": "[Climber](https://example.com)（YouTube · 19時2位）",
-            "rank_evidence": "07時18位 → 19時2位",
+            "rank_evidence": "7時18位 → 19時2位",
             "category": "検索・動画",
         },
     ]
@@ -687,7 +693,7 @@ def test_render_cross_source_highlights_markdown_lists_items(gads):
         {
             "label": "豊臣秀長",
             "sources_display": "Wikipedia (JA), Google Trends (JP)",
-            "rank_evidence": "07時8位 → 19時2位",
+            "rank_evidence": "7時8位 → 19時2位",
         },
     ]
     md = gads.render_cross_source_highlights_markdown(highlights, date(2026, 5, 20))
@@ -936,7 +942,7 @@ def test_finalize_editorial_fills_spotlights_and_replaces_one_liner(gads):
         {
             "label": "Climber",
             "category": "検索・動画",
-            "rank_evidence": "07時圏外 → 13時3位 → 19時1位",
+            "rank_evidence": "7時圏外 → 13時3位 → 19時1位",
             "link_line": "[Climber](https://example.com)（YouTube · 19時1位）",
         },
     ]
@@ -945,7 +951,7 @@ def test_finalize_editorial_fills_spotlights_and_replaces_one_liner(gads):
             "label": "Climber",
             "category": "検索・動画",
             "reason": "rising",
-            "rank_evidence": "07時圏外 → 13時3位 → 19時1位",
+            "rank_evidence": "7時圏外 → 13時3位 → 19時1位",
         },
     ]
     index = {
@@ -1025,7 +1031,7 @@ def test_render_rising_highlights_includes_notes(gads):
     items = [
         {
             "link_line": "[Climber](https://example.com)（YouTube · 19時2位）",
-            "rank_evidence": "07時18位 → 19時2位",
+            "rank_evidence": "7時18位 → 19時2位",
             "category": "検索・動画",
             "label": "Climber",
         },

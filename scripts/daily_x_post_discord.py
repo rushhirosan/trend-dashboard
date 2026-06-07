@@ -77,27 +77,27 @@ def plain_x_post_to_discord_markdown(text: str) -> str:
 
 
 def build_daily_x_post_discord_payload(date_str: str, jp: str, us: str) -> dict[str, Any]:
-    """Webhook POST 用 JSON（1 embed・JP/US はクリック可能な Markdown リンク）。"""
+    """Webhook POST 用 JSON（1 embed・JP/US はコードブロックで X へコピペ）。"""
     return {
         "username": "Trend Dashboard",
         "embeds": [
             {
                 "title": f"X 投稿案 — {date_str}",
                 "description": (
-                    "各項目はリンク付き（タップで記事へ）。"
-                    " X 投稿用のプレーン文案は `generate_daily_x_post_series.py --write` か GitHub Actions。"
+                    "各ブロック右上の **コピー** で X にそのまま貼り付け。"
+                    " 記事 URL は行ごと含まれています。"
                     " JP を先、US を後。任意で US 返信文を返信ツイートに。"
                 ),
                 "color": _EMBED_COLOR,
                 "fields": [
                     {
                         "name": "JP — 今日の急上昇3つ",
-                        "value": plain_x_post_to_discord_markdown(jp),
+                        "value": _code_block(jp),
                         "inline": False,
                     },
                     {
                         "name": "US — Today's rising 3",
-                        "value": plain_x_post_to_discord_markdown(us),
+                        "value": _code_block(us),
                         "inline": False,
                     },
                     {

@@ -53,9 +53,13 @@ def test_build_payload_includes_jp_us_code_blocks(dxd):
     embed = payload["embeds"][0]
     assert embed["title"] == "X 投稿案 — 2026-06-03"
     fields = {f["name"]: f["value"] for f in embed["fields"]}
-    assert "[① foo（検索）](<https://example.com/jp>)" in fields["JP — 今日の急上昇3つ"]
-    assert "[一覧](<https://trends-dashboard.fly.dev/>)" in fields["JP — 今日の急上昇3つ"]
-    assert "[① bar (News)](<https://example.com/us>)" in fields["US — Today's rising 3"]
+    jp_block = fields["JP — 今日の急上昇3つ"]
+    us_block = fields["US — Today's rising 3"]
+    assert jp_block.startswith("```") and jp_block.endswith("```")
+    assert "① foo（検索）\nhttps://example.com/jp" in jp_block
+    assert "一覧: https://trends-dashboard.fly.dev/" in jp_block
+    assert us_block.startswith("```") and us_block.endswith("```")
+    assert "① bar (News)\nhttps://example.com/us" in us_block
     assert dxd.US_REPLY_SNIPPET in fields["US 返信（任意・英語）"]
 
 
@@ -92,7 +96,8 @@ def test_notify_posts_json(dxd, monkeypatch):
     call_kw = session.post.call_args
     assert call_kw[0][0] == webhook
     body = call_kw[1]["json"]
-    assert body["embeds"][0]["fields"][0]["value"] == "jp block"
+    assert "jp block" in body["embeds"][0]["fields"][0]["value"]
+    assert body["embeds"][0]["fields"][0]["value"].startswith("```")
 
 
 def test_notify_raises_on_http_error(dxd):

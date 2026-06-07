@@ -201,11 +201,22 @@ _PROVIDER_DISPLAY: Dict[str, str] = {
     "usaspending": "USAspending",
 }
 SLOT_LABELS = {
-    "07": "07時台ジョブ後",
+    "07": "7時台ジョブ後",
     "13": "13時台ジョブ後",
     "19": "19時台ジョブ後",
     "01": "翌1時台ジョブ後（前日を閉じる）",
 }
+
+# 読者向けスロット表記（DB の "07" 等をゼロ埋めせず 7時 / 7→13→19 にする）
+DAYTIME_SLOTS_ARROW = "→".join(str(int(s)) for s in DAYTIME_SLOTS)
+
+
+def _slot_hour_label(slot: str) -> str:
+    try:
+        return str(int(str(slot).strip()))
+    except (ValueError, TypeError):
+        s = str(slot or "").strip()
+        return s.lstrip("0") or s or "0"
 
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 MAX_USER_CHARS = 100_000
@@ -686,14 +697,14 @@ def _format_digest_link_line(
 
 
 def _format_slot_rank(slot: str, rank: int) -> str:
-    return f"{slot}時{rank}位"
+    return f"{_slot_hour_label(slot)}時{rank}位"
 
 
 def _format_slot_rank_or_oob(slot: str, ranks: dict[str, int]) -> str:
     """top N に無いスロットは「圏外」。"""
     r = ranks.get(slot)
     if r is None:
-        return f"{slot}時圏外"
+        return f"{_slot_hour_label(slot)}時圏外"
     return _format_slot_rank(slot, int(r))
 
 
@@ -1245,7 +1256,7 @@ def build_label_link_index(
             href_line = _format_digest_link_line(
                 display,
                 series_key or "?",
-                "07→13→19",
+                DAYTIME_SLOTS_ARROW,
                 url,
             )
         index[nk] = {
@@ -1276,7 +1287,7 @@ def build_label_link_index(
         keys = h.get("series_keys") or []
         sk = str(keys[0]) if keys else ""
         url = _url_for_label_in_series(series_by_slot, sk, label) if sk else None
-        line = _format_digest_link_line(label, sk or "?", "07→13→19", url) if label else None
+        line = _format_digest_link_line(label, sk or "?", DAYTIME_SLOTS_ARROW, url) if label else None
         register(label, line, series_key=sk)
 
     return index
@@ -1325,7 +1336,7 @@ def render_rising_highlights_markdown(
     lines: List[str] = [_RISING_HEADING, ""]
     if not items:
         lines.append(
-            "（07→13→19 の間で、順位が大きく上がった話題はありませんでした）"
+            f"（{DAYTIME_SLOTS_ARROW} の間で、順位が大きく上がった話題はありませんでした）"
         )
         return "\n".join(lines).rstrip() + "\n"
     for i, it in enumerate(items, 1):
@@ -1666,7 +1677,7 @@ def build_mechanical_one_liner(
 
     if not sentences:
         return (
-            "07→13→19 では、目立った順位の急上昇は限定的でした。"
+            f"{DAYTIME_SLOTS_ARROW} では、目立った順位の急上昇は限定的でした。"
             "カテゴリ別の上位は下記のとおりです。"
         )
 

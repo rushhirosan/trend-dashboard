@@ -1115,6 +1115,7 @@ def main() -> int:
 
     database_url = (args.database_url or os.environ.get("DATABASE_URL") or "").strip()
     use_snapshots_db = bool(database_url) and not args.from_api
+    series_by_slot = None
 
     if use_snapshots_db:
         try:
@@ -1235,8 +1236,23 @@ def main() -> int:
                 file=sys.stderr,
             )
         else:
+            # Discord は X 280 字制限なし → スナップショット由来なら全文で再生成
+            discord_jp, discord_us = jp, us
+            if series_by_slot is not None:
+                discord_jp = build_jp_block_from_snapshots(
+                    series_by_slot,
+                    d,
+                    max_jp_x_weighted=0,
+                    include_article_links=True,
+                )
+                discord_us = build_us_block_from_snapshots(
+                    series_by_slot,
+                    d,
+                    max_chars=0,
+                    include_article_links=True,
+                )
             try:
-                notify_daily_x_post_discord(webhook, d, jp, us)
+                notify_daily_x_post_discord(webhook, d, discord_jp, discord_us)
             except (requests.RequestException, RuntimeError) as e:
                 print(f"ERROR: Discord 通知失敗: {e}", file=sys.stderr)
                 return 1

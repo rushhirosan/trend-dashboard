@@ -3,18 +3,17 @@ Discord Webhook へ日次 X 投稿案（JP / US）を送る。
 
 ``generate_daily_x_post_series.py --discord`` から利用。
 Webhook URL はスケジューラ通知と同じ ``DISCORD_WEBHOOK_URL``（``utils/alert_service`` と共通）。
+
+JP / US 文案は Embed field ではなくプレーン ``content`` メッセージで送る。
+iPhone でも長押し「テキストをコピー」→ X 貼り付けがしやすい（Embed field は iOS で選択不可）。
 """
 
 from __future__ import annotations
 
 import os
-import re
 from typing import Any
 
 import requests
-
-_URL_LINE = re.compile(r"^https?://\S+$", re.I)
-_LIST_LINE = re.compile(r"^一覧:\s*(https?://\S+)\s*$")
 
 US_REPLY_SNIPPET = (
     "Dashboard refreshes on a JST schedule (1/7/13/19 JST). "
@@ -23,6 +22,8 @@ US_REPLY_SNIPPET = (
 
 DATA_STATUS_URL = "https://trends-dashboard.fly.dev/data-status"
 _EMBED_COLOR = 0x5865F2  # Discord blurple — コピー用通知と区別しやすい
+_DISCORD_CONTENT_MAX = 2000
+_WEBHOOK_USERNAME = "Trend Dashboard"
 
 
 def resolve_discord_webhook_url(override: str | None = None) -> str | None:
@@ -33,83 +34,54 @@ def resolve_discord_webhook_url(override: str | None = None) -> str | None:
     return None
 
 
-def _code_block(text: str) -> str:
-    """Discord embed field 用。本文に ``` が含まれても壊れにくいようフェンスを調整。"""
+def _webhook_base() -> dict[str, Any]:
+    return {"username": _WEBHOOK_USERNAME}
+
+
+def _plain_content_payload(text: str) -> dict[str, Any]:
     body = (text or "").strip()
-    fence = "```"
-    while fence in body:
-        fence += "`"
-    return f"{fence}\n{body}\n{fence}"
+    if not body:
+        raise ValueError("Discord content must not be empty")
+    if len(body) > _DISCORD_CONTENT_MAX:
+        raise ValueError(
+            f"Discord content exceeds {_DISCORD_CONTENT_MAX} chars ({len(body)})"
+        )
+    return {**_webhook_base(), "content": body}
 
 
-def _discord_link_label(text: str) -> str:
-    """Discord の [label](url) が壊れないよう角括弧を全角に。"""
-    return text.replace("[", "［").replace("]", "］")
-
-
-def _discord_link(label: str, url: str) -> str:
-    return f"[{_discord_link_label(label)}](<{url}>)"
-
-
-def plain_x_post_to_discord_markdown(text: str) -> str:
-    """
-    X 投稿案（見出し + 次行 URL）を Discord embed 用 Markdown に変換する。
-    コードブロック内では URL がリンク化されないため、embed field ではこちらを使う。
-    """
-    lines = (text or "").strip().split("\n")
-    out: list[str] = []
-    i = 0
-    while i < len(lines):
-        line = lines[i]
-        next_line = lines[i + 1].strip() if i + 1 < len(lines) else ""
-        if next_line and _URL_LINE.match(next_line):
-            out.append(_discord_link(line, next_line))
-            i += 2
-            continue
-        list_match = _LIST_LINE.match(line.strip())
-        if list_match:
-            out.append(_discord_link("一覧", list_match.group(1)))
-            i += 1
-            continue
-        out.append(line)
-        i += 1
-    return "\n".join(out)
-
-
-def build_daily_x_post_discord_payload(date_str: str, jp: str, us: str) -> dict[str, Any]:
-    """Webhook POST 用 JSON（1 embed・JP/US はコードブロックで X へコピペ）。"""
+def build_daily_x_post_discord_header_payload(date_str: str) -> dict[str, Any]:
+    """説明用 Embed のみ（コピー対象の文案は含めない）。"""
     return {
-        "username": "Trend Dashboard",
+        **_webhook_base(),
         "embeds": [
             {
                 "title": f"X 投稿案 — {date_str}",
                 "description": (
-                    "各ブロック右上の **コピー** で X にそのまま貼り付け。"
+                    "下の **JP → US → US 返信** を順に長押し → **テキストをコピー** で X に貼り付け。"
                     " 記事 URL は行ごと含まれています。"
-                    " JP を先、US を後。任意で US 返信文を返信ツイートに。"
                 ),
                 "color": _EMBED_COLOR,
-                "fields": [
-                    {
-                        "name": "JP — 今日の急上昇3つ",
-                        "value": _code_block(jp),
-                        "inline": False,
-                    },
-                    {
-                        "name": "US — Today's rising 3",
-                        "value": _code_block(us),
-                        "inline": False,
-                    },
-                    {
-                        "name": "US 返信（任意・英語）",
-                        "value": _code_block(US_REPLY_SNIPPET),
-                        "inline": False,
-                    },
-                ],
                 "footer": {"text": f"鮮度確認: {DATA_STATUS_URL}"},
             }
         ],
     }
+
+
+def build_daily_x_post_discord_payloads(
+    date_str: str, jp: str, us: str
+) -> list[dict[str, Any]]:
+    """Webhook POST 用 JSON のリスト（ヘッダー Embed + JP/US/返信のプレーン文）。"""
+    return [
+        build_daily_x_post_discord_header_payload(date_str),
+        _plain_content_payload(jp),
+        _plain_content_payload(us),
+        _plain_content_payload(US_REPLY_SNIPPET),
+    ]
+
+
+def build_daily_x_post_discord_payload(date_str: str, jp: str, us: str) -> dict[str, Any]:
+    """後方互換: 先頭ペイロード（ヘッダー Embed）のみ返す。"""
+    return build_daily_x_post_discord_header_payload(date_str)
 
 
 def notify_daily_x_post_discord(
@@ -121,10 +93,10 @@ def notify_daily_x_post_discord(
     session: requests.Session | None = None,
     timeout: float = 30.0,
 ) -> None:
-    """Discord Webhook に日次 X 投稿案を POST。HTTP エラー時は RuntimeError。"""
-    payload = build_daily_x_post_discord_payload(date_str, jp, us)
+    """Discord Webhook に日次 X 投稿案を POST（複数メッセージ）。HTTP エラー時は RuntimeError。"""
     http = session or requests
-    resp = http.post(webhook_url, json=payload, timeout=timeout)
-    if resp.status_code >= 400:
-        body = (resp.text or "")[:500]
-        raise RuntimeError(f"Discord HTTP {resp.status_code}: {body}")
+    for payload in build_daily_x_post_discord_payloads(date_str, jp, us):
+        resp = http.post(webhook_url, json=payload, timeout=timeout)
+        if resp.status_code >= 400:
+            body = (resp.text or "")[:500]
+            raise RuntimeError(f"Discord HTTP {resp.status_code}: {body}")

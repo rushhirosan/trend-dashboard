@@ -35,7 +35,7 @@ def test_resolve_discord_webhook_url_rejects_non_discord(dxd, monkeypatch):
     assert dxd.resolve_discord_webhook_url(None) is None
 
 
-def test_build_payload_includes_jp_us_code_blocks(dxd):
+def test_build_payloads_plain_jp_us_and_reply(dxd):
     jp = (
         "【2026-06-03】今日の急上昇3つ（JP）\n"
         "① foo（検索）\n"
@@ -48,39 +48,23 @@ def test_build_payload_includes_jp_us_code_blocks(dxd):
         "https://example.com/us\n"
         "一覧: https://trends-dashboard.fly.dev/us"
     )
-    payload = dxd.build_daily_x_post_discord_payload("2026-06-03", jp, us)
-    assert payload["username"] == "Trend Dashboard"
-    embed = payload["embeds"][0]
+    payloads = dxd.build_daily_x_post_discord_payloads("2026-06-03", jp, us)
+    assert len(payloads) == 4
+    assert payloads[0]["username"] == "Trend Dashboard"
+    embed = payloads[0]["embeds"][0]
     assert embed["title"] == "X 投稿案 — 2026-06-03"
-    fields = {f["name"]: f["value"] for f in embed["fields"]}
-    jp_block = fields["JP — 今日の急上昇3つ"]
-    us_block = fields["US — Today's rising 3"]
-    assert jp_block.startswith("```") and jp_block.endswith("```")
-    assert "① foo（検索）\nhttps://example.com/jp" in jp_block
-    assert "一覧: https://trends-dashboard.fly.dev/" in jp_block
-    assert us_block.startswith("```") and us_block.endswith("```")
-    assert "① bar (News)\nhttps://example.com/us" in us_block
-    assert dxd.US_REPLY_SNIPPET in fields["US 返信（任意・英語）"]
+    assert "embeds" not in payloads[1]
+    assert payloads[1]["content"] == jp
+    assert payloads[2]["content"] == us
+    assert payloads[3]["content"] == dxd.US_REPLY_SNIPPET
 
 
-def test_plain_x_post_to_discord_markdown_leaves_header_lines(dxd):
-    jp = "【2026-06-03】今日の急上昇3つ（JP）\n① only title（検索）"
-    out = dxd.plain_x_post_to_discord_markdown(jp)
-    assert out == jp
+def test_plain_content_rejects_over_limit(dxd):
+    with pytest.raises(ValueError, match="exceeds 2000"):
+        dxd._plain_content_payload("x" * 2001)
 
 
-def test_discord_link_label_escapes_brackets(dxd):
-    assert dxd._discord_link_label("a[b]c") == "a［b］c"
-
-
-def test_code_block_escapes_inner_backticks(dxd):
-    text = "line with ``` inside"
-    wrapped = dxd._code_block(text)
-    assert wrapped.startswith("````")
-    assert text in wrapped
-
-
-def test_notify_posts_json(dxd, monkeypatch):
+def test_notify_posts_four_messages(dxd):
     jp = "jp block"
     us = "us block"
     webhook = "https://discord.com/api/webhooks/9/abc"
@@ -92,20 +76,19 @@ def test_notify_posts_json(dxd, monkeypatch):
 
     dxd.notify_daily_x_post_discord(webhook, "2026-06-03", jp, us, session=session)
 
-    session.post.assert_called_once()
-    call_kw = session.post.call_args
-    assert call_kw[0][0] == webhook
-    body = call_kw[1]["json"]
-    assert "jp block" in body["embeds"][0]["fields"][0]["value"]
-    assert body["embeds"][0]["fields"][0]["value"].startswith("```")
+    assert session.post.call_count == 4
+    bodies = [call[1]["json"] for call in session.post.call_args_list]
+    assert bodies[0]["embeds"][0]["title"] == "X 投稿案 — 2026-06-03"
+    assert bodies[1]["content"] == "jp block"
+    assert bodies[2]["content"] == "us block"
+    assert bodies[3]["content"] == dxd.US_REPLY_SNIPPET
 
 
 def test_notify_raises_on_http_error(dxd):
     session = MagicMock()
-    resp = MagicMock()
-    resp.status_code = 400
-    resp.text = "Invalid payload"
-    session.post.return_value = resp
+    ok = MagicMock(status_code=204, text="")
+    bad = MagicMock(status_code=400, text="Invalid payload")
+    session.post.side_effect = [ok, bad]
 
     with pytest.raises(RuntimeError, match="Discord HTTP 400"):
         dxd.notify_daily_x_post_discord(

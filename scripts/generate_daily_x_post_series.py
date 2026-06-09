@@ -75,8 +75,8 @@ DEFAULT_MAX_US_CHARS = X_FREE_CHARACTER_LIMIT
 X_FREE_URL_WEIGHT = 23
 POST_FOOTER_URL = "https://trends-dashboard.fly.dev/"
 POST_FOOTER_URL_US = "https://trends-dashboard.fly.dev/us"
-JP_LIST_LINE = f"一覧: {POST_FOOTER_URL}"
-US_LIST_LINE = f"一覧: {POST_FOOTER_URL_US}"
+JP_LIST_LINE = f"全ソース: {POST_FOOTER_URL}"
+US_LIST_LINE = f"Dashboard: {POST_FOOTER_URL_US}"
 
 JP_CATEGORY_TAILS = ("（検索）", "（動画）", "（ニュース）", "（IT）", "（エンタメ）")
 US_CATEGORY_TAILS = (" (Search)", " (Video)", " (News)", " (IT)", " (Entertainment)")
@@ -220,6 +220,29 @@ def clip(s: str, max_len: int) -> str:
         if last_sp > max(cut // 3, 6):
             chunk = chunk[:last_sp]
     return chunk + "…"
+
+
+def _format_rising_date_short(d: str) -> str:
+    """YYYY-MM-DD → M/D（X 向け短い日付）。"""
+    parts = d.split("-")
+    if len(parts) == 3:
+        try:
+            return f"{int(parts[1])}/{int(parts[2])}"
+        except ValueError:
+            pass
+    return d
+
+
+def _jp_rising_header(d: str, *, compact: bool, count: int) -> str:
+    if compact:
+        return f"【{_format_rising_date_short(d)}】急上昇{count}（JP）"
+    return f"【{d}】今日の急上昇3つ（JP）"
+
+
+def _us_rising_header(d: str, *, compact: bool, count: int) -> str:
+    if compact:
+        return f"Rising {count} (US) {_format_rising_date_short(d)} · 8pm JST"
+    return f"Today's rising 3 (US) {d} · 8pm JST"
 
 
 def second_keyword(rows: list) -> str:
@@ -592,24 +615,77 @@ def _compose_jp_rising_body(
     max_jp_x_weighted: int,
     include_article_links: bool = True,
 ) -> str:
-    def ln(marker: str, inner: str, tail: str, url: str, lim: int) -> str:
-        head = f"{marker} {clip(inner, lim)}（{tail}）"
-        if include_article_links and url:
+    compact = max_jp_x_weighted > 0
+    pick_counts = (3, 2, 1) if compact else (len(picks),)
+
+    def ln(
+        marker: str,
+        inner: str,
+        tail: str,
+        url: str,
+        lim: int,
+        *,
+        with_links: bool,
+    ) -> str:
+        head = f"{marker} {clip(inner, lim)}"
+        if with_links and url:
             return f"{head}\n{url}"
         return head
 
-    im = max(12, inner_max)
-    body = ""
-    while im >= 8:
-        lines = [f"【{d}】今日の急上昇3つ（JP）"]
-        for marker, (inner, tail, url) in zip(RISING_MARKERS, picks):
-            lines.append(ln(marker, inner, tail, url, im))
+    def assemble(
+        subset: list[tuple[str, str, str]],
+        lim: int,
+        *,
+        with_links: bool,
+    ) -> str:
+        n = len(subset)
+        lines = [_jp_rising_header(d, compact=compact, count=n)]
+        for marker, (inner, tail, url) in zip(RISING_MARKERS, subset):
+            lines.append(
+                ln(marker, inner, tail, url, lim, with_links=with_links)
+            )
         lines.append(JP_LIST_LINE)
-        body = "\n".join(lines)
-        if max_jp_x_weighted <= 0 or _jp_body_x_weight(body) <= max_jp_x_weighted:
-            break
-        im -= 2
-    if max_jp_x_weighted > 0 and _jp_body_x_weight(body) > max_jp_x_weighted:
+        return "\n".join(lines)
+
+    body = ""
+    reduced_note = False
+    dropped_links = False
+    link_passes: list[bool] = [False]
+    if include_article_links:
+        link_passes = [True]
+        if compact:
+            link_passes.append(False)
+
+    for with_links in link_passes:
+        for n in pick_counts:
+            subset = picks[:n]
+            if not subset:
+                continue
+            im = 48 if compact else max(12, inner_max)
+            while im >= 8:
+                body = assemble(subset, im, with_links=with_links)
+                if max_jp_x_weighted <= 0 or _jp_body_x_weight(body) <= max_jp_x_weighted:
+                    if compact and n < len(picks) and not reduced_note:
+                        print(
+                            f"NOTE: JP rising reduced to {n} item(s) for X budget",
+                            file=sys.stderr,
+                        )
+                        reduced_note = True
+                    if (
+                        compact
+                        and include_article_links
+                        and not with_links
+                        and not dropped_links
+                    ):
+                        print(
+                            "WARNING: JP rising block dropped article links to fit X budget",
+                            file=sys.stderr,
+                        )
+                        dropped_links = True
+                    return body
+                im -= 2
+
+    if max_jp_x_weighted > 0 and body and _jp_body_x_weight(body) > max_jp_x_weighted:
         print(
             "WARNING: JP rising block still exceeds X weighted budget",
             file=sys.stderr,
@@ -697,10 +773,6 @@ def build_jp_block(
         inner_max=inner_max,
         max_jp_x_weighted=max_jp_x_weighted,
     )
-
-
-def _us_rising_header(d: str) -> str:
-    return f"Today's rising 3 (US) {d} · 8pm JST"
 
 
 def _us_header(d: str, compact: bool) -> str:
@@ -798,15 +870,42 @@ def _compose_us_rising_body(
     include_article_links: bool = True,
 ) -> str:
     x_free_counting = max_chars <= X_FREE_CHARACTER_LIMIT
+    compact = x_free_counting and max_chars > 0
+    pick_counts = (3, 2, 1) if compact else (len(picks),)
 
-    def assemble(inner_limit: int, with_links: bool) -> str:
-        lines = [_us_rising_header(d)]
-        for marker, (inner, tail, article_url) in zip(RISING_MARKERS, picks):
-            head = f"{marker} {clip(inner, inner_limit)} ({tail})"
-            if with_links and article_url:
-                lines.append(f"{head}\n{article_url}")
-            else:
-                lines.append(head)
+    def ln(
+        marker: str,
+        inner: str,
+        tail: str,
+        article_url: str,
+        inner_limit: int,
+        *,
+        with_links: bool,
+    ) -> str:
+        head = f"{marker} {clip(inner, inner_limit)}"
+        if with_links and article_url:
+            return f"{head}\n{article_url}"
+        return head
+
+    def assemble(
+        subset: list[tuple[str, str, str]],
+        inner_limit: int,
+        *,
+        with_links: bool,
+    ) -> str:
+        n = len(subset)
+        lines = [_us_rising_header(d, compact=compact, count=n)]
+        for marker, (inner, tail, article_url) in zip(RISING_MARKERS, subset):
+            lines.append(
+                ln(
+                    marker,
+                    inner,
+                    tail,
+                    article_url,
+                    inner_limit,
+                    with_links=with_links,
+                )
+            )
         lines.append(US_LIST_LINE)
         return "\n".join(lines)
 
@@ -818,22 +917,45 @@ def _compose_us_rising_body(
         return len(body) > max_chars
 
     if max_chars <= 0:
-        return assemble(80, include_article_links)
+        return assemble(picks, 80, with_links=include_article_links)
 
-    link_modes = [True, False] if include_article_links else [False]
-    body = assemble(16, False)
-    for with_links in link_modes:
-        inner_limit = 48
-        while inner_limit >= 8:
-            body = assemble(inner_limit, with_links)
-            if not over_budget(body):
-                if include_article_links and not with_links:
-                    print(
-                        "WARNING: US rising block dropped article links to fit X budget",
-                        file=sys.stderr,
-                    )
-                return body
-            inner_limit -= 2
+    body = ""
+    reduced_note = False
+    dropped_links = False
+    link_passes: list[bool] = [False]
+    if include_article_links:
+        link_passes = [True]
+        if compact:
+            link_passes.append(False)
+
+    for with_links in link_passes:
+        for n in pick_counts:
+            subset = picks[:n]
+            if not subset:
+                continue
+            inner_limit = 48 if compact else 48
+            while inner_limit >= 8:
+                body = assemble(subset, inner_limit, with_links=with_links)
+                if not over_budget(body):
+                    if compact and n < len(picks) and not reduced_note:
+                        print(
+                            f"NOTE: US rising reduced to {n} item(s) for X budget",
+                            file=sys.stderr,
+                        )
+                        reduced_note = True
+                    if (
+                        compact
+                        and include_article_links
+                        and not with_links
+                        and not dropped_links
+                    ):
+                        print(
+                            "WARNING: US rising block dropped article links to fit X budget",
+                            file=sys.stderr,
+                        )
+                        dropped_links = True
+                    return body
+                inner_limit -= 2
 
     if over_budget(body):
         print(
@@ -841,6 +963,24 @@ def _compose_us_rising_body(
             file=sys.stderr,
         )
     return body
+
+
+def build_x_post_blocks_for_discord_copy(
+    series_by_slot: dict[str, dict[str, list[Any]]],
+    d: str,
+) -> tuple[str, str]:
+    """Discord 用: X にそのまま貼る（280 字・記事 URL は収まれば付ける）。"""
+    jp = build_jp_block_from_snapshots(
+        series_by_slot,
+        d,
+        include_article_links=True,
+    )
+    us = build_us_block_from_snapshots(
+        series_by_slot,
+        d,
+        include_article_links=True,
+    )
+    return jp, us
 
 
 def build_us_block_from_snapshots(
@@ -928,7 +1068,7 @@ def compose_daily_markdown(date_str: str, jp_inner: str, us_inner: str) -> str:
         "",
         "- **自動投入:** `scripts/generate_daily_x_post_series.py --write` が **`trend_daily_snapshots`** の **07 / 13 / 19** を読み、**AI 日次サマリーと同じ急上昇判定**で全ソース横断・最大3件（JP/US 各ブロック）選びます。入力は **`DATABASE_URL`** か **`--from-api`**（`GET /api/summaries/daily-snapshots`）。",
         "- **GitHub Actions:** `.github/workflows/daily-x-post-series.yml` が **JST 20:10 前後（UTC 11:10）** に **`docs/x_post_samples/daily/{日付}.md`** を更新します。",
-        "- 一覧: https://trends-dashboard.fly.dev/",
+        f"- {JP_LIST_LINE}",
         "- 鮮度: https://trends-dashboard.fly.dev/data-status",
         "",
         "**US 返信に足す場合（任意・英語）:**",
@@ -1236,21 +1376,12 @@ def main() -> int:
                 file=sys.stderr,
             )
         else:
-            # Discord は X 280 字制限なし → スナップショット由来なら全文で再生成
-            discord_jp, discord_us = jp, us
             if series_by_slot is not None:
-                discord_jp = build_jp_block_from_snapshots(
-                    series_by_slot,
-                    d,
-                    max_jp_x_weighted=0,
-                    include_article_links=True,
+                discord_jp, discord_us = build_x_post_blocks_for_discord_copy(
+                    series_by_slot, d
                 )
-                discord_us = build_us_block_from_snapshots(
-                    series_by_slot,
-                    d,
-                    max_chars=0,
-                    include_article_links=True,
-                )
+            else:
+                discord_jp, discord_us = jp, us
             try:
                 notify_daily_x_post_discord(webhook, d, discord_jp, discord_us)
             except (requests.RequestException, RuntimeError) as e:

@@ -42,8 +42,7 @@ def test_run_sends_and_marks_completed(monkeypatch):
     gx.default_business_day_for_evening_x_post_jst.return_value = date(2026, 6, 4)
     gx.SNAPSHOT_SLOTS_DAYTIME = ("07", "13", "19")
     gx.load_snapshots_daytime_slots.return_value = {"07": {}, "13": {}, "19": {}}
-    gx.build_jp_block_from_snapshots.return_value = "jp block"
-    gx.build_us_block_from_snapshots.return_value = "us block"
+    gx.build_x_post_blocks_for_discord_copy.return_value = ("jp copy", "us copy")
 
     dxd = MagicMock()
     dxd.resolve_discord_webhook_url.return_value = "https://discord.com/api/webhooks/1/x"
@@ -57,7 +56,7 @@ def test_run_sends_and_marks_completed(monkeypatch):
     dxd.notify_daily_x_post_discord.assert_called_once_with(
         "https://discord.com/api/webhooks/1/x",
         "2026-06-04",
-        "jp block",
-        "us block",
+        "jp copy",
+        "us copy",
     )
     db.mark_slot_completed.assert_called_once_with("xpost_discord_2026-06-04")

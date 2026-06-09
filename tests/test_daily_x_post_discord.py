@@ -35,28 +35,27 @@ def test_resolve_discord_webhook_url_rejects_non_discord(dxd, monkeypatch):
     assert dxd.resolve_discord_webhook_url(None) is None
 
 
-def test_build_payloads_plain_jp_us_and_reply(dxd):
+def test_build_payloads_jp_us_only_with_suppress_embeds(dxd):
     jp = (
-        "【2026-06-03】今日の急上昇3つ（JP）\n"
-        "① foo（検索）\n"
+        "【6/9】急上昇3（JP）\n"
+        "① foo\n"
         "https://example.com/jp\n"
-        "一覧: https://trends-dashboard.fly.dev/"
+        "全ソース: https://trends-dashboard.fly.dev/"
     )
     us = (
-        "Today's rising 3 (US) 2026-06-03 · 8pm JST\n"
-        "① bar (News)\n"
+        "Rising 3 (US) 6/9 · 8pm JST\n"
+        "① bar\n"
         "https://example.com/us\n"
-        "一覧: https://trends-dashboard.fly.dev/us"
+        "Dashboard: https://trends-dashboard.fly.dev/us"
     )
-    payloads = dxd.build_daily_x_post_discord_payloads("2026-06-03", jp, us)
-    assert len(payloads) == 4
+    payloads = dxd.build_daily_x_post_discord_payloads(jp, us)
+    assert len(payloads) == 2
     assert payloads[0]["username"] == "Trend Dashboard"
-    embed = payloads[0]["embeds"][0]
-    assert embed["title"] == "X 投稿案 — 2026-06-03"
-    assert "embeds" not in payloads[1]
-    assert payloads[1]["content"] == jp
-    assert payloads[2]["content"] == us
-    assert payloads[3]["content"] == dxd.US_REPLY_SNIPPET
+    assert "embeds" not in payloads[0]
+    assert payloads[0]["content"] == jp
+    assert payloads[0]["flags"] == dxd._SUPPRESS_EMBEDS_FLAG
+    assert payloads[1]["content"] == us
+    assert payloads[1]["flags"] == dxd._SUPPRESS_EMBEDS_FLAG
 
 
 def test_plain_content_rejects_over_limit(dxd):
@@ -64,7 +63,7 @@ def test_plain_content_rejects_over_limit(dxd):
         dxd._plain_content_payload("x" * 2001)
 
 
-def test_notify_posts_four_messages(dxd):
+def test_notify_posts_two_messages(dxd):
     jp = "jp block"
     us = "us block"
     webhook = "https://discord.com/api/webhooks/9/abc"
@@ -74,14 +73,13 @@ def test_notify_posts_four_messages(dxd):
     resp.text = ""
     session.post.return_value = resp
 
-    dxd.notify_daily_x_post_discord(webhook, "2026-06-03", jp, us, session=session)
+    dxd.notify_daily_x_post_discord(webhook, "2026-06-09", jp, us, session=session)
 
-    assert session.post.call_count == 4
+    assert session.post.call_count == 2
     bodies = [call[1]["json"] for call in session.post.call_args_list]
-    assert bodies[0]["embeds"][0]["title"] == "X 投稿案 — 2026-06-03"
-    assert bodies[1]["content"] == "jp block"
-    assert bodies[2]["content"] == "us block"
-    assert bodies[3]["content"] == dxd.US_REPLY_SNIPPET
+    assert bodies[0]["content"] == "jp block"
+    assert bodies[1]["content"] == "us block"
+    assert bodies[0]["flags"] == dxd._SUPPRESS_EMBEDS_FLAG
 
 
 def test_notify_raises_on_http_error(dxd):
@@ -93,7 +91,7 @@ def test_notify_raises_on_http_error(dxd):
     with pytest.raises(RuntimeError, match="Discord HTTP 400"):
         dxd.notify_daily_x_post_discord(
             "https://discord.com/api/webhooks/1/x",
-            "2026-06-03",
+            "2026-06-09",
             "jp",
             "us",
             session=session,

@@ -72,16 +72,7 @@ def run_evening_x_post_discord_notify(db: Any | None = None) -> bool:
         return False
 
     try:
-        # Discord は X の 280 字制限がないため全文（記事 URL 付き）
-        jp = gx.build_jp_block_from_snapshots(
-            series_by_slot,
-            day_s,
-            max_jp_x_weighted=0,
-            include_article_links=True,
-        )
-        us = gx.build_us_block_from_snapshots(
-            series_by_slot, day_s, max_chars=0, include_article_links=True
-        )
+        jp, us = gx.build_x_post_blocks_for_discord_copy(series_by_slot, day_s)
     except ValueError as e:
         logger.error("evening_x_post: 文案生成失敗: %s", e)
         return False

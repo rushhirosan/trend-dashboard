@@ -129,7 +129,7 @@ def test_build_blocks_from_snapshots_rising_format(gx):
 
 
 def test_us_rising_fits_x_budget_when_article_urls_are_long(gx):
-    """長い記事 URL でも ValueError にせず、必要ならリンク無しで 280 字以内に収める。"""
+    """長い記事 URL でも ValueError にせず、件数削減またはリンク省略で 280 字以内に収める。"""
     long_url = "https://edition.cnn.com/2026/06/06/politics/example-story-with-a-very-long-path-segment/index.html"
     bundle = {
         "07": {
@@ -151,9 +151,64 @@ def test_us_rising_fits_x_budget_when_article_urls_are_long(gx):
     us = gx.build_us_block_from_snapshots(
         bundle, "2026-06-06", max_chars=gx.X_FREE_CHARACTER_LIMIT
     )
-    assert "Today's rising 3" in us
+    assert "Rising" in us
     assert gx._us_body_x_weight(us) <= gx.X_FREE_CHARACTER_LIMIT
-    assert long_url not in us
+
+
+def test_x_budget_uses_compact_header_and_short_categories(gx):
+    bundle = {
+        "07": {
+            "google_trends_jp": [{"t": "FlatJP", "r": 1}],
+            "youtube_trends_jp": [{"t": "ClimberJP", "r": 18}],
+            "google_trends_us": [{"t": "FlatUS", "r": 1}],
+            "youtube_trends_us": [{"t": "ClimberUS", "r": 20}],
+        },
+        "13": {
+            "google_trends_jp": [{"t": "FlatJP", "r": 1}],
+            "youtube_trends_jp": [{"t": "ClimberJP", "r": 9}],
+            "google_trends_us": [{"t": "FlatUS", "r": 1}],
+            "youtube_trends_us": [{"t": "ClimberUS", "r": 11}],
+        },
+        "19": {
+            "google_trends_jp": [{"t": "FlatJP", "r": 1}],
+            "youtube_trends_jp": [{"t": "ClimberJP", "r": 2}],
+            "google_trends_us": [{"t": "FlatUS", "r": 1}],
+            "youtube_trends_us": [{"t": "ClimberUS", "r": 3}],
+        },
+    }
+    jp = gx.build_jp_block_from_snapshots(bundle, "2026-05-12")
+    assert "【5/12】急上昇" in jp
+    assert "（検索）" not in jp and "（動画）" not in jp
+    assert gx._jp_body_x_weight(jp) <= gx.X_FREE_CHARACTER_LIMIT
+    us = gx.build_us_block_from_snapshots(bundle, "2026-05-12")
+    assert "Rising" in us
+    assert gx._us_body_x_weight(us) <= gx.X_FREE_CHARACTER_LIMIT
+
+
+def test_discord_copy_blocks_omit_article_urls_when_too_long(gx):
+    article = "https://www3.nhk.or.jp/news/html/20260529/k100.html"
+    long_url = "https://edition.cnn.com/2026/06/06/politics/example-story-with-a-very-long-path-segment/index.html"
+    bundle = {
+        "07": {
+            "nhk_jp": [{"t": "Typhoon News", "r": 10}],
+            "worldnews_jp": [{"t": "Long Headline One", "r": 12}],
+            "zenn_jp": [{"t": "Long Headline Two", "r": 14}],
+        },
+        "13": {
+            "nhk_jp": [{"t": "Typhoon News", "r": 5}],
+            "worldnews_jp": [{"t": "Long Headline One", "r": 6}],
+            "zenn_jp": [{"t": "Long Headline Two", "r": 7}],
+        },
+        "19": {
+            "nhk_jp": [{"t": "Typhoon News", "r": 1, "u": article}],
+            "worldnews_jp": [{"t": "Long Headline One", "r": 2, "u": long_url}],
+            "zenn_jp": [{"t": "Long Headline Two", "r": 3, "u": long_url}],
+        },
+    }
+    jp_copy, _ = gx.build_x_post_blocks_for_discord_copy(bundle, "2026-06-04")
+    assert gx._jp_body_x_weight(jp_copy) <= gx.X_FREE_CHARACTER_LIMIT
+    # 1件+長URLでも収まる日は URL 付きになる（件数削減優先）
+    assert "①" in jp_copy
 
 
 def test_build_blocks_include_article_urls_when_present(gx):

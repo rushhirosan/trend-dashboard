@@ -2052,10 +2052,10 @@
                 </div><!-- /.tab-pane#pane-market -->
 
                 <div class="tab-pane fade" id="pane-entertainment" role="tabpanel" aria-labelledby="tab-entertainment">
-                    <!-- 8行目: 映画 + 本 + Bluesky -->
+                    <!-- 8行目: 映画 + 本 -->
                 <div class="row g-3 mb-3">
                     <!-- 左側: 映画トレンド -->
-                    <article class="col-12 col-md-4" id="source-movie">
+                    <article class="col-12 col-md-6" id="source-movie">
                         <div class="card h-100">
                             <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                                 <h2 class="h5 mb-0"><i class="fas fa-film" aria-hidden="true"></i> 映画トレンド</h2>
@@ -2126,8 +2126,8 @@
                             </div>
                         </div>
                     </article>
-                    <!-- 中央: 本トレンド -->
-                    <article class="col-12 col-md-4" id="source-book">
+                    <!-- 右側: 本トレンド -->
+                    <article class="col-12 col-md-6" id="source-book">
                         <div class="card h-100">
                             <div class="card-header bg-info text-white d-flex justify-content-between align-items-center flex-wrap gap-2">
                                 <h2 class="h5 mb-0"><i class="fas fa-book" aria-hidden="true"></i> 本トレンド</h2>
@@ -2208,8 +2208,12 @@
                             </div>
                         </div>
                     </article>
-                    <!-- 右側: Bluesky -->
-                    <article class="col-12 col-md-4" id="source-bluesky">
+                </div>
+
+                <!-- 9行目: Bluesky + 音楽 -->
+                <div class="row g-3 mb-3">
+                    <!-- 左側: Bluesky -->
+                    <article class="col-12 col-md-6" id="source-bluesky">
                         <div class="card h-100">
                             <div class="card-header d-flex justify-content-between align-items-center" style="background-color: #0085FF; color: white;">
                                 <h2 class="h5 mb-0"><i class="fas fa-feather" aria-hidden="true"></i> Bluesky</h2>
@@ -2261,11 +2265,7 @@
                             </div>
                         </div>
                     </article>
-                </div>
-
-                <!-- 9行目: Spotify + Podcast -->
-                <div class="row g-3 mb-3">
-                    <!-- 左側: 音楽トレンド -->
+                    <!-- 右側: 音楽トレンド -->
                     <article class="col-12 col-md-6" id="source-music">
                         <div class="card h-100">
                             <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
@@ -2334,7 +2334,11 @@
                             </div>
                         </div>
                     </article>
-                    <!-- 右側: Podcast トレンド -->
+                </div>
+
+                <!-- 10行目: Podcast + 楽天 -->
+                <div class="row g-3 mb-3">
+                    <!-- 左側: Podcast トレンド -->
                     <article class="col-12 col-md-6" id="source-podcast">
                         <div class="card h-100">
                             <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
@@ -2409,12 +2413,8 @@
                             </div>
                         </div>
                     </article>
-                </div>
-
-                <!-- 10行目: 楽天 + OpenAlex + Twitch -->
-                <div class="row g-3 mb-3">
-                    <!-- 左: 楽天商品トレンド -->
-                    <article class="col-12 col-md-4" id="source-rakuten">
+                    <!-- 右側: 楽天商品トレンド -->
+                    <article class="col-12 col-md-6" id="source-rakuten">
                         <div class="card h-100">
                             <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
                                 <h2 class="h5 mb-0"><i class="fas fa-shopping-cart" aria-hidden="true"></i> 楽天商品トレンド</h2>
@@ -2508,8 +2508,12 @@
                             </div>
                         </div>
                     </article>
-                    <!-- 中央: OpenAlex 学術論文トレンド -->
-                    <article class="col-12 col-md-4" id="source-openalex">
+                </div>
+
+                <!-- 11行目: OpenAlex + Twitch -->
+                <div class="row g-3 mb-3">
+                    <!-- 左側: OpenAlex 学術論文トレンド -->
+                    <article class="col-12 col-md-6" id="source-openalex">
                         <div class="card h-100">
                             <div class="card-header d-flex justify-content-between align-items-center" style="background-color: #6c5ce7; color: white;">
                                 <h2 class="h5 mb-0"><i class="fas fa-graduation-cap" aria-hidden="true"></i> OpenAlex 学術論文</h2>
@@ -2583,8 +2587,8 @@
                             </div>
                         </div>
                     </article>
-                    <!-- 右: Twitch トレンド -->
-                    <article class="col-12 col-md-4" id="source-twitch">
+                    <!-- 右側: Twitch トレンド -->
+                    <article class="col-12 col-md-6" id="source-twitch">
                         <div class="card h-100">
                             <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
                                 <h2 class="h5 mb-0"><i class="fab fa-twitch" aria-hidden="true"></i> Twitch トレンド</h2>

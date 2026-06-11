@@ -164,4 +164,5 @@ MIT License
 - [API価格分析](docs/API_PRICING_ANALYSIS.md)
 - [有料サマリー検証：パターンA・フェーズ1（テンプレ・チェックリスト）](docs/summary_pattern_a_phase1.md)
 - [サマリー原稿の保存場所（Markdown・サイト未公開）](docs/summaries/README.md)
+- [AIサマリー マネタイズ計画（工程・進捗）](docs/monetization.md)
 

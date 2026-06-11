@@ -8,7 +8,8 @@
 2. **レビューで品質・リンク・事実関係を確認**（フロントマターの `status` で区別）
 3. **問題なければ配信パイプラインに載せる**（メール・X・有料枠などは別実装。原稿の正本はこのディレクトリ）
 
-運用の約束・タイムボックス・チェックリストの詳細は [`summary_pattern_a_phase1.md`](../summary_pattern_a_phase1.md) を正とする。
+運用の約束・タイムボックス・チェックリストの詳細は [`summary_pattern_a_phase1.md`](../summary_pattern_a_phase1.md) を正とする。  
+マネタイズ方針・工程・進捗は [`monetization.md`](../monetization.md) を参照。
 
 ---
 

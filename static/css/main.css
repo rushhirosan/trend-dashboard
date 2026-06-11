@@ -194,7 +194,7 @@ body {
 
 /* 楽天商品名の表示改善 */
 #rakutenTrendsTableBody td:nth-child(2) {
-    max-width: 200px;
+    min-width: 8rem;
     word-wrap: break-word;
     word-break: break-word;
     white-space: normal;
@@ -1875,14 +1875,19 @@ body.data-status-active #data-status .card-body {
 }
 
 /* Rakuten table - compact row layout */
+#rakutenTrendsTable {
+    table-layout: fixed;
+    width: 100%;
+}
+
 #rakutenTrendsTable .badge {
     font-size: 0.55rem;
 }
 
 #rakutenTrendsTable tbody td {
-    padding: 0.2rem 0.4rem;
-    font-size: 0.68rem;
-    line-height: 1.2;
+    padding: 0.25rem 0.45rem;
+    font-size: 0.75rem;
+    line-height: 1.25;
 }
 
 #rakutenTrendsTable img {
@@ -1890,11 +1895,13 @@ body.data-status-active #data-status .card-body {
     max-height: 36px;
 }
 
-/* Limit product title to 2 lines - 商品名列のみ折り返し可能に */
+/* 商品名列に幅を確保 */
+#rakutenTrendsTable th:nth-child(2),
 #rakutenTrendsTable td:nth-child(2) {
     white-space: normal;
     word-break: break-word;
-    max-width: 300px; /* 適切な最大幅を設定 */
+    width: 42%;
+    min-width: 8rem;
 }
 
 #rakutenTrendsTable td:nth-child(2) strong,
@@ -1907,11 +1914,18 @@ body.data-status-active #data-status .card-body {
     line-height: 1.3;
 }
 
-/* Tighten columns; allow wrapping only for title column */
 /* 商品名列以外の列は折り返し禁止 */
 #rakutenTrendsTable th:not(:nth-child(2)),
 #rakutenTrendsTable td:not(:nth-child(2)) {
     white-space: nowrap;
+}
+
+/* 狭いカードではショップ列を非表示（商品名の可読性優先） */
+@media (max-width: 991.98px) {
+    #rakutenTrendsTable th:nth-child(6),
+    #rakutenTrendsTable td:nth-child(6) {
+        display: none;
+    }
 }
 
 /* カードのマージン調整 */

@@ -188,31 +188,12 @@ def create_app():
         }
         ai_summary_fake_door = None
         if AppConfig.ENABLE_AI_SUMMARY_FAKE_DOOR:
+            from services.summary.daily_summary_preview import preview_for_fake_door
+
             ai_summary_fake_door = {
-                'today_label': ai_summary_mock['today_label'],
-                'week_label': ai_summary_mock['week_label'],
-                'today_top1': ai_summary_mock['today_top5'][0],
-                'week_top1': ai_summary_mock['week_top5'][0],
-                'today_top5_en': [
-                    'Generative AI agent operations (ongoing in JP/US)',
-                    'Geopolitical risk and supply chain shifts',
-                    'Semiconductor investment themes',
-                    'Cybersecurity vulnerability response',
-                    'Public procurement / gov DX keywords',
-                ],
-                'week_top5_en': [
-                    'AI agents moving into production',
-                    'US-originated news propagating to Japan (1–2 day lag)',
-                    'Sustained interest in security incidents',
-                    'Developer sources (GitHub/HN/DEV) moving together',
-                    'Macro / gov data connecting to market themes',
-                ],
+                'ja': preview_for_fake_door('ja'),
+                'en': preview_for_fake_door('en'),
             }
-            # EN top1 lines derived from EN lists when we add EN labels later
-            ai_summary_fake_door['today_top1_en'] = ai_summary_fake_door['today_top5_en'][0]
-            ai_summary_fake_door['week_top1_en'] = ai_summary_fake_door['week_top5_en'][0]
-            ai_summary_fake_door['today_label_en'] = 'Day: 2026-05-03 (runs 01:00 / 07:00 / 13:00 / 19:00 JST)'
-            ai_summary_fake_door['week_label_en'] = 'Week: 2026-04-27 – 2026-05-03'
         return {
             'ENABLE_SUBSCRIPTION_UI': AppConfig.ENABLE_SUBSCRIPTION_UI,
             'BUY_ME_A_COFFEE_USERNAME': AppConfig.BUY_ME_A_COFFEE_USERNAME,

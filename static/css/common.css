@@ -219,6 +219,14 @@ h6, .h6 { font-size: 0.9rem; }
 .text-info { color: #17a2b8 !important; }
 .text-muted { color: #6c757d !important; }
 
+/* AI朝刊プレビュー: 3カラム内で一行結論を最大5行 */
+.ai-summary-one-liner {
+    display: -webkit-box;
+    -webkit-line-clamp: 5;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
 /* Buy Me a Coffee スタイル */
 .buy-me-a-coffee-container {
     margin-top: 1rem;

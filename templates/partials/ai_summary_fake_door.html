@@ -1,57 +1,57 @@
-{# AIサマリー Fake door: Top1 ティーザー + Top5 CTA → モーダルは「準備中」のみ（locale: ja|en, region: jp|us）
-   fake_door_embedded: 高さはコンテンツ基準（左右は dashboard_summary_height_sync で中央に合わせる） #}
+{# AIサマリー: 朝刊プレビュー（一行結論無料）+ CTA → モーダルは準備中 #}
 {% set embedded = fake_door_embedded | default(false) %}
 {% set loc = fake_door_locale | default('ja') %}
 {% set reg = fake_door_region | default('jp') %}
-{% set fd = AI_SUMMARY_FAKE_DOOR %}
+{% set fd = AI_SUMMARY_FAKE_DOOR[loc] %}
 {% if loc == 'en' %}
-  {% set t1 = "Coming soon" %}
-  {% set w1 = "Coming soon" %}
-  {% set lab_t = fd.today_label_en %}
-  {% set lab_w = fd.week_label_en %}
-  {% set title_a = "AI summary preview" %}
-  {% set h_today = "Daily (Top 1)" %}
-  {% set h_week = "Weekly (Top 1)" %}
-  {% set cta = "View Top 5" %}
-  {% set modal_title = "Top 5" %}
+  {% set title_a = "Trend briefing" %}
+  {% set badge = "Free preview" %}
+  {% set one_liner_label = "Headline" %}
+  {% set locked = "Full brief (topics, rank moves, categories) — email delivery planned." %}
+  {% set cta = "Read full brief" %}
+  {% set modal_title = "Full brief" %}
   {% set modal_lead = "Coming soon." %}
   {% set btn_close = "Close" %}
-  {% set sub_hint = "Top5 coming soon" %}
+  {% set sub_hint = "Email signup coming soon" %}
+  {% set no_preview = "Summary is being prepared." %}
 {% else %}
-  {% set t1 = "準備中" %}
-  {% set w1 = "準備中" %}
-  {% set lab_t = fd.today_label %}
-  {% set lab_w = fd.week_label %}
-  {% set title_a = "AIサマリー（プレビュー）" %}
-  {% set h_today = "今日（Top1 のみ）" %}
-  {% set h_week = "今週（Top1 のみ）" %}
-  {% set cta = "Top5を見る" %}
-  {% set modal_title = "Top5" %}
+  {% set title_a = "トレンド朝刊" %}
+  {% set badge = "無料プレビュー" %}
+  {% set one_liner_label = "一行結論" %}
+  {% set locked = "全文（論点・順位の動き・カテゴリ別）はメール配信予定" %}
+  {% set cta = "全文を見る" %}
+  {% set modal_title = "全文" %}
   {% set modal_lead = "準備中です。" %}
   {% set btn_close = "閉じる" %}
-  {% set sub_hint = "Top5準備中" %}
+  {% set sub_hint = "メール配信は準備中" %}
+  {% set no_preview = "サマリーを準備中です。" %}
 {% endif %}
 <section id="ai-summary-fake-door-root" aria-label="{{ title_a }}"
     class="ai-summary-fake-door-root{% if embedded %} dashboard-summary-panel mb-0 w-100{% else %} mb-3{% endif %}"
     data-fake-door-region="{{ reg }}"
     data-fake-door-locale="{{ loc }}">
-  <div class="card border-secondary">
+  <div class="card border-secondary h-100">
     <div class="card-header bg-light py-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
-      <h2 class="h6 mb-0"><i class="fas fa-magic me-1 text-primary" aria-hidden="true"></i>{{ title_a }}</h2>
-      <span class="badge bg-secondary">Preview</span>
+      <h2 class="h6 mb-0"><i class="fas fa-newspaper me-1 text-primary" aria-hidden="true"></i>{{ title_a }}</h2>
+      <span class="badge bg-secondary">{{ badge }}</span>
     </div>
-    <div class="card-body {% if embedded %}py-2 d-flex flex-column gap-4{% else %}py-3{% endif %}">
-      <div class="row {% if embedded %}g-2{% else %}g-3{% endif %}">
-        <div class="col-12 {% if not embedded %}col-md-6{% endif %}">
-          <p class="small text-muted mb-1">{{ lab_t }}</p>
-          <p class="small mb-0 fw-semibold"><span class="text-muted">{{ h_today }}:</span> {{ t1 }}</p>
-        </div>
-        <div class="col-12 {% if not embedded %}col-md-6{% endif %}">
-          <p class="small text-muted mb-1">{{ lab_w }}</p>
-          <p class="small mb-0 fw-semibold"><span class="text-muted">{{ h_week }}:</span> {{ w1 }}</p>
-        </div>
+    <div class="card-body {% if embedded %}py-2 d-flex flex-column{% else %}py-3{% endif %}">
+      <p class="small fw-semibold mb-1">{{ fd.headline }}</p>
+      {% if fd.observation_meta %}
+      <p class="small text-muted mb-2">{{ fd.observation_meta }}</p>
+      {% endif %}
+      <div class="mb-2">
+        <p class="small text-muted mb-1">{{ one_liner_label }}</p>
+        {% if fd.one_liner %}
+        <p class="small mb-0 ai-summary-one-liner">{{ fd.one_liner }}</p>
+        {% else %}
+        <p class="small mb-0 text-muted">{{ no_preview }}</p>
+        {% endif %}
       </div>
-      <div class="d-flex flex-wrap align-items-center gap-3{% if not embedded %} mt-4{% endif %}">
+      <p class="small text-muted mb-0{% if not embedded %} mt-2{% endif %}">
+        <i class="fas fa-lock me-1" aria-hidden="true"></i>{{ locked }}
+      </p>
+      <div class="d-flex flex-wrap align-items-center gap-3 mt-3">
         <button type="button" class="btn btn-primary btn-sm" id="ai-summary-fake-door-cta"
             data-bs-toggle="modal" data-bs-target="#aiSummaryFakeDoorModal">
           {{ cta }}

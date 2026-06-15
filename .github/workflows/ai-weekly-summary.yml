@@ -23,10 +23,11 @@ jobs:
       - name: Install dependencies
         run: pip install "requests>=2.31" "python-dotenv>=0.19"
 
-      - name: Generate weekly from daily Markdown
+      - name: Generate weekly from snapshot rollups + OpenAI
         env:
+          TREND_DASHBOARD_BASE_URL: https://trends-dashboard.fly.dev
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: python scripts/generate_ai_weekly_summary.py --write --force
+        run: python scripts/generate_ai_weekly_summary.py --from-api --write --force
 
       - name: Commit if changed
         run: |

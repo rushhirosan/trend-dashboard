@@ -531,6 +531,61 @@ def _series_pref_score(series_key: str) -> int:
     return 1
 
 
+def series_region(series_key: str) -> Optional[str]:
+    """スナップショット series_key の地域（jp / us）。曖昧な系列は None。"""
+    sk = (series_key or "").strip().lower()
+    if not sk:
+        return None
+    if sk.endswith("_jp") or "_jp_" in sk or sk.endswith("_ja"):
+        return "jp"
+    if sk.endswith("_us") or "_us_" in sk or sk.endswith("_en"):
+        return "us"
+    for prefix in (
+        "nhk_",
+        "prtimes",
+        "rakuten_",
+        "qiita_",
+        "zenn_",
+        "note_",
+        "ipa_",
+        "jpcert_",
+        "hatena_",
+        "estat_",
+        "kkj_",
+    ):
+        if sk.startswith(prefix):
+            return "jp"
+    for prefix in (
+        "cnn_",
+        "hackernews_",
+        "ebay_",
+        "cisa_",
+        "devto_",
+        "thehackernews_",
+        "producthunt_",
+        "globenewswire",
+        "bls_",
+        "usaspending",
+        "medium_",
+    ):
+        if sk.startswith(prefix):
+            return "us"
+    return None
+
+
+def filter_rows_by_region(rows: List[Dict[str, Any]], region: str) -> List[Dict[str, Any]]:
+    """series_key の地域が一致するスナップショット行だけ残す。"""
+    want = (region or "").strip().lower()
+    if want not in ("jp", "us"):
+        return list(rows)
+    out: List[Dict[str, Any]] = []
+    for row in rows:
+        sk = str(row.get("series_key") or "")
+        if series_region(sk) == want:
+            out.append(row)
+    return out
+
+
 def _series_provider(series_key: str) -> str:
     """クロスソース判定用: 同一取得元（API・マネージャ・別カテゴリ/地域）を1プロバイダにまとめる。
 
@@ -807,11 +862,11 @@ def _rank_display_for_rising(ranks: dict[str, int]) -> str:
 def build_rising_highlights(
     rows: List[Dict[str, Any]],
     *,
-    count: int = RISING_HIGHLIGHT_COUNT,
+    count: Optional[int] = RISING_HIGHLIGHT_COUNT,
 ) -> List[Dict[str, Any]]:
     """
-    全 series 横断で 07→13→19 の順位改善が大きいラベルを最大 count 件。
-    日次サマリーの「昨日いちばん動いた3つ」のたたき台。
+    全 series 横断で 07→13→19 の順位改善が大きいラベルを返す。
+    count 省略時は資格あり候補をすべて（週次集計用）。日次は count=3 等で上位のみ。
     """
     series_by_slot = rows_to_series_by_slot(rows)
     series_keys: set[str] = set()
@@ -822,7 +877,13 @@ def build_rising_highlights(
         series_by_slot,
         sorted(series_keys),
     )
-    items = sr.pick_top_rising(pool, count=count)
+    if count is None:
+        items = sorted(
+            pool,
+            key=lambda c: (-c["jump"], -c["freq"], c["r_best"], c["display"]),
+        )
+    else:
+        items = sr.pick_top_rising(pool, count=count)
     out: List[Dict[str, Any]] = []
     for raw in items:
         ranks = dict(raw.get("ranks") or {})
@@ -906,7 +967,7 @@ def _collect_label_index(
 def build_cross_source_highlights(
     rows: List[Dict[str, Any]],
     *,
-    count: int = CROSS_SOURCE_HIGHLIGHT_COUNT,
+    count: Optional[int] = CROSS_SOURCE_HIGHLIGHT_COUNT,
 ) -> List[Dict[str, Any]]:
     """独立した取得元（_series_provider が2種以上）をまたいだ同一ラベル（正規化一致）を優先。
 
@@ -958,6 +1019,8 @@ def build_cross_source_highlights(
             c["label"],
         ),
     )
+    if count is None:
+        return candidates
     return candidates[:count]
 
 
@@ -2170,7 +2233,13 @@ def run_generate(
     return full, meta
 
 
+def openai_api_key() -> str:
+    """OPENAI_API_KEY を優先。ローカル .env の OPEN_API_KEY も受け付ける。"""
+    return (os.getenv("OPENAI_API_KEY") or os.getenv("OPEN_API_KEY") or "").strip()
+
+
 def main() -> int:
+    load_dotenv(_SCRIPT_DIR.parent / ".env")
     load_dotenv()
     p = argparse.ArgumentParser(description="Generate daily AI summary from trend_daily_snapshots")
     p.add_argument(
@@ -2220,7 +2289,7 @@ def main() -> int:
         bd = default_business_day_jst()
 
     database_url = (os.getenv("DATABASE_URL") or "").strip()
-    api_key = (os.getenv("OPENAI_API_KEY") or "").strip()
+    api_key = openai_api_key()
     model = (os.getenv("OPENAI_SUMMARY_MODEL") or "gpt-4o-mini").strip()
     base_url = (
         (args.base_url or os.getenv("TREND_DASHBOARD_BASE_URL") or BASE_DEFAULT).rstrip("/")

@@ -1,6 +1,17 @@
 # AI 週次サマリー — ISO 週1ファイル
 
-[`generate_ai_weekly_summary.py`](../../scripts/generate_ai_weekly_summary.py) が、**日次サマリー Markdown だけ**を入力に `weekly/YYYY-Www.md`（週次＋週のホットトピック）を生成します。DB・トレンド API は使いません。
+[`generate_ai_weekly_summary.py`](../../scripts/generate_ai_weekly_summary.py) が、**7日分の trend_daily_snapshots**（既定）を地域別（🇯🇵 日本 / 🇺🇸 アメリカ）に集計し、OpenAI で `weekly/YYYY-Www.md` を生成します。日次 Markdown は補助コンテキスト（欠損可）。
+
+## 地域別の構成
+
+週次レポートは **日本とアメリカを対称に** 扱います。
+
+- **今週の流れ**: `flow_jp` / `flow_us` の2段落
+- **急上昇・クロスソース**: 各地域ごとに最大3件ずつ（機械集計）
+- **週次 rising**: 日次 top5 ではなく **資格あり候補を7日分すべて** 週次集計。`週次スコア = 出現日数×100 + 観測スロット数×5 + jump合計 + 複数ソース+25 + 系列重み` で top3 を選ぶ
+
+米国ソースだけを混ぜて全体トップ5を取る旧方式は廃止しています。
+末尾の「ソース一覧」「週のホットトピック」も廃止（急上昇・クロスソースにリンクと根拠があるため）。
 
 ## ファイル名
 

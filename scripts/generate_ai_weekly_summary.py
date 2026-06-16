@@ -50,7 +50,7 @@ WEEKLY_CROSS_PER_REGION = 3
 WEEKLY_REGIONS = ("jp", "us")
 WEEKLY_REGION_LABELS = {"jp": "🇯🇵 日本", "us": "🇺🇸 アメリカ"}
 # 週次 rising スコア（jump 同率時の tie-break 用）
-WEEKLY_SCORE_DAY = 100
+WEEKLY_SCORE_DAY = 10
 WEEKLY_SCORE_SLOT = 5
 WEEKLY_SCORE_JUMP = 1.0
 WEEKLY_SCORE_CROSS = 25
@@ -541,6 +541,126 @@ def build_mechanical_llm_payload(
     return {"regions": regions}
 
 
+_RANK_EVIDENCE_SLOT_RE = re.compile(r"(\d+)時(?:(\d+)位|圏外)")
+_DAYTIME_SLOT_KEYS = ("07", "13", "19")
+
+
+def _short_calendar_date(ds: str) -> str:
+    """2026-06-08 → 06-08"""
+    try:
+        return date.fromisoformat(ds).strftime("%m-%d")
+    except ValueError:
+        return ds
+
+
+def parse_rank_evidence(evidence: str) -> Dict[str, Optional[int]]:
+    """rank_evidence 文字列を {07,13,19} → 順位（圏外は None）に分解。"""
+    ranks: Dict[str, Optional[int]] = {s: None for s in _DAYTIME_SLOT_KEYS}
+    for m in _RANK_EVIDENCE_SLOT_RE.finditer(evidence or ""):
+        slot = m.group(1).zfill(2)
+        if slot not in ranks:
+            continue
+        rank_str = m.group(2)
+        ranks[slot] = int(rank_str) if rank_str else None
+    return ranks
+
+
+def _format_rank_cell(rank: Optional[int]) -> str:
+    return "—" if rank is None else str(rank)
+
+
+def format_weekly_rising_summary_line(item: Dict[str, Any]) -> str:
+    """1行サマリー（出現・jump・スコア・区分）。"""
+    days = item.get("days") or []
+    parts: List[str] = []
+    if days:
+        parts.append(f"**{len(days)}日**")
+    jump = item.get("jump_sum")
+    if jump is not None:
+        parts.append(f"jump **+{jump}**")
+    score = item.get("weekly_score")
+    if score is not None:
+        parts.append(f"スコア **{score}**")
+    if item.get("cross_source"):
+        parts.append("複数ソース")
+    cat = (item.get("category") or "").strip()
+    if cat:
+        parts.append(cat)
+    return "> " + " · ".join(parts) if parts else ""
+
+
+def format_weekly_rank_table(rank_evidence_by_day: Dict[str, str]) -> str:
+    """07/13/19 の順位を日付×スロットの Markdown 表にする。"""
+    if not rank_evidence_by_day:
+        return ""
+    header = "| 日 | 07 | 13 | 19 |"
+    sep = "|:--:|:-:|:-:|:-:|"
+    rows: List[str] = [header, sep]
+    for ds, ev in sorted(rank_evidence_by_day.items()):
+        ranks = parse_rank_evidence(ev)
+        rows.append(
+            "| "
+            + " | ".join(
+                [
+                    _short_calendar_date(ds),
+                    _format_rank_cell(ranks["07"]),
+                    _format_rank_cell(ranks["13"]),
+                    _format_rank_cell(ranks["19"]),
+                ]
+            )
+            + " |"
+        )
+    return "\n".join(rows)
+
+
+def _best_rank_from_evidence(evidence: str) -> Optional[int]:
+    vals = [r for r in parse_rank_evidence(evidence).values() if r is not None]
+    return min(vals) if vals else None
+
+
+def _mermaid_safe_label(label: str, *, max_len: int = 28) -> str:
+    s = re.sub(r'["\[\]#;|]', "", str(label or "")).strip()
+    return (s[:max_len] or "topic").replace("\n", " ")
+
+
+def format_weekly_best_rank_mermaid(
+    label: str,
+    rank_evidence_by_day: Dict[str, str],
+) -> str:
+    """週内の日別ベスト順位を Mermaid xychart で可視化（2日以上あるときのみ）。"""
+    points: List[tuple[str, int]] = []
+    for ds, ev in sorted(rank_evidence_by_day.items()):
+        best = _best_rank_from_evidence(ev)
+        if best is not None:
+            points.append((_short_calendar_date(ds), best))
+    if len(points) < 2:
+        return ""
+    labels = ", ".join(f'"{d}"' for d, _ in points)
+    values = ", ".join(str(r) for _, r in points)
+    ymax = max(r for _, r in points)
+    title = _mermaid_safe_label(label)
+    return (
+        "```mermaid\n"
+        "xychart-beta\n"
+        f'    title "{title} — 日別ベスト順位"\n'
+        f"    x-axis [{labels}]\n"
+        f'    y-axis "順位" 1 --> {max(ymax + 2, 10)}\n'
+        f"    line [{values}]\n"
+        "```"
+    )
+
+
+def _compact_weekly_link_line(item: Dict[str, Any]) -> str:
+    """週次表示用: link_line から順位表記を除き、ソース名だけ残す。"""
+    link = str(item.get("link_line") or "").strip()
+    if not link:
+        return str(item.get("label") or "")
+    m = re.match(r"^(\[[^\]]+\]\([^)]+\))（([^·）]+)", link)
+    if m:
+        return f"{m.group(1)}（{m.group(2).strip()}）"
+    return re.sub(r"（[^）]*）\s*$", "", link)
+
+
 def render_weekly_rising_markdown(
     weekly_rising: Dict[str, List[Dict[str, Any]]],
 ) -> str:
@@ -556,25 +676,22 @@ def render_weekly_rising_markdown(
             continue
         any_items = True
         for i, it in enumerate(items, 1):
-            link = it.get("link_line") or it.get("label")
+            link = _compact_weekly_link_line(it)
             lines.append(f"{i}. {link}")
-            days = it.get("days") or []
-            if days:
-                cross_tag = " · 複数ソース" if it.get("cross_source") else ""
-                lines.append(
-                    f"   - **出現**: {len(days)}日（{', '.join(days)}） · "
-                    f"jump合計 {it.get('jump_sum', 0)} · 週次スコア {it.get('weekly_score', 0)}{cross_tag}"
-                )
-            ev_parts = [
-                f"{d}: {ev}"
-                for d, ev in sorted((it.get("rank_evidence_by_day") or {}).items())
-            ]
-            if ev_parts:
-                lines.append(f"   - **根拠**: {' / '.join(ev_parts[:3])}")
-            cat = it.get("category")
-            if cat:
-                lines.append(f"   - **区分**: {cat}")
             lines.append("")
+            summary = format_weekly_rising_summary_line(it)
+            if summary:
+                lines.append(summary)
+                lines.append("")
+            rank_by_day = it.get("rank_evidence_by_day") or {}
+            table = format_weekly_rank_table(rank_by_day)
+            if table:
+                lines.append(table)
+                lines.append("")
+            chart = format_weekly_best_rank_mermaid(str(it.get("label") or ""), rank_by_day)
+            if chart:
+                lines.append(chart)
+                lines.append("")
     if not any_items:
         return (
             f"{_WEEKLY_RISING_HEADING}\n\n"
@@ -602,18 +719,20 @@ def render_weekly_cross_markdown(
             lines.append(f"#### {i}. {label}")
             lines.append("")
             days = it.get("days") or []
+            meta_parts: List[str] = []
             if days:
-                lines.append(f"- **出現日数**: {len(days)}日（{', '.join(days)}）")
-            sources = it.get("sources_display")
+                meta_parts.append(f"**{len(days)}日**")
+            sources = (it.get("sources_display") or "").strip()
             if sources:
-                lines.append(f"- **登場ソース**: {sources}")
-            ev_parts = [
-                f"{d}: {ev}"
-                for d, ev in sorted((it.get("rank_evidence_by_day") or {}).items())
-            ]
-            if ev_parts:
-                lines.append(f"- **根拠**: {' / '.join(ev_parts[:3])}")
-            lines.append("")
+                meta_parts.append(sources)
+            if meta_parts:
+                lines.append("> " + " · ".join(meta_parts))
+                lines.append("")
+            rank_by_day = it.get("rank_evidence_by_day") or {}
+            table = format_weekly_rank_table(rank_by_day)
+            if table:
+                lines.append(table)
+                lines.append("")
     if not any_items:
         return (
             f"{_WEEKLY_CROSS_HEADING}\n\n"

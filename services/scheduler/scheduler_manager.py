@@ -296,13 +296,41 @@ class TrendsScheduler:
                     coalesce=True,  # 複数の遅延実行を1回にまとめる
                     max_instances=1  # 同時実行は1つのみ
                 )
+
+                try:
+                    gap_retry_minute = int(os.getenv("TRENDS_SLOT_GAP_RETRY_MINUTE", "35"))
+                except (TypeError, ValueError):
+                    gap_retry_minute = 35
+                gap_retry_minute = max(5, min(55, gap_retry_minute))
+                for hour, job_id in (
+                    (1, "gap_retry_1am"),
+                    (7, "gap_retry_7am"),
+                    (13, "gap_retry_1pm"),
+                    (19, "gap_retry_7pm"),
+                ):
+                    self.scheduler.add_job(
+                        func=self._retry_missed_slot_if_needed,
+                        trigger=CronTrigger(
+                            hour=hour, minute=gap_retry_minute, timezone=jst
+                        ),
+                        id=job_id,
+                        name=f"スロット欠損リトライ ({hour:02d}:{gap_retry_minute:02d} JST)",
+                        replace_existing=True,
+                        misfire_grace_time=1800,
+                        coalesce=True,
+                        max_instances=1,
+                    )
                 
                 # スケジューラーを開始
                 self.scheduler.start()
                 self.is_running = True
                 
                 logger.info("✅ スケジューラー開始完了")
-                logger.info("📅 毎日深夜1:00、朝7:00、昼13:00、夜19:00（日本時間）に全トレンドを自動取得します")
+                logger.info(
+                    "📅 毎日1:00/7:00/13:00/19:00 JST に全トレンド取得。"
+                    " 各スロット+%s分に欠損リトライ",
+                    gap_retry_minute,
+                )
                 
                 # 起動時の自動実行: SKIP_STARTUP_EXECUTION=false のときのみ補完を検討
                 # デプロイ直後（deploy_marker が直近）の場合は補完スキップ＝クラッシュ時のみ補完
@@ -468,23 +496,30 @@ class TrendsScheduler:
             # OOM防止: 起動直後はメモリ逼迫のため、2〜3分待ってから低負荷モードで補完
             if should_execute_1am or should_execute_7am or should_execute_1pm or should_execute_7pm:
                 missed_times = []
+                missed_slot_keys: list[str] = []
                 if should_execute_1am:
                     missed_times.append("1時")
+                    missed_slot_keys.append(self._slot_key_for_slot("1am", today))
                 if should_execute_7am:
                     missed_times.append("7時")
+                    missed_slot_keys.append(self._slot_key_for_slot("7am", today))
                 if should_execute_1pm:
                     missed_times.append("13時")
+                    missed_slot_keys.append(self._slot_key_for_slot("1pm", today))
                 if should_execute_7pm:
                     missed_times.append("19時")
+                    missed_slot_keys.append(self._slot_key_for_slot("7pm", today))
                 delay_sec = int(os.getenv('TREND_STARTUP_CATCHUP_DELAY_SECONDS', '120'))
                 logger.info(f"🔄 当日の{', '.join(missed_times)}の処理を{delay_sec}秒後に実行します（低負荷モード・OOM対策）")
-                def _run_catchup():
+                def _run_catchup(keys=list(missed_slot_keys)):
                     try:
                         logger.info("🔄 起動時補完: 遅延実行を開始します")
                         self._fetch_all_trends(
                             force=True,
                             low_memory_mode=True,
                             trigger_source="startup_catchup",
+                            slot_key_override=keys[0] if keys else None,
+                            backfill_slot_keys=keys,
                         )
                     except Exception as e:
                         logger.error(f"❌ 起動時補完エラー: {e}", exc_info=True)
@@ -552,7 +587,14 @@ class TrendsScheduler:
             result['success'] = False
         return result, job_timed_out
     
-    def _fetch_all_trends(self, force=False, trigger_source='scheduler', low_memory_mode=False):
+    def _fetch_all_trends(
+        self,
+        force=False,
+        trigger_source='scheduler',
+        low_memory_mode=False,
+        slot_key_override=None,
+        backfill_slot_keys=None,
+    ):
         """全プラットフォームのトレンドを取得（既存のrefresh_all_trends()を使用）
         
         Args:
@@ -560,6 +602,11 @@ class TrendsScheduler:
                    Falseの場合、スケジューラー実行時（通常の定期実行）
             trigger_source: 呼び出し元の識別子。'scheduler'=定期実行、'api'=API（手動/外部）
             low_memory_mode: Trueの場合、max_concurrent=1, batch_delay=5で実行（OOM対策・起動時補完用）
+            slot_key_override: スナップショット保存用 slot_key（例: 7am_2026-06-12）
+            backfill_slot_keys: 起動時補完など、複数スロットの snapshot バックフィル
+
+        Returns:
+            メイン処理（トレンド取得）まで到達したら True。ロック競合等でスキップしたら False。
         """
         # 定時実行（1/7/13/19時）は低負荷モードを環境変数で制御（API手動実行は従来どおり）
         if trigger_source == 'scheduler' and not force:
@@ -571,7 +618,7 @@ class TrendsScheduler:
                 trigger_source=trigger_source,
                 reason="同一プロセスで既にトレンド取得が実行中のためスキップしました。",
             )
-            return
+            return False
 
         # 分散ロック取得（DB優先→ファイルロック、複数マシン・二重Discord通知を防ぐ）
         lock_handle = self._try_acquire_scheduler_lock()
@@ -585,16 +632,17 @@ class TrendsScheduler:
                 trigger_source=trigger_source,
                 reason="他プロセス/他マシンでトレンド取得が実行中のためスキップしました。",
             )
-            return
+            return False
 
         self._fetching_in_progress = True
+        executed = False
         try:
             jst = pytz.timezone('Asia/Tokyo')
             now_jst = datetime.now(jst)
             today = now_jst.date()
 
             # スロット単位の二重実行防止（「完了済み」をDBで共有。成功した実行が1本になるよう、完了時のみ記録）
-            slot_key = self._slot_key_for_now(now_jst)
+            slot_key = slot_key_override or self._slot_key_for_now(now_jst)
             if not force and slot_key and self.db and hasattr(self.db, 'has_slot_completed_recently'):
                 if self.db.has_slot_completed_recently(slot_key, window_minutes=25):
                     logger.info("⏰ 同一スロットが既に完了済みのためスキップします（slot=%s）", slot_key)
@@ -604,7 +652,7 @@ class TrendsScheduler:
                     )
                     self._release_scheduler_lock(lock_handle)
                     self._fetching_in_progress = False
-                    return
+                    return False
 
             # 既に当日実行済みかチェック（重複実行を防ぐ・同一プロセス用）
             # force=Trueの場合はスキップしない
@@ -620,7 +668,7 @@ class TrendsScheduler:
                         )
                         self._release_scheduler_lock(lock_handle)
                         self._fetching_in_progress = False
-                        return
+                        return False
                 # 7時前後（6:00-8:00）の実行の場合、当日の7時ジョブが既に実行済みかチェック
                 if 6 <= now_jst.hour < 8 and self.last_daily_execution_date == today:
                     logger.info(f"⏰ 当日の7時のジョブは既に実行済みです（{today}）。重複実行をスキップします。")
@@ -630,7 +678,7 @@ class TrendsScheduler:
                     )
                     self._release_scheduler_lock(lock_handle)
                     self._fetching_in_progress = False
-                    return
+                    return False
                 # 13時前後（12:00-14:00）の実行の場合、1時間以内に13時ジョブが実行済みかチェック
                 if 12 <= now_jst.hour < 14 and self.last_afternoon_execution_time:
                     time_diff = (now_jst - self.last_afternoon_execution_time).total_seconds()
@@ -642,7 +690,7 @@ class TrendsScheduler:
                         )
                         self._release_scheduler_lock(lock_handle)
                         self._fetching_in_progress = False
-                        return
+                        return False
                 # 19時前後（18:00-20:00）の実行の場合、1時間以内に19時ジョブが実行済みかチェック
                 if 18 <= now_jst.hour < 20 and self.last_evening_execution_time:
                     time_diff = (now_jst - self.last_evening_execution_time).total_seconds()
@@ -654,8 +702,9 @@ class TrendsScheduler:
                         )
                         self._release_scheduler_lock(lock_handle)
                         self._fetching_in_progress = False
-                        return
+                        return False
             
+            executed = True
             logger.info("🔄 自動トレンド取得開始 [trigger=%s]", trigger_source)
             # 終了時刻ではなく「開始時」の slot_key で business_day / slot を確定（長時間バッチでもずれない）
             snapshot_slot_key = slot_key
@@ -698,7 +747,7 @@ class TrendsScheduler:
                 logger.error("❌ トレンドマネージャーが初期化されていません")
                 self._release_scheduler_lock(lock_handle)
                 self._fetching_in_progress = False
-                return
+                return True
 
             result, job_timed_out = self._run_refresh_all_trends_with_job_timeout(
                 low_memory_mode=low_memory_mode,
@@ -726,25 +775,54 @@ class TrendsScheduler:
                     },
                 )
 
-            with self.app.app_context():
-                managers = self.app.config.get('TREND_MANAGERS') or managers
-                # 7時起点 business_day の薄いスナップショット（キャッシュから Top タイトル等）
-                try:
-                    from services.trend_snapshot_service import write_snapshots_for_scheduler_run
+            snapshot_status: dict = {}
+            prior_slot_gaps: list[str] = []
+            try:
+                with self.app.app_context():
+                    managers = self.app.config.get('TREND_MANAGERS') or managers
+                    from services.snapshot_slot_health import (
+                        find_missing_prior_slots,
+                        parse_slot_key,
+                        slot_has_snapshot,
+                        write_and_verify_snapshot,
+                    )
 
                     cap = datetime.now(jst)
-                    write_snapshots_for_scheduler_run(
-                        managers=managers,
-                        scheduler_slot_key=snapshot_slot_key,
-                        trigger_source=trigger_source,
-                        captured_at=cap,
-                    )
-                except Exception as snap_exc:
-                    logger.warning(
-                        "⚠️ トレンドスナップショット保存スキップ/失敗: %s",
-                        snap_exc,
-                        exc_info=True,
-                    )
+                    if snapshot_slot_key:
+                        snapshot_status = write_and_verify_snapshot(
+                            managers,
+                            self.db,
+                            snapshot_slot_key,
+                            trigger_source,
+                            cap,
+                        )
+                        parsed_sk = parse_slot_key(snapshot_slot_key)
+                        if parsed_sk:
+                            bd, cur_slot = parsed_sk
+                            prior_slot_gaps = find_missing_prior_slots(
+                                self.db, bd, cur_slot
+                            )
+                    for sk in backfill_slot_keys or []:
+                        if sk == snapshot_slot_key:
+                            continue
+                        parsed_bf = parse_slot_key(sk)
+                        if not parsed_bf:
+                            continue
+                        bf_day, bf_slot = parsed_bf
+                        if not slot_has_snapshot(self.db, bf_day, bf_slot):
+                            write_and_verify_snapshot(
+                                managers,
+                                self.db,
+                                sk,
+                                trigger_source,
+                                cap,
+                            )
+            except Exception as snap_exc:
+                logger.warning(
+                    "⚠️ トレンドスナップショット保存/検証失敗: %s",
+                    snap_exc,
+                    exc_info=True,
+                )
             
             # 結果をログ出力
             results = result.get('results', {})
@@ -975,6 +1053,8 @@ class TrendsScheduler:
                 execution_id, start_time, end_time,
                 total_count, success_count, failed_count, duration, failed_trends_details, has_anomaly,
                 trigger_source=trigger_source,
+                snapshot_status=snapshot_status,
+                prior_slot_gaps=prior_slot_gaps,
             )
 
             # スロットを「完了済み」として記録（二重実行防止。成功時のみ記録するため、クラッシュした場合は別プロセスが再実行可能）
@@ -1022,6 +1102,7 @@ class TrendsScheduler:
                     logger.info("⏭️ 手動実行（force=True）のため、メール自動送信をスキップします")
             else:
                 logger.info("⏭️ メール自動送信をスキップします（SKIP_EMAIL_ON_UPDATE=true）")
+            return True
             
         except Exception as e:
             logger.error(f"❌ 自動トレンド取得エラー: {e}", exc_info=True)
@@ -1052,6 +1133,7 @@ class TrendsScheduler:
                     logger.error(f"❌ メール送信エラー: {email_error}", exc_info=True)
             else:
                 logger.info("⏭️ メール自動送信をスキップします（SKIP_EMAIL_ON_UPDATE=true）")
+            return executed
         finally:
             # 分散ロックを解放し、フラグをリセット
             self._release_scheduler_lock(lock_handle)
@@ -1186,6 +1268,44 @@ class TrendsScheduler:
         
         return has_anomaly
     
+    def _retry_missed_slot_if_needed(self) -> None:
+        """各スロット T+35 分: スナップショット欠損時のみ1回リトライ（通知数は完了1通のみ）。"""
+        if self._fetching_in_progress:
+            logger.info("⏭️ 欠損リトライ: 取得処理実行中のためスキップ")
+            return
+        jst = pytz.timezone("Asia/Tokyo")
+        now_jst = datetime.now(jst)
+        slot_key = self._slot_key_for_now(now_jst)
+        if not slot_key:
+            return
+        retry_marker = f"gap_retry_{slot_key}"
+        if self.db and hasattr(self.db, "has_slot_completed"):
+            if self.db.has_slot_completed(retry_marker):
+                return
+        from services.snapshot_slot_health import slot_needs_recovery
+
+        if not slot_needs_recovery(self.db, slot_key):
+            return
+        logger.warning("🔄 スロット欠損を検知 — リトライします: %s", slot_key)
+        ran = False
+        try:
+            ran = self._fetch_all_trends(
+                force=True,
+                trigger_source="gap_retry",
+                low_memory_mode=True,
+                slot_key_override=slot_key,
+            )
+        finally:
+            if (
+                ran
+                and self.db
+                and hasattr(self.db, "mark_slot_completed")
+            ):
+                try:
+                    self.db.mark_slot_completed(retry_marker)
+                except Exception as e:
+                    logger.warning("⚠️ gap_retry マーカー記録失敗: %s", e)
+
     def _slot_key_for_now(self, now_jst) -> str | None:
         """現在時刻が属するスロットのキーを返す（例: 7am_2026-02-10）。該当しなければ None。"""
         date_str = now_jst.date().isoformat()
@@ -1212,6 +1332,7 @@ class TrendsScheduler:
         labels = {
             'scheduler': 'スケジューラ(定期)',
             'startup_catchup': '起動時補完',
+            'gap_retry': '欠損リトライ',
             'api': 'API（手動/外部）',
         }
         return labels.get(trigger_source, trigger_source or '不明')
@@ -1266,6 +1387,8 @@ class TrendsScheduler:
         failed_trends_details: list,
         has_anomaly: bool,
         trigger_source: str = 'scheduler',
+        snapshot_status: dict | None = None,
+        prior_slot_gaps: list | None = None,
     ) -> None:
         """スケジューラ実行結果をDiscord通知（成功時も失敗時も）"""
         if not self.alert_service:
@@ -1276,9 +1399,17 @@ class TrendsScheduler:
         # 失敗率を計算
         failure_rate = (failed_count / total_count) * 100 if total_count > 0 else 0
         
+        snapshot_bad = bool(
+            snapshot_status
+            and snapshot_status.get("scheduler_slot_key")
+            and not snapshot_status.get("verified_ok")
+        )
+        gaps = list(prior_slot_gaps or [])
+        gaps_bad = bool(gaps)
+
         # アラートタイプを決定
-        if has_anomaly:
-            alert_type = "warning" if failed_count > 0 else "warning"
+        if has_anomaly or snapshot_bad or gaps_bad:
+            alert_type = "warning"
         elif failed_count == 0:
             alert_type = "success"
         else:
@@ -1288,7 +1419,16 @@ class TrendsScheduler:
         trigger_label = self._trigger_label(trigger_source)
 
         # タイトルとメッセージを構築（トリガーをメッセージにも含めて一覧で分かるようにする）
-        if failed_count == 0:
+        if failed_count == 0 and not snapshot_bad and not gaps_bad:
+            title = "✅ トレンド取得正常終了"
+            message = f"全てのトレンド取得が正常に完了しました。\nトリガー: {trigger_label}"
+        elif failed_count == 0 and (snapshot_bad or gaps_bad):
+            title = "⚠️ トレンド取得完了（スナップショット欠損）"
+            message = (
+                f"トレンド取得は完了しましたが、スナップショットに問題があります。\n"
+                f"トリガー: {trigger_label}"
+            )
+        elif failed_count == 0:
             title = "✅ トレンド取得正常終了"
             message = f"全てのトレンド取得が正常に完了しました。\nトリガー: {trigger_label}"
         else:
@@ -1297,6 +1437,11 @@ class TrendsScheduler:
 
         # 詳細情報を構築（トリガー元を先頭付近に表示。二重実行調査用にホスト・PIDを追加）
         host_short, pid = _process_identity()
+        from services.snapshot_slot_health import (
+            format_prior_slot_gaps,
+            format_snapshot_status_for_discord,
+        )
+
         details = {
             "実行ID": execution_id,
             "トリガー": trigger_label,
@@ -1308,7 +1453,18 @@ class TrendsScheduler:
             "実行時間": f"{duration_min:.1f}分 ({duration:.2f}秒)",
             "開始時刻": start_time.strftime("%Y-%m-%d %H:%M:%S JST"),
             "終了時刻": end_time.strftime("%Y-%m-%d %H:%M:%S JST"),
+            "スナップショット": format_snapshot_status_for_discord(snapshot_status),
         }
+        if gaps_bad and snapshot_status and snapshot_status.get("business_day"):
+            from datetime import date as date_cls
+            try:
+                bd = date_cls.fromisoformat(str(snapshot_status["business_day"]))
+            except ValueError:
+                bd = None
+            if bd:
+                gap_line = format_prior_slot_gaps(gaps, bd)
+                if gap_line:
+                    details["前スロット欠損"] = gap_line
         
         # エラー詳細を追加
         if failed_trends_details:

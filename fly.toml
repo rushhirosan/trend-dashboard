@@ -25,8 +25,8 @@ primary_region = "nrt"
   MEMORY_LIMIT_MB = "1024"
   # バッチ間待機秒数（メモリ・接続の解放を待つ、OOM対策）
   TREND_REFRESH_BATCH_DELAY_SECONDS = "3"
-  # スケジューラ一括取得の開始時に Discord へ1通（完了通知と切り分け用）
-  DISCORD_NOTIFY_SCHEDULER_START = "true"
+  # 完了通知のみ（開始通知はオフ）
+  DISCORD_NOTIFY_SCHEDULER_START = "false"
   # 1ソースあたりの最大待ち（秒）。ハング時にバッチが止まらないよう上限
   TREND_REFRESH_TASK_TIMEOUT_SECONDS = "600"
   # ジョブ全体の上限（秒）。DBロック(90分)より短くし、フラグ解放と完了通知を保証

@@ -2558,6 +2558,24 @@ class TrendsCache:
             logger.error("❌ get_trend_daily_snapshots_for_business_day エラー: %s", e, exc_info=True)
             return []
 
+    def count_trend_daily_snapshot_rows(self, business_day: date, slot: str) -> int:
+        """指定 business_day × slot の trend_daily_snapshots 行数。"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT COUNT(*) FROM trend_daily_snapshots
+                        WHERE business_day = %s AND slot = %s
+                        """,
+                        (business_day, slot),
+                    )
+                    row = cursor.fetchone()
+                    return int(row[0]) if row else 0
+        except Exception as e:
+            logger.error("❌ count_trend_daily_snapshot_rows エラー: %s", e, exc_info=True)
+            return 0
+
     def get_scheduler_lock_status(self):
         """スケジューラー分散ロックの現在状態を返す（デバッグ用）。取得失敗時は None。"""
         try:

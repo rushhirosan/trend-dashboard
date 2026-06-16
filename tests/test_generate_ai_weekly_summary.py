@@ -252,6 +252,55 @@ def test_aggregate_weekly_cross_source(gaws):
     assert "google_trends" in out[0]["providers"]
 
 
+def test_format_rank_evidence_parsing(gaws):
+    ranks = gaws.parse_rank_evidence("7時10位 → 13時8位 → 19時8位")
+    assert ranks == {"07": 10, "13": 8, "19": 8}
+    assert gaws.parse_rank_evidence("7時圏外 → 13時10位 → 19時9位") == {
+        "07": None,
+        "13": 10,
+        "19": 9,
+    }
+
+
+def test_format_weekly_rank_table(gaws):
+    table = gaws.format_weekly_rank_table(
+        {
+            "2026-06-08": "7時10位 → 13時8位 → 19時8位",
+            "2026-06-09": "7時圏外 → 13時6位 → 19時6位",
+        }
+    )
+    assert "| 日 | 07 | 13 | 19 |" in table
+    assert "| 06-08 | 10 | 8 | 8 |" in table
+    assert "| 06-09 | — | 6 | 6 |" in table
+
+
+def test_render_weekly_rising_markdown_uses_table_not_prose_evidence(gaws):
+    rising = {
+        "jp": [
+            {
+                "label": "ライラック",
+                "days": ["2026-06-08", "2026-06-09"],
+                "day_count": 2,
+                "jump_sum": 15.0,
+                "weekly_score": 145.0,
+                "category": "エンタメ",
+                "link_line": "[ライラック](https://example.com)",
+                "rank_evidence_by_day": {
+                    "2026-06-08": "7時10位 → 13時8位 → 19時8位",
+                    "2026-06-09": "7時8位 → 13時6位 → 19時6位",
+                },
+            }
+        ],
+        "us": [],
+    }
+    md = gaws.render_weekly_rising_markdown(rising)
+    assert "| 06-08 | 10 | 8 | 8 |" in md
+    assert "jump **+15.0**" in md
+    assert "根拠:" not in md
+    assert "jump合計" not in md
+    assert "```mermaid" in md
+
+
 def test_assemble_weekly_markdown_includes_regional_sections(gaws):
     mon = date(2026, 6, 8)
     sun = date(2026, 6, 14)

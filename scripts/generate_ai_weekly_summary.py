@@ -627,7 +627,11 @@ def format_weekly_best_rank_mermaid(
     label: str,
     rank_evidence_by_day: Dict[str, str],
 ) -> str:
-    """週内の日別ベスト順位を Mermaid xychart で可視化（2日以上あるときのみ）。"""
+    """週内の日別ベスト順位を Mermaid xychart で可視化（2日以上あるときのみ）。
+
+    Mermaid は y-axis を ``max --> min`` にすると目盛りがほぼ出ないため、
+    折れ線は表示用に反転し、実順位は x 軸ラベル ``MM-DD (N位)`` で示す。
+    """
     points: List[tuple[str, int]] = []
     for ds, ev in sorted(rank_evidence_by_day.items()):
         best = _best_rank_from_evidence(ev)
@@ -635,17 +639,18 @@ def format_weekly_best_rank_mermaid(
             points.append((_short_calendar_date(ds), best))
     if len(points) < 2:
         return ""
-    labels = ", ".join(f'"{d}"' for d, _ in points)
-    values = ", ".join(str(r) for _, r in points)
+    labels = ", ".join(f'"{d} ({r}位)"' for d, r in points)
     ymax = max(r for _, r in points)
+    y_top = max(ymax + 2, 10)
+    chart_values = ", ".join(str(y_top + 1 - r) for _, r in points)
     title = _mermaid_safe_label(label)
     return (
         "```mermaid\n"
         "xychart-beta\n"
-        f'    title "{title} — 日別ベスト順位"\n'
+        f'    title "{title} — 日別ベスト順位（上=1位）"\n'
         f"    x-axis [{labels}]\n"
-        f'    y-axis "順位" 1 --> {max(ymax + 2, 10)}\n'
-        f"    line [{values}]\n"
+        f'    y-axis "順位" 1 --> {y_top}\n'
+        f"    line [{chart_values}]\n"
         "```"
     )
 
@@ -744,16 +749,13 @@ def render_weekly_cross_markdown(
 def render_data_premise(meta: Dict[str, Any]) -> str:
     missing_snap = meta.get("missing_snapshot_dates") or []
     partial = meta.get("partial_snapshot_dates") or []
-    missing_daily = meta.get("missing_dates") or []
-    if not missing_snap and not partial and not missing_daily:
+    if not missing_snap and not partial:
         return ""
     lines = ["## データ前提", ""]
     if missing_snap:
         lines.append(f"- スナップショット欠損日: {', '.join(missing_snap)}")
     if partial:
         lines.append(f"- スナップショット部分欠損（スロット欠け）: {', '.join(partial)}")
-    if missing_daily:
-        lines.append(f"- 日次サマリー Markdown 欠損: {', '.join(missing_daily)}")
     return "\n".join(lines).rstrip() + "\n"
 
 

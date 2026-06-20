@@ -18,6 +18,9 @@ from apscheduler.triggers.cron import CronTrigger
 from database_config import TrendsCache
 from services.subscription.subscription_manager import SubscriptionManager
 from utils.scheduler_lock import is_local_holder_process_dead, parse_scheduler_lock_holder
+from utils.shutdown_errors import is_interpreter_shutdown_error
+
+AUTO_FETCH_TRIGGERS = frozenset({"scheduler", "gap_retry", "startup_catchup"})
 
 
 def _process_identity():
@@ -159,7 +162,12 @@ class TrendsScheduler:
 
         recovery_count = 0
         circuit_opened = False
-        if recovery_slot and hasattr(self.db, "record_oom_lock_recovery"):
+        recent_deploy = self._is_recent_deploy()
+        if (
+            recovery_slot
+            and hasattr(self.db, "record_oom_lock_recovery")
+            and not recent_deploy
+        ):
             recovery_count = self.db.record_oom_lock_recovery(recovery_slot)
             if (
                 recovery_count >= OOM_RECOVERY_CIRCUIT_THRESHOLD
@@ -186,8 +194,12 @@ class TrendsScheduler:
                     alert_key,
                     window_minutes=OOM_RECOVERY_ALERT_COOLDOWN_MINUTES,
                 )
-            should_alert = circuit_opened or not recently_alerted
-            if should_alert:
+            should_alert = (circuit_opened or not recently_alerted) and not recent_deploy
+            if recent_deploy:
+                logger.info(
+                    "⏭️ 直近デプロイのため stale lock 回収 Discord 通知を抑制（deploy による worker 切替）"
+                )
+            elif should_alert:
                 try:
                     if circuit_opened:
                         self._send_alert(
@@ -695,6 +707,19 @@ class TrendsScheduler:
                 "❌ refresh_all_trends がジョブ上限 %s 秒を超過しました",
                 job_timeout_seconds,
             )
+        except RuntimeError as e:
+            if is_interpreter_shutdown_error(e):
+                logger.warning(
+                    "⏭️ refresh_all_trends: worker シャットダウン中のため中断 (%s)",
+                    e,
+                )
+                result_holder["result"] = {
+                    "success": False,
+                    "results": {},
+                    "worker_shutdown": True,
+                }
+            else:
+                raise
         finally:
             executor.shutdown(wait=False, cancel_futures=True)
 
@@ -736,6 +761,17 @@ class TrendsScheduler:
                 self._send_scheduler_skip_notification(
                     trigger_source=trigger_source,
                     reason=f"OOM 連続回収により slot({prefetch_slot_key}) の自動再取得を停止しています。",
+                )
+            return False
+        if trigger_source in AUTO_FETCH_TRIGGERS and self._is_recent_deploy():
+            logger.info(
+                "⏭️ 直近デプロイのため自動トレンド取得をスキップします（trigger=%s）",
+                trigger_source,
+            )
+            if trigger_source == "scheduler":
+                self._send_scheduler_skip_notification(
+                    trigger_source=trigger_source,
+                    reason="直近にデプロイされたため、定時取得をスキップします（次スロットまたは gap_retry で補完）。",
                 )
             return False
         # 同時実行防止: 既に実行中の場合はスキップ（同一プロセス内）
@@ -885,6 +921,11 @@ class TrendsScheduler:
                 result.get('success'),
                 job_timed_out,
             )
+            if result.get("worker_shutdown"):
+                logger.warning(
+                    "⏭️ worker シャットダウンのため取得を中断（deploy/SIGTERM 想定・Discord 通知なし）"
+                )
+                return executed
             if job_timed_out:
                 self._send_alert(
                     "critical",
@@ -1232,6 +1273,12 @@ class TrendsScheduler:
             return True
             
         except Exception as e:
+            if is_interpreter_shutdown_error(e):
+                logger.warning(
+                    "⏭️ 自動トレンド取得: worker シャットダウン中のため中断 (%s)",
+                    e,
+                )
+                return executed
             logger.error(f"❌ 自動トレンド取得エラー: {e}", exc_info=True)
             import traceback
             error_traceback = traceback.format_exc()

@@ -168,6 +168,9 @@ def _get_task_timeout_seconds(explicit=None):
         return 600.0
 
 
+from utils.shutdown_errors import is_interpreter_shutdown_error
+
+
 def _execute_task_batches(tasks, call_manager, *, max_concurrent, batch_delay_seconds, task_timeout_seconds):
     """タスクをバッチ並列実行。タイムアウトした未完了タスクは失敗扱いにして続行する。"""
     results = {}
@@ -184,13 +187,31 @@ def _execute_task_batches(tasks, call_manager, *, max_concurrent, batch_delay_se
     )
 
     completed_count = 0
+    worker_shutdown = False
     for batch_idx, batch in enumerate(batches):
+        if worker_shutdown:
+            break
         workers = min(len(batch), batch_size)
-        executor = ThreadPoolExecutor(max_workers=workers)
-        future_to_task = {
-            executor.submit(call_manager, key, handler, region): (key, region)
-            for key, handler, region in batch
-        }
+        try:
+            executor = ThreadPoolExecutor(max_workers=workers)
+        except RuntimeError as exc:
+            if is_interpreter_shutdown_error(exc):
+                logger.warning("⏭️ バッチ実行開始を中断（worker シャットダウン）: %s", exc)
+                worker_shutdown = True
+                break
+            raise
+        try:
+            future_to_task = {
+                executor.submit(call_manager, key, handler, region): (key, region)
+                for key, handler, region in batch
+            }
+        except RuntimeError as exc:
+            executor.shutdown(wait=False, cancel_futures=True)
+            if is_interpreter_shutdown_error(exc):
+                logger.warning("⏭️ バッチタスク投入を中断（worker シャットダウン）: %s", exc)
+                worker_shutdown = True
+                break
+            raise
         pending = dict(future_to_task)
         try:
             while pending:
@@ -234,8 +255,6 @@ def _execute_task_batches(tasks, call_manager, *, max_concurrent, batch_delay_se
                                 'status': resp.get('status'),
                                 'data_count': len(resp.get('data') or []),
                             }
-                        del resp
-                        gc.collect()
                         logger.debug("✅ [%s/%s] %s 完了", completed_count, len(tasks), rk)
                     except Exception as exc:
                         logger.error(

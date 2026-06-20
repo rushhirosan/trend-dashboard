@@ -45,8 +45,11 @@ cache/
 .coverage
 htmlcov/
 
-# Documentation
-docs/
+# Documentation (keep daily summary manuscripts for Fake door on production)
+docs/**
+!docs/summaries/
+!docs/summaries/daily/
+!docs/summaries/daily/*.md
 *.md
 !README.md
 

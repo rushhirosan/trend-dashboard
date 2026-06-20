@@ -100,8 +100,8 @@ JP `/`・US `/us` のダッシュボード上部 3 カラム:
 
 | 項目 | 状態 |
 |------|------|
-| **いま** | フェーズ1（原稿・品質）〜 フェーズ2a 準備 |
-| **次のマイルストーン** | Fake door に approved の一行結論 + Waitlist フォーム |
+| **いま** | フェーズ2a（Waitlist 稼働・本番 E2E 待ち） |
+| **次のマイルストーン** | 本番で Waitlist 登録 E2E + 2〜4週の関心検証 |
 | **本命案** | A（フリーミアム + メール）— 変更時は [決定ログ](#決定ログ) に記載 |
 
 ### フェーズ1 — 原稿・品質・SLA（課金前）
@@ -148,28 +148,28 @@ JP `/`・US `/us` のダッシュボード上部 3 カラム:
 
 #### A-2a-1 一行結論の取り出し
 
-- [ ] 抽出ルール確定（`## 今日の一行結論`）
-- [ ] JP のみ先行 / US 同時 — 決定: ___________
-- [ ] サンプル1日分で動作確認
+- [x] 抽出ルール確定（`## 今日の一行結論` → 表示は `teaser` / 一行サマリー）
+- [x] JP のみ先行 / US 同時 — 決定: **同時（locale 別カード、同一原稿）**
+- [x] サンプル1日分で動作確認
 
 #### A-2a-2 Fake door 実データ表示
 
 - [x] Fake door UI 本番配置済み（現状「準備中」プレースホルダ）
-- [ ] `ENABLE_AI_SUMMARY_FAKE_DOOR` で approved 一行結論を表示
-- [ ] 原稿なし時のフォールバック文言
+- [x] `ENABLE_AI_SUMMARY_FAKE_DOOR` で approved 一行結論を表示（`AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT` で DEBUG 時 draft 可）
+- [x] 原稿なし時のフォールバック文言
 
 #### A-2a-3 Waitlist フォーム
 
 - [x] API `POST /api/waitlist/ai-summary` 実装済み
 - [x] DB `ai_summary_waitlist` 実装済み
-- [ ] モーダルにメールフォーム UI
+- [x] モーダルにメールフォーム UI
 - [ ] 本番で登録 E2E 確認
 
 #### A-2a-4 計測・コピー
 
 - [x] GA4 `fake_door_view` / `ai_summary_top5_click`
-- [ ] `waitlist_submit` / `waitlist_success`（任意）
-- [ ] モーダルに提供予定文案
+- [x] `waitlist_submit` / `waitlist_success`（`waitlist_error` 含む）
+- [x] モーダルに提供予定文案
 
 #### A-2a-5 関心検証（2〜4週）
 
@@ -263,6 +263,7 @@ JP `/`・US `/us` のダッシュボード上部 3 カラム:
 |------|----------|
 | 2026-06-11 | マネタイズ doc 初版。本命案 A、並行 B 可。 |
 | 2026-06-11 | README / steps / progress を本ファイルに統合。 |
+| 2026-06-19 | フェーズ2a 実装: teaser 表示・approved ゲート・Waitlist モーダル・GA4 waitlist_*。 |
 | | |
 
 ---

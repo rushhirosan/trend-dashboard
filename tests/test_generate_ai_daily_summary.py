@@ -976,6 +976,10 @@ def test_finalize_editorial_fills_spotlights_and_replaces_one_liner(gads):
     )
     assert trace["one_liner_source"] == "mechanical"
     assert "Climber" in out["one_liner"]
+    assert out["teaser"]
+    assert "Climber" in out["teaser"]
+    assert trace.get("teaser_source") in ("llm", "derived")
+    assert len(out["teaser"]) <= gads._TEASER_MAX_CHARS
     assert trace.get("spotlights_filled")
     assert len(out["spotlights"]) >= 1
     assert not any("若い世代" in str(n.get("note") or "") for n in out["rising_notes"])
@@ -984,6 +988,7 @@ def test_finalize_editorial_fills_spotlights_and_replaces_one_liner(gads):
 def test_parse_editorial_json(gads):
     raw = json.dumps(
         {
+            "teaser": "「Climber」が順位上昇。",
             "one_liner": "台風と dazn が目立った。",
             "spotlights": [
                 {
@@ -999,6 +1004,7 @@ def test_parse_editorial_json(gads):
         ensure_ascii=False,
     )
     data = gads.parse_editorial_json(raw)
+    assert data["teaser"].startswith("「Climber」")
     assert data["one_liner"].startswith("台風")
     assert len(data["spotlights"]) == 1
     assert data["cross_intro"] is None

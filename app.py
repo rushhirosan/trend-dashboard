@@ -191,8 +191,12 @@ def create_app():
             from services.summary.daily_summary_preview import preview_for_fake_door
 
             ai_summary_fake_door = {
-                'ja': preview_for_fake_door('ja'),
-                'en': preview_for_fake_door('en'),
+                'ja': preview_for_fake_door(
+                    'ja', allow_draft=AppConfig.AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT
+                ),
+                'en': preview_for_fake_door(
+                    'en', allow_draft=AppConfig.AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT
+                ),
             }
         return {
             'ENABLE_SUBSCRIPTION_UI': AppConfig.ENABLE_SUBSCRIPTION_UI,

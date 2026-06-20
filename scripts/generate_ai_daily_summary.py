@@ -78,6 +78,7 @@ EDITORIAL_CANDIDATE_MAX = 12
 SPOTLIGHT_MAX = 5
 SPOTLIGHT_MIN = 2
 _MECHANICAL_ONE_LINER_MAX = 420
+_TEASER_MAX_CHARS = 90
 _GENERIC_ONE_LINER = re.compile(
     r"(注目を集めて|人気です|が話題|盛り上がり|関心が高ま)",
     re.I,
@@ -1695,6 +1696,28 @@ def one_liner_is_acceptable(
     return True
 
 
+def build_teaser_from_one_liner(one_liner: str, max_chars: int = _TEASER_MAX_CHARS) -> str:
+    """Fake door 用: one_liner の先頭1文を短く切る。"""
+    from services.summary.daily_summary_preview import clamp_teaser, first_sentence
+
+    return clamp_teaser(first_sentence(one_liner), max_chars=max_chars)
+
+
+def teaser_is_acceptable(
+    teaser: str,
+    rising_items: List[Dict[str, Any]],
+) -> bool:
+    s = (teaser or "").strip()
+    if len(s) < 12 or len(s) > _TEASER_MAX_CHARS:
+        return False
+    if _warn_vague_one_liner(s) or _GENERIC_ONE_LINER.search(s):
+        return False
+    labels = [str(r.get("label") or "").strip() for r in rising_items if r.get("label")]
+    if labels and not any(lab in s for lab in labels[:3]):
+        return False
+    return True
+
+
 def build_mechanical_one_liner(
     editorial_candidates: List[Dict[str, Any]],
     rising_items: List[Dict[str, Any]],
@@ -1892,6 +1915,16 @@ def finalize_editorial(
         if one:
             trace["one_liner_replaced"] = True
 
+    teaser = str(editorial.get("teaser") or "").strip()
+    if teaser_is_acceptable(teaser, rising_items):
+        trace["teaser_source"] = "llm"
+    else:
+        teaser = build_teaser_from_one_liner(str(editorial.get("one_liner") or ""))
+        trace["teaser_source"] = "derived"
+        if str(editorial.get("teaser") or "").strip():
+            trace["teaser_replaced"] = True
+    editorial["teaser"] = teaser
+
     llm_spots = [
         sp
         for sp in (editorial.get("spotlights") or [])
@@ -1985,6 +2018,7 @@ def parse_editorial_json(raw: str) -> Dict[str, Any]:
         raise RuntimeError("editorial JSON must be an object")
 
     out: Dict[str, Any] = {
+        "teaser": str(data.get("teaser") or "").strip(),
         "one_liner": str(data.get("one_liner") or "").strip(),
         "spotlights": [],
         "rising_notes": [],
@@ -2060,8 +2094,14 @@ def merge_front_matter(
     business_day: date,
     model: str,
     inner_markdown: str,
+    *,
+    teaser: str = "",
 ) -> str:
     gen_at = datetime.now(JST).strftime("%Y-%m-%d %H:%M JST")
+    teaser_line = ""
+    if teaser:
+        escaped = teaser.replace("\\", "\\\\").replace('"', '\\"')
+        teaser_line = f'teaser: "{escaped}"\n'
     fm = f"""---
 status: draft
 summary_date: "{business_day.isoformat()}"
@@ -2072,7 +2112,7 @@ model: "{model}"
 business_day: "{business_day.isoformat()}"
 snapshot_slots_included: ["07", "13", "19", "01"]
 generated_at: "{gen_at}"
----
+{teaser_line}---
 
 """
     body = strip_wrapping_fences(inner_markdown)
@@ -2084,6 +2124,9 @@ SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ�
 
 **出力は JSON オブジェクトのみ**（Markdown 不可）。次のキーを含める:
 
+- `teaser` (string): **サイト無料プレビュー用**。1文・**最大90字**。主題は1つに絞る。
+  rising_highlights の **先頭 label を1件**そのまま含める。順位の動きは括弧で短く（例: 7時圏外→19時1位）。
+  2件目以降のトピックは書かない（それらは one_liner / 有料全文向け）。
 - `one_liner` (string): 最大3文。必ず rising_highlights の label を **2件以上**そのまま含める。
   reason=category_leader かつ category=ニュース の候補が rising に無い場合は、その label も含める。
   「注目を集めて」「人気です」等の抽象表現は禁止。全カテゴリを無理に埋めない。
@@ -2229,7 +2272,12 @@ def run_generate(
     meta.update(fin_trace)
     if vague_warn and meta.get("one_liner_source") == "llm":
         meta["editorial_warning"] = vague_warn
-    full = merge_front_matter(business_day, model, inner)
+    full = merge_front_matter(
+        business_day,
+        model,
+        inner,
+        teaser=str(editorial.get("teaser") or ""),
+    )
     return full, meta
 
 

@@ -9,9 +9,9 @@ primary_region = "nrt"
   DEBUG = "False"
   # スケジューラ二重実行防止: DB分散ロックを有効化（複数マシン・プロセスで1本のみ実行）
   TRENDS_SCHEDULER_USE_DB_LOCK = "true"
-  # 起動時の取り逃し補完: true=常にスキップ、false=デプロイ直後はスキップ・クラッシュ再起動時は補完（deploy_marker で判定）
-  # DEPLOY_CATCHUP_SKIP_WINDOW_SECONDS=300 で「直近デプロイ」の窓（秒）。デフォルト300（5分）
-  SKIP_STARTUP_EXECUTION = "false"
+  # 起動時の取り逃し補完: OOM 再起動のたびに全量再取得が走ると通知ループになるため true 推奨
+  # 取り逃しは定時(1/7/13/19)と T+35 分の gap_retry で補完
+  SKIP_STARTUP_EXECUTION = "true"
   # デプロイ時のメール送信を無効化（スケジューラー実行時のみメール送信）
   SKIP_EMAIL_ON_UPDATE = "false"
   # DB分散ロックの保持時間（分）。一括取得が長時間でも期限切れで二重実行されないよう、想定最長ジョブより長めに
@@ -20,7 +20,7 @@ primary_region = "nrt"
   TREND_REFRESH_MAX_CONCURRENT = "2"
   # スケジューラ定期実行: 同時1本で OOM 回避（2026-05-30: 768MB+concurrent=2 で anon-rss~600MB→SIGKILL）
   TRENDS_SCHEDULER_LOW_MEMORY_MAX_CONCURRENT = "1"
-  TRENDS_SCHEDULER_LOW_MEMORY_BATCH_DELAY_SECONDS = "2"
+  TRENDS_SCHEDULER_LOW_MEMORY_BATCH_DELAY_SECONDS = "4"
   # memory_watchdog の fallback 上限（cgroup と揃える）
   MEMORY_LIMIT_MB = "1024"
   # バッチ間待機秒数（メモリ・接続の解放を待つ、OOM対策）
@@ -55,5 +55,5 @@ primary_region = "nrt"
 [[vm]]
   cpu_kind = "shared"
   cpus = 1
-  # 2026-05-30: 768MB で 7:00 ジョブ中に OOM（anon-rss~601MB）→ 1024MB に戻す
+  # 1024MB のまま OOM 対策は低負荷モード・バッチ待機・結果のメモリ解放で対応
   memory_mb = 1024

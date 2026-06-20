@@ -2499,6 +2499,62 @@ class TrendsCache:
         except Exception as e:
             logger.warning("⚠️ mark_slot_completed エラー: %s", e)
 
+    @staticmethod
+    def oom_recovery_slot_prefix(slot_key: str) -> str:
+        return f"oom_rec_{slot_key}_"
+
+    @staticmethod
+    def oom_circuit_open_slot_key(slot_key: str) -> str:
+        return f"oom_open_{slot_key}"
+
+    @staticmethod
+    def oom_recovery_alert_slot_key(slot_key: str) -> str:
+        return f"oom_alert_{slot_key}"
+
+    def count_oom_lock_recoveries(self, slot_key: str) -> int:
+        """同一スロットの OOM ロック回収回数（scheduler_slot_run の oom_rec_* 行数）。"""
+        prefix = self.oom_recovery_slot_prefix(slot_key)
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT COUNT(*) FROM scheduler_slot_run
+                        WHERE slot_key LIKE %s
+                        """,
+                        (f"{prefix}%",),
+                    )
+                    row = cursor.fetchone()
+                    return int(row[0]) if row else 0
+        except Exception as e:
+            logger.warning("⚠️ count_oom_lock_recoveries エラー: %s", e)
+            return 0
+
+    def record_oom_lock_recovery(self, slot_key: str) -> int:
+        """OOM ロック回収を1件記録し、当該スロットの累計回数を返す。"""
+        if not slot_key:
+            return 0
+        prefix = self.oom_recovery_slot_prefix(slot_key)
+        count = self.count_oom_lock_recoveries(slot_key)
+        next_key = f"{prefix}{count + 1:03d}"
+        if len(next_key) > 64:
+            logger.warning("⚠️ OOM recovery slot_key が長すぎます: %s", next_key)
+            return count + 1
+        self.mark_slot_completed(next_key)
+        return count + 1
+
+    def is_oom_circuit_open(self, slot_key: str) -> bool:
+        """OOM 連続回収により当該スロットの自動再取得を停止しているか。"""
+        if not slot_key:
+            return False
+        return self.has_slot_completed(self.oom_circuit_open_slot_key(slot_key))
+
+    def open_oom_circuit(self, slot_key: str) -> None:
+        """当該スロットの OOM サーキットブレーカーを開く（自動再取得を止める）。"""
+        if not slot_key:
+            return
+        self.mark_slot_completed(self.oom_circuit_open_slot_key(slot_key))
+
     def upsert_trend_daily_snapshots_batch(self, rows):
         """business_day × slot × series_key 単位でスナップショットをUPSERTする。
 

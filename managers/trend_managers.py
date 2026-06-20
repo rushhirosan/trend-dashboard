@@ -222,6 +222,20 @@ def _execute_task_batches(tasks, call_manager, *, max_concurrent, batch_delay_se
                         rk, result_data = fut.result()
                         with results_lock:
                             results[rk] = result_data
+                        resp = result_data.get('response')
+                        if (
+                            result_data.get('success')
+                            and isinstance(resp, dict)
+                            and 'data' in resp
+                        ):
+                            # OOM対策: 成功レスポンスの生データは結果集約後不要
+                            result_data['response'] = {
+                                'success': resp.get('success', True),
+                                'status': resp.get('status'),
+                                'data_count': len(resp.get('data') or []),
+                            }
+                        del resp
+                        gc.collect()
                         logger.debug("✅ [%s/%s] %s 完了", completed_count, len(tasks), rk)
                     except Exception as exc:
                         logger.error(

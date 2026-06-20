@@ -10,6 +10,7 @@ from typing import Optional
 
 JST = timezone(timedelta(hours=9))
 _ONE_LINER_HEADING = "## 今日の一行結論"
+TEASER_MAX_CHARS = 90
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DAILY_DIR = _REPO_ROOT / "docs" / "summaries" / "daily"
 _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---", re.DOTALL)
@@ -17,6 +18,7 @@ _BUSINESS_DAY_RE = re.compile(r'^business_day:\s*"?([0-9]{4}-[0-9]{2}-[0-9]{2})"
 _STATUS_RE = re.compile(r"^status:\s*(\w+)", re.M)
 _GENERATOR_RE = re.compile(r"^generator:\s*(\S+)", re.M)
 _SLOTS_RE = re.compile(r'snapshot_slots_included:\s*\[(.*?)\]')
+_TEASER_RE = re.compile(r'^teaser:\s*"(.*)"\s*$', re.M)
 
 
 @dataclass(frozen=True)
@@ -24,6 +26,7 @@ class DailySummaryPreview:
     business_day: date
     delivery_day: date
     one_liner: str
+    teaser: str
     snapshot_slots: tuple[str, ...]
     status: str
     source_path: Optional[Path] = None
@@ -54,6 +57,17 @@ class DailySummaryPreview:
         slots = "/".join(self.snapshot_slots) if self.snapshot_slots else "07/13/19/01"
         return f"Observation: {self.business_day.isoformat()} (slots {slots})"
 
+    def subline_ja(self) -> str:
+        slots = "/".join(self.snapshot_slots) if self.snapshot_slots else "07/13/19/01"
+        return f"{self.headline_ja()}（{slots} 反映）"
+
+    def subline_en(self) -> str:
+        slots = "/".join(self.snapshot_slots) if self.snapshot_slots else "07/13/19/01"
+        return f"{self.headline_en()} (slots {slots})"
+
+    def display_teaser(self) -> str:
+        return teaser_for_display(self.one_liner, self.teaser)
+
 
 def _today_jst() -> date:
     return datetime.now(JST).date()
@@ -80,7 +94,39 @@ def _parse_frontmatter(text: str) -> dict:
         out["snapshot_slots"] = tuple(
             s.strip().strip('"').strip("'") for s in raw.split(",") if s.strip()
         )
+    teaser = _TEASER_RE.search(block)
+    if teaser:
+        out["teaser"] = teaser.group(1).replace('\\"', '"').strip()
     return out
+
+
+def first_sentence(text: str) -> str:
+    """一行結論から先頭の1文を取り出す（Fake door 用フォールバック）。"""
+    s = (text or "").strip()
+    if not s:
+        return ""
+    for sep in ("。", "．"):
+        idx = s.find(sep)
+        if idx >= 0:
+            return s[: idx + len(sep)].strip()
+    if ". " in s:
+        return s.split(". ", 1)[0].strip() + "."
+    return s
+
+
+def clamp_teaser(text: str, max_chars: int = TEASER_MAX_CHARS) -> str:
+    s = (text or "").strip()
+    if len(s) <= max_chars:
+        return s
+    return s[: max_chars - 1].rstrip() + "…"
+
+
+def teaser_for_display(one_liner: str, teaser: str = "") -> str:
+    """トップ朝刊カード用の短いリード（frontmatter teaser 優先）。"""
+    explicit = (teaser or "").strip()
+    if explicit:
+        return clamp_teaser(explicit)
+    return clamp_teaser(first_sentence(one_liner))
 
 
 def extract_one_liner(markdown_body: str) -> str:
@@ -124,17 +170,30 @@ def _parse_summary_file(path: Path, delivery_day: date) -> Optional[DailySummary
         business_day=business_day,
         delivery_day=delivery_day,
         one_liner=one_liner,
+        teaser=str(meta.get("teaser") or "").strip(),
         snapshot_slots=tuple(slots),
         status=str(meta.get("status") or "draft"),
         source_path=path,
     )
 
 
+def _is_publishable_status(status: str, *, allow_draft: bool) -> bool:
+    st = (status or "draft").strip().lower()
+    if st == "approved":
+        return True
+    return allow_draft and st == "draft"
+
+
 def load_latest_daily_preview(
     daily_dir: Optional[Path] = None,
     delivery_day: Optional[date] = None,
+    *,
+    allow_draft: bool = False,
 ) -> Optional[DailySummaryPreview]:
-    """``docs/summaries/daily/`` の最新 AI 生成日次から一行結論を返す。"""
+    """``docs/summaries/daily/`` の最新 AI 生成日次からプレビューを返す。
+
+    本番想定では ``allow_draft=False``（``status: approved`` のみ）。
+    """
     root = daily_dir or _DAILY_DIR
     if not root.is_dir():
         return None
@@ -146,22 +205,23 @@ def load_latest_daily_preview(
     )
     for path in candidates:
         preview = _parse_summary_file(path, deliver)
-        if preview:
+        if preview and _is_publishable_status(preview.status, allow_draft=allow_draft):
             return preview
     return None
 
 
-def preview_for_fake_door(locale: str = "ja") -> dict:
+def preview_for_fake_door(locale: str = "ja", *, allow_draft: bool = False) -> dict:
     """テンプレート ``AI_SUMMARY_FAKE_DOOR`` 用の dict。"""
-    preview = load_latest_daily_preview()
+    preview = load_latest_daily_preview(allow_draft=allow_draft)
     deliver = _today_jst()
     if preview:
+        subline = preview.subline_ja() if locale == "ja" else preview.subline_en()
         return {
             "has_preview": True,
             "headline": preview.headline_ja() if locale == "ja" else preview.headline_en(),
-            "observation_meta": (
-                preview.observation_meta_ja() if locale == "ja" else preview.observation_meta_en()
-            ),
+            "subline": subline,
+            "observation_meta": "",
+            "teaser": preview.display_teaser(),
             "one_liner": preview.one_liner,
             "business_day": preview.business_day.isoformat(),
             "delivery_day": preview.delivery_day.isoformat(),
@@ -175,7 +235,9 @@ def preview_for_fake_door(locale: str = "ja") -> dict:
     return {
         "has_preview": False,
         "headline": fallback_headline,
+        "subline": fallback_headline,
         "observation_meta": "",
+        "teaser": "",
         "one_liner": "",
         "business_day": "",
         "delivery_day": deliver.isoformat(),

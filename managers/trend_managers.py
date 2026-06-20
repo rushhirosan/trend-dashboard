@@ -396,12 +396,25 @@ def _build_us_refresh_tasks(managers, force_refresh):
     return tasks
 
 
+def _normalize_refresh_region(region) -> str | None:
+    """region: None|'both' → 両方, 'jp'/'us' → 片方のみ。"""
+    if region is None:
+        return None
+    r = str(region).strip().lower()
+    if r in ("", "both", "all"):
+        return None
+    if r in ("jp", "us"):
+        return r
+    raise ValueError(f"invalid refresh region: {region!r}")
+
+
 def refresh_all_trends(
     managers,
     force_refresh=True,
     max_concurrent=None,
     batch_delay_seconds=None,
     task_timeout_seconds=None,
+    region=None,
 ):
     """
     すべてのトレンドカテゴリを強制更新するユーティリティ関数
@@ -414,10 +427,12 @@ def refresh_all_trends(
         max_concurrent (int|None): 同時実行数。Noneの場合は環境変数 TREND_REFRESH_MAX_CONCURRENT（デフォルト6）
         batch_delay_seconds (float|None): バッチ間の待機秒数。Noneの場合は環境変数 TREND_REFRESH_BATCH_DELAY_SECONDS（デフォルト2）
         task_timeout_seconds (float|None): 1タスクの最大待ち秒数。Noneの場合は TREND_REFRESH_TASK_TIMEOUT_SECONDS（デフォルト600）
+        region (str|None): None で JP+US。'jp' / 'us' で片方のみ（OOM 対策の subprocess 分割用）
 
     Returns:
         dict: 各カテゴリの更新結果
     """
+    refresh_region = _normalize_refresh_region(region)
     def call_manager(key, handler, region='JP'):
         """マネージャーを呼び出して結果を返す（並列実行用）"""
         manager = managers.get(key)
@@ -460,38 +475,46 @@ def refresh_all_trends(
 
     phase_pause = _get_phase_pause_seconds()
     results = {}
+    run_jp = refresh_region in (None, "jp")
+    run_us = refresh_region in (None, "us")
 
-    logger.info("🇯🇵 日本のデータを更新中（並列実行）...")
-    jp_tasks = _build_jp_refresh_tasks(force_refresh)
-    jp_results = _execute_task_batches(
-        jp_tasks,
-        call_manager,
-        max_concurrent=concurrency,
-        batch_delay_seconds=delay_sec,
-        task_timeout_seconds=task_timeout_seconds,
-    )
-    results.update(jp_results)
-    del jp_tasks, jp_results
-    logger.info("⏸️ JP フェーズ完了 — メモリ返却待機 %.1f 秒", phase_pause)
-    _release_batch_memory(pause_seconds=phase_pause)
+    if run_jp:
+        logger.info("🇯🇵 日本のデータを更新中（並列実行）...")
+        jp_tasks = _build_jp_refresh_tasks(force_refresh)
+        jp_results = _execute_task_batches(
+            jp_tasks,
+            call_manager,
+            max_concurrent=concurrency,
+            batch_delay_seconds=delay_sec,
+            task_timeout_seconds=task_timeout_seconds,
+        )
+        results.update(jp_results)
+        del jp_tasks, jp_results
+        if run_us:
+            logger.info("⏸️ JP フェーズ完了 — メモリ返却待機 %.1f 秒", phase_pause)
+            _release_batch_memory(pause_seconds=phase_pause)
 
-    logger.info("🇺🇸 USのデータを更新中（並列実行）...")
-    us_tasks = _build_us_refresh_tasks(managers, force_refresh)
-    us_results = _execute_task_batches(
-        us_tasks,
-        call_manager,
-        max_concurrent=concurrency,
-        batch_delay_seconds=delay_sec,
-        task_timeout_seconds=task_timeout_seconds,
-    )
-    results.update(us_results)
-    del us_tasks, us_results
+    if run_us:
+        logger.info("🇺🇸 USのデータを更新中（並列実行）...")
+        us_tasks = _build_us_refresh_tasks(managers, force_refresh)
+        us_results = _execute_task_batches(
+            us_tasks,
+            call_manager,
+            max_concurrent=concurrency,
+            batch_delay_seconds=delay_sec,
+            task_timeout_seconds=task_timeout_seconds,
+        )
+        results.update(us_results)
+        del us_tasks, us_results
 
-    overall_success = all(result.get('success') for result in results.values())
+    overall_success = all(result.get('success') for result in results.values()) if results else False
 
-    return {
+    out = {
         'success': overall_success,
-        'results': results
+        'results': results,
     }
+    if refresh_region:
+        out['region'] = refresh_region
+    return out
 
 

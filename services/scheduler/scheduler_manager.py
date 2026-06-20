@@ -2,6 +2,8 @@ import os
 import json
 import logging
 import socket
+import subprocess
+import sys
 import threading
 import time
 import signal
@@ -85,6 +87,41 @@ try:
     )
 except (TypeError, ValueError):
     OOM_RECOVERY_CIRCUIT_THRESHOLD = 3
+
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+_REFRESH_REGION_SCRIPT = os.path.join(_REPO_ROOT, "scripts", "refresh_trends_region.py")
+_REFRESH_RESULT_PREFIX = "REFRESH_RESULT_JSON:"
+SCHEDULER_SUBPROCESS_PHASES = os.environ.get(
+    "TRENDS_SCHEDULER_SUBPROCESS_PHASES", "true"
+).lower() in ("1", "true", "yes")
+
+
+def _parse_refresh_subprocess_stdout(stdout: str) -> dict:
+    """refresh_trends_region.py の REFRESH_RESULT_JSON 行をパース。"""
+    if not stdout:
+        return {"success": False, "results": {}}
+    for line in reversed(stdout.splitlines()):
+        line = line.strip()
+        if line.startswith(_REFRESH_RESULT_PREFIX):
+            try:
+                return json.loads(line[len(_REFRESH_RESULT_PREFIX) :])
+            except json.JSONDecodeError:
+                break
+    return {"success": False, "results": {}, "error": "missing_refresh_result_json"}
+
+
+def _merge_phase_refresh_results(jp_result: dict, us_result: dict) -> dict:
+    """JP/US subprocess の結果を1件にまとめる。"""
+    jp = jp_result or {"success": False, "results": {}}
+    us = us_result or {"success": False, "results": {}}
+    merged = {}
+    merged.update(jp.get("results") or {})
+    merged.update(us.get("results") or {})
+    return {
+        "success": bool(jp.get("success")) and bool(us.get("success")),
+        "results": merged,
+        "phases": {"jp": jp, "us": us},
+    }
 
 
 class TrendsScheduler:
@@ -819,8 +856,139 @@ class TrendsScheduler:
             except Exception as e:
                 logger.error(f"❌ スケジューラー停止エラー: {e}")
 
+    def _run_refresh_region_subprocess(
+        self,
+        region: str,
+        *,
+        low_memory_mode: bool,
+        timeout_seconds: int,
+    ) -> tuple[dict, bool]:
+        """JP または US のみを別プロセスで refresh（OOM 時に RSS を OS へ返す）。"""
+        if not os.path.isfile(_REFRESH_REGION_SCRIPT):
+            logger.error("❌ refresh subprocess script not found: %s", _REFRESH_REGION_SCRIPT)
+            return (
+                {
+                    "success": False,
+                    "results": {},
+                    "region": region,
+                    "error": "refresh_script_missing",
+                },
+                False,
+            )
+
+        cmd = [sys.executable, _REFRESH_REGION_SCRIPT, "--region", region]
+        if low_memory_mode:
+            cmd.extend(
+                [
+                    "--max-concurrent",
+                    str(SCHEDULER_LOW_MEMORY_MAX_CONCURRENT),
+                    "--batch-delay",
+                    str(SCHEDULER_LOW_MEMORY_BATCH_DELAY_SECONDS),
+                ]
+            )
+
+        env = os.environ.copy()
+        env["ENABLE_SCHEDULER"] = "false"
+        env.setdefault("SKIP_STARTUP_EXECUTION", "true")
+
+        logger.info(
+            "🔄 refresh subprocess 開始 region=%s timeout=%ss cmd=%s",
+            region,
+            timeout_seconds,
+            " ".join(cmd),
+        )
+        timed_out = False
+        try:
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+                env=env,
+                cwd=_REPO_ROOT,
+            )
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            logger.error(
+                "❌ refresh subprocess タイムアウト region=%s (%ss)",
+                region,
+                timeout_seconds,
+            )
+            return (
+                {
+                    "success": False,
+                    "results": {},
+                    "region": region,
+                    "phase_timed_out": True,
+                },
+                True,
+            )
+
+        if proc.stderr:
+            for line in proc.stderr.splitlines()[-20:]:
+                if line.strip():
+                    logger.info("refresh subprocess stderr [%s]: %s", region, line)
+
+        result = _parse_refresh_subprocess_stdout(proc.stdout or "")
+        if proc.returncode != 0 and result.get("success"):
+            result = dict(result)
+            result["success"] = False
+        if proc.returncode != 0 and not result.get("error"):
+            result = dict(result)
+            result["error"] = f"subprocess_exit_{proc.returncode}"
+        result.setdefault("region", region)
+
+        logger.info(
+            "🔄 refresh subprocess 完了 region=%s success=%s exit=%s",
+            region,
+            result.get("success"),
+            proc.returncode,
+        )
+        return result, timed_out
+
+    def _run_refresh_all_trends_subprocess_phases(
+        self,
+        *,
+        low_memory_mode: bool,
+        job_timeout_seconds: int,
+    ) -> tuple[dict, bool]:
+        """JP → US を順に subprocess で実行し、結果をマージ。"""
+        phase_timeout = max(600, job_timeout_seconds // 2)
+        jp_result, jp_timed_out = self._run_refresh_region_subprocess(
+            "jp",
+            low_memory_mode=low_memory_mode,
+            timeout_seconds=phase_timeout,
+        )
+        if jp_timed_out:
+            merged = _merge_phase_refresh_results(jp_result, {"success": False, "results": {}})
+            merged["job_timed_out"] = True
+            merged["success"] = False
+            return merged, True
+
+        us_result, us_timed_out = self._run_refresh_region_subprocess(
+            "us",
+            low_memory_mode=low_memory_mode,
+            timeout_seconds=phase_timeout,
+        )
+        merged = _merge_phase_refresh_results(jp_result, us_result)
+        if us_timed_out:
+            merged["job_timed_out"] = True
+            merged["success"] = False
+            return merged, True
+        return merged, False
+
     def _run_refresh_all_trends_with_job_timeout(self, low_memory_mode, job_timeout_seconds):
-        """refresh_all_trends を別スレッドで実行し、上限超過時も呼び出し元へ制御を返す。"""
+        """refresh_all_trends を実行。低負荷モード時は JP/US を subprocess で分割（OOM 対策）。"""
+        if low_memory_mode and SCHEDULER_SUBPROCESS_PHASES:
+            logger.info(
+                "🔄 refresh_all_trends: subprocess フェーズ分割 (JP → US, phase_timeout=%ss)",
+                max(600, job_timeout_seconds // 2),
+            )
+            return self._run_refresh_all_trends_subprocess_phases(
+                low_memory_mode=low_memory_mode,
+                job_timeout_seconds=job_timeout_seconds,
+            )
+
         result_holder = {}
 
         def _run():

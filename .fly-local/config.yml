@@ -1,0 +1,12 @@
+wire_guard_state:
+    personal:
+        org: personal
+        name: interactive-Hiroyuki-Igusa-2025noMacBook-Air-rushhirosan-gmail-com-01KVJC9AB6BM8EY6TRGM1HB761
+        region: sjc
+        localpublic: mGeOq4Jk2Ly4a5S2FJp92SzXBgU14Emta3pJwX0koTo=
+        localprivate: 6yS/fZlWbIW6mDV6xv3YYsx0vg0rrQ3tDegoF0CP7L4=
+        dns: ""
+        peer:
+            peerip: fdaa:21:ccb2:a7b:910f:c72:1e6c:3902
+            endpointip: sjc2.gateway.6pn.dev
+            pubkey: j0WUwN5RXh/rwu4tYtaqrXjDAjVlzJgdMLfUHYwxVAQ=

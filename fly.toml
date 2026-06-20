@@ -21,6 +21,8 @@ primary_region = "nrt"
   # スケジューラ定期実行: 同時1本で OOM 回避（2026-05-30: 768MB+concurrent=2 で anon-rss~600MB→SIGKILL）
   TRENDS_SCHEDULER_LOW_MEMORY_MAX_CONCURRENT = "1"
   TRENDS_SCHEDULER_LOW_MEMORY_BATCH_DELAY_SECONDS = "8"
+  # 定時 refresh を JP/US で subprocess 分割（全カテゴリ取得維持・RSS ピーク低減）
+  TRENDS_SCHEDULER_SUBPROCESS_PHASES = "true"
   # memory_watchdog の fallback 上限（cgroup と揃える）
   MEMORY_LIMIT_MB = "1024"
   # バッチ間待機秒数（メモリ・接続の解放を待つ、OOM対策）

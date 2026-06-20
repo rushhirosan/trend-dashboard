@@ -20,6 +20,68 @@
     - GitHub Trending（スクレイピング）
     - Mastodon API
 
+## OOM / スケジューラ（2026-06-21 調査） 🔥
+
+### スナップショット履歴から分かったこと（`captured_at` → JST）
+
+定時取得が成功している日（例: business_day **2026-06-19**）の目安:
+
+| slot | 期待 (JST) | 実際の captured_at (JST) |
+|------|------------|---------------------------|
+| 07 | ~07:00 台 | ~07:12 |
+| 13 | ~13:00 台 | ~13:12 |
+| 19 | ~19:00 台 | ~19:12 |
+| 01 | ~01:00 台（翌暦日） | ~01:12 |
+
+**business_day=2026-06-20**（OOM 発生夜）:
+
+| slot | captured_at (JST) | 判定 |
+|------|-------------------|------|
+| 07 | **~16:02** | ❌ 定時ではない（13 時台と同一セッション） |
+| 13 | **~16:03** | ❌ 定時ではない（07 と 14 秒差で一括書き込み） |
+| 19 | ~20:22 | △ 19 時台だが通常より ~1h 遅め（要ログ照合） |
+| 01 | なし | ❌ 1:00 / 1:35 gap_retry とも OOM で未保存 |
+
+→ 「6/20 の 07/13/19 は全部ある」は**定時成功ではなく、落ちた後のキャッシュ/backfill で穴埋めされた可能性が高い**（07/13 は同一時刻の一括補填が確定）。
+
+確認コマンド（本番 API）:
+
+```bash
+curl -s "https://trends-dashboard.fly.dev/api/summaries/daily-snapshots?business_day=2026-06-20" \
+  | python3 -c "import json,sys; from collections import defaultdict; d=json.load(sys.stdin); b=defaultdict(set); [b[r['slot']].add(r['captured_at']) for r in d.get('data',[])]; print({k:sorted(v) for k,v in b.items()})"
+```
+
+DB 直確認: `scripts/inspect_scheduler_slots.py`（`scheduler_slot_run` + snapshots）。fly ssh 時は `PYTHONPATH=/app` が必要。
+
+### 対策 TODO（メモリ増なし優先）
+
+#### 即時（運用）
+
+- [ ] **slot 01 補完**: `python scripts/backfill_snapshot_slot.py --slot-key 1am_2026-06-21`（OOM 後にキャッシュが生きていれば軽量。ダメなら 2048MB 一時 scale 後に gap_retry / 手動 refresh）
+- [ ] **6/20 の 07/13 スナップショットを要再取得か判断**: captured_at が 16:02 JST のため AI 日次サマリー用の「その時点のトレンド」としては欠陥。必要なら `--slot-key 7am_2026-06-20` / `1pm_2026-06-20` を定時相当データで再 backfill（全量 refresh または当該スロットのみ）
+- [ ] **Grafana で 6/20 07/13/19/21 1:00 の OOM・scheduler 完了ログを突合**（`Out of memory` / `refresh_all_trends` / `スナップショット保存` / `gap_retry`）
+
+#### コード（優先度高 — 1024MB のまま完走を目指す）
+
+- [ ] **スケジューラ全量 refresh から KKJ を外す or 別ジョブ化**（OOM 直前が KKJ レート待ち。ダッシュボード必須でなければ scheduler 負荷から除外）
+- [ ] **scheduler 実行時のみ `fetch_all_categories=False`**（楽天・はてな・Note — 定時は軽量、手動/API は現状維持）
+- [ ] **IPA RSS: 240 件一括 parse を limit 件に切る**（force_refresh 時もエントリ上限）
+- [ ] **JP / US を同一プロセスで連続実行せず、フェーズ間にプロセス再起動 or ジョブ分割**（ピーク RSS 860MB 問題の根本）
+- [ ] **captured_at 健全性チェック**: 保存時に slot 期待時刻帯（例: 07 なら 06:30–08:00 JST）外なら Discord warning（backfill 誤認防止）
+- [ ] **`inspect_scheduler_slots.py` を fly ssh からそのまま実行可能に**（`sys.path` / `TODAY` 引数化）
+
+#### 監視
+
+- [ ] **memory_watchdog が OOM 前に Discord を出せていない理由を確認**（45s 間隔・82% 閾値 vs 861MB 瞬間到達）
+- [ ] **Grafana アラート**: `Out of memory` / `Worker.*SIGKILL` で OOM 本体を通知（ロック回収アラートと役割分担）
+
+#### 判断保留（最後の手段）
+
+- [ ] **Fly VM 1024→2048MB の要否判断** — 差分 ~$5–6/月（~700–900 円）。上記コード対策後も 1am/7am で OOM が続く場合のみ
+- [ ] 2048MB に上げる場合: `fly scale memory 2048 --app trends-dashboard` + `fly.toml` の `memory_mb` / `MEMORY_LIMIT_MB` を揃える
+
+---
+
 ## 改善提案 🚀
 
 ### 優先度: 高

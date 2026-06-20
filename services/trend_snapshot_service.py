@@ -291,7 +291,7 @@ def collect_series_snapshots(managers: Dict[str, Any]) -> List[Tuple[str, List[D
         add(
             "rakuten_jp",
             lambda: ra.get_trends(
-                force_refresh=False, fetch_all_categories=True, limit=25
+                force_refresh=False, fetch_all_categories=False, limit=25
             ),
         )
 
@@ -303,7 +303,7 @@ def collect_series_snapshots(managers: Dict[str, Any]) -> List[Tuple[str, List[D
                 category="all",
                 limit=25,
                 force_refresh=False,
-                fetch_all_categories=True,
+                fetch_all_categories=False,
             ),
         )
 
@@ -430,7 +430,7 @@ def collect_series_snapshots(managers: Dict[str, Any]) -> List[Tuple[str, List[D
                 category="all",
                 limit=25,
                 force_refresh=False,
-                fetch_all_categories=True,
+                fetch_all_categories=False,
             ),
         )
 

@@ -3,8 +3,9 @@
 yfinanceを使用して急騰・急落銘柄を取得
 """
 
-import os
+import gc
 import math
+import os
 from decimal import Decimal, InvalidOperation
 import yfinance as yf
 from yahooquery import Ticker as YahooTicker
@@ -664,10 +665,12 @@ class StockTrendsManager(BaseTrendsManager):
             logger.info(f"📈 Stock: {max_tickers}銘柄のデータ取得を開始します (market: {market})")
             
             # yahooqueryで一括取得（効率的）
+            yahoo_ticker = None
+            quote_price_data = None
+            hist = None
             try:
                 yahoo_ticker = YahooTicker(ticker_symbols)
                 # リアルな現在値・前日終値を取得（Yahooウェブ表示と一致）
-                quote_price_data = None
                 try:
                     quote_price_data = yahoo_ticker.get_modules(['price'])
                 except Exception as e:
@@ -812,7 +815,12 @@ class StockTrendsManager(BaseTrendsManager):
                     'error': f'株価データ取得エラー: {str(e)}',
                     'success': False
                 }
-                
+            finally:
+                yahoo_ticker = None
+                quote_price_data = None
+                hist = None
+                gc.collect()
+
         except Exception as e:
             logger.error(f"❌ Stock yahooquery エラー: {e}", exc_info=True)
             return {

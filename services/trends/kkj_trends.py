@@ -5,6 +5,7 @@ APIキー不要。http://www.kkj.go.jp/api/
 """
 
 import calendar
+import gc
 import re
 import requests
 import xml.etree.ElementTree as ET
@@ -415,6 +416,8 @@ class KKJTrendsManager(BaseTrendsManager):
                 series.append({"period": period, "value": cnt if cnt is not None else 0})
             series.sort(key=lambda x: (x.get("period") or ""), reverse=True)
             signals_monthly[key] = series
+            del series
+            gc.collect()
 
         # --- 都道府県ランキング と キーワード別 注目の案件 Top5 ---
         # キーワード別件数はAPIの「総件数」、県別は「一覧取得した結果」の都道府県別集計。
@@ -461,6 +464,8 @@ class KKJTrendsManager(BaseTrendsManager):
                     "prefecture": (r.get("prefecture") or "").strip(),
                 })
             keyword_top_cases[key] = top5
+            del results, prefecture_counts, top5, seen_urls
+            gc.collect()
         # 後方互換: prefecture_ranking は DX のランキング
         ranking = prefecture_rankings.get("dx", [])
 

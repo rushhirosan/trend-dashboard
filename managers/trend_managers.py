@@ -4,7 +4,6 @@
 """
 
 from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
-import gc
 import os
 import threading
 import time
@@ -51,6 +50,7 @@ from services.trends.usaspending_trends import UsaspendingTrendsManager
 from services.trends.openalex_trends import OpenAlexTrendsManager
 from services.trends.bluesky_trends import BlueskyTrendsManager
 from utils.logger_config import get_logger
+from utils.memory_trim import try_release_rss
 
 # ロガーの初期化
 logger = get_logger(__name__)
@@ -168,7 +168,43 @@ def _get_task_timeout_seconds(explicit=None):
         return 600.0
 
 
+def _get_phase_pause_seconds():
+    """JP/US フェーズ間の待機（メモリ返却の猶予）。"""
+    try:
+        return max(0.0, min(60.0, float(os.getenv('TREND_REFRESH_PHASE_PAUSE_SECONDS', '3'))))
+    except (ValueError, TypeError):
+        return 3.0
+
+
 from utils.shutdown_errors import is_interpreter_shutdown_error
+
+
+def _compact_task_result(result_data: dict) -> dict:
+    """集約用に最小フィールドだけ残す（大きな response.data を持たない）。"""
+    if not result_data.get('success'):
+        compact = {'success': False}
+        err = result_data.get('error')
+        if err:
+            compact['error'] = err
+        return compact
+    resp = result_data.get('response')
+    if isinstance(resp, dict) and 'data' in resp:
+        return {
+            'success': True,
+            'response': {
+                'success': resp.get('success', True),
+                'status': resp.get('status'),
+                'data_count': len(resp.get('data') or []),
+            },
+        }
+    return {'success': True}
+
+
+def _release_batch_memory(*, pause_seconds: float = 0.0) -> None:
+    """バッチ間・フェーズ間: gc + malloc_trim（Linux）+ 任意の待機。"""
+    try_release_rss(collect=True)
+    if pause_seconds > 0:
+        time.sleep(pause_seconds)
 
 
 def _execute_task_batches(tasks, call_manager, *, max_concurrent, batch_delay_seconds, task_timeout_seconds):
@@ -188,97 +224,176 @@ def _execute_task_batches(tasks, call_manager, *, max_concurrent, batch_delay_se
 
     completed_count = 0
     worker_shutdown = False
-    for batch_idx, batch in enumerate(batches):
-        if worker_shutdown:
-            break
-        workers = min(len(batch), batch_size)
-        try:
-            executor = ThreadPoolExecutor(max_workers=workers)
-        except RuntimeError as exc:
-            if is_interpreter_shutdown_error(exc):
-                logger.warning("⏭️ バッチ実行開始を中断（worker シャットダウン）: %s", exc)
-                worker_shutdown = True
-                break
-            raise
-        try:
-            future_to_task = {
-                executor.submit(call_manager, key, handler, region): (key, region)
-                for key, handler, region in batch
-            }
-        except RuntimeError as exc:
-            executor.shutdown(wait=False, cancel_futures=True)
-            if is_interpreter_shutdown_error(exc):
-                logger.warning("⏭️ バッチタスク投入を中断（worker シャットダウン）: %s", exc)
-                worker_shutdown = True
-                break
-            raise
-        pending = dict(future_to_task)
-        try:
-            while pending:
-                done, not_done = wait(
-                    pending.keys(),
-                    timeout=task_timeout,
-                    return_when=FIRST_COMPLETED,
-                )
-                if not done:
-                    for fut in not_done:
-                        key, region = pending[fut]
-                        result_key = f"{key}_{region}"
-                        logger.error(
-                            "❌ タスクタイムアウト (%s): %.0f秒以内に完了しませんでした",
-                            result_key,
-                            task_timeout,
-                        )
-                        with results_lock:
-                            results[result_key] = {
-                                'success': False,
-                                'error': f'task_timeout after {task_timeout:.0f}s',
-                            }
-                    break
-                for fut in done:
-                    key, region = pending.pop(fut)
-                    result_key = f"{key}_{region}"
-                    completed_count += 1
-                    try:
-                        rk, result_data = fut.result()
-                        with results_lock:
-                            results[rk] = result_data
-                        resp = result_data.get('response')
-                        if (
-                            result_data.get('success')
-                            and isinstance(resp, dict)
-                            and 'data' in resp
-                        ):
-                            # OOM対策: 成功レスポンスの生データは結果集約後不要
-                            result_data['response'] = {
-                                'success': resp.get('success', True),
-                                'status': resp.get('status'),
-                                'data_count': len(resp.get('data') or []),
-                            }
-                        del resp
-                        gc.collect()
-                        logger.debug("✅ [%s/%s] %s 完了", completed_count, len(tasks), rk)
-                    except Exception as exc:
-                        logger.error(
-                            "❌ タスク実行エラー (%s): %s",
-                            result_key,
-                            exc,
-                            exc_info=True,
-                        )
-                        with results_lock:
-                            results[result_key] = {
-                                'success': False,
-                                'error': str(exc),
-                            }
-        finally:
-            executor.shutdown(wait=False, cancel_futures=True)
+    workers = max(1, batch_size) if batch_size else 1
+    try:
+        executor = ThreadPoolExecutor(max_workers=workers)
+    except RuntimeError as exc:
+        if is_interpreter_shutdown_error(exc):
+            logger.warning("⏭️ バッチ実行開始を中断（worker シャットダウン）: %s", exc)
+            return results
+        raise
 
-        if delay_sec > 0 and batch_idx < len(batches) - 1:
-            gc.collect()
-            time.sleep(delay_sec)
+    try:
+        for batch_idx, batch in enumerate(batches):
+            if worker_shutdown:
+                break
+            try:
+                future_to_task = {
+                    executor.submit(call_manager, key, handler, region): (key, region)
+                    for key, handler, region in batch
+                }
+            except RuntimeError as exc:
+                if is_interpreter_shutdown_error(exc):
+                    logger.warning("⏭️ バッチタスク投入を中断（worker シャットダウン）: %s", exc)
+                    worker_shutdown = True
+                    break
+                raise
+            pending = dict(future_to_task)
+            try:
+                while pending:
+                    done, not_done = wait(
+                        pending.keys(),
+                        timeout=task_timeout,
+                        return_when=FIRST_COMPLETED,
+                    )
+                    if not done:
+                        for fut in not_done:
+                            key, region = pending[fut]
+                            result_key = f"{key}_{region}"
+                            logger.error(
+                                "❌ タスクタイムアウト (%s): %.0f秒以内に完了しませんでした",
+                                result_key,
+                                task_timeout,
+                            )
+                            with results_lock:
+                                results[result_key] = {
+                                    'success': False,
+                                    'error': f'task_timeout after {task_timeout:.0f}s',
+                                }
+                        break
+                    for fut in done:
+                        key, region = pending.pop(fut)
+                        result_key = f"{key}_{region}"
+                        completed_count += 1
+                        try:
+                            rk, result_data = fut.result()
+                            compact = _compact_task_result(result_data)
+                            with results_lock:
+                                results[rk] = compact
+                            del result_data
+                            _release_batch_memory()
+                            logger.debug("✅ [%s/%s] %s 完了", completed_count, len(tasks), rk)
+                        except Exception as exc:
+                            logger.error(
+                                "❌ タスク実行エラー (%s): %s",
+                                result_key,
+                                exc,
+                                exc_info=True,
+                            )
+                            with results_lock:
+                                results[result_key] = {
+                                    'success': False,
+                                    'error': str(exc),
+                                }
+            finally:
+                future_to_task.clear()
+                pending.clear()
+
+            if batch_idx < len(batches) - 1:
+                _release_batch_memory(pause_seconds=delay_sec)
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
 
     logger.info("✅ 並列実行完了: %s件の結果を取得しました", len(results))
     return results
+
+
+def _build_jp_refresh_tasks(force_refresh):
+    """日本向け refresh タスク一覧。"""
+    tasks = []
+    tasks.append(('google', lambda m: m.get_trends('JP', force_refresh=force_refresh), 'JP'))
+    tasks.append(('youtube', lambda m: m.get_trends('JP', force_refresh=force_refresh), 'JP'))
+    tasks.append(('music', lambda m: m.get_trends('spotify', 'JP', force_refresh=force_refresh), 'JP'))
+    tasks.append(('worldnews', lambda m: m.get_trends(country='jp', category=None, force_refresh=force_refresh), 'JP'))
+    tasks.append(('podcast', lambda m: m.get_trends('best_podcasts', region='jp', force_refresh=force_refresh), 'JP'))
+    tasks.append(('rakuten', lambda m: m.get_trends(force_refresh=force_refresh, fetch_all_categories=True), 'JP'))
+    tasks.append(('hatena', lambda m: m.get_trends(category='all', limit=25, force_refresh=force_refresh, fetch_all_categories=True), 'JP'))
+    if os.getenv('TWITCH_CLIENT_ID') and os.getenv('TWITCH_CLIENT_SECRET'):
+        tasks.append(('twitch', lambda m: m._fetch_and_cache_all_categories(), 'JP'))
+    else:
+        logger.info("⚠️ Twitch: 認証情報未設定のためスキップ (TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET)")
+    tasks.append(('qiita', lambda m: m.get_trends(limit=25, sort='likes_count', force_refresh=force_refresh), 'JP'))
+    tasks.append(('nhk', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('prtimes', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('prtimes_hatena', lambda m: m.get_trends(limit=5, force_refresh=force_refresh), 'JP'))
+    tasks.append(('stock', lambda m: m.get_trends(market='JP', limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('crypto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('movie', lambda m: m.get_trends(country='JP', time_window='day', limit=25, force_refresh=force_refresh), 'JP'))
+    for cat in ('all', 'fiction', 'business', 'humanities', 'practical'):
+        def book_jp_handler(m, category=cat):
+            return m.get_trends(country='JP', limit=25, force_refresh=force_refresh, category=category)
+        tasks.append(('book', book_jp_handler, 'JP'))
+    tasks.append(('github', lambda m: m.get_trends(language='all', limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('appstore', lambda m: m.get_trends(country='JP', category='all', limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('ipa', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('jpcert', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('zenn', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('note', lambda m: m.get_trends(category='all', limit=25, force_refresh=force_refresh, fetch_all_categories=True), 'JP'))
+    tasks.append(('wikipedia', lambda m: m.get_trends(lang='ja', limit=25, force_refresh=force_refresh), 'JP'))
+    tasks.append(('estat', lambda m: m.get_trends(limit=6, force_refresh=force_refresh), 'JP'))
+    tasks.append(('kkj', lambda m: m.get_public_sector_signals(force_refresh=force_refresh, cache_only=False), 'JP'))
+    tasks.append(('bluesky', lambda m: m.get_trends(limit=25, force_refresh=force_refresh, region='jp'), 'JP'))
+    for cat in ('trending', 'ai', 'nlp', 'climate', 'biotech', 'quantum', 'medical'):
+        def _openalex_jp(m, c=cat):
+            return m.get_trends(category=c, limit=25, force_refresh=force_refresh, region='jp')
+        tasks.append(('openalex', _openalex_jp, 'JP'))
+    return tasks
+
+
+def _build_us_refresh_tasks(managers, force_refresh):
+    """米国向け refresh タスク一覧。"""
+    tasks = []
+    tasks.append(('google', lambda m: m.get_trends('US', force_refresh=force_refresh), 'US'))
+    tasks.append(('youtube', lambda m: m.get_trends('US', force_refresh=force_refresh), 'US'))
+    tasks.append(('music', lambda m: m.get_trends('spotify', 'US', force_refresh=force_refresh), 'US'))
+    tasks.append(('worldnews', lambda m: m.get_trends(country='us', category=None, force_refresh=force_refresh), 'US'))
+    tasks.append(('podcast', lambda m: m.get_trends('best_podcasts', region='us', force_refresh=force_refresh), 'US'))
+    if os.getenv('TWITCH_CLIENT_ID') and os.getenv('TWITCH_CLIENT_SECRET'):
+        tasks.append(('twitch', lambda m: m._fetch_and_cache_all_categories(), 'US'))
+    ebay_manager = managers.get('ebay')
+    if ebay_manager:
+        categories = ebay_manager.get_available_categories()
+        for category in categories:
+            def ebay_handler(m, cat=category):
+                return m.get_trends(category=cat, limit=25, force_refresh=force_refresh)
+            tasks.append(('ebay', ebay_handler, 'US'))
+    tasks.append(('hackernews', lambda m: m.get_trends('top', limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('producthunt', lambda m: m.get_trends(limit=25, sort='votes', force_refresh=force_refresh), 'US'))
+    tasks.append(('cnn', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('globenewswire', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('globenewswire_market_reaction', lambda m: m.get_trends(limit=15, force_refresh=force_refresh), 'US'))
+    tasks.append(('stock', lambda m: m.get_trends(market='US', limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('crypto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('movie', lambda m: m.get_trends(country='US', time_window='day', limit=25, force_refresh=force_refresh), 'US'))
+    for cat in ('all', 'fiction', 'business', 'biography', 'science'):
+        def book_us_handler(m, category=cat):
+            return m.get_trends(country='US', limit=25, force_refresh=force_refresh, category=category)
+        tasks.append(('book', book_us_handler, 'US'))
+    tasks.append(('github', lambda m: m.get_trends(language='all', limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('appstore', lambda m: m.get_trends(country='US', category='all', limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('cisa_kev', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('thehackernews', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('medium', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('devto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('wikipedia', lambda m: m.get_trends(lang='en', limit=25, force_refresh=force_refresh), 'US'))
+    tasks.append(('bls', lambda m: m.get_trends(limit=10, force_refresh=force_refresh), 'US'))
+    tasks.append(('usaspending', lambda m: m.get_trends(force_refresh=force_refresh), 'US'))
+    tasks.append(('bluesky', lambda m: m.get_trends(limit=25, force_refresh=force_refresh, region='us'), 'US'))
+    for cat in ('trending', 'ai', 'nlp', 'climate', 'biotech', 'quantum', 'medical'):
+        def _openalex_us(m, c=cat):
+            return m.get_trends(category=c, limit=25, force_refresh=force_refresh, region='us')
+        tasks.append(('openalex', _openalex_us, 'US'))
+    return tasks
 
 
 def refresh_all_trends(
@@ -335,100 +450,6 @@ def refresh_all_trends(
                 'error': str(exc)
             }
 
-    # タスクリストを作成
-    tasks = []
-
-    # 日本のデータを更新するタスク
-    logger.info("🇯🇵 日本のデータを更新中（並列実行）...")
-    tasks.append(('google', lambda m: m.get_trends('JP', force_refresh=force_refresh), 'JP'))
-    tasks.append(('youtube', lambda m: m.get_trends('JP', force_refresh=force_refresh), 'JP'))
-    tasks.append(('music', lambda m: m.get_trends('spotify', 'JP', force_refresh=force_refresh), 'JP'))
-    tasks.append(('worldnews', lambda m: m.get_trends(country='jp', category=None, force_refresh=force_refresh), 'JP'))
-    tasks.append(('podcast', lambda m: m.get_trends('best_podcasts', region='jp', force_refresh=force_refresh), 'JP'))
-    tasks.append(('rakuten', lambda m: m.get_trends(force_refresh=force_refresh, fetch_all_categories=True), 'JP'))
-    tasks.append(('hatena', lambda m: m.get_trends(category='all', limit=25, force_refresh=force_refresh, fetch_all_categories=True), 'JP'))
-    if os.getenv('TWITCH_CLIENT_ID') and os.getenv('TWITCH_CLIENT_SECRET'):
-        tasks.append(('twitch', lambda m: m._fetch_and_cache_all_categories(), 'JP'))
-    else:
-        logger.info("⚠️ Twitch: 認証情報未設定のためスキップ (TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET)")
-    tasks.append(('qiita', lambda m: m.get_trends(limit=25, sort='likes_count', force_refresh=force_refresh), 'JP'))
-    tasks.append(('nhk', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
-    tasks.append(('prtimes', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
-    tasks.append(('prtimes_hatena', lambda m: m.get_trends(limit=5, force_refresh=force_refresh), 'JP'))
-    tasks.append(('stock', lambda m: m.get_trends(market='JP', limit=25, force_refresh=force_refresh), 'JP'))
-    tasks.append(('crypto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
-    tasks.append(('movie', lambda m: m.get_trends(country='JP', time_window='day', limit=25, force_refresh=force_refresh), 'JP'))
-    # Book: 全カテゴリをキャッシュ（総合・文芸・ビジネス・人文・社会・実用・IT）
-    for cat in ('all', 'fiction', 'business', 'humanities', 'practical'):
-        def book_jp_handler(m, category=cat):
-            return m.get_trends(country='JP', limit=25, force_refresh=force_refresh, category=category)
-        tasks.append(('book', book_jp_handler, 'JP'))
-    tasks.append(('github', lambda m: m.get_trends(language='all', limit=25, force_refresh=force_refresh), 'JP'))
-    tasks.append(('appstore', lambda m: m.get_trends(country='JP', category='all', limit=25, force_refresh=force_refresh), 'JP'))
-    tasks.append(('ipa', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
-    tasks.append(('jpcert', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
-    tasks.append(('zenn', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'JP'))
-    tasks.append(('note', lambda m: m.get_trends(category='all', limit=25, force_refresh=force_refresh, fetch_all_categories=True), 'JP'))
-    tasks.append(('wikipedia', lambda m: m.get_trends(lang='ja', limit=25, force_refresh=force_refresh), 'JP'))
-    # 行政データ（e-Stat）/ 政府調達（KKJ）も定期取得（JPのみ）
-    tasks.append(('estat', lambda m: m.get_trends(limit=6, force_refresh=force_refresh), 'JP'))
-    tasks.append(('kkj', lambda m: m.get_public_sector_signals(force_refresh=force_refresh, cache_only=False), 'JP'))
-    tasks.append(('bluesky', lambda m: m.get_trends(limit=25, force_refresh=force_refresh, region='jp'), 'JP'))
-    # OpenAlex: 日本向け（日本語論文のみ）
-    for cat in ('trending', 'ai', 'nlp', 'climate', 'biotech', 'quantum', 'medical'):
-        def _openalex_jp(m, c=cat):
-            return m.get_trends(category=c, limit=25, force_refresh=force_refresh, region='jp')
-        tasks.append(('openalex', _openalex_jp, 'JP'))
-
-    # USのデータを更新するタスク
-    logger.info("🇺🇸 USのデータを更新中（並列実行）...")
-    tasks.append(('google', lambda m: m.get_trends('US', force_refresh=force_refresh), 'US'))
-    tasks.append(('youtube', lambda m: m.get_trends('US', force_refresh=force_refresh), 'US'))
-    tasks.append(('music', lambda m: m.get_trends('spotify', 'US', force_refresh=force_refresh), 'US'))
-    tasks.append(('worldnews', lambda m: m.get_trends(country='us', category=None, force_refresh=force_refresh), 'US'))
-    tasks.append(('podcast', lambda m: m.get_trends('best_podcasts', region='us', force_refresh=force_refresh), 'US'))
-    if os.getenv('TWITCH_CLIENT_ID') and os.getenv('TWITCH_CLIENT_SECRET'):
-        tasks.append(('twitch', lambda m: m._fetch_and_cache_all_categories(), 'US'))
-    # eBay: 全カテゴリーを取得してキャッシュに保存
-    ebay_manager = managers.get('ebay')
-    if ebay_manager:
-        categories = ebay_manager.get_available_categories()
-        for category in categories:
-            def ebay_handler(m, cat=category):
-                return m.get_trends(category=cat, limit=25, force_refresh=force_refresh)
-            tasks.append(('ebay', ebay_handler, 'US'))
-    # Redditは使用していないため無効化
-    # tasks.append(('reddit', lambda m: m.get_trends('all', limit=25, time_filter='day', force_refresh=force_refresh), 'US'))
-    tasks.append(('hackernews', lambda m: m.get_trends('top', limit=25, force_refresh=force_refresh), 'US'))
-    tasks.append(('producthunt', lambda m: m.get_trends(limit=25, sort='votes', force_refresh=force_refresh), 'US'))
-    tasks.append(('cnn', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
-    tasks.append(('globenewswire', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
-    tasks.append(('globenewswire_market_reaction', lambda m: m.get_trends(limit=15, force_refresh=force_refresh), 'US'))
-    tasks.append(('stock', lambda m: m.get_trends(market='US', limit=25, force_refresh=force_refresh), 'US'))
-    tasks.append(('crypto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
-    tasks.append(('movie', lambda m: m.get_trends(country='US', time_window='day', limit=25, force_refresh=force_refresh), 'US'))
-    # Book: 全カテゴリをキャッシュ（all, fiction, business, biography, science）
-    for cat in ('all', 'fiction', 'business', 'biography', 'science'):
-        def book_us_handler(m, category=cat):
-            return m.get_trends(country='US', limit=25, force_refresh=force_refresh, category=category)
-        tasks.append(('book', book_us_handler, 'US'))
-    tasks.append(('github', lambda m: m.get_trends(language='all', limit=25, force_refresh=force_refresh), 'US'))
-    tasks.append(('appstore', lambda m: m.get_trends(country='US', category='all', limit=25, force_refresh=force_refresh), 'US'))
-    tasks.append(('cisa_kev', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
-    tasks.append(('thehackernews', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
-    tasks.append(('medium', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
-    tasks.append(('devto', lambda m: m.get_trends(limit=25, force_refresh=force_refresh), 'US'))
-    tasks.append(('wikipedia', lambda m: m.get_trends(lang='en', limit=25, force_refresh=force_refresh), 'US'))
-    tasks.append(('bls', lambda m: m.get_trends(limit=10, force_refresh=force_refresh), 'US'))
-    tasks.append(('usaspending', lambda m: m.get_trends(force_refresh=force_refresh), 'US'))
-    tasks.append(('bluesky', lambda m: m.get_trends(limit=25, force_refresh=force_refresh, region='us'), 'US'))
-    # OpenAlex: US向け（言語制限なし）
-    for cat in ('trending', 'ai', 'nlp', 'climate', 'biotech', 'quantum', 'medical'):
-        def _openalex_us(m, c=cat):
-            return m.get_trends(category=c, limit=25, force_refresh=force_refresh, region='us')
-        tasks.append(('openalex', _openalex_us, 'US'))
-
-    # 同時実行数: 引数 > 環境変数 TREND_REFRESH_MAX_CONCURRENT > デフォルト6（OOM防止）
     concurrency = max_concurrent if max_concurrent is not None else _get_refresh_concurrency()
     delay_sec = batch_delay_seconds
     if delay_sec is None:
@@ -437,13 +458,34 @@ def refresh_all_trends(
         except (ValueError, TypeError):
             delay_sec = 2.0
 
-    results = _execute_task_batches(
-        tasks,
+    phase_pause = _get_phase_pause_seconds()
+    results = {}
+
+    logger.info("🇯🇵 日本のデータを更新中（並列実行）...")
+    jp_tasks = _build_jp_refresh_tasks(force_refresh)
+    jp_results = _execute_task_batches(
+        jp_tasks,
         call_manager,
         max_concurrent=concurrency,
         batch_delay_seconds=delay_sec,
         task_timeout_seconds=task_timeout_seconds,
     )
+    results.update(jp_results)
+    del jp_tasks, jp_results
+    logger.info("⏸️ JP フェーズ完了 — メモリ返却待機 %.1f 秒", phase_pause)
+    _release_batch_memory(pause_seconds=phase_pause)
+
+    logger.info("🇺🇸 USのデータを更新中（並列実行）...")
+    us_tasks = _build_us_refresh_tasks(managers, force_refresh)
+    us_results = _execute_task_batches(
+        us_tasks,
+        call_manager,
+        max_concurrent=concurrency,
+        batch_delay_seconds=delay_sec,
+        task_timeout_seconds=task_timeout_seconds,
+    )
+    results.update(us_results)
+    del us_tasks, us_results
 
     overall_success = all(result.get('success') for result in results.values())
 
@@ -451,6 +493,5 @@ def refresh_all_trends(
         'success': overall_success,
         'results': results
     }
-
 
 

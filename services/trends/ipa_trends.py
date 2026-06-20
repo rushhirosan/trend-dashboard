@@ -1,6 +1,8 @@
-import requests
-import feedparser
+import gc
 import re
+
+import feedparser
+import requests
 from datetime import datetime
 from database_config import TrendsCache
 from utils.logger_config import get_logger
@@ -428,11 +430,15 @@ class IPATrendsManager(BaseTrendsManager):
                     'message': '記事が見つかりませんでした'
                 }
             
-            logger.info(f"✅ IPA RSS: {len(feed.entries)}件のエントリーを取得")
-            
+            entry_count = len(feed.entries)
+            logger.info(f"✅ IPA RSS: {entry_count}件のエントリーを取得")
+            entries_slice = feed.entries[:limit]
+            del feed
+            gc.collect()
+
             # データを整形
             formatted_data = []
-            for entry in feed.entries[:limit]:
+            for entry in entries_slice:
                 try:
                     # RSSフィードの公開日（RSS配信日）を取得
                     rss_published_date = None

@@ -18,7 +18,11 @@ from apscheduler.triggers.cron import CronTrigger
 from database_config import TrendsCache
 from services.subscription.subscription_manager import SubscriptionManager
 from utils.scheduler_lock import is_local_holder_process_dead, parse_scheduler_lock_holder
-from utils.scheduler_slot_key import resolve_scheduler_slot_key, slot_key_for_datetime
+from utils.scheduler_slot_key import (
+    SCHEDULED_SLOTS,
+    resolve_scheduler_slot_key,
+    slot_key_for_datetime,
+)
 from utils.shutdown_errors import is_interpreter_shutdown_error
 
 AUTO_FETCH_TRIGGERS = frozenset({"scheduler", "gap_retry", "startup_catchup"})
@@ -436,6 +440,9 @@ class TrendsScheduler:
                 # スケジューラーを開始
                 self.scheduler.start()
                 self.is_running = True
+
+                # OOM 等で前 worker が残した DB ロックを起動直後に回収（再取得はしない）
+                self._recover_stale_lock_on_startup()
                 
                 logger.info("✅ スケジューラー開始完了")
                 logger.info(
@@ -645,24 +652,162 @@ class TrendsScheduler:
                 missed_slot_keys = [sk for _, sk in filtered_pairs]
                 if not missed_slot_keys:
                     return
-                delay_sec = int(os.getenv('TREND_STARTUP_CATCHUP_DELAY_SECONDS', '120'))
-                logger.info(f"🔄 当日の{', '.join(missed_times)}の処理を{delay_sec}秒後に実行します（低負荷モード・OOM対策）")
-                def _run_catchup(keys=list(missed_slot_keys)):
-                    try:
-                        logger.info("🔄 起動時補完: 遅延実行を開始します")
-                        self._fetch_all_trends(
-                            force=True,
-                            low_memory_mode=True,
-                            trigger_source="startup_catchup",
-                            slot_key_override=keys[0] if keys else None,
-                            backfill_slot_keys=keys,
-                        )
-                    except Exception as e:
-                        logger.error(f"❌ 起動時補完エラー: {e}", exc_info=True)
-                threading.Timer(delay_sec, _run_catchup).start()
+                self._schedule_startup_slot_recovery(missed_times, missed_slot_keys, jst)
         except Exception as e:
             logger.error(f"❌ 起動時チェックエラー: {e}", exc_info=True)
             # エラーが発生してもスケジューラーの起動は継続
+
+    def _gap_retry_minute(self) -> int:
+        try:
+            gap_retry_minute = int(os.getenv("TRENDS_SLOT_GAP_RETRY_MINUTE", "35"))
+        except (TypeError, ValueError):
+            gap_retry_minute = 35
+        return max(5, min(55, gap_retry_minute))
+
+    def _slot_name_from_slot_key(self, slot_key: str) -> str | None:
+        if not slot_key or "_" not in slot_key:
+            return None
+        return slot_key.rsplit("_", 1)[0]
+
+    def _slot_scheduled_hour(self, slot_name: str) -> int | None:
+        for hour, name in SCHEDULED_SLOTS:
+            if name == slot_name:
+                return hour
+        return None
+
+    def _recover_stale_lock_on_startup(self) -> None:
+        """起動直後に dead holder の DB ロックを回収する（取得は再開しない）。"""
+        if not USE_DB_LOCK or not self.db or not hasattr(self.db, "get_scheduler_lock_status"):
+            return
+        try:
+            lock_status = self.db.get_scheduler_lock_status()
+        except Exception as e:
+            logger.warning("⚠️ 起動時ロック確認エラー: %s", e)
+            return
+        if not lock_status or not lock_status.get("holder_id"):
+            return
+        if not is_local_holder_process_dead(lock_status["holder_id"]):
+            return
+        self._try_recover_stale_scheduler_lock()
+
+    def _schedule_startup_slot_recovery(
+        self,
+        missed_times: list[str],
+        missed_slot_keys: list[str],
+        jst,
+    ) -> None:
+        """起動時補完: 全量 startup_catchup は行わず gap_retry のみ（OOM ループ防止）。"""
+        gap_min = self._gap_retry_minute()
+
+        for sk in missed_slot_keys:
+            if self.db and hasattr(self.db, "count_oom_lock_recoveries"):
+                recovery_count = self.db.count_oom_lock_recoveries(sk)
+                if recovery_count > 0:
+                    logger.warning(
+                        "⏭️ 起動時補完をスキップ（OOM ロック回収 %s 回）: %s。"
+                        " 全量 force_refresh は行いません。"
+                        " 各スロット %02d:%02d JST の gap_retry または次スロットで補完します。",
+                        recovery_count,
+                        sk,
+                        *self._gap_retry_time_for_slot_key(sk, gap_min),
+                    )
+                    return
+
+        logger.info(
+            "⏭️ 起動時の全量 startup_catchup は行いません（OOM ループ防止）。"
+            " 未完了: %s — 各スロット T+%s 分の gap_retry で補完します。",
+            ", ".join(missed_times),
+            gap_min,
+        )
+
+        now_jst = datetime.now(jst)
+        slots_to_retry: list[str] = []
+        for sk in missed_slot_keys:
+            gap_hour, gap_minute = self._gap_retry_time_for_slot_key(sk, gap_min)
+            if gap_hour is None:
+                continue
+            gap_at = now_jst.replace(
+                hour=gap_hour, minute=gap_minute, second=0, microsecond=0
+            )
+            if now_jst < gap_at:
+                continue
+            retry_marker = f"gap_retry_{sk}"
+            if self.db and hasattr(self.db, "has_slot_completed"):
+                if self.db.has_slot_completed(retry_marker):
+                    continue
+            from services.snapshot_slot_health import slot_needs_recovery
+
+            if slot_needs_recovery(self.db, sk):
+                slots_to_retry.append(sk)
+
+        if not slots_to_retry:
+            return
+
+        delay_sec = int(os.getenv("TREND_STARTUP_CATCHUP_DELAY_SECONDS", "120"))
+        logger.info(
+            "🔄 起動時 gap_retry のみ実行します（%s 秒後）: %s",
+            delay_sec,
+            ", ".join(slots_to_retry),
+        )
+
+        def _run_gap_retries(keys=list(slots_to_retry)):
+            try:
+                for sk in keys:
+                    self._retry_slot_by_key(sk)
+            except Exception as e:
+                logger.error("❌ 起動時 gap_retry エラー: %s", e, exc_info=True)
+
+        threading.Timer(delay_sec, _run_gap_retries).start()
+
+    def _gap_retry_time_for_slot_key(
+        self, slot_key: str, gap_min: int
+    ) -> tuple[int | None, int | None]:
+        slot_name = self._slot_name_from_slot_key(slot_key)
+        if not slot_name:
+            return None, None
+        hour = self._slot_scheduled_hour(slot_name)
+        if hour is None:
+            return None, None
+        return hour, gap_min
+
+    def _mark_gap_retry_completed_if_slot_done(self, slot_key: str) -> None:
+        retry_marker = f"gap_retry_{slot_key}"
+        if not self.db or not hasattr(self.db, "mark_slot_completed"):
+            return
+        if hasattr(self.db, "has_slot_completed") and self.db.has_slot_completed(slot_key):
+            try:
+                self.db.mark_slot_completed(retry_marker)
+            except Exception as e:
+                logger.warning("⚠️ gap_retry マーカー記録失敗: %s", e)
+
+    def _retry_slot_by_key(self, slot_key: str) -> bool:
+        """指定スロットの欠損リトライ（gap_retry 相当）。スロット完了時のみ True。"""
+        if self._fetching_in_progress:
+            logger.info("⏭️ スロットリトライ: 取得処理実行中のためスキップ (%s)", slot_key)
+            return False
+        retry_marker = f"gap_retry_{slot_key}"
+        if self.db and hasattr(self.db, "has_slot_completed"):
+            if self.db.has_slot_completed(retry_marker):
+                return False
+        if self._is_oom_fetch_blocked(slot_key):
+            return False
+        from services.snapshot_slot_health import slot_needs_recovery
+
+        if not slot_needs_recovery(self.db, slot_key):
+            return False
+        logger.warning("🔄 スロット欠損を検知 — リトライします: %s", slot_key)
+        ran = False
+        try:
+            ran = self._fetch_all_trends(
+                force=True,
+                trigger_source="gap_retry",
+                low_memory_mode=True,
+                slot_key_override=slot_key,
+            )
+        finally:
+            if ran:
+                self._mark_gap_retry_completed_if_slot_done(slot_key)
+        return ran
     
     def stop(self):
         """スケジューラーを停止"""
@@ -1452,41 +1597,12 @@ class TrendsScheduler:
     
     def _retry_missed_slot_if_needed(self) -> None:
         """各スロット T+35 分: スナップショット欠損時のみ1回リトライ（通知数は完了1通のみ）。"""
-        if self._fetching_in_progress:
-            logger.info("⏭️ 欠損リトライ: 取得処理実行中のためスキップ")
-            return
         jst = pytz.timezone("Asia/Tokyo")
         now_jst = datetime.now(jst)
         slot_key = self._slot_key_for_now(now_jst)
         if not slot_key:
             return
-        retry_marker = f"gap_retry_{slot_key}"
-        if self.db and hasattr(self.db, "has_slot_completed"):
-            if self.db.has_slot_completed(retry_marker):
-                return
-        from services.snapshot_slot_health import slot_needs_recovery
-
-        if not slot_needs_recovery(self.db, slot_key):
-            return
-        logger.warning("🔄 スロット欠損を検知 — リトライします: %s", slot_key)
-        ran = False
-        try:
-            ran = self._fetch_all_trends(
-                force=True,
-                trigger_source="gap_retry",
-                low_memory_mode=True,
-                slot_key_override=slot_key,
-            )
-        finally:
-            if (
-                ran
-                and self.db
-                and hasattr(self.db, "mark_slot_completed")
-            ):
-                try:
-                    self.db.mark_slot_completed(retry_marker)
-                except Exception as e:
-                    logger.warning("⚠️ gap_retry マーカー記録失敗: %s", e)
+        self._retry_slot_by_key(slot_key)
 
     def _resolve_scheduler_slot_key(self, now_jst, stale_holder_id: str | None = None) -> str | None:
         """OOM 回収・サーキット判定用。14時台などウィンドウ外でも未完了スロットを特定する。"""

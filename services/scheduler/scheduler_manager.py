@@ -18,6 +18,7 @@ from apscheduler.triggers.cron import CronTrigger
 from database_config import TrendsCache
 from services.subscription.subscription_manager import SubscriptionManager
 from utils.scheduler_lock import is_local_holder_process_dead, parse_scheduler_lock_holder
+from utils.scheduler_slot_key import resolve_scheduler_slot_key, slot_key_for_datetime
 from utils.shutdown_errors import is_interpreter_shutdown_error
 
 AUTO_FETCH_TRIGGERS = frozenset({"scheduler", "gap_retry", "startup_catchup"})
@@ -76,10 +77,10 @@ except (TypeError, ValueError):
     OOM_RECOVERY_ALERT_COOLDOWN_MINUTES = 60
 try:
     OOM_RECOVERY_CIRCUIT_THRESHOLD = max(
-        2, min(50, int(os.environ.get("TRENDS_SCHEDULER_OOM_RECOVERY_CIRCUIT_THRESHOLD", "5")))
+        2, min(50, int(os.environ.get("TRENDS_SCHEDULER_OOM_RECOVERY_CIRCUIT_THRESHOLD", "3")))
     )
 except (TypeError, ValueError):
-    OOM_RECOVERY_CIRCUIT_THRESHOLD = 5
+    OOM_RECOVERY_CIRCUIT_THRESHOLD = 3
 
 
 class TrendsScheduler:
@@ -156,7 +157,10 @@ class TrendsScheduler:
         if not recovery_slot:
             try:
                 jst = pytz.timezone("Asia/Tokyo")
-                recovery_slot = self._slot_key_for_now(datetime.now(jst))
+                recovery_slot = self._resolve_scheduler_slot_key(
+                    datetime.now(jst),
+                    stale_holder,
+                )
             except Exception:
                 recovery_slot = None
 
@@ -223,8 +227,10 @@ class TrendsScheduler:
                         self._send_alert(
                             "warning",
                             "スケジューラロック回収（OOM回復）",
-                            "前回のトレンド取得プロセスが異常終了したため、DBロックを解放しました。このプロセスで取得を再開します。",
+                            "前回のトレンド取得プロセスが異常終了したため、DBロックを解放しました。"
+                            "このプロセスでは再取得せず、gap_retry または次スロットで補完します。",
                             {
+                                "スロット": recovery_slot or "不明",
                                 "解放した holder": stale_holder,
                                 "回収回数": str(recovery_count) if recovery_count else "不明",
                                 "ホスト": host_short,
@@ -274,15 +280,15 @@ class TrendsScheduler:
                     if self.db.try_acquire_scheduler_lock_db(holder_id, SCHEDULER_LOCK_MINUTES):
                         logger.debug("🔒 スケジューラーDB分散ロックを取得しました")
                         return ('db', holder_id)
-                    # OOM 等で holder が死んでいればロックを回収して1回だけ再試行
-                    jst = pytz.timezone("Asia/Tokyo")
-                    recovery_slot = self._slot_key_for_now(datetime.now(jst))
-                    if self._try_recover_stale_scheduler_lock(recovery_slot):
-                        if self._is_oom_fetch_blocked(recovery_slot):
-                            return None
-                        if self.db.try_acquire_scheduler_lock_db(holder_id, SCHEDULER_LOCK_MINUTES):
-                            logger.info("🔒 スケジューラーDB分散ロックを取得しました（stale lock 回収後）")
-                            return ('db', holder_id)
+                    # OOM 等で holder が死んでいればロックを回収（同一呼び出しでは再取得しない）
+                    if self._try_recover_stale_scheduler_lock():
+                        jst = pytz.timezone("Asia/Tokyo")
+                        recovery_slot = self._resolve_scheduler_slot_key(datetime.now(jst))
+                        logger.info(
+                            "⏭️ stale lock 回収のみ。このプロセスでは取得を再開しません（OOMループ防止） slot=%s",
+                            recovery_slot,
+                        )
+                        return None
                     # DBロックが「他が保持中」の場合はここで終了。ファイルロックにフォールバックしない
                     lock_status = None
                     if hasattr(self.db, 'get_scheduler_lock_status'):
@@ -755,7 +761,9 @@ class TrendsScheduler:
         if trigger_source == 'scheduler' and not force:
             low_memory_mode = SCHEDULER_LOW_MEMORY_MODE
         jst_prefetch = pytz.timezone('Asia/Tokyo')
-        prefetch_slot_key = slot_key_override or self._slot_key_for_now(datetime.now(jst_prefetch))
+        prefetch_slot_key = slot_key_override or self._resolve_scheduler_slot_key(
+            datetime.now(jst_prefetch),
+        )
         if trigger_source != 'api' and prefetch_slot_key and self._is_oom_fetch_blocked(prefetch_slot_key):
             if trigger_source == 'scheduler':
                 self._send_scheduler_skip_notification(
@@ -1480,19 +1488,22 @@ class TrendsScheduler:
                 except Exception as e:
                     logger.warning("⚠️ gap_retry マーカー記録失敗: %s", e)
 
+    def _resolve_scheduler_slot_key(self, now_jst, stale_holder_id: str | None = None) -> str | None:
+        """OOM 回収・サーキット判定用。14時台などウィンドウ外でも未完了スロットを特定する。"""
+        is_completed = None
+        if self.db and hasattr(self.db, "has_slot_completed"):
+            is_completed = self.db.has_slot_completed
+        return resolve_scheduler_slot_key(
+            now_jst,
+            stale_holder_id,
+            misfire_grace_seconds=3600,
+            job_timeout_seconds=SCHEDULER_JOB_TIMEOUT_SECONDS,
+            is_slot_completed=is_completed,
+        )
+
     def _slot_key_for_now(self, now_jst) -> str | None:
         """現在時刻が属するスロットのキーを返す（例: 7am_2026-02-10）。該当しなければ None。"""
-        date_str = now_jst.date().isoformat()
-        h = now_jst.hour
-        if 0 <= h < 2:
-            return f"1am_{date_str}"
-        if 6 <= h < 8:
-            return f"7am_{date_str}"
-        if 12 <= h < 14:
-            return f"1pm_{date_str}"
-        if 18 <= h < 20:
-            return f"7pm_{date_str}"
-        return None
+        return slot_key_for_datetime(now_jst)
 
     def _slot_key_for_slot(self, slot_name: str, date_obj) -> str:
         """指定スロット・日付の slot_key を返す（例: 7am_2026-03-03）。

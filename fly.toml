@@ -31,6 +31,8 @@ primary_region = "nrt"
   TREND_REFRESH_TASK_TIMEOUT_SECONDS = "600"
   # ジョブ全体の上限（秒）。DBロック(90分)より短くし、フラグ解放と完了通知を保証
   TRENDS_SCHEDULER_JOB_TIMEOUT_SECONDS = "5100"
+  # OOM ロック回収がこの回数に達したら当該スロットの自動再取得を停止
+  TRENDS_SCHEDULER_OOM_RECOVERY_CIRCUIT_THRESHOLD = "3"
 
 [http_service]
   internal_port = 8080

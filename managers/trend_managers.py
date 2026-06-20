@@ -255,6 +255,8 @@ def _execute_task_batches(tasks, call_manager, *, max_concurrent, batch_delay_se
                                 'status': resp.get('status'),
                                 'data_count': len(resp.get('data') or []),
                             }
+                        del resp
+                        gc.collect()
                         logger.debug("✅ [%s/%s] %s 完了", completed_count, len(tasks), rk)
                     except Exception as exc:
                         logger.error(

@@ -18,6 +18,19 @@ def parse_scheduler_lock_holder(holder_id: str):
         return None
 
 
+def scheduler_lock_holder_unix_ts(holder_id: str) -> int | None:
+    """holder_id に含まれるロック取得時刻（Unix 秒）。"""
+    if not holder_id:
+        return None
+    parts = holder_id.rsplit("-", 2)
+    if len(parts) != 3:
+        return None
+    try:
+        return int(parts[2])
+    except ValueError:
+        return None
+
+
 def is_local_holder_process_dead(holder_id: str) -> bool:
     """同一ホスト上で holder の PID が存在しない（OOM 等で終了）なら True。"""
     parsed = parse_scheduler_lock_holder(holder_id)

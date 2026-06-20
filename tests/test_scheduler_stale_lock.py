@@ -29,3 +29,11 @@ def test_is_local_holder_process_dead_nonexistent_pid():
     host = socket.gethostname()
     holder = f"{host}-999999999-12345"
     assert is_local_holder_process_dead(holder) is True
+
+
+def test_scheduler_lock_holder_unix_ts():
+    from utils.scheduler_lock import scheduler_lock_holder_unix_ts
+
+    assert scheduler_lock_holder_unix_ts("e82d4d4a44e758-696-1780092000") == 1780092000
+    assert scheduler_lock_holder_unix_ts("") is None
+    assert scheduler_lock_holder_unix_ts("invalid") is None

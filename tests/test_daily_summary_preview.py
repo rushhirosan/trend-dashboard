@@ -117,8 +117,8 @@ def test_headline_ja():
         snapshot_slots=("07", "13", "19", "01"),
         status="draft",
     )
-    assert p.headline_ja() == "6/11 朝刊 — 昨日（6/10）のトレンド"
-    assert p.subline_ja() == "6/11 朝刊 — 昨日（6/10）のトレンド（07/13/19/01 反映）"
+    assert p.headline_ja() == "日次 6/11 — 昨日（6/10）のトレンド"
+    assert p.subline_ja() == "日次 6/11 — 昨日（6/10）のトレンド（07/13/19/01 反映）"
 
 
 def test_headline_ja_when_summary_is_stale():
@@ -130,7 +130,7 @@ def test_headline_ja_when_summary_is_stale():
         snapshot_slots=("07", "13", "19", "01"),
         status="draft",
     )
-    assert p.headline_ja() == "6/12 朝刊 — 6/10のトレンド"
+    assert p.headline_ja() == "日次 6/12 — 6/10のトレンド"
 
 
 def test_load_latest_skips_draft_when_not_allowed(tmp_path: Path):

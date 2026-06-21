@@ -139,6 +139,58 @@ class IPATrendsManager(BaseTrendsManager):
             logger.debug(f"IPA URL日付抽出エラー: {url}, {e}")
         
         return None
+
+    def _parse_iso_datetime(self, value):
+        if not value:
+            return None
+        if isinstance(value, datetime):
+            return value
+        try:
+            return datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+        except ValueError:
+            return None
+
+    def _is_midnight_calendar_date(self, value) -> bool:
+        """URL/HTML 由来の日付のみ（0時0分）か。RSS 再掲載時刻は False。"""
+        dt = self._parse_iso_datetime(value)
+        if not dt:
+            return False
+        return (
+            dt.hour == 0
+            and dt.minute == 0
+            and dt.second == 0
+            and dt.microsecond == 0
+        )
+
+    def _resolve_original_published_date(self, url):
+        """URL → HTML の順で初出公開日を解決（RSS 日付は使わない）。"""
+        original = self._extract_published_date_from_url(url)
+        if not original:
+            original = self._fetch_original_published_date_from_html(url)
+        return original
+
+    def _normalize_dates_for_sort(self, data):
+        """キャッシュ/API 双方でソート前に公開日を正規化する。"""
+        if not data:
+            return data
+        for item in data:
+            url = item.get('url') or ''
+            original = item.get('original_published_date')
+            if not original and url:
+                extracted = self._extract_published_date_from_url(url)
+                if extracted:
+                    original = extracted.isoformat()
+                    item['original_published_date'] = original
+
+            published = item.get('published_date')
+            if original:
+                item['published_date'] = original
+            elif published and self._is_midnight_calendar_date(published):
+                item['original_published_date'] = published
+            elif published and not self._is_midnight_calendar_date(published):
+                # 旧キャッシュ: RSS 取得時刻が published_date に入っている
+                item['published_date'] = None
+        return data
     
     def _fetch_original_published_date_from_html(self, url):
         """
@@ -318,8 +370,14 @@ class IPATrendsManager(BaseTrendsManager):
         return result
 
     def _publication_date(self, item):
-        """初出記事のソート用公開日"""
-        return item.get('original_published_date') or item.get('published_date') or ''
+        """初出記事のソート用公開日（カレンダー日付のみ。不明・RSS再掲は最後）"""
+        original = item.get('original_published_date')
+        if original:
+            return original
+        published = item.get('published_date')
+        if published and self._is_midnight_calendar_date(published):
+            return published
+        return ''
 
     def _is_update_item(self, item):
         """更新記事かどうか（キャッシュには is_updated が無い場合はタイトルで判定）"""
@@ -393,6 +451,7 @@ class IPATrendsManager(BaseTrendsManager):
             removed_count = original_count - len(data)
             if removed_count > 0:
                 logger.info(f"✅ IPA: キャッシュから取得したデータから {removed_count}件の重複記事を除去しました（{original_count}件 → {len(data)}件）")
+            data = self._normalize_dates_for_sort(data)
             data = self._sort_ipa_items(data)
             # 制限数まで取得
             data = data[:limit]
@@ -458,18 +517,8 @@ class IPATrendsManager(BaseTrendsManager):
                     else:
                         rss_published_date = datetime.now()
                     
-                    # URLから実際の公開日を抽出
                     entry_url = entry.get('link', '')
-                    original_published_date = self._extract_published_date_from_url(entry_url)
-                    
-                    # URLパターンから抽出できない場合、HTMLページから取得を試す
-                    # パフォーマンスを考慮して、限定的に使用（日付が含まれていないパターンのみ）
-                    if not original_published_date:
-                        # ファイル名に日付パターン（8桁の数字）が含まれていない場合のみ
-                        filename = entry_url.split('/')[-1] if '/' in entry_url else entry_url
-                        if not re.search(r'\d{8}', filename):
-                            # 日付が含まれていないパターン（例：win10_eos.html）
-                            original_published_date = self._fetch_original_published_date_from_html(entry_url)
+                    original_published_date = self._resolve_original_published_date(entry_url)
                     
                     # タイトルを取得
                     title = entry.get('title', 'No Title')
@@ -484,8 +533,8 @@ class IPATrendsManager(BaseTrendsManager):
                         # 更新された記事はHTMLから最終更新日を取得
                         last_updated_date = self._fetch_last_updated_date_from_html(entry_url)
                     
-                    # 実際の公開日を優先（取得できた場合）
-                    published_date = original_published_date if original_published_date else rss_published_date
+                    # ソート/表示用は初出公開日のみ（RSS 再掲日時は rss_published_date に保持）
+                    published_date = original_published_date
                     
                     # 説明文を取得
                     description = ''
@@ -518,6 +567,7 @@ class IPATrendsManager(BaseTrendsManager):
             if removed_count > 0:
                 logger.info(f"✅ IPA: {removed_count}件の重複記事を除去しました（{original_count}件 → {len(formatted_data)}件）")
             
+            formatted_data = self._normalize_dates_for_sort(formatted_data)
             formatted_data = self._sort_ipa_items(formatted_data)
             
             # 制限数まで取得

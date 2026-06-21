@@ -38,7 +38,7 @@ class DailySummaryPreview:
             obs_label = f"昨日（{o.month}/{o.day}）"
         else:
             obs_label = f"{o.month}/{o.day}"
-        return f"{d.month}/{d.day} 朝刊 — {obs_label}のトレンド"
+        return f"日次 {d.month}/{d.day} — {obs_label}のトレンド"
 
     def headline_en(self) -> str:
         d = self.delivery_day
@@ -47,7 +47,7 @@ class DailySummaryPreview:
             obs_label = f"yesterday ({o.month}/{o.day})"
         else:
             obs_label = f"{o.month}/{o.day}"
-        return f"{d.month}/{d.day} briefing — trends for {obs_label}"
+        return f"Daily {d.month}/{d.day} — trends for {obs_label}"
 
     def observation_meta_ja(self) -> str:
         slots = "/".join(self.snapshot_slots) if self.snapshot_slots else "07/13/19/01"
@@ -122,7 +122,7 @@ def clamp_teaser(text: str, max_chars: int = TEASER_MAX_CHARS) -> str:
 
 
 def teaser_for_display(one_liner: str, teaser: str = "") -> str:
-    """トップ朝刊カード用の短いリード（frontmatter teaser 優先）。"""
+    """トップサマリーカード用の短いリード（frontmatter teaser 優先）。"""
     explicit = (teaser or "").strip()
     if explicit:
         return clamp_teaser(explicit)
@@ -228,9 +228,9 @@ def preview_for_fake_door(locale: str = "ja", *, allow_draft: bool = False) -> d
             "status": preview.status,
         }
     fallback_headline = (
-        f"{deliver.month}/{deliver.day} 朝刊 — 準備中"
+        f"日次 {deliver.month}/{deliver.day} — 準備中"
         if locale == "ja"
-        else f"{deliver.month}/{deliver.day} briefing — coming soon"
+        else f"Daily {deliver.month}/{deliver.day} — coming soon"
     )
     return {
         "has_preview": False,

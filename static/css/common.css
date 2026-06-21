@@ -219,7 +219,7 @@ h6, .h6 { font-size: 0.9rem; }
 .text-info { color: #17a2b8 !important; }
 .text-muted { color: #6c757d !important; }
 
-/* AI朝刊プレビュー: 3カラム内でティーザーを最大2行 */
+/* AIサマリープレビュー: 3カラム内でティーザーを最大2行 */
 .ai-summary-one-liner {
     display: -webkit-box;
     -webkit-line-clamp: 2;

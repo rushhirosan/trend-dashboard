@@ -11,12 +11,12 @@
   {% set cta = "Read full brief" %}
   {% set modal_title = "Daily trend brief" %}
   {% set modal_lead = "We plan to email the full daily brief around 10:30 JST (topics, rank moves, category highlights). Paid launch timing TBD." %}
-  {% set modal_note = "Join the waitlist to get notified when delivery starts. No charge at signup." %}
+  {% set modal_note = "Email signup will open once delivery is ready. Signup is not available yet." %}
   {% set email_label = "Email" %}
   {% set email_placeholder = "you@example.com" %}
   {% set btn_submit = "Join waitlist" %}
   {% set btn_close = "Close" %}
-  {% set sub_hint = "Waitlist open" %}
+  {% set sub_hint = "Coming soon" %}
   {% set no_preview = "Summary is being prepared." %}
   {% set waitlist_success = "You're on the list. We'll email you when the brief launches." %}
   {% set waitlist_error = "Signup failed. Please try again." %}
@@ -29,12 +29,12 @@
   {% set cta = "全文を見る" %}
   {% set modal_title = "日次サマリー全文" %}
   {% set modal_lead = "毎朝10:30 JST頃、論点・順位の動き・カテゴリ別トップをメールでお届けする予定です（有料・開始時期未定）。" %}
-  {% set modal_note = "関心登録いただいた方に、提供開始時にご案内します。現時点では課金は発生しません。" %}
+  {% set modal_note = "配信の準備が整い次第、事前登録を開始します。現時点では登録はお受けしていません。" %}
   {% set email_label = "メールアドレス" %}
   {% set email_placeholder = "example@email.com" %}
-  {% set btn_submit = "関心登録する" %}
+  {% set btn_submit = "事前登録する" %}
   {% set btn_close = "閉じる" %}
-  {% set sub_hint = "関心登録受付中" %}
+  {% set sub_hint = "提供準備中" %}
   {% set no_preview = "サマリーを準備中です。" %}
   {% set waitlist_success = "登録を受け付けました。提供開始時にご連絡します。" %}
   {% set waitlist_error = "登録に失敗しました。しばらくしてからお試しください。" %}
@@ -44,6 +44,7 @@
     class="ai-summary-fake-door-root{% if embedded %} dashboard-summary-panel mb-0 w-100{% else %} mb-3{% endif %}"
     data-fake-door-region="{{ reg }}"
     data-fake-door-locale="{{ loc }}"
+    data-waitlist-enabled="false"
     data-waitlist-success="{{ waitlist_success }}"
     data-waitlist-error="{{ waitlist_error }}"
     data-waitlist-invalid="{{ waitlist_invalid }}">
@@ -99,10 +100,11 @@
               <div class="mb-3">
                 <label for="ai-summary-waitlist-email" class="form-label small mb-1">{{ email_label }}</label>
                 <input type="email" class="form-control form-control-sm" id="ai-summary-waitlist-email"
-                    name="email" autocomplete="email" inputmode="email" required
-                    placeholder="{{ email_placeholder }}">
+                    name="email" autocomplete="email" inputmode="email" required disabled
+                    aria-disabled="true" placeholder="{{ email_placeholder }}">
               </div>
-              <button type="submit" class="btn btn-primary btn-sm" id="ai-summary-waitlist-submit">
+              <button type="submit" class="btn btn-primary btn-sm" id="ai-summary-waitlist-submit" disabled
+                  aria-disabled="true">
                 {{ btn_submit }}
               </button>
             </form>

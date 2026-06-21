@@ -1,4 +1,4 @@
-"""AIサマリー有料版の関心登録（Fake door / Waitlist）"""
+"""AIサマリー有料版の事前登録（Fake door / Waitlist）"""
 
 import re
 from typing import Tuple

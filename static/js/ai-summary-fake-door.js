@@ -25,8 +25,13 @@
     el.classList.add('d-none');
   }
 
+  function isWaitlistEnabled(root) {
+    return root && root.getAttribute('data-waitlist-enabled') !== 'false';
+  }
+
   function resetWaitlistModal(root) {
     if (!root) return;
+    var waitlistEnabled = isWaitlistEnabled(root);
     var formWrap = document.getElementById('ai-summary-waitlist-form-wrap');
     var form = document.getElementById('ai-summary-waitlist-form');
     var successEl = document.getElementById('ai-summary-waitlist-success');
@@ -42,10 +47,13 @@
     }
     hideError(errorEl);
     if (submitBtn) {
-      submitBtn.disabled = false;
+      submitBtn.disabled = !waitlistEnabled;
       submitBtn.removeAttribute('aria-busy');
     }
-    if (emailInput) emailInput.value = '';
+    if (emailInput) {
+      emailInput.value = '';
+      emailInput.disabled = !waitlistEnabled;
+    }
   }
 
   function init() {
@@ -55,6 +63,7 @@
     var region = (root.getAttribute('data-fake-door-region') || 'jp').trim();
     var locale = (root.getAttribute('data-fake-door-locale') || 'ja').trim();
     var baseParams = { region: region, locale: locale, location: 'ai_summary_fake_door' };
+    var waitlistEnabled = isWaitlistEnabled(root);
     var msgSuccess = root.getAttribute('data-waitlist-success') || '';
     var msgError = root.getAttribute('data-waitlist-error') || '';
     var msgInvalid = root.getAttribute('data-waitlist-invalid') || '';
@@ -70,9 +79,11 @@
     if (modalEl) {
       modalEl.addEventListener('shown.bs.modal', function () {
         sendGa('fake_door_view', baseParams);
-        var emailInput = document.getElementById('ai-summary-waitlist-email');
-        if (emailInput) {
-          window.setTimeout(function () { emailInput.focus(); }, 150);
+        if (waitlistEnabled) {
+          var emailInput = document.getElementById('ai-summary-waitlist-email');
+          if (emailInput && !emailInput.disabled) {
+            window.setTimeout(function () { emailInput.focus(); }, 150);
+          }
         }
       });
       modalEl.addEventListener('hidden.bs.modal', function () {
@@ -81,7 +92,7 @@
     }
 
     var form = document.getElementById('ai-summary-waitlist-form');
-    if (!form) return;
+    if (!form || !waitlistEnabled) return;
 
     form.addEventListener('submit', function (ev) {
       ev.preventDefault();

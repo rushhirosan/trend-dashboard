@@ -41,6 +41,9 @@ primary_region = "nrt"
   TRENDS_SCHEDULER_JOB_TIMEOUT_SECONDS = "5100"
   # OOM ロック回収がこの回数に達したら当該スロットの自動再取得を停止
   TRENDS_SCHEDULER_OOM_RECOVERY_CIRCUIT_THRESHOLD = "3"
+  # サマリー用スナップショット保持（business_day ベース）。週次7日+余裕で既定10日
+  TREND_SNAPSHOT_RETENTION_DAYS = "10"
+  TREND_SNAPSHOT_RETENTION_ENABLED = "true"
 
 [http_service]
   internal_port = 8080

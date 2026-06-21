@@ -2632,6 +2632,88 @@ class TrendsCache:
             logger.error("❌ count_trend_daily_snapshot_rows エラー: %s", e, exc_info=True)
             return 0
 
+    def count_trend_daily_snapshots_older_than(self, cutoff_business_day: date) -> int:
+        """business_day < cutoff の trend_daily_snapshots 行数。"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT COUNT(*) FROM trend_daily_snapshots
+                        WHERE business_day < %s
+                        """,
+                        (cutoff_business_day,),
+                    )
+                    row = cursor.fetchone()
+                    return int(row[0]) if row else 0
+        except Exception as e:
+            logger.error(
+                "❌ count_trend_daily_snapshots_older_than エラー: %s", e, exc_info=True
+            )
+            return 0
+
+    def purge_trend_daily_snapshots_older_than(self, cutoff_business_day: date) -> int:
+        """business_day < cutoff の trend_daily_snapshots を削除。削除行数を返す。"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        DELETE FROM trend_daily_snapshots
+                        WHERE business_day < %s
+                        """,
+                        (cutoff_business_day,),
+                    )
+                    deleted = cursor.rowcount
+                    conn.commit()
+                    return int(deleted) if deleted is not None else 0
+        except Exception as e:
+            logger.error(
+                "❌ purge_trend_daily_snapshots_older_than エラー: %s", e, exc_info=True
+            )
+            raise
+
+    def count_scheduler_slot_run_older_than(self, cutoff_at) -> int:
+        """started_at < cutoff の scheduler_slot_run 行数。"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT COUNT(*) FROM scheduler_slot_run
+                        WHERE started_at < %s
+                        """,
+                        (cutoff_at,),
+                    )
+                    row = cursor.fetchone()
+                    return int(row[0]) if row else 0
+        except Exception as e:
+            logger.error(
+                "❌ count_scheduler_slot_run_older_than エラー: %s", e, exc_info=True
+            )
+            return 0
+
+    def purge_scheduler_slot_run_older_than(self, cutoff_at) -> int:
+        """started_at < cutoff の scheduler_slot_run を削除。削除行数を返す。"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        DELETE FROM scheduler_slot_run
+                        WHERE started_at < %s
+                        """,
+                        (cutoff_at,),
+                    )
+                    deleted = cursor.rowcount
+                    conn.commit()
+                    return int(deleted) if deleted is not None else 0
+        except Exception as e:
+            logger.error(
+                "❌ purge_scheduler_slot_run_older_than エラー: %s", e, exc_info=True
+            )
+            raise
+
     def get_scheduler_lock_status(self):
         """スケジューラー分散ロックの現在状態を返す（デバッグ用）。取得失敗時は None。"""
         try:

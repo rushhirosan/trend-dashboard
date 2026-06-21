@@ -30,6 +30,7 @@ from utils.scheduler_slot_key import (
     slot_key_for_datetime,
 )
 from utils.shutdown_errors import is_interpreter_shutdown_error
+from services.snapshot_retention import purge_expired_snapshots
 
 AUTO_FETCH_TRIGGERS = frozenset({"scheduler", "gap_retry", "startup_catchup"})
 
@@ -493,6 +494,18 @@ class TrendsScheduler:
                         coalesce=True,
                         max_instances=1,
                     )
+
+                # スナップショット保持期間超過分の削除（週次サマリー用に ~10 日で足りる）
+                self.scheduler.add_job(
+                    func=self._purge_snapshot_retention,
+                    trigger=CronTrigger(hour=3, minute=0, timezone=jst),
+                    id="snapshot_retention_purge",
+                    name="スナップショット保持期間クリーンアップ (03:00 JST)",
+                    replace_existing=True,
+                    misfire_grace_time=3600,
+                    coalesce=True,
+                    max_instances=1,
+                )
                 
                 # スケジューラーを開始
                 self.scheduler.start()
@@ -504,7 +517,8 @@ class TrendsScheduler:
                 logger.info("✅ スケジューラー開始完了")
                 logger.info(
                     "📅 毎日1:00/7:00/13:00/19:00 JST に全トレンド取得。"
-                    " 各スロット+%s分に欠損リトライ",
+                    " 各スロット+%s分に欠損リトライ。"
+                    " 03:00 JST にスナップショット保持クリーンアップ",
                     gap_retry_minute,
                 )
                 
@@ -1795,7 +1809,14 @@ class TrendsScheduler:
             has_anomaly = True
         
         return has_anomaly
-    
+
+    def _purge_snapshot_retention(self) -> None:
+        """trend_daily_snapshots / scheduler_slot_run の保持日数超過分を削除。"""
+        try:
+            purge_expired_snapshots(db=self.db)
+        except Exception as e:
+            logger.warning("⚠️ スナップショット保持クリーンアップエラー: %s", e, exc_info=True)
+
     def _retry_missed_slot_if_needed(self) -> None:
         """各スロット T+35 分: スナップショット欠損時のみ1回リトライ（通知数は完了1通のみ）。"""
         jst = pytz.timezone("Asia/Tokyo")

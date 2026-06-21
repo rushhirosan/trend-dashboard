@@ -20,6 +20,10 @@ from apscheduler.triggers.cron import CronTrigger
 from database_config import TrendsCache
 from services.subscription.subscription_manager import SubscriptionManager
 from utils.scheduler_lock import is_local_holder_process_dead, parse_scheduler_lock_holder
+from utils.cache_status_keys import (
+    map_refresh_result_key_to_cache_keys,
+    region_refresh_stats,
+)
 from utils.scheduler_slot_key import (
     SCHEDULED_SLOTS,
     resolve_scheduler_slot_key,
@@ -117,11 +121,27 @@ def _merge_phase_refresh_results(jp_result: dict, us_result: dict) -> dict:
     merged = {}
     merged.update(jp.get("results") or {})
     merged.update(us.get("results") or {})
-    return {
+    out = {
         "success": bool(jp.get("success")) and bool(us.get("success")),
         "results": merged,
         "phases": {"jp": jp, "us": us},
     }
+    out["region_stats"] = region_refresh_stats(merged)
+    return out
+
+
+def _subprocess_phase_ok(phase_result: dict, timed_out: bool) -> bool:
+    """subprocess 1フェーズが完走成功したか。"""
+    if timed_out:
+        return False
+    if phase_result.get("oom_killed"):
+        return False
+    if not phase_result.get("success"):
+        return False
+    err = str(phase_result.get("error") or "")
+    if err.startswith("subprocess_exit_") and err != "subprocess_exit_0":
+        return False
+    return bool(phase_result.get("results"))
 
 
 class TrendsScheduler:
@@ -936,6 +956,9 @@ class TrendsScheduler:
         if proc.returncode != 0 and not result.get("error"):
             result = dict(result)
             result["error"] = f"subprocess_exit_{proc.returncode}"
+        if proc.returncode == -9:
+            result = dict(result)
+            result["oom_killed"] = True
         result.setdefault("region", region)
 
         logger.info(
@@ -963,7 +986,25 @@ class TrendsScheduler:
             merged = _merge_phase_refresh_results(jp_result, {"success": False, "results": {}})
             merged["job_timed_out"] = True
             merged["success"] = False
+            merged["jp_phase_failed"] = True
+            merged["us_phase_skipped"] = True
             return merged, True
+
+        if not _subprocess_phase_ok(jp_result, jp_timed_out):
+            logger.error(
+                "❌ JP フェーズ失敗のため US subprocess をスキップします (success=%s error=%s oom=%s)",
+                jp_result.get("success"),
+                jp_result.get("error"),
+                jp_result.get("oom_killed"),
+            )
+            merged = _merge_phase_refresh_results(
+                jp_result,
+                {"success": False, "results": {}, "skipped": True},
+            )
+            merged["success"] = False
+            merged["jp_phase_failed"] = True
+            merged["us_phase_skipped"] = True
+            return merged, False
 
         us_result, us_timed_out = self._run_refresh_region_subprocess(
             "us",
@@ -974,7 +1015,11 @@ class TrendsScheduler:
         if us_timed_out:
             merged["job_timed_out"] = True
             merged["success"] = False
+            merged["us_phase_failed"] = True
             return merged, True
+        if not _subprocess_phase_ok(us_result, us_timed_out):
+            merged["success"] = False
+            merged["us_phase_failed"] = True
         return merged, False
 
     def _run_refresh_all_trends_with_job_timeout(self, low_memory_mode, job_timeout_seconds):
@@ -1318,6 +1363,20 @@ class TrendsScheduler:
             success_count = sum(1 for r in results.values() if r.get('success', False))
             total_count = len(results)
             failed_count = total_count - success_count
+            region_stats = result.get('region_stats') or region_refresh_stats(results)
+            jp_stats = region_stats.get('JP', {})
+            us_stats = region_stats.get('US', {})
+            logger.info(
+                "📊 地域別成功: JP %s/%s, US %s/%s",
+                jp_stats.get('success', 0),
+                jp_stats.get('total', 0),
+                us_stats.get('success', 0),
+                us_stats.get('total', 0),
+            )
+            if result.get('us_phase_skipped'):
+                logger.warning("⏭️ US フェーズは JP 失敗のためスキップされました")
+            if result.get('jp_phase_failed'):
+                logger.error("❌ JP フェーズ失敗 (oom=%s)", result.get('phases', {}).get('jp', {}).get('oom_killed'))
             
             # 失敗したトレンドをログに詳細出力し、エラー詳細を収集
             failed_trends = []
@@ -1327,6 +1386,22 @@ class TrendsScheduler:
                     'source': '_job',
                     'error': f'job_timeout after {SCHEDULER_JOB_TIMEOUT_SECONDS}s',
                     'status': 'timeout',
+                })
+            if result.get('jp_phase_failed'):
+                jp_phase = (result.get('phases') or {}).get('jp') or {}
+                err = jp_phase.get('error') or 'jp_phase_failed'
+                if jp_phase.get('oom_killed'):
+                    err = f'OOM killed ({err})'
+                failed_trends_details.append({
+                    'source': '_jp_phase',
+                    'error': str(err),
+                    'status': 'failed',
+                })
+            if result.get('us_phase_skipped'):
+                failed_trends_details.append({
+                    'source': '_us_phase',
+                    'error': 'skipped (JP phase failed)',
+                    'status': 'skipped',
                 })
             for key, result_data in results.items():
                 success = result_data.get('success', False)
@@ -1386,69 +1461,17 @@ class TrendsScheduler:
             logger.info(f"✅ 自動トレンド取得完了: {success_count}/{total_count} 成功")
             logger.info(f"⏱️ 実行時間: {duration:.2f}秒")
             
-            # 成功したトレンドのみタイムスタンプを更新
-            # refresh_all_trendsの結果キー（例：google_JP）をcache_key（例：google_trends）にマッピング
-            # 注意: 1つのトレンドが複数のcache_keyに展開される場合がある（例：note→5つのcache_key、stock_JP/stock_US→2つのcache_key）
-            def map_result_key_to_cache_key(result_key):
-                """refresh_all_trendsの結果キーをcache_keyにマッピング"""
-                if '_' not in result_key:
-                    return None
-                
-                parts = result_key.rsplit('_', 1)
-                if len(parts) != 2:
-                    return None
-                
-                key, region = parts
-                
-                # 特殊なケース（国別・地域別に分かれるもの）
-                if key == 'stock':
-                    return f'stock_trends_{region}'
-                elif key == 'book':
-                    return f'book_trends_{region}'
-                elif key == 'movie':
-                    return f'movie_trends_{region}'
-                elif key == 'appstore':
-                    # App Storeは国別に分かれる
-                    return f'appstore_trends_{region}'
-                elif key == 'ebay':
-                    # eBayは複数のカテゴリがあるが、cache_keyは統合されている
-                    return 'ebay_trends'
-                elif key == 'note':
-                    # Noteは複数のカテゴリがあるため、全てのカテゴリのキャッシュキーを返す
-                    # リストを返すことで、呼び出し側で展開できる
-                    return ['note_trends_all', 'note_trends_tech', 'note_trends_business', 'note_trends_lifestyle', 'note_trends_entertainment']
-                elif key == 'wikipedia':
-                    # Wikipediaは言語別: JP→ja, US→en（サービス側のcache_keyと一致させる）
-                    return f'wikipedia_trends_{"ja" if region == "JP" else "en"}'
-                elif key == 'music':
-                    # Spotifyは地域別: music_trends_JP / music_trends_US
-                    return f'music_trends_{region}'
-                elif key == 'bluesky':
-                    # Bluesky: JP=日本語投稿(bluesky_trends_jp)、US=言語制限なし(bluesky_trends)
-                    return 'bluesky_trends_jp' if region == 'JP' else 'bluesky_trends'
-                elif key == 'openalex':
-                    # OpenAlexはカテゴリ別×地域別: trending_jp, ai_jp, ... (JP) / trending, ai, ... (US)
-                    cats = ('trending', 'ai', 'nlp', 'climate', 'biotech', 'quantum', 'medical')
-                    if region == 'JP':
-                        return [f'openalex_trends_{c}_jp' for c in cats]
-                    return [f'openalex_trends_{c}' for c in cats]
-                else:
-                    # 通常のケース: {key}_trends
-                    return f'{key}_trends'
-            
-            # 成功したトレンドのcache_keyを収集
+            # 成功したトレンドのみタイムスタンプを更新（地域別 cache_key）
             successful_cache_keys = []
             for result_key, result_data in results.items():
                 if result_data.get('success', False):
-                    cache_key = map_result_key_to_cache_key(result_key)
+                    cache_key = map_refresh_result_key_to_cache_keys(result_key)
                     if cache_key:
-                        # Noteの場合はリストなので展開する
                         if isinstance(cache_key, list):
                             successful_cache_keys.extend(cache_key)
                         else:
                             successful_cache_keys.append(cache_key)
                     else:
-                        # マッピングに失敗した場合のログ
                         logger.warning(f"⚠️ cache_keyマッピング失敗: {result_key} → None")
             
             # デバッグ: 収集されたcache_keyをログ出力（Stock TrendsとApp Storeを確認）
@@ -1544,16 +1567,26 @@ class TrendsScheduler:
                 trigger_source=trigger_source,
                 snapshot_status=snapshot_status,
                 prior_slot_gaps=prior_slot_gaps,
+                region_stats=region_stats,
+                refresh_success=bool(result.get('success')),
+                jp_phase_failed=bool(result.get('jp_phase_failed')),
+                us_phase_skipped=bool(result.get('us_phase_skipped')),
             )
 
-            # スロットを「完了済み」として記録（二重実行防止。成功時のみ記録するため、クラッシュした場合は別プロセスが再実行可能）
-            # 重要: トリガー時刻のスロットを記録する。完了時刻で判定すると、7:00開始のジョブが12:04に終わった場合に
-            # 1pm が記録され、13:00の本来の実行が「既に完了済み」と誤判定されてスキップされる不具合を防ぐ。
+            # スロットを「完了済み」として記録（全フェーズ成功時のみ）
             completed_slot = slot_key  # 開始時に判定したスロット（トリガー時刻ベース）
             if result.get('job_timed_out'):
                 logger.warning(
                     "⏭️ ジョブ全体タイムアウトのためスロット完了は記録しません（slot=%s）",
                     completed_slot,
+                )
+            elif result.get('jp_phase_failed') or result.get('us_phase_failed') or not result.get('success'):
+                logger.warning(
+                    "⏭️ 部分失敗のためスロット完了は記録しません（slot=%s success=%s jp_failed=%s us_skipped=%s）",
+                    completed_slot,
+                    result.get('success'),
+                    result.get('jp_phase_failed'),
+                    result.get('us_phase_skipped'),
                 )
             elif completed_slot and self.db and hasattr(self.db, 'mark_slot_completed'):
                 self.db.mark_slot_completed(completed_slot)
@@ -1858,6 +1891,10 @@ class TrendsScheduler:
         trigger_source: str = 'scheduler',
         snapshot_status: dict | None = None,
         prior_slot_gaps: list | None = None,
+        region_stats: dict | None = None,
+        refresh_success: bool = True,
+        jp_phase_failed: bool = False,
+        us_phase_skipped: bool = False,
     ) -> None:
         """スケジューラ実行結果をDiscord通知（成功時も失敗時も）"""
         if not self.alert_service:
@@ -1875,9 +1912,31 @@ class TrendsScheduler:
         )
         gaps = list(prior_slot_gaps or [])
         gaps_bad = bool(gaps)
+        region_stats = region_stats or {}
+        jp_stats = region_stats.get("JP") or {}
+        us_stats = region_stats.get("US") or {}
+        jp_line = f"{jp_stats.get('success', 0)}/{jp_stats.get('total', 0)}"
+        us_line = f"{us_stats.get('success', 0)}/{us_stats.get('total', 0)}"
+        if us_phase_skipped:
+            us_line = "skipped"
+
+        fully_ok = (
+            refresh_success
+            and not jp_phase_failed
+            and not us_phase_skipped
+            and failed_count == 0
+        )
+        oom_killed = any(
+            d.get("source") == "_jp_phase" and "OOM" in str(d.get("error", ""))
+            for d in failed_trends_details
+        )
 
         # アラートタイプを決定
-        if has_anomaly or snapshot_bad or gaps_bad:
+        if jp_phase_failed and oom_killed:
+            alert_type = "critical"
+        elif jp_phase_failed or us_phase_skipped or not refresh_success:
+            alert_type = "warning"
+        elif has_anomaly or snapshot_bad or gaps_bad:
             alert_type = "warning"
         elif failed_count == 0:
             alert_type = "success"
@@ -1888,15 +1947,27 @@ class TrendsScheduler:
         trigger_label = self._trigger_label(trigger_source)
 
         # タイトルとメッセージを構築（トリガーをメッセージにも含めて一覧で分かるようにする）
-        if failed_count == 0 and not snapshot_bad and not gaps_bad:
+        if fully_ok and not snapshot_bad and not gaps_bad:
             title = "✅ トレンド取得正常終了"
             message = f"全てのトレンド取得が正常に完了しました。\nトリガー: {trigger_label}"
-        elif failed_count == 0 and (snapshot_bad or gaps_bad):
+        elif fully_ok and (snapshot_bad or gaps_bad):
             title = "⚠️ トレンド取得完了（スナップショット欠損）"
             message = (
                 f"トレンド取得は完了しましたが、スナップショットに問題があります。\n"
                 f"トリガー: {trigger_label}"
             )
+        elif jp_phase_failed or us_phase_skipped or not refresh_success:
+            title = "❌ トレンド取得失敗（部分完了）"
+            if us_phase_skipped:
+                message = (
+                    f"JP フェーズ失敗のため US をスキップしました（JP: {jp_line}）。\n"
+                    f"トリガー: {trigger_label}"
+                )
+            else:
+                message = (
+                    f"トレンド取得が完了しませんでした（JP: {jp_line}, US: {us_line}）。\n"
+                    f"トリガー: {trigger_label}"
+                )
         elif failed_count == 0:
             title = "✅ トレンド取得正常終了"
             message = f"全てのトレンド取得が正常に完了しました。\nトリガー: {trigger_label}"
@@ -1917,6 +1988,8 @@ class TrendsScheduler:
             "ホスト": host_short,
             "プロセスID": str(pid),
             "成功": f"{success_count}/{total_count}",
+            "JP": jp_line,
+            "US": us_line,
             "失敗": str(failed_count),
             "失敗率": f"{failure_rate:.1f}%",
             "実行時間": f"{duration_min:.1f}分 ({duration:.2f}秒)",

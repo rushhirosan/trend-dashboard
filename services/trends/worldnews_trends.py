@@ -409,8 +409,8 @@ class WorldNewsTrendsManager(BaseTrendsManager):
         """データをキャッシュに保存"""
         try:
             self.db.save_worldnews_trends_to_cache(data, cache_key, country)
-            # cache_statusテーブルも更新
-            self._update_cache_status('worldnews_trends', len(data))
+            status_key = self._cache_status_key("worldnews_trends", country=country)
+            self._update_cache_status(status_key, len(data))
         except Exception as e:
             logger.error(f"キャッシュ保存エラー: {e}", exc_info=True)
     

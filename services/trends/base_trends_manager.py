@@ -136,6 +136,12 @@ class BaseTrendsManager(ABC):
         """
         return False
 
+    def _cache_status_key(self, cache_key: str, **kwargs) -> str:
+        """JP/US 別の cache_status キー（共有キー上書き防止）。"""
+        from utils.cache_status_keys import resolve_cache_status_key
+
+        return resolve_cache_status_key(cache_key, **kwargs)
+
     def _clear_cache(self, *args, **kwargs) -> bool:
         """キャッシュをクリアする（オプション）
 
@@ -293,7 +299,12 @@ class BaseTrendsManager(ABC):
                         logger.info(f"✅ {self.service_name}: ダミーデータ{len(dummy_data)}件を生成し、キャッシュに保存しました")
                         try:
                             cache_key = self._get_cache_key(*args, **kwargs)
-                            self._update_cache_status(cache_key, len(dummy_data), *args, **kwargs)
+                            self._update_cache_status(
+                                self._cache_status_key(cache_key, **kwargs),
+                                len(dummy_data),
+                                *args,
+                                **kwargs,
+                            )
                         except Exception as e:
                             logger.warning(f"⚠️ {self.service_name}: cache_status更新中にエラーが発生しました (ダミーモード): {e}")
                     else:
@@ -410,7 +421,12 @@ class BaseTrendsManager(ABC):
                                 and (not trends_data or len(trends_data) == 0)
                             )
                             if not skip_status:
-                                update_success = self._update_cache_status(cache_key, len(trends_data or []), *args, **kwargs)
+                                update_success = self._update_cache_status(
+                                    self._cache_status_key(cache_key, **kwargs),
+                                    len(trends_data or []),
+                                    *args,
+                                    **kwargs,
+                                )
                                 if not update_success:
                                     logger.debug(
                                         f"⚠️ {self.service_name}: cache_statusの更新をスキップしました（未実装または失敗）"

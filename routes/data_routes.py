@@ -7,6 +7,7 @@ import os
 from datetime import date
 from flask import Blueprint, jsonify, request, current_app
 from database_config import TrendsCache
+from utils.cache_status_keys import freshness_lookup_keys
 from utils.logger_config import get_logger
 
 # ロガーの初期化
@@ -121,28 +122,10 @@ def get_data_freshness():
         for cache_key, display_name in cache_key_map.items():
             try:
                 cache_info = None
-                
-                # 国別のキャッシュキーを処理
-                if cache_key == 'bluesky_trends':
-                    # Bluesky: JP=日本語投稿(bluesky_trends_jp)、US=言語制限なし(bluesky_trends)
-                    bluesky_key = 'bluesky_trends_jp' if country == 'JP' else 'bluesky_trends'
-                    cache_info = all_cache_status.get(bluesky_key)
-                elif cache_key == 'openalex_trends_trending':
-                    # OpenAlex: JP=日本語論文(trending_jp)、US=言語制限なし(trending)
-                    openalex_key = 'openalex_trends_trending_jp' if country == 'JP' else 'openalex_trends_trending'
-                    cache_info = all_cache_status.get(openalex_key)
-                elif cache_key in ['movie_trends', 'book_trends', 'appstore_trends', 'stock_trends', 'music_trends']:
-                    cache_key_with_country = f'{cache_key}_{country}'
-                    cache_info = all_cache_status.get(cache_key_with_country)
-                    if not cache_info:
-                        # フォールバック: もう一方の国のデータをチェック
-                        fallback_country = 'US' if country == 'JP' else 'JP'
-                        cache_info = all_cache_status.get(f'{cache_key}_{fallback_country}')
-                    if not cache_info and cache_key == 'music_trends':
-                        # music_trendsのみ: 旧形式(music_trends単体)のフォールバック（移行期間用）
-                        cache_info = all_cache_status.get('music_trends')
-                else:
-                    cache_info = all_cache_status.get(cache_key)
+                for lookup_key in freshness_lookup_keys(cache_key, country):
+                    cache_info = all_cache_status.get(lookup_key)
+                    if cache_info:
+                        break
                 
                 if cache_info:
                     # last_updatedがdatetimeオブジェクトの場合はisoformatに変換

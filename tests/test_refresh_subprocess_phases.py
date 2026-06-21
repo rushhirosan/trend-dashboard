@@ -21,6 +21,45 @@ def test_merge_phase_refresh_results():
     assert "a_JP" in merged["results"]
     assert "b_US" in merged["results"]
     assert merged["phases"]["jp"]["success"] is True
+    assert merged["region_stats"]["JP"]["success"] == 1
+    assert merged["region_stats"]["US"]["success"] == 0
+
+
+def test_subprocess_phase_ok():
+    assert sm._subprocess_phase_ok({"success": True, "results": {"a": {}}}, False)
+    assert not sm._subprocess_phase_ok({"success": False, "results": {}}, False)
+    assert not sm._subprocess_phase_ok({"success": False, "results": {}, "oom_killed": True}, False)
+    assert not sm._subprocess_phase_ok({"success": True, "results": {}}, True)
+
+
+def test_jp_failure_skips_us_subprocess(monkeypatch):
+    jp_payload = {
+        "success": False,
+        "results": {"google_JP": {"success": True}},
+        "region": "jp",
+        "oom_killed": True,
+        "error": "subprocess_exit_-9",
+    }
+    calls = []
+
+    def fake_subprocess(self, region, *, low_memory_mode, timeout_seconds):
+        calls.append(region)
+        if region == "jp":
+            return jp_payload, False
+        return {"success": True, "results": {}}, False
+
+    monkeypatch.setattr(sm.TrendsScheduler, "_run_refresh_region_subprocess", fake_subprocess)
+    scheduler = sm.TrendsScheduler(_FakeApp())
+    result, timed_out = scheduler._run_refresh_all_trends_with_job_timeout(
+        low_memory_mode=True,
+        job_timeout_seconds=1200,
+    )
+    assert timed_out is False
+    assert calls == ["jp"]
+    assert result["success"] is False
+    assert result["jp_phase_failed"] is True
+    assert result["us_phase_skipped"] is True
+    assert "cnn_US" not in result["results"]
 
 
 class _FakeApp:

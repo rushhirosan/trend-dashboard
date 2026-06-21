@@ -423,8 +423,8 @@ class YouTubeTrendsManager(BaseTrendsManager):
         """YouTube Trendsデータをキャッシュに保存（get_rising_trends用）"""
         try:
             self.db.save_youtube_trends_to_cache(trends_data, region_code, trend_type)
-            # cache_statusテーブルも更新
-            self._update_cache_status('youtube_trends', len(trends_data))
+            status_key = self._cache_status_key("youtube_trends", region_code=region_code)
+            self._update_cache_status(status_key, len(trends_data))
         except Exception as e:
             logger.error(f"YouTubeキャッシュ保存エラー: {e}", exc_info=True)
             raise

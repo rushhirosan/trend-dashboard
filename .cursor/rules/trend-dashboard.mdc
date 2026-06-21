@@ -229,6 +229,7 @@ alwaysApply: true
 - Keep documentation concise and practical
 - Record source-specific caveats when they matter operationally
 - Paid-summary validation (Pattern A, phase 1 templates and checklists): `docs/summary_pattern_a_phase1.md`
+- Future work backlog (monetization, improvements, ops): `docs/BACKLOG.md` — update this file only for new TODOs
 
 ---
 

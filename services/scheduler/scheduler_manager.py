@@ -1908,7 +1908,10 @@ class TrendsScheduler:
         snapshot_bad = bool(
             snapshot_status
             and snapshot_status.get("scheduler_slot_key")
-            and not snapshot_status.get("verified_ok")
+            and (
+                not snapshot_status.get("verified_ok")
+                or not snapshot_status.get("captured_at_ok", True)
+            )
         )
         gaps = list(prior_slot_gaps or [])
         gaps_bad = bool(gaps)

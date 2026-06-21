@@ -1,17 +1,24 @@
 """snapshot_slot_health のユニットテスト。"""
 
-from datetime import date
-from unittest.mock import MagicMock, patch
+from datetime import date, datetime
+from unittest.mock import patch
+
+import pytz
 
 from services.snapshot_slot_health import (
+    check_captured_at_in_slot_window,
     find_missing_prior_slots,
     format_prior_slot_gaps,
     format_snapshot_status_for_discord,
+    iter_scheduled_slots_for_business_day,
     prior_slot_codes,
     slot_has_snapshot,
+    slot_key_for,
     slot_needs_recovery,
     write_and_verify_snapshot,
 )
+
+JST = pytz.timezone("Asia/Tokyo")
 
 
 class FakeDb:
@@ -78,6 +85,44 @@ def test_format_snapshot_status_for_discord():
     assert "失敗" in ng
 
 
+def test_slot_key_for_and_iter():
+    bd = date(2026, 6, 20)
+    assert slot_key_for(bd, "07") == "7am_2026-06-20"
+    assert slot_key_for(bd, "01") == "1am_2026-06-21"
+    keys = [k for _, k in iter_scheduled_slots_for_business_day(bd)]
+    assert keys == [
+        "7am_2026-06-20",
+        "1pm_2026-06-20",
+        "7pm_2026-06-20",
+        "1am_2026-06-21",
+    ]
+
+
+def test_check_captured_at_in_slot_window():
+    bd = date(2026, 6, 20)
+    ok_time = JST.localize(datetime(2026, 6, 20, 13, 12))
+    assert check_captured_at_in_slot_window(ok_time, bd, "13") == (True, "")
+    bad_time = JST.localize(datetime(2026, 6, 20, 16, 2))
+    ok, msg = check_captured_at_in_slot_window(bad_time, bd, "13")
+    assert ok is False
+    assert "期待帯" in msg
+
+
+def test_format_snapshot_status_captured_at_warning():
+    warn = format_snapshot_status_for_discord(
+        {
+            "scheduler_slot_key": "1pm_2026-06-20",
+            "verified_ok": True,
+            "captured_at_ok": False,
+            "captured_at_warning": "時刻帯外",
+            "business_day": "2026-06-20",
+            "slot": "13",
+            "row_count": 70,
+        }
+    )
+    assert warn.startswith("⚠️ 時刻帯外")
+
+
 def test_slot_has_snapshot_and_needs_recovery():
     bd = date(2026, 6, 12)
     db = FakeDb({(bd, "07"): 0, (bd, "13"): 5})
@@ -102,6 +147,7 @@ def test_write_and_verify_snapshot(mock_write):
     assert status["verified_ok"] is True
     assert status["row_count"] == 70
     assert status["slot"] == "07"
+    assert "captured_at_ok" in status
 
     mock_write.return_value = False
     status2 = write_and_verify_snapshot(

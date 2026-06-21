@@ -2,7 +2,8 @@
 メモリ逼迫検知（OOM 直前の警告を Discord へ）。
 
 カーネルによる OOM killer（SIGKILL）が走った瞬間には Python は動かないため、
-「Out of memory」行そのものはアプリ内では捕捉できない。cgroup の上限に対する RSS 比率で事前警告する。
+「Out of memory」行そのものはアプリ内では捕捉できない。cgroup の上限に対する
+使用量比率で事前警告する（subprocess 含む cgroup 全体を優先）。
 """
 
 from __future__ import annotations
@@ -31,6 +32,15 @@ def _read_cgroup_memory_limit_bytes() -> int | None:
         return None
 
 
+def _read_cgroup_memory_usage_bytes() -> int | None:
+    """cgroup v2 の memory.current（子 subprocess 含む）。"""
+    try:
+        with open("/sys/fs/cgroup/memory.current", encoding="utf-8") as f:
+            return int(f.read().strip())
+    except (OSError, ValueError):
+        return None
+
+
 def _read_rss_bytes() -> int | None:
     """現在プロセスの VmRSS（/proc/self/status）。"""
     try:
@@ -54,18 +64,31 @@ def _fallback_limit_bytes() -> int:
 
 
 def get_memory_status() -> dict[str, Any]:
-    """GET /api/alert/test 用: RSS・上限・比率（監視・デバッグ用）。"""
+    """GET /api/alert/test 用: RSS・cgroup 使用量・上限・比率（監視・デバッグ用）。"""
     rss = _read_rss_bytes()
+    cgroup_usage = _read_cgroup_memory_usage_bytes()
     limit = _read_cgroup_memory_limit_bytes()
     if limit is None:
         limit = _fallback_limit_bytes()
         limit_source = "fallback(MEMORY_LIMIT_MB or 512)"
     else:
         limit_source = "cgroup memory.max"
-    ratio = (rss / limit) if rss is not None and limit else None
+
+    # OOM 判定は subprocess を含む cgroup 全体を優先
+    usage = cgroup_usage if cgroup_usage is not None else rss
+    usage_source = "cgroup memory.current" if cgroup_usage is not None else "process VmRSS"
+    ratio = (usage / limit) if usage is not None and limit else None
+
     return {
         "rss_bytes": rss,
         "rss_mb": round(rss / (1024 * 1024), 1) if rss is not None else None,
+        "cgroup_usage_bytes": cgroup_usage,
+        "cgroup_usage_mb": round(cgroup_usage / (1024 * 1024), 1)
+        if cgroup_usage is not None
+        else None,
+        "usage_bytes": usage,
+        "usage_mb": round(usage / (1024 * 1024), 1) if usage is not None else None,
+        "usage_source": usage_source,
         "limit_bytes": limit,
         "limit_mb": round(limit / (1024 * 1024), 1),
         "limit_source": limit_source,
@@ -96,7 +119,7 @@ def _memory_watchdog_loop(
         return
 
     logger.info(
-        "memory_watchdog: 開始 (warn=%.0f%% critical=%.0f%% interval=%ss)",
+        "memory_watchdog: 開始 (warn=%.0f%% critical=%.0f%% interval=%ss usage=cgroup優先)",
         warn_ratio * 100,
         critical_ratio * 100,
         interval_sec,
@@ -106,11 +129,20 @@ def _memory_watchdog_loop(
         try:
             time.sleep(interval_sec)
             st = get_memory_status()
-            rss = st.get("rss_bytes")
+            usage = st.get("usage_bytes")
             limit = st.get("limit_bytes")
-            if rss is None or not limit:
+            if usage is None or not limit:
                 continue
-            ratio = rss / limit
+            ratio = usage / limit
+
+            details = {
+                "使用率": f"{ratio:.1%}",
+                "使用量_MB": str(st.get("usage_mb")),
+                "使用量ソース": str(st.get("usage_source")),
+                "プロセスRSS_MB": str(st.get("rss_mb")),
+                "上限_MB": str(st.get("limit_mb")),
+                "limit_source": str(st.get("limit_source")),
+            }
 
             if ratio >= critical_ratio:
                 if not _should_send("critical", cooldown_sec):
@@ -118,18 +150,14 @@ def _memory_watchdog_loop(
                 svc.send_alert(
                     "critical",
                     "メモリ逼迫（OOM 直前の可能性）",
-                    "プロセスの RSS が cgroup 上限に近づいています。まもなく OOM でワーカーが落ちると、スケジューラ完了の Discord は届きません。\n"
-                    "対策: 取得バッチの軽量化・分割、または VM メモリ増（課金）を検討してください。",
-                    {
-                        "RSS_MB": str(st.get("rss_mb")),
-                        "上限_MB": str(st.get("limit_mb")),
-                        "使用率": f"{ratio:.1%}",
-                        "limit_source": str(st.get("limit_source")),
-                    },
+                    "cgroup / プロセスのメモリ使用量が上限に近づいています。"
+                    "まもなく OOM するとスケジューラ完了 Discord は届きません。",
+                    details,
                 )
                 logger.warning(
-                    "memory_watchdog: critical ratio=%.2f rss_mb=%s limit_mb=%s",
+                    "memory_watchdog: critical ratio=%.2f usage_mb=%s rss_mb=%s limit_mb=%s",
                     ratio,
+                    st.get("usage_mb"),
                     st.get("rss_mb"),
                     st.get("limit_mb"),
                 )
@@ -140,16 +168,12 @@ def _memory_watchdog_loop(
                     "warning",
                     "メモリ使用率が高い",
                     "一括取得などでメモリを多く使っています。続くと OOM のリスクがあります。",
-                    {
-                        "RSS_MB": str(st.get("rss_mb")),
-                        "上限_MB": str(st.get("limit_mb")),
-                        "使用率": f"{ratio:.1%}",
-                        "limit_source": str(st.get("limit_source")),
-                    },
+                    details,
                 )
                 logger.warning(
-                    "memory_watchdog: warning ratio=%.2f rss_mb=%s limit_mb=%s",
+                    "memory_watchdog: warning ratio=%.2f usage_mb=%s rss_mb=%s limit_mb=%s",
                     ratio,
+                    st.get("usage_mb"),
                     st.get("rss_mb"),
                     st.get("limit_mb"),
                 )
@@ -167,16 +191,16 @@ def start_memory_watchdog() -> None:
         return
 
     try:
-        warn_ratio = float(os.getenv("MEMORY_PRESSURE_WARN_RATIO", "0.82"))
-        critical_ratio = float(os.getenv("MEMORY_PRESSURE_CRITICAL_RATIO", "0.90"))
-        interval_sec = float(os.getenv("MEMORY_WATCHDOG_INTERVAL_SEC", "45"))
-        cooldown_sec = float(os.getenv("MEMORY_PRESSURE_ALERT_COOLDOWN_SEC", "1200"))
+        warn_ratio = float(os.getenv("MEMORY_PRESSURE_WARN_RATIO", "0.75"))
+        critical_ratio = float(os.getenv("MEMORY_PRESSURE_CRITICAL_RATIO", "0.88"))
+        interval_sec = float(os.getenv("MEMORY_WATCHDOG_INTERVAL_SEC", "15"))
+        cooldown_sec = float(os.getenv("MEMORY_PRESSURE_ALERT_COOLDOWN_SEC", "600"))
     except ValueError:
-        warn_ratio, critical_ratio, interval_sec, cooldown_sec = 0.82, 0.90, 45.0, 1200.0
+        warn_ratio, critical_ratio, interval_sec, cooldown_sec = 0.75, 0.88, 15.0, 600.0
 
     warn_ratio = min(0.99, max(0.5, warn_ratio))
     critical_ratio = min(0.99, max(warn_ratio + 0.01, critical_ratio))
-    interval_sec = max(15.0, interval_sec)
+    interval_sec = max(10.0, interval_sec)
     cooldown_sec = max(60.0, cooldown_sec)
 
     t = threading.Thread(

@@ -1,15 +1,39 @@
 #!/usr/bin/env python3
 """本番 scheduler_slot_run / snapshots / lock の状態確認（fly ssh 用）。"""
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 from database_config import TrendsCache
 
-TODAY = "2026-06-20"
 
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Inspect scheduler slots and snapshots")
+    parser.add_argument(
+        "--business-day",
+        default=None,
+        help="YYYY-MM-DD（default: 今日 JST）",
+    )
+    args = parser.parse_args()
 
-def main() -> None:
+    if args.business_day:
+        today = args.business_day
+    else:
+        import pytz
+        from datetime import datetime
+
+        today = datetime.now(pytz.timezone("Asia/Tokyo")).date().isoformat()
+
     db = TrendsCache()
     with db.get_connection() as conn:
         with conn.cursor() as cur:
-            print("=== scheduler_slot_run (today) ===")
+            print(f"=== scheduler_slot_run ({today}) ===")
             cur.execute(
                 """
                 SELECT slot_key, started_at
@@ -18,12 +42,12 @@ def main() -> None:
                    OR slot_key LIKE %s
                 ORDER BY started_at
                 """,
-                (f"%{TODAY}%", "oom_%"),
+                (f"%{today}%", "oom_%"),
             )
             for row in cur.fetchall():
                 print(row)
 
-            print("=== trend_daily_snapshots (today) ===")
+            print(f"=== trend_daily_snapshots (business_day={today}) ===")
             cur.execute(
                 """
                 SELECT slot, COUNT(*) AS series_count, MAX(captured_at) AS last_cap
@@ -32,7 +56,7 @@ def main() -> None:
                 GROUP BY slot
                 ORDER BY slot
                 """,
-                (TODAY,),
+                (today,),
             )
             for row in cur.fetchall():
                 print(row)
@@ -45,6 +69,8 @@ def main() -> None:
             cur.execute("SELECT last_deploy_at FROM deploy_marker LIMIT 1")
             print(cur.fetchone())
 
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

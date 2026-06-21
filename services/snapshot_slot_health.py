@@ -2,12 +2,23 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
+
+import pytz
 
 from services.trend_snapshot_service import parse_scheduler_slot_key
 
+JST = pytz.timezone("Asia/Tokyo")
 SLOT_ORDER = ("07", "13", "19", "01")
+
+# 定時スロットの captured_at 期待帯（JST）。外れていれば backfill 誤認防止の warning。
+_SLOT_CAPTURE_HOURS: dict[str, tuple[int, int]] = {
+    "07": (6, 9),
+    "13": (12, 15),
+    "19": (18, 21),
+    "01": (0, 3),
+}
 
 
 def prior_slot_codes(slot_code: str) -> List[str]:
@@ -66,6 +77,59 @@ def parse_slot_key(slot_key: str) -> Optional[Tuple[date, str]]:
     return parsed
 
 
+def slot_key_for(business_day: date, slot_code: str) -> str:
+    """business_day + slot_code → scheduler slot_key。"""
+    slot_code = slot_code.zfill(2)
+    if slot_code == "01":
+        cal = business_day + timedelta(days=1)
+        return f"1am_{cal.isoformat()}"
+    if slot_code == "07":
+        return f"7am_{business_day.isoformat()}"
+    if slot_code == "13":
+        return f"1pm_{business_day.isoformat()}"
+    if slot_code == "19":
+        return f"7pm_{business_day.isoformat()}"
+    raise ValueError(f"unsupported slot_code: {slot_code}")
+
+
+def iter_scheduled_slots_for_business_day(business_day: date) -> List[tuple[str, str]]:
+    """(slot_code, slot_key) を定時順に返す。"""
+    return [(code, slot_key_for(business_day, code)) for code in SLOT_ORDER]
+
+
+def check_captured_at_in_slot_window(
+    captured_at: datetime,
+    business_day: date,
+    slot_code: str,
+) -> tuple[bool, str]:
+    """captured_at が定時帯内か（JST）。戻り値: (ok, message)。"""
+    hours = _SLOT_CAPTURE_HOURS.get(slot_code)
+    if not hours:
+        return True, ""
+    lo, hi = hours
+    if captured_at.tzinfo is None:
+        cap = JST.localize(captured_at)
+    else:
+        cap = captured_at.astimezone(JST)
+
+    if slot_code == "01":
+        cal_day = business_day + timedelta(days=1)
+    else:
+        cal_day = business_day
+
+    if cap.date() != cal_day:
+        return False, (
+            f"captured_at {cap.strftime('%Y-%m-%d %H:%M JST')} が "
+            f"slot {slot_code} の暦日 {cal_day} と一致しません"
+        )
+    if not (lo <= cap.hour < hi):
+        return False, (
+            f"captured_at {cap.strftime('%H:%M JST')} が slot {slot_code} の"
+            f" 期待帯 {lo:02d}:00–{hi:02d}:00 JST 外です（backfill 疑い）"
+        )
+    return True, ""
+
+
 def slot_needs_recovery(
     db: Any,
     slot_key: str,
@@ -109,6 +173,10 @@ def write_and_verify_snapshot(
     if not parsed:
         return empty
     business_day, slot_code = parsed
+    cap = captured_at if captured_at is not None else datetime.now(JST)
+    captured_at_ok, captured_at_warning = check_captured_at_in_slot_window(
+        cap, business_day, slot_code
+    )
     write_ok = write_snapshots_for_scheduler_run(
         managers=managers,
         scheduler_slot_key=scheduler_slot_key,
@@ -124,16 +192,25 @@ def write_and_verify_snapshot(
         "business_day": business_day.isoformat(),
         "slot": slot_code,
         "scheduler_slot_key": scheduler_slot_key,
+        "captured_at_ok": captured_at_ok,
+        "captured_at_warning": captured_at_warning or None,
     }
 
 
 def format_snapshot_status_for_discord(status: Optional[Dict[str, Any]]) -> str:
     if not status or not status.get("scheduler_slot_key"):
         return "（対象スロットなし）"
-    if status.get("verified_ok"):
+    base_ok = status.get("verified_ok")
+    cap_warn = status.get("captured_at_warning")
+    if base_ok and status.get("captured_at_ok", True):
         return (
             f"OK · {status.get('business_day')} · slot {status.get('slot')} · "
             f"{status.get('row_count')} series"
+        )
+    if base_ok and cap_warn:
+        return (
+            f"⚠️ 時刻帯外 · {status.get('business_day')} · slot {status.get('slot')} · "
+            f"{status.get('row_count')} series · {cap_warn}"
         )
     row_count = status.get("row_count", 0)
     write_ok = status.get("write_ok")

@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """
-trend_daily_snapshots / scheduler_slot_run の古い行を削除する。
+trend_daily_snapshots / scheduler_slot_run / docs/summaries 原稿の古い行・ファイルを削除する。
 
-本番（dry-run）:
+本番 DB（dry-run）:
   fly ssh console -a trends-dashboard -C \\
     "sh -c 'cd /app && PYTHONPATH=/app python scripts/purge_snapshot_retention.py --dry-run'"
 
-実行:
-  python scripts/purge_snapshot_retention.py
-  python scripts/purge_snapshot_retention.py --days 10 --dry-run
+リポジトリ原稿（手元・保持確認）:
+  python scripts/purge_snapshot_retention.py --dry-run
+  python scripts/purge_snapshot_retention.py --summaries-only --dry-run
+
+docs/summaries は GHA が git にコミットするため、削除を git に反映するには手元で実行後 commit する。
 """
 
 from __future__ import annotations
@@ -31,13 +33,35 @@ from services.snapshot_retention import purge_expired_snapshots  # noqa: E402
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Purge trend_daily_snapshots and scheduler_slot_run older than retention"
+        description="Purge old snapshots, scheduler_slot_run rows, and docs/summaries files"
     )
     parser.add_argument(
         "--days",
         type=int,
         default=None,
-        help="保持日数（default: TREND_SNAPSHOT_RETENTION_DAYS or 10）",
+        help="DB スナップショット保持日数（default: TREND_SNAPSHOT_RETENTION_DAYS or 10）",
+    )
+    parser.add_argument(
+        "--daily-summary-days",
+        type=int,
+        default=None,
+        help="日次サマリー Markdown 保持日数（default: SUMMARY_DAILY_RETENTION_DAYS or 10）",
+    )
+    parser.add_argument(
+        "--weekly-summary-days",
+        type=int,
+        default=None,
+        help="週次サマリー Markdown 保持日数（default: SUMMARY_WEEKLY_RETENTION_DAYS or 30）",
+    )
+    parser.add_argument(
+        "--summaries-only",
+        action="store_true",
+        help="docs/summaries のみ（DB は触らない）",
+    )
+    parser.add_argument(
+        "--no-summaries",
+        action="store_true",
+        help="DB のみ（docs/summaries は触らない）",
     )
     parser.add_argument(
         "--dry-run",
@@ -47,19 +71,50 @@ def main() -> int:
     parser.add_argument("--json", action="store_true", help="結果を JSON で出力")
     args = parser.parse_args()
 
-    result = purge_expired_snapshots(days=args.days, dry_run=args.dry_run)
+    if args.summaries_only:
+        from services.snapshot_retention import purge_expired_summary_files
+
+        summary_result = purge_expired_summary_files(
+            daily_days=args.daily_summary_days,
+            weekly_days=args.weekly_summary_days,
+            dry_run=args.dry_run,
+        )
+        result = {
+            "enabled": True,
+            "dry_run": args.dry_run,
+            "summaries_only": True,
+            "ok": True,
+            **summary_result,
+            "snapshots_deleted": 0,
+            "scheduler_rows_deleted": 0,
+        }
+    else:
+        result = purge_expired_snapshots(
+            days=args.days,
+            daily_summary_days=args.daily_summary_days,
+            weekly_summary_days=args.weekly_summary_days,
+            purge_summary_files=not args.no_summaries,
+            dry_run=args.dry_run,
+        )
+
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
+        mode = "would_delete" if args.dry_run else "deleted"
         print(
-            f"retention={result['retention_days']}d "
-            f"snapshot_cutoff={result['snapshot_cutoff']} "
-            f"snapshots={'would_delete' if args.dry_run else 'deleted'}="
-            f"{result['snapshots_deleted']} "
-            f"scheduler_slot_run={'would_delete' if args.dry_run else 'deleted'}="
-            f"{result['scheduler_rows_deleted']}"
+            f"retention={result.get('retention_days')}d "
+            f"snapshot_cutoff={result.get('snapshot_cutoff')} "
+            f"snapshots={mode}={result.get('snapshots_deleted', 0)} "
+            f"scheduler_slot_run={mode}={result.get('scheduler_rows_deleted', 0)} "
+            f"daily_summary={mode}={result.get('daily_summary_files_deleted', 0)} "
+            f"weekly_summary={mode}={result.get('weekly_summary_files_deleted', 0)}"
         )
-    return 0 if result.get("ok") else 1
+        if result.get("daily_summary_cutoff"):
+            print(
+                f"daily_cutoff={result['daily_summary_cutoff']} "
+                f"weekly_cutoff={result.get('weekly_summary_cutoff')}"
+            )
+    return 0 if result.get("ok", True) else 1
 
 
 if __name__ == "__main__":

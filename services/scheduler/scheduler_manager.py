@@ -500,7 +500,7 @@ class TrendsScheduler:
                     func=self._purge_snapshot_retention,
                     trigger=CronTrigger(hour=3, minute=0, timezone=jst),
                     id="snapshot_retention_purge",
-                    name="スナップショット保持期間クリーンアップ (03:00 JST)",
+                    name="スナップショット・サマリー原稿 保持期間クリーンアップ (03:00 JST)",
                     replace_existing=True,
                     misfire_grace_time=3600,
                     coalesce=True,
@@ -1811,7 +1811,7 @@ class TrendsScheduler:
         return has_anomaly
 
     def _purge_snapshot_retention(self) -> None:
-        """trend_daily_snapshots / scheduler_slot_run の保持日数超過分を削除。"""
+        """trend_daily_snapshots / scheduler_slot_run / docs/summaries の保持日数超過分を削除。"""
         try:
             purge_expired_snapshots(db=self.db)
         except Exception as e:

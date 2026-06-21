@@ -44,6 +44,9 @@ primary_region = "nrt"
   # サマリー用スナップショット保持（business_day ベース）。週次7日+余裕で既定10日
   TREND_SNAPSHOT_RETENTION_DAYS = "10"
   TREND_SNAPSHOT_RETENTION_ENABLED = "true"
+  # docs/summaries 原稿（Fly 上はデプロイ時点のファイルのみ。git 反映は手元実行）
+  SUMMARY_DAILY_RETENTION_DAYS = "10"
+  SUMMARY_WEEKLY_RETENTION_DAYS = "30"
 
 [http_service]
   internal_port = 8080

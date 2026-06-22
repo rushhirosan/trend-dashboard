@@ -248,6 +248,27 @@ def test_is_noisy_label_filters_procurement(gads):
         "usaspending_us",
     )
     assert not gads._is_noisy_label("豊臣秀長", "wikipedia_jp")
+    assert gads._is_noisy_label("に参加したレポマンガ！", "note_jp")
+
+
+def test_pick_display_from_agg_prefers_longer_non_fragment(gads):
+    agg = {
+        "ranks": {"13": 1, "19": 1},
+        "display_by_slot": {
+            "13": "に参加したレポマンガ！",
+            "19": "GitHubリポジトリに参加したレポマンガ！",
+        },
+    }
+    assert gads._pick_display_from_agg(agg) == "GitHubリポジトリに参加したレポマンガ！"
+
+
+def test_filter_rising_notes_drops_generic_boilerplate(gads):
+    rising = [{"label": "Climber"}]
+    notes = gads.filter_rising_notes(
+        [{"match_label": "Climber", "note": "急上昇中のトピックです。"}],
+        rising,
+    )
+    assert notes == []
 
 
 def test_slot_hour_label_strips_leading_zero(gads):
@@ -694,15 +715,26 @@ def test_format_daily_slot_rank_mermaid_y_axis_rank_one_at_top(gads):
         "Climber",
         {"07": 18, "13": 3, "19": 1},
     )
-    assert 'y-axis "順位" 1 --> 20' in chart
+    assert 'y-axis "順位" 19 --> 1' in chart
     assert '"7時 (18位)"' in chart
     assert '"19時 (1位)"' in chart
-    assert "line [3, 18, 20]" in chart
+    assert "line [18, 3, 1]" in chart
     assert "上=1位" in chart
+
+
+def test_format_daily_slot_rank_mermaid_tight_y_axis_for_small_ranks(gads):
+    chart = gads.format_daily_slot_rank_mermaid("Moved", {"13": 4, "19": 2})
+    assert 'y-axis "順位" 5 --> 1' in chart
+    assert "line [4, 2]" in chart
 
 
 def test_format_daily_slot_rank_mermaid_skips_single_slot(gads):
     assert gads.format_daily_slot_rank_mermaid("Only", {"19": 1}) == ""
+
+
+def test_format_daily_slot_rank_mermaid_skips_flat_ranks(gads):
+    assert gads.format_daily_slot_rank_mermaid("Flat", {"13": 1, "19": 1}) == ""
+    assert gads.format_daily_slot_rank_mermaid("Moved", {"13": 4, "19": 2}) != ""
 
 
 def test_render_cross_source_highlights_markdown_empty(gads):
@@ -812,7 +844,7 @@ def test_build_llm_payload_includes_editorial_fields(gads):
     assert "quiet_editorial_categories" in payload
     assert "rising_highlights" in payload
     assert "cross_source_highlights" in payload
-    assert "spotlight_max" in payload
+    assert "spotlight_max" not in payload
     assert "急上昇" not in payload["reader_context"] or "editorial_candidates" in payload["reader_context"]
 
 
@@ -965,7 +997,7 @@ def test_one_liner_is_acceptable_requires_rising_labels(gads):
     assert gads.one_liner_is_acceptable(mech, news, rising)
 
 
-def test_finalize_editorial_fills_spotlights_and_replaces_one_liner(gads):
+def test_finalize_editorial_replaces_one_liner_and_filters_generic_notes(gads):
     rising = [
         {
             "label": "Climber",
@@ -1008,8 +1040,8 @@ def test_finalize_editorial_fills_spotlights_and_replaces_one_liner(gads):
     assert "Climber" in out["teaser"]
     assert trace.get("teaser_source") in ("llm", "derived")
     assert len(out["teaser"]) <= gads._TEASER_MAX_CHARS
-    assert trace.get("spotlights_filled")
-    assert len(out["spotlights"]) >= 1
+    assert out["spotlights"] == []
+    assert trace["spotlights_renderable"] == 0
     assert not any("若い世代" in str(n.get("note") or "") for n in out["rising_notes"])
 
 
@@ -1038,7 +1070,7 @@ def test_parse_editorial_json(gads):
     assert data["cross_intro"] is None
 
 
-def test_render_editorial_markdown_resolves_links(gads):
+def test_render_editorial_markdown_one_liner_only(gads):
     editorial = {
         "one_liner": "テスト一行。",
         "spotlights": [
@@ -1057,8 +1089,9 @@ def test_render_editorial_markdown_resolves_links(gads):
     }
     md = gads.render_editorial_markdown(editorial, index)
     assert gads._ONE_LINER_HEADING in md
-    assert "https://example.com" in md
-    assert "### 1. 台風" in md
+    assert "テスト一行。" in md
+    assert gads._SPOTLIGHTS_HEADING not in md
+    assert "### 1. 台風" not in md
 
 
 def test_render_rising_highlights_includes_notes(gads):

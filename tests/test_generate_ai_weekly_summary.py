@@ -299,7 +299,7 @@ def test_render_weekly_rising_markdown_uses_table_not_prose_evidence(gaws):
     assert "根拠:" not in md
     assert "jump合計" not in md
     assert "```mermaid" in md
-    assert 'y-axis "順位" 1 --> 10' in md
+    assert 'y-axis "順位" 9 --> 1' in md
     assert '("06-08 (8位)"' in md or '"06-08 (8位)"' in md
 
 
@@ -311,11 +311,21 @@ def test_format_weekly_best_rank_mermaid_y_axis_rank_one_at_top(gaws):
             "2026-06-12": "7時4位 → 13時2位 → 19時2位",
         },
     )
-    assert 'y-axis "順位" 1 --> 10' in chart
+    assert 'y-axis "順位" 9 --> 1' in chart
     assert '"06-08 (8位)"' in chart
     assert '"06-12 (2位)"' in chart
-    assert "line [3, 9]" in chart
+    assert "line [8, 2]" in chart
     assert "上=1位" in chart
+
+
+def test_format_weekly_best_rank_mermaid_skips_flat_ranks(gaws):
+    assert gaws.format_weekly_best_rank_mermaid(
+        "Flat",
+        {
+            "2026-06-08": "7時4位 → 13時4位 → 19時4位",
+            "2026-06-09": "7時4位 → 13時4位 → 19時4位",
+        },
+    ) == ""
 
 
 def test_assemble_weekly_markdown_includes_regional_sections(gaws):

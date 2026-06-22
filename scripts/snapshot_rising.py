@@ -44,6 +44,20 @@ def clean_rising_display(display: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
+# 先頭欠落タイトル（例: 「リポジトリに参加した…」が「に参加した…」だけ残る）
+_FRAGMENT_LABEL_RE = re.compile(
+    r"^(に|を|が|は|と|で|へ|も|や|から|まで|より)"
+    r"(参加|出演|登場|関連|関する|における|について|対応|発表|公開|更新|配信|発売)"
+)
+
+
+def is_fragment_label(display: str) -> bool:
+    s = clean_rising_display(display)
+    if not s:
+        return True
+    return bool(_FRAGMENT_LABEL_RE.search(s))
+
+
 def is_weak_rising_label(display: str) -> bool:
     s = clean_rising_display(display)
     if not s or s == "…" or len(s) < 4:
@@ -72,6 +86,8 @@ def is_noisy_label(display: str, series_key: str = "") -> bool:
     if is_weak_rising_label(display):
         return True
     s = clean_rising_display(display)
+    if is_fragment_label(s):
+        return True
     sk = (series_key or "").lower()
     if len(s) > 100:
         return True
@@ -114,26 +130,37 @@ def daytime_best_rank(ranks: dict[str, int]) -> int:
     return min(vals) if vals else 999
 
 
+def mermaid_rank_y_axis_high(rank_vals: list[int]) -> int:
+    """xychart 逆軸 ``N --> 1`` の N。データ幅に合わせないと Mermaid の目盛りがほぼ出ない。"""
+    if not rank_vals:
+        return 3
+    r_max = max(rank_vals)
+    r_min = min(rank_vals)
+    y_high = r_max + 1
+    if y_high - r_min < 2:
+        y_high = r_min + 2
+    return max(y_high, 3)
+
 def pick_display_from_agg(agg: dict[str, Any]) -> str:
-    """表示ラベルは一日の最良順位が出たスロットの表記を優先。"""
+    """表示ラベルは非断片・長い表記を優先し、同点なら最良順位のスロットを使う。"""
     ranks = agg.get("ranks") or {}
     by_slot = agg.get("display_by_slot") or {}
-    best_slot: Optional[str] = None
-    best_r = 999
-    for slot in DAYTIME_SLOTS:
-        r = ranks.get(slot)
-        if r is not None and int(r) < best_r:
-            best_r = int(r)
-            best_slot = slot
-    if best_slot:
-        d = by_slot.get(best_slot)
-        if d:
-            return clean_rising_display(str(d))
+    candidates: list[tuple[int, int, int, str]] = []
     for slot in DAYTIME_SLOTS:
         d = by_slot.get(slot)
-        if d:
-            return clean_rising_display(str(d))
-    return ""
+        if not d:
+            continue
+        cleaned = clean_rising_display(str(d))
+        if not cleaned:
+            continue
+        r = ranks.get(slot)
+        rank_prio = int(r) if r is not None else 999
+        frag_penalty = 1 if is_fragment_label(cleaned) else 0
+        candidates.append((frag_penalty, -len(cleaned), rank_prio, cleaned))
+    if not candidates:
+        return ""
+    candidates.sort()
+    return candidates[0][3]
 
 
 def aggregate_labels_for_series(

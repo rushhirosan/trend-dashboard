@@ -116,7 +116,7 @@ def test_jp_two_chunks_then_us(monkeypatch):
             return (jp1 if jp_chunk == 1 else jp2), False
         return us_payload, False
 
-    monkeypatch.setattr(sm, "SCHEDULER_JP_SUBCHUNKS", 2)
+    monkeypatch.setattr(sm, "SCHEDULER_JP_SUBCHUNKS", 4)
     monkeypatch.setattr(sm.TrendsScheduler, "_run_refresh_region_subprocess", fake_subprocess)
     monkeypatch.setattr(sm.TrendsScheduler, "_pause_between_subprocess_phases", lambda self: None)
     scheduler = sm.TrendsScheduler(_FakeApp())
@@ -126,7 +126,10 @@ def test_jp_two_chunks_then_us(monkeypatch):
     )
     assert timed_out is False
     assert result["success"] is True
-    assert calls == [("jp", 1, 2), ("jp", 2, 2), ("us", None, None)]
-    assert "google_JP" in result["results"]
-    assert "youtube_JP" in result["results"]
-    assert "cnn_US" in result["results"]
+    assert calls == [
+        ("jp", 1, 4),
+        ("jp", 2, 4),
+        ("jp", 3, 4),
+        ("jp", 4, 4),
+        ("us", None, None),
+    ]

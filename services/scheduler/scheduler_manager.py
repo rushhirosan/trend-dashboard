@@ -1016,7 +1016,9 @@ class TrendsScheduler:
                 if line.strip():
                     logger.info("refresh subprocess stderr [%s]: %s", region, line)
 
-        result = _parse_refresh_subprocess_stdout(proc.stdout or "")
+        from managers.trend_managers import compact_refresh_result
+
+        result = compact_refresh_result(_parse_refresh_subprocess_stdout(proc.stdout or ""))
         if proc.returncode != 0 and result.get("success"):
             result = dict(result)
             result["success"] = False
@@ -1099,6 +1101,7 @@ class TrendsScheduler:
                 self._pause_between_subprocess_phases()
 
         jp_result = _merge_jp_chunk_results(jp_chunk_results)
+        jp_chunk_results.clear()
         self._pause_between_subprocess_phases()
 
         us_result, us_timed_out = self._run_refresh_region_subprocess(
@@ -1228,16 +1231,28 @@ class TrendsScheduler:
                 )
             return False
         if trigger_source in AUTO_FETCH_TRIGGERS and self._is_recent_deploy():
-            logger.info(
-                "⏭️ 直近デプロイのため自動トレンド取得をスキップします（trigger=%s）",
-                trigger_source,
+            bypass_deploy_guard = (
+                trigger_source == "gap_retry"
+                and slot_key_override
+                and self.db
+                and hasattr(self.db, "has_slot_completed")
+                and not self.db.has_slot_completed(slot_key_override)
             )
-            if trigger_source == "scheduler":
-                self._send_scheduler_skip_notification(
-                    trigger_source=trigger_source,
-                    reason="直近にデプロイされたため、定時取得をスキップします（次スロットまたは gap_retry で補完）。",
+            if not bypass_deploy_guard:
+                logger.info(
+                    "⏭️ 直近デプロイのため自動トレンド取得をスキップします（trigger=%s）",
+                    trigger_source,
                 )
-            return False
+                if trigger_source == "scheduler":
+                    self._send_scheduler_skip_notification(
+                        trigger_source=trigger_source,
+                        reason="直近にデプロイされたため、定時取得をスキップします（次スロットまたは gap_retry で補完）。",
+                    )
+                return False
+            logger.info(
+                "🔄 直近デプロイだが未完了スロット gap_retry のため続行します（slot=%s）",
+                slot_key_override,
+            )
         # 同時実行防止: 既に実行中の場合はスキップ（同一プロセス内）
         if self._fetching_in_progress:
             logger.warning("⚠️ データ取得処理が既に実行中です。重複実行をスキップします")
@@ -1361,12 +1376,15 @@ class TrendsScheduler:
                 except Exception as e:
                     logger.warning("⚠️ 開始通知Discord送信スキップ: %s", e)
 
-            # メモリ節約のため、古いキャッシュデータを削除（2日以上経過したデータ）
-            try:
-                logger.info("🧹 古いキャッシュデータを削除中...")
-                self.db.delete_old_cache_data(days=2)
-            except Exception as e:
-                logger.warning(f"⚠️ 古いキャッシュデータ削除エラー（処理は継続）: {e}", exc_info=True)
+            # 低負荷モードでは DB 負荷・接続競合を避け、subprocess 前の掃除はスキップ
+            if not low_memory_mode:
+                try:
+                    logger.info("🧹 古いキャッシュデータを削除中...")
+                    self.db.delete_old_cache_data(days=2)
+                except Exception as e:
+                    logger.warning(f"⚠️ 古いキャッシュデータ削除エラー（処理は継続）: {e}", exc_info=True)
+            else:
+                logger.info("⏭️ 低負荷モードのため古いキャッシュ削除をスキップします")
             
             # app.configからマネージャーを取得し refresh_all_trends をジョブ全体タイムアウト付きで実行
             managers = self.app.config.get('TREND_MANAGERS')

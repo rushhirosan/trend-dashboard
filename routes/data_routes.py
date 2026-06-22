@@ -306,15 +306,37 @@ def execute_scheduler():
                 'success': False,
                 'error': 'スケジューラーが初期化されていません'
             }), 500
-        
-        # スケジューラーの_fetch_all_trendsを実行（手動実行のためforce=True）
-        # force=Trueの場合、メール送信はスキップされる（明示的な手動実行のため）
-        # trigger_source='api' でDiscord通知に「API（手動/外部）」と表示される
-        scheduler._fetch_all_trends(force=True, trigger_source='api')
-        
+
+        slot_key = (request.args.get('slot_key') or '').strip() or None
+        low_memory_mode = request.args.get('low_memory', 'true').lower() in ('1', 'true', 'yes')
+        run_async = request.args.get('async', 'true').lower() in ('1', 'true', 'yes')
+
+        def _run_fetch():
+            with current_app.app_context():
+                scheduler._fetch_all_trends(
+                    force=True,
+                    trigger_source='api',
+                    low_memory_mode=low_memory_mode,
+                    slot_key_override=slot_key,
+                )
+
+        # 長時間ジョブは Gunicorn ワーカー内バックグラウンドで実行（fly ssh 二重 create_app を避ける）
+        if run_async:
+            import threading
+
+            threading.Thread(target=_run_fetch, daemon=True, name='scheduler-manual-fetch').start()
+            return jsonify({
+                'success': True,
+                'message': 'スケジューラー実行を開始しました（バックグラウンド）',
+                'slot_key': slot_key,
+                'low_memory_mode': low_memory_mode,
+            })
+
+        _run_fetch()
         return jsonify({
             'success': True,
-            'message': 'スケジューラー実行完了（データ更新のみ、メール送信はスキップ）'
+            'message': 'スケジューラー実行完了（データ更新のみ、メール送信はスキップ）',
+            'slot_key': slot_key,
         })
     except Exception as e:
         return handle_data_error('スケジューラー実行', e)

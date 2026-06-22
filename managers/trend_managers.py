@@ -321,6 +321,9 @@ def _slice_refresh_tasks(tasks, chunk_index, chunk_count):
     return tasks[start:end]
 
 
+from utils.jp_refresh_chunks import select_jp_refresh_tasks
+
+
 def _build_jp_refresh_tasks(force_refresh, chunk_index=None, chunk_count=None):
     """日本向け refresh タスク一覧。chunk_* 指定時は OOM 対策の subprocess 分割用。"""
     tasks = []
@@ -360,7 +363,7 @@ def _build_jp_refresh_tasks(force_refresh, chunk_index=None, chunk_count=None):
         def _openalex_jp(m, c=cat):
             return m.get_trends(category=c, limit=25, force_refresh=force_refresh, region='jp')
         tasks.append(('openalex', _openalex_jp, 'JP'))
-    return _slice_refresh_tasks(tasks, chunk_index, chunk_count)
+    return select_jp_refresh_tasks(tasks, chunk_index, chunk_count)
 
 
 def _build_us_refresh_tasks(managers, force_refresh):

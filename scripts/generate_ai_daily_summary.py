@@ -84,7 +84,7 @@ _GENERIC_ONE_LINER = re.compile(
     re.I,
 )
 _GENERIC_RISING_NOTE = re.compile(
-    r"(若い世代|話題です|盛り上がり|関心が高ま|人気です|特に.*の間で)",
+    r"(若い世代|話題です|盛り上がり|関心が高ま|人気です|特に.*の間で|急上昇中|注目を集め)",
     re.I,
 )
 # 連日上位の定番（編集候補・一行結論から除外。トップ3根拠リストには残す）
@@ -839,7 +839,10 @@ def _mermaid_safe_label(label: str, *, max_len: int = 28) -> str:
 
 
 def format_daily_slot_rank_mermaid(label: str, ranks: dict[str, int]) -> str:
-    """一日のスロット別順位を Mermaid xychart で可視化（2スロット以上あるときのみ）。"""
+    """一日のスロット別順位を Mermaid xychart で可視化。
+
+    2スロット以上かつ順位に変化があるときのみ（同順の横ばいは表だけ）。
+    """
     points: List[tuple[str, int]] = []
     for slot in DAYTIME_SLOTS:
         r = ranks.get(slot)
@@ -847,17 +850,19 @@ def format_daily_slot_rank_mermaid(label: str, ranks: dict[str, int]) -> str:
             points.append((f"{_slot_hour_label(slot)}時", int(r)))
     if len(points) < 2:
         return ""
+    rank_vals = [r for _, r in points]
+    if len(set(rank_vals)) < 2:
+        return ""
     labels = ", ".join(f'"{h} ({r}位)"' for h, r in points)
-    ymax = max(r for _, r in points)
-    y_top = max(ymax + 2, 10)
-    chart_values = ", ".join(str(y_top + 1 - r) for _, r in points)
+    y_high = sr.mermaid_rank_y_axis_high(rank_vals)
+    chart_values = ", ".join(str(r) for _, r in points)
     title = _mermaid_safe_label(label)
     return (
         "```mermaid\n"
         "xychart-beta\n"
         f'    title "{title} — スロット別順位（上=1位）"\n'
         f"    x-axis [{labels}]\n"
-        f'    y-axis "順位" 1 --> {y_top}\n'
+        f'    y-axis "順位" {y_high} --> 1\n'
         f"    line [{chart_values}]\n"
         "```"
     )
@@ -1652,43 +1657,12 @@ def render_editorial_markdown(
     editorial: Dict[str, Any],
     label_index: Dict[str, Dict[str, Any]],
 ) -> str:
-    """一行結論 + 見どころ（リンクは機械 index からのみ）。"""
+    """一行結論のみ（急上昇は別セクションで表・図付き）。"""
+    _ = label_index
     lines: List[str] = []
     one_liner = str(editorial.get("one_liner") or "").strip()
     if one_liner:
         lines.extend([_ONE_LINER_HEADING, "", one_liner, ""])
-
-    spotlights = editorial.get("spotlights") or []
-    if spotlights:
-        lines.append(_SPOTLIGHTS_HEADING)
-        lines.append("")
-        n = 0
-        for sp in spotlights:
-            if not isinstance(sp, dict):
-                continue
-            title = str(sp.get("title") or "").strip()
-            body = str(sp.get("body") or "").strip()
-            if not title or not body:
-                continue
-            source_lines = _resolve_source_labels(sp.get("source_labels") or [], label_index)
-            if not source_lines:
-                continue
-            n += 1
-            lines.append(f"### {n}. {title}")
-            lines.append("")
-            lines.append(f"- **なにが起きているか**: {body}")
-            lines.append("- **ソース**: " + " · ".join(source_lines))
-            caveat = str(sp.get("caveat") or "").strip()
-            if caveat:
-                lines.append(f"- **注意**: {caveat}")
-            lines.append("")
-        if n == 0:
-            lines.pop()
-            if lines and lines[-1] == "":
-                lines.pop()
-            if lines and lines[-1] == _SPOTLIGHTS_HEADING:
-                lines.pop()
-
     return "\n".join(lines).rstrip()
 
 
@@ -1713,8 +1687,7 @@ def build_llm_payload(
             "候補の rank_evidence は 07→13→19 の一日推移（圏外含む）。"
             "one_liner は rising_highlights の label を2件以上そのまま含め、"
             "ニュースの category_leader があればそれも含める（未達なら機械文に差し替えられる）。"
-            "spotlights は source_labels を候補 label と完全一致させ、最低2件。"
-            "URL は出力しない（source_labels のみ）。"
+            "URL は出力しない。"
         ),
         "editorial_candidates": editorial_candidates,
         "quiet_editorial_categories": quiet_editorial,
@@ -1735,7 +1708,6 @@ def build_llm_payload(
             }
             for h in cross_items
         ],
-        "spotlight_max": SPOTLIGHT_MAX,
     }
 
 
@@ -1985,15 +1957,6 @@ def filter_rising_notes(
             continue
         out.append({"match_label": ml, "note": note})
 
-    if out or not rising_items:
-        return out
-
-    for r in rising_items:
-        ev = str(r.get("rank_evidence") or "").strip()
-        lab = str(r.get("label") or "").strip()
-        if not lab or not ev:
-            continue
-        out.append({"match_label": lab, "note": f"{ev}。"})
     return out
 
 
@@ -2029,43 +1992,11 @@ def finalize_editorial(
             trace["teaser_replaced"] = True
     editorial["teaser"] = teaser
 
-    llm_spots = [
-        sp
-        for sp in (editorial.get("spotlights") or [])
-        if isinstance(sp, dict) and _spotlight_will_render(sp, label_index)
-    ]
-    mech_spots = build_mechanical_spotlights(
-        editorial_candidates, rising_items, cross_items
-    )
-    mech_renderable = sum(
-        1 for sp in mech_spots if _spotlight_will_render(sp, label_index)
-    )
-    target_min = min(SPOTLIGHT_MIN, mech_renderable) if mech_renderable else 0
-
-    if len(llm_spots) < target_min:
-        seen_titles: set[str] = set()
-        merged: List[Dict[str, Any]] = []
-        for sp in llm_spots + mech_spots:
-            if not _spotlight_will_render(sp, label_index):
-                continue
-            title_nk = _normalize_label_key(str(sp.get("title") or ""))
-            if title_nk in seen_titles:
-                continue
-            seen_titles.add(title_nk)
-            merged.append(sp)
-            if len(merged) >= SPOTLIGHT_MAX:
-                break
-        editorial["spotlights"] = merged
-        trace["spotlights_renderable"] = len(merged)
-        if len(llm_spots) < target_min:
-            trace["spotlights_filled"] = True
-    else:
-        editorial["spotlights"] = llm_spots[:SPOTLIGHT_MAX]
-        trace["spotlights_renderable"] = len(editorial["spotlights"])
-
+    editorial["spotlights"] = []
     editorial["rising_notes"] = filter_rising_notes(
         editorial.get("rising_notes") or [], rising_items
     )
+    trace["spotlights_renderable"] = 0
     return editorial, trace
 
 
@@ -2234,11 +2165,8 @@ SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ�
 - `one_liner` (string): 最大3文。必ず rising_highlights の label を **2件以上**そのまま含める。
   reason=category_leader かつ category=ニュース の候補が rising に無い場合は、その label も含める。
   「注目を集めて」「人気です」等の抽象表現は禁止。全カテゴリを無理に埋めない。
-- `spotlights` (array, 最大 spotlight_max 件・**最低2件**): 各要素は
-  `{ "title", "body", "source_labels": [入力の label と完全一致する文字列], "caveat": 任意 }`
-  body は rank_evidence の事実を1文で述べる（憶測・世代論は禁止）。リンクは書かない。
 - `rising_notes` (array): `{ "match_label", "note" }` — rising_highlights の label に対応する1文補足。
-  rising_highlights が空なら []。
+  順位の事実の繰り返し・「急上昇中」「注目を集め」等の定型は禁止。rising_highlights が空なら []。
 - `cross_intro` (string|null): cross_source_highlights が1件以上あるときのみ導入1〜2文。0件なら null。
 - `category_intros` (object): キーは区分名、値は1文。quiet_editorial_categories 以外を優先。
   静かな区分は省略可。抽象語のみ（「定番アプリ」「SNS投稿」等）は禁止。
@@ -2487,6 +2415,30 @@ def main() -> int:
             emit_status(False, phase="snapshot_db", error=str(e))
             return 1
 
+    if not rows:
+        if via_http:
+            snap_hint = (
+                f"{base_url}/api/summaries/daily-snapshots"
+                f"?business_day={bd.isoformat()}"
+            )
+            print(
+                f"❌ business_day={bd} の trend_daily_snapshots 行がありません"
+                f"（API 0 行: {snap_hint}）。",
+                file=sys.stderr,
+            )
+            print(
+                "   本番 DB に未保存・デプロイ直後・base URL 誤りの可能性。"
+                " curl で行数を確認してから再実行してください。",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"❌ business_day={bd} の trend_daily_snapshots 行がありません（DB 0 行）。",
+                file=sys.stderr,
+            )
+        emit_status(False, phase="snapshots", error="no_snapshot_rows", snapshot_row_count=0)
+        return 2
+
     if args.dry_run and not api_key:
         rising_items = build_rising_highlights(rows, count=RISING_HIGHLIGHT_COUNT)
         cross_items = build_cross_source_highlights(rows, count=CROSS_SOURCE_HIGHLIGHT_COUNT)
@@ -2519,14 +2471,6 @@ def main() -> int:
         print(f"❌ OpenAI / 合成失敗: {e}", file=sys.stderr)
         emit_status(False, phase="openai", error=str(e), snapshot_row_count=len(rows))
         return 1
-
-    if meta.get("error") == "no_snapshot_rows":
-        print(
-            f"❌ business_day={bd} の trend_daily_snapshots 行がありません。",
-            file=sys.stderr,
-        )
-        emit_status(False, phase="snapshots", error="no_snapshot_rows", snapshot_row_count=0)
-        return 2
 
     if args.dry_run:
         print(text)

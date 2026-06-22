@@ -21,7 +21,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install "requests>=2.31" "python-dotenv>=0.19"
+        run: pip install "requests>=2.31" "psycopg2-binary>=2.9" "python-dotenv>=0.19"
 
       - name: Generate weekly from snapshot rollups + OpenAI
         env:

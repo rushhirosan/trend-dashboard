@@ -12,6 +12,7 @@ from services.snapshot_slot_health import (
     format_snapshot_status_for_discord,
     iter_scheduled_slots_for_business_day,
     prior_slot_codes,
+    refresh_succeeded_for_snapshot,
     slot_has_snapshot,
     slot_key_for,
     slot_needs_recovery,
@@ -22,11 +23,19 @@ JST = pytz.timezone("Asia/Tokyo")
 
 
 class FakeDb:
-    def __init__(self, counts: dict[tuple[date, str], int] | None = None):
+    def __init__(
+        self,
+        counts: dict[tuple[date, str], int] | None = None,
+        completed: set[str] | None = None,
+    ):
         self.counts = counts or {}
+        self.completed = completed or set()
 
     def count_trend_daily_snapshot_rows(self, business_day: date, slot: str) -> int:
         return self.counts.get((business_day, slot), 0)
+
+    def has_slot_completed(self, slot_key: str) -> bool:
+        return slot_key in self.completed
 
 
 def test_prior_slot_codes():
@@ -125,12 +134,25 @@ def test_format_snapshot_status_captured_at_warning():
 
 def test_slot_has_snapshot_and_needs_recovery():
     bd = date(2026, 6, 12)
-    db = FakeDb({(bd, "07"): 0, (bd, "13"): 5})
+    db = FakeDb({(bd, "07"): 0, (bd, "13"): 5}, completed={"1pm_2026-06-12"})
     assert slot_has_snapshot(db, bd, "07") is False
     assert slot_has_snapshot(db, bd, "13") is True
     assert slot_needs_recovery(db, "7am_2026-06-12") is True
     assert slot_needs_recovery(db, "1pm_2026-06-12") is False
     assert slot_needs_recovery(db, "invalid") is False
+
+
+def test_slot_needs_recovery_when_snapshot_exists_but_slot_incomplete():
+    bd = date(2026, 6, 23)
+    db = FakeDb({(bd, "07"): 70})
+    assert slot_needs_recovery(db, "7am_2026-06-23") is True
+
+
+def test_refresh_succeeded_for_snapshot():
+    assert refresh_succeeded_for_snapshot({"success": True}) is True
+    assert refresh_succeeded_for_snapshot({"success": False, "jp_phase_failed": True}) is False
+    assert refresh_succeeded_for_snapshot({"success": False, "job_timed_out": True}) is False
+    assert refresh_succeeded_for_snapshot({"success": True, "us_phase_failed": True}) is False
 
 
 @patch("services.trend_snapshot_service.write_snapshots_for_scheduler_run")

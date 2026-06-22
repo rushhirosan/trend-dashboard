@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(_REPO_ROOT, ".env"))
 load_dotenv()
 
-from managers.trend_managers import refresh_all_trends
+from managers.trend_managers import compact_refresh_result, refresh_all_trends
 from utils.logger_config import get_logger
 
 logger = get_logger(__name__)
@@ -37,7 +37,20 @@ def main() -> int:
     parser.add_argument("--region", choices=("jp", "us"), required=True)
     parser.add_argument("--max-concurrent", type=int, default=None)
     parser.add_argument("--batch-delay", type=float, default=None)
+    parser.add_argument("--jp-chunk", type=int, default=None, help="JP 分割番号 (1始まり)")
+    parser.add_argument("--jp-chunks", type=int, default=None, help="JP 分割数")
     args = parser.parse_args()
+
+    if args.region != "jp" and (args.jp_chunk is not None or args.jp_chunks is not None):
+        _emit_result(
+            {
+                "success": False,
+                "results": {},
+                "region": args.region,
+                "error": "jp_chunk_args_require_region_jp",
+            }
+        )
+        return 1
 
     os.environ.setdefault("ENABLE_SCHEDULER", "false")
     os.environ.setdefault("SKIP_STARTUP_EXECUTION", "true")
@@ -75,6 +88,8 @@ def main() -> int:
                 max_concurrent=args.max_concurrent,
                 batch_delay_seconds=args.batch_delay,
                 region=args.region,
+                jp_chunk=args.jp_chunk,
+                jp_chunks=args.jp_chunks,
             )
         except Exception as exc:
             logger.error("refresh_all_trends failed: %s", exc, exc_info=True)
@@ -88,7 +103,7 @@ def main() -> int:
             )
             return 1
 
-    _emit_result(result)
+    _emit_result(compact_refresh_result(result))
     return 0 if result.get("success") else 1
 
 

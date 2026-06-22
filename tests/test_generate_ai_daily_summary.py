@@ -670,15 +670,39 @@ def test_render_rising_highlights_markdown_empty(gads):
 def test_render_rising_highlights_markdown_lists_items(gads):
     items = [
         {
-            "link_line": "[Climber](https://example.com)（YouTube · 19時2位）",
-            "rank_evidence": "7時18位 → 19時2位",
+            "link_line": "[Climber](https://example.com)（YouTube · 7時18位 → 19時2位）",
+            "label": "Climber",
+            "rank_evidence": "7時18位 → 13時圏外 → 19時2位",
+            "ranks": {"07": 18, "19": 2},
+            "jump": 16.0,
             "category": "検索・動画",
         },
     ]
     md = gads.render_rising_highlights_markdown(items)
     assert "1. [Climber]" in md
-    assert "**根拠**" in md
-    assert "**区分**: 検索・動画" in md
+    assert "jump **+16.0**" in md
+    assert "検索・動画" in md
+    assert "| 07 | 13 | 19 |" in md
+    assert "| 順位 | 18 | — | 2 |" in md
+    assert "```mermaid" in md
+    assert "**根拠**" not in md
+    assert "**区分**" not in md
+
+
+def test_format_daily_slot_rank_mermaid_y_axis_rank_one_at_top(gads):
+    chart = gads.format_daily_slot_rank_mermaid(
+        "Climber",
+        {"07": 18, "13": 3, "19": 1},
+    )
+    assert 'y-axis "順位" 1 --> 20' in chart
+    assert '"7時 (18位)"' in chart
+    assert '"19時 (1位)"' in chart
+    assert "line [3, 18, 20]" in chart
+    assert "上=1位" in chart
+
+
+def test_format_daily_slot_rank_mermaid_skips_single_slot(gads):
+    assert gads.format_daily_slot_rank_mermaid("Only", {"19": 1}) == ""
 
 
 def test_render_cross_source_highlights_markdown_empty(gads):
@@ -693,12 +717,16 @@ def test_render_cross_source_highlights_markdown_lists_items(gads):
         {
             "label": "豊臣秀長",
             "sources_display": "Wikipedia (JA), Google Trends (JP)",
-            "rank_evidence": "7時8位 → 19時2位",
+            "rank_evidence": "7時8位 → 13時圏外 → 19時2位",
+            "ranks": {"07": 8, "19": 2},
         },
     ]
     md = gads.render_cross_source_highlights_markdown(highlights, date(2026, 5, 20))
     assert "### 1. 豊臣秀長" in md
     assert "Wikipedia (JA), Google Trends (JP)" in md
+    assert "| 07 | 13 | 19 |" in md
+    assert "```mermaid" in md
+    assert "**根拠**" not in md
     assert gads._CROSS_NONE_LINE not in md
 
 

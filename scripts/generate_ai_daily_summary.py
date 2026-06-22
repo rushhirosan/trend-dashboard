@@ -797,6 +797,95 @@ def _format_rank_evidence(ranks: dict[str, int]) -> str:
     return " → ".join(_format_slot_rank_or_oob(slot, ranks) for slot in DAYTIME_SLOTS)
 
 
+_RANK_EVIDENCE_SLOT_RE = re.compile(r"(\d+)時(?:(\d+)位|圏外)")
+
+
+def _parse_rank_evidence(evidence: str) -> Dict[str, Optional[int]]:
+    """rank_evidence 文字列を {07,13,19} → 順位（圏外は None）に分解。"""
+    ranks: Dict[str, Optional[int]] = {slot: None for slot in DAYTIME_SLOTS}
+    for m in _RANK_EVIDENCE_SLOT_RE.finditer(evidence or ""):
+        slot = m.group(1).zfill(2)
+        if slot not in ranks:
+            continue
+        rank_str = m.group(2)
+        ranks[slot] = int(rank_str) if rank_str else None
+    return ranks
+
+
+def _ranks_dict_from_item(item: Dict[str, Any]) -> dict[str, int]:
+    ranks = item.get("ranks")
+    if isinstance(ranks, dict) and ranks:
+        return {str(k): int(v) for k, v in ranks.items()}
+    parsed = _parse_rank_evidence(str(item.get("rank_evidence") or ""))
+    return {slot: int(r) for slot, r in parsed.items() if r is not None}
+
+
+def _format_rank_cell(rank: Optional[int]) -> str:
+    return "—" if rank is None else str(rank)
+
+
+def format_daily_rank_table(ranks: dict[str, int]) -> str:
+    """07/13/19 の順位を1行の Markdown 表にする。"""
+    header = "| | 07 | 13 | 19 |"
+    sep = "|:--:|:-:|:-:|:-:|"
+    cells = [_format_rank_cell(ranks.get(slot)) for slot in DAYTIME_SLOTS]
+    row = "| 順位 | " + " | ".join(cells) + " |"
+    return "\n".join([header, sep, row])
+
+
+def _mermaid_safe_label(label: str, *, max_len: int = 28) -> str:
+    s = re.sub(r'["\[\]#;|]', "", str(label or "")).strip()
+    return (s[:max_len] or "topic").replace("\n", " ")
+
+
+def format_daily_slot_rank_mermaid(label: str, ranks: dict[str, int]) -> str:
+    """一日のスロット別順位を Mermaid xychart で可視化（2スロット以上あるときのみ）。"""
+    points: List[tuple[str, int]] = []
+    for slot in DAYTIME_SLOTS:
+        r = ranks.get(slot)
+        if r is not None:
+            points.append((f"{_slot_hour_label(slot)}時", int(r)))
+    if len(points) < 2:
+        return ""
+    labels = ", ".join(f'"{h} ({r}位)"' for h, r in points)
+    ymax = max(r for _, r in points)
+    y_top = max(ymax + 2, 10)
+    chart_values = ", ".join(str(y_top + 1 - r) for _, r in points)
+    title = _mermaid_safe_label(label)
+    return (
+        "```mermaid\n"
+        "xychart-beta\n"
+        f'    title "{title} — スロット別順位（上=1位）"\n'
+        f"    x-axis [{labels}]\n"
+        f'    y-axis "順位" 1 --> {y_top}\n'
+        f"    line [{chart_values}]\n"
+        "```"
+    )
+
+
+def _compact_daily_link_line(item: Dict[str, Any]) -> str:
+    """表示用: link_line から順位表記を除き、ソース名だけ残す。"""
+    link = str(item.get("link_line") or "").strip()
+    if not link:
+        return str(item.get("label") or "")
+    m = re.match(r"^(\[[^\]]+\]\([^)]+\))（([^·）]+)", link)
+    if m:
+        return f"{m.group(1)}（{m.group(2).strip()}）"
+    return re.sub(r"（[^）]*）\s*$", "", link)
+
+
+def format_daily_rising_summary_line(item: Dict[str, Any]) -> str:
+    """1行サマリー（jump・区分）。"""
+    parts: List[str] = []
+    jump = item.get("jump")
+    if jump is not None:
+        parts.append(f"jump **+{jump}**")
+    cat = (item.get("category") or "").strip()
+    if cat:
+        parts.append(cat)
+    return "> " + " · ".join(parts) if parts else ""
+
+
 def _daytime_label_sort_key(
     ranks: dict[str, int],
     *,
@@ -911,6 +1000,7 @@ def build_rising_highlights(
         out.append(
             {
                 **picked,
+                "ranks": ranks,
                 "rank_evidence": rank_evidence,
                 "rank_display": rank_display,
                 "url": url,
@@ -1404,18 +1494,26 @@ def render_rising_highlights_markdown(
         )
         return "\n".join(lines).rstrip() + "\n"
     for i, it in enumerate(items, 1):
-        lines.append(f"{i}. {it.get('link_line') or it.get('label')}")
+        lines.append(f"{i}. {_compact_daily_link_line(it)}")
+        lines.append("")
+        summary = format_daily_rising_summary_line(it)
+        if summary:
+            lines.append(summary)
+            lines.append("")
         label_nk = _normalize_label_key(str(it.get("label") or ""))
         note = notes_by_label.get(label_nk)
         if note:
             lines.append(f"   - **補足**: {note}")
-        ev = it.get("rank_evidence")
-        if ev:
-            lines.append(f"   - **根拠**: {ev}")
-        cat = it.get("category")
-        if cat:
-            lines.append(f"   - **区分**: {cat}")
-        lines.append("")
+            lines.append("")
+        ranks = _ranks_dict_from_item(it)
+        table = format_daily_rank_table(ranks)
+        if table:
+            lines.append(table)
+            lines.append("")
+        chart = format_daily_slot_rank_mermaid(str(it.get("label") or ""), ranks)
+        if chart:
+            lines.append(chart)
+            lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -1442,9 +1540,15 @@ def render_cross_source_highlights_markdown(
         sources = h.get("sources_display")
         if sources:
             lines.append(f"- **登場ソース**: {sources}")
-        ev = h.get("rank_evidence")
-        if ev:
-            lines.append(f"- **根拠**: {ev}")
+        ranks = _ranks_dict_from_item(h)
+        table = format_daily_rank_table(ranks)
+        if table:
+            lines.append("")
+            lines.append(table)
+        chart = format_daily_slot_rank_mermaid(str(h.get("label") or ""), ranks)
+        if chart:
+            lines.append("")
+            lines.append(chart)
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 

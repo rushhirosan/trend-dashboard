@@ -136,17 +136,30 @@ def slot_needs_recovery(
     *,
     require_completed: bool = False,
 ) -> bool:
-    """スナップショット行が無い、または（任意で）スロット未完了なら復旧対象。"""
+    """refresh 未完了、またはスナップショット行が無ければ復旧対象。"""
     parsed = parse_slot_key(slot_key)
     if not parsed:
         return False
     business_day, slot_code = parsed
+    # OOM 等で refresh 失敗後に古いキャッシュだけ snapshot された場合も再取得する
+    if db and hasattr(db, "has_slot_completed"):
+        if not db.has_slot_completed(slot_key):
+            return True
     if slot_has_snapshot(db, business_day, slot_code):
         return False
     if require_completed and db and hasattr(db, "has_slot_completed"):
         if not db.has_slot_completed(slot_key):
             return False
     return True
+
+
+def refresh_succeeded_for_snapshot(refresh_result: dict) -> bool:
+    """全フェーズ成功時のみスナップショットを書く（失敗時の gap_retry 阻害を防ぐ）。"""
+    if refresh_result.get("job_timed_out"):
+        return False
+    if refresh_result.get("jp_phase_failed") or refresh_result.get("us_phase_failed"):
+        return False
+    return bool(refresh_result.get("success"))
 
 
 def write_and_verify_snapshot(

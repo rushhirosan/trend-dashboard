@@ -23,6 +23,10 @@ primary_region = "nrt"
   TRENDS_SCHEDULER_LOW_MEMORY_BATCH_DELAY_SECONDS = "8"
   # 定時 refresh を JP/US で subprocess 分割（全カテゴリ取得維持・RSS ピーク低減）
   TRENDS_SCHEDULER_SUBPROCESS_PHASES = "true"
+  # JP を 2 subprocess に分割（1536MB 内で RSS ピーク低減）
+  TRENDS_SCHEDULER_JP_SUBCHUNKS = "2"
+  # subprocess フェーズ間: 親の gc/malloc_trim + cgroup 安定待ち（秒）
+  TRENDS_SCHEDULER_SUBPROCESS_PHASE_PAUSE_SECONDS = "5"
   # memory_watchdog の fallback 上限（cgroup と揃える）
   MEMORY_LIMIT_MB = "1536"
   # memory_watchdog: cgroup 全体（subprocess 含む）を 15s 間隔で監視

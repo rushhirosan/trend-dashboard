@@ -99,6 +99,19 @@ _REFRESH_RESULT_PREFIX = "REFRESH_RESULT_JSON:"
 SCHEDULER_SUBPROCESS_PHASES = os.environ.get(
     "TRENDS_SCHEDULER_SUBPROCESS_PHASES", "true"
 ).lower() in ("1", "true", "yes")
+try:
+    SCHEDULER_JP_SUBCHUNKS = max(
+        1, min(4, int(os.environ.get("TRENDS_SCHEDULER_JP_SUBCHUNKS", "2")))
+    )
+except (TypeError, ValueError):
+    SCHEDULER_JP_SUBCHUNKS = 2
+try:
+    SCHEDULER_SUBPROCESS_PHASE_PAUSE_SECONDS = max(
+        0.0,
+        float(os.environ.get("TRENDS_SCHEDULER_SUBPROCESS_PHASE_PAUSE_SECONDS", "3")),
+    )
+except (TypeError, ValueError):
+    SCHEDULER_SUBPROCESS_PHASE_PAUSE_SECONDS = 3.0
 
 
 def _parse_refresh_subprocess_stdout(stdout: str) -> dict:
@@ -113,6 +126,35 @@ def _parse_refresh_subprocess_stdout(stdout: str) -> dict:
             except json.JSONDecodeError:
                 break
     return {"success": False, "results": {}, "error": "missing_refresh_result_json"}
+
+
+def _merge_jp_chunk_results(chunks: list[dict]) -> dict:
+    """JP subprocess 分割の結果を1つの jp フェーズ結果にまとめる。"""
+    merged_results: dict = {}
+    all_success = True
+    oom_killed = False
+    errors: list[str] = []
+    for chunk in chunks:
+        merged_results.update(chunk.get("results") or {})
+        if not chunk.get("success"):
+            all_success = False
+        if chunk.get("oom_killed"):
+            oom_killed = True
+        err = chunk.get("error")
+        if err:
+            errors.append(str(err))
+    out = {
+        "success": all_success,
+        "results": merged_results,
+        "region": "jp",
+    }
+    if oom_killed:
+        out["oom_killed"] = True
+    if errors:
+        out["error"] = errors[-1]
+    if len(chunks) > 1:
+        out["jp_chunks"] = chunks
+    return out
 
 
 def _merge_phase_refresh_results(jp_result: dict, us_result: dict) -> dict:
@@ -896,6 +938,8 @@ class TrendsScheduler:
         *,
         low_memory_mode: bool,
         timeout_seconds: int,
+        jp_chunk: int | None = None,
+        jp_chunks: int | None = None,
     ) -> tuple[dict, bool]:
         """JP または US のみを別プロセスで refresh（OOM 時に RSS を OS へ返す）。"""
         if not os.path.isfile(_REFRESH_REGION_SCRIPT):
@@ -920,14 +964,23 @@ class TrendsScheduler:
                     str(SCHEDULER_LOW_MEMORY_BATCH_DELAY_SECONDS),
                 ]
             )
+        if (
+            region == "jp"
+            and jp_chunk is not None
+            and jp_chunks is not None
+            and jp_chunks > 1
+        ):
+            cmd.extend(["--jp-chunk", str(jp_chunk), "--jp-chunks", str(jp_chunks)])
 
         env = os.environ.copy()
         env["ENABLE_SCHEDULER"] = "false"
         env.setdefault("SKIP_STARTUP_EXECUTION", "true")
 
         logger.info(
-            "🔄 refresh subprocess 開始 region=%s timeout=%ss cmd=%s",
+            "🔄 refresh subprocess 開始 region=%s jp_chunk=%s/%s timeout=%ss cmd=%s",
             region,
+            jp_chunk,
+            jp_chunks,
             timeout_seconds,
             " ".join(cmd),
         )
@@ -983,42 +1036,70 @@ class TrendsScheduler:
         )
         return result, timed_out
 
+    def _pause_between_subprocess_phases(self) -> None:
+        """subprocess 間: 親プロセスの RSS 返却と cgroup 安定待ち。"""
+        from utils.memory_trim import try_release_rss
+
+        try_release_rss(collect=True)
+        if SCHEDULER_SUBPROCESS_PHASE_PAUSE_SECONDS > 0:
+            import time
+
+            time.sleep(SCHEDULER_SUBPROCESS_PHASE_PAUSE_SECONDS)
+
     def _run_refresh_all_trends_subprocess_phases(
         self,
         *,
         low_memory_mode: bool,
         job_timeout_seconds: int,
     ) -> tuple[dict, bool]:
-        """JP → US を順に subprocess で実行し、結果をマージ。"""
-        phase_timeout = max(600, job_timeout_seconds // 2)
-        jp_result, jp_timed_out = self._run_refresh_region_subprocess(
-            "jp",
-            low_memory_mode=low_memory_mode,
-            timeout_seconds=phase_timeout,
-        )
-        if jp_timed_out:
-            merged = _merge_phase_refresh_results(jp_result, {"success": False, "results": {}})
-            merged["job_timed_out"] = True
-            merged["success"] = False
-            merged["jp_phase_failed"] = True
-            merged["us_phase_skipped"] = True
-            return merged, True
+        """JP（必要なら分割）→ US を順に subprocess で実行し、結果をマージ。"""
+        jp_subchunks = SCHEDULER_JP_SUBCHUNKS if low_memory_mode else 1
+        phase_count = jp_subchunks + 1
+        phase_timeout = max(600, job_timeout_seconds // phase_count)
+        jp_chunk_results: list[dict] = []
 
-        if not _subprocess_phase_ok(jp_result, jp_timed_out):
-            logger.error(
-                "❌ JP フェーズ失敗のため US subprocess をスキップします (success=%s error=%s oom=%s)",
-                jp_result.get("success"),
-                jp_result.get("error"),
-                jp_result.get("oom_killed"),
+        for chunk_idx in range(1, jp_subchunks + 1):
+            jp_result, jp_timed_out = self._run_refresh_region_subprocess(
+                "jp",
+                low_memory_mode=low_memory_mode,
+                timeout_seconds=phase_timeout,
+                jp_chunk=chunk_idx if jp_subchunks > 1 else None,
+                jp_chunks=jp_subchunks if jp_subchunks > 1 else None,
             )
-            merged = _merge_phase_refresh_results(
-                jp_result,
-                {"success": False, "results": {}, "skipped": True},
-            )
-            merged["success"] = False
-            merged["jp_phase_failed"] = True
-            merged["us_phase_skipped"] = True
-            return merged, False
+            jp_chunk_results.append(jp_result)
+            if jp_timed_out:
+                merged = _merge_phase_refresh_results(
+                    _merge_jp_chunk_results(jp_chunk_results),
+                    {"success": False, "results": {}},
+                )
+                merged["job_timed_out"] = True
+                merged["success"] = False
+                merged["jp_phase_failed"] = True
+                merged["us_phase_skipped"] = True
+                return merged, True
+            if not _subprocess_phase_ok(jp_result, jp_timed_out):
+                logger.error(
+                    "❌ JP フェーズ失敗 (chunk=%s/%s) — US subprocess をスキップ "
+                    "(success=%s error=%s oom=%s)",
+                    chunk_idx,
+                    jp_subchunks,
+                    jp_result.get("success"),
+                    jp_result.get("error"),
+                    jp_result.get("oom_killed"),
+                )
+                merged = _merge_phase_refresh_results(
+                    _merge_jp_chunk_results(jp_chunk_results),
+                    {"success": False, "results": {}, "skipped": True},
+                )
+                merged["success"] = False
+                merged["jp_phase_failed"] = True
+                merged["us_phase_skipped"] = True
+                return merged, False
+            if chunk_idx < jp_subchunks:
+                self._pause_between_subprocess_phases()
+
+        jp_result = _merge_jp_chunk_results(jp_chunk_results)
+        self._pause_between_subprocess_phases()
 
         us_result, us_timed_out = self._run_refresh_region_subprocess(
             "us",
@@ -1039,9 +1120,12 @@ class TrendsScheduler:
     def _run_refresh_all_trends_with_job_timeout(self, low_memory_mode, job_timeout_seconds):
         """refresh_all_trends を実行。低負荷モード時は JP/US を subprocess で分割（OOM 対策）。"""
         if low_memory_mode and SCHEDULER_SUBPROCESS_PHASES:
+            _jp_chunks = SCHEDULER_JP_SUBCHUNKS
+            _phase_timeout = max(600, job_timeout_seconds // (_jp_chunks + 1))
             logger.info(
-                "🔄 refresh_all_trends: subprocess フェーズ分割 (JP → US, phase_timeout=%ss)",
-                max(600, job_timeout_seconds // 2),
+                "🔄 refresh_all_trends: subprocess フェーズ分割 (JP×%s → US, phase_timeout=%ss)",
+                _jp_chunks,
+                _phase_timeout,
             )
             return self._run_refresh_all_trends_subprocess_phases(
                 low_memory_mode=low_memory_mode,
@@ -1325,51 +1409,63 @@ class TrendsScheduler:
 
             snapshot_status: dict = {}
             prior_slot_gaps: list[str] = []
-            try:
-                with self.app.app_context():
-                    managers = self.app.config.get('TREND_MANAGERS') or managers
-                    from services.snapshot_slot_health import (
-                        find_missing_prior_slots,
-                        parse_slot_key,
-                        slot_has_snapshot,
-                        write_and_verify_snapshot,
-                    )
+            from services.snapshot_slot_health import refresh_succeeded_for_snapshot
 
-                    cap = datetime.now(jst)
-                    if snapshot_slot_key:
-                        snapshot_status = write_and_verify_snapshot(
-                            managers,
-                            self.db,
-                            snapshot_slot_key,
-                            trigger_source,
-                            cap,
+            if refresh_succeeded_for_snapshot(result):
+                try:
+                    with self.app.app_context():
+                        managers = self.app.config.get('TREND_MANAGERS') or managers
+                        from services.snapshot_slot_health import (
+                            find_missing_prior_slots,
+                            parse_slot_key,
+                            slot_has_snapshot,
+                            write_and_verify_snapshot,
                         )
-                        parsed_sk = parse_slot_key(snapshot_slot_key)
-                        if parsed_sk:
-                            bd, cur_slot = parsed_sk
-                            prior_slot_gaps = find_missing_prior_slots(
-                                self.db, bd, cur_slot
-                            )
-                    for sk in backfill_slot_keys or []:
-                        if sk == snapshot_slot_key:
-                            continue
-                        parsed_bf = parse_slot_key(sk)
-                        if not parsed_bf:
-                            continue
-                        bf_day, bf_slot = parsed_bf
-                        if not slot_has_snapshot(self.db, bf_day, bf_slot):
-                            write_and_verify_snapshot(
+
+                        cap = datetime.now(jst)
+                        if snapshot_slot_key:
+                            snapshot_status = write_and_verify_snapshot(
                                 managers,
                                 self.db,
-                                sk,
+                                snapshot_slot_key,
                                 trigger_source,
                                 cap,
                             )
-            except Exception as snap_exc:
+                            parsed_sk = parse_slot_key(snapshot_slot_key)
+                            if parsed_sk:
+                                bd, cur_slot = parsed_sk
+                                prior_slot_gaps = find_missing_prior_slots(
+                                    self.db, bd, cur_slot
+                                )
+                        for sk in backfill_slot_keys or []:
+                            if sk == snapshot_slot_key:
+                                continue
+                            parsed_bf = parse_slot_key(sk)
+                            if not parsed_bf:
+                                continue
+                            bf_day, bf_slot = parsed_bf
+                            if not slot_has_snapshot(self.db, bf_day, bf_slot):
+                                write_and_verify_snapshot(
+                                    managers,
+                                    self.db,
+                                    sk,
+                                    trigger_source,
+                                    cap,
+                                )
+                except Exception as snap_exc:
+                    logger.warning(
+                        "⚠️ トレンドスナップショット保存/検証失敗: %s",
+                        snap_exc,
+                        exc_info=True,
+                    )
+            else:
                 logger.warning(
-                    "⚠️ トレンドスナップショット保存/検証失敗: %s",
-                    snap_exc,
-                    exc_info=True,
+                    "⏭️ refresh 未完了のためスナップショット保存をスキップ "
+                    "(success=%s jp_failed=%s us_failed=%s timed_out=%s)",
+                    result.get("success"),
+                    result.get("jp_phase_failed"),
+                    result.get("us_phase_failed"),
+                    result.get("job_timed_out"),
                 )
             
             # 結果をログ出力
@@ -1503,8 +1599,13 @@ class TrendsScheduler:
             
             # 成功したトレンドのみタイムスタンプを更新（更新完了時刻を使用）
             timestamp_updated = False
+            if not successful_cache_keys:
+                logger.info("⏭️ 成功トレンドなし — タイムスタンプ更新をスキップします")
+                timestamp_updated = True
             max_retries = 3
             for attempt in range(max_retries):
+                if timestamp_updated:
+                    break
                 try:
                     logger.info(f"🔄 成功したトレンドの更新時刻を更新します（{len(successful_cache_keys)}件）[試行 {attempt + 1}/{max_retries}]")
                     success = self.db.update_successful_trends_timestamp(successful_cache_keys, end_time)

@@ -308,8 +308,21 @@ def _execute_task_batches(tasks, call_manager, *, max_concurrent, batch_delay_se
     return results
 
 
-def _build_jp_refresh_tasks(force_refresh):
-    """日本向け refresh タスク一覧。"""
+def _slice_refresh_tasks(tasks, chunk_index, chunk_count):
+    """タスク一覧を chunk_count 等分し chunk_index 番目（1始まり）だけ返す。"""
+    if chunk_index is None or chunk_count is None or chunk_count <= 1:
+        return tasks
+    if chunk_index < 1 or chunk_index > chunk_count:
+        raise ValueError(f"invalid chunk: {chunk_index}/{chunk_count}")
+    total = len(tasks)
+    size = (total + chunk_count - 1) // chunk_count
+    start = (chunk_index - 1) * size
+    end = min(start + size, total)
+    return tasks[start:end]
+
+
+def _build_jp_refresh_tasks(force_refresh, chunk_index=None, chunk_count=None):
+    """日本向け refresh タスク一覧。chunk_* 指定時は OOM 対策の subprocess 分割用。"""
     tasks = []
     tasks.append(('google', lambda m: m.get_trends('JP', force_refresh=force_refresh), 'JP'))
     tasks.append(('youtube', lambda m: m.get_trends('JP', force_refresh=force_refresh), 'JP'))
@@ -347,7 +360,7 @@ def _build_jp_refresh_tasks(force_refresh):
         def _openalex_jp(m, c=cat):
             return m.get_trends(category=c, limit=25, force_refresh=force_refresh, region='jp')
         tasks.append(('openalex', _openalex_jp, 'JP'))
-    return tasks
+    return _slice_refresh_tasks(tasks, chunk_index, chunk_count)
 
 
 def _build_us_refresh_tasks(managers, force_refresh):
@@ -408,6 +421,15 @@ def _normalize_refresh_region(region) -> str | None:
     raise ValueError(f"invalid refresh region: {region!r}")
 
 
+def compact_refresh_result(result: dict) -> dict:
+    """subprocess stdout 用に response.data を除いて結果を縮小（親プロセス RSS 低減）。"""
+    results = result.get("results") or {}
+    compact_results = {k: _compact_task_result(v) for k, v in results.items()}
+    out = dict(result)
+    out["results"] = compact_results
+    return out
+
+
 def refresh_all_trends(
     managers,
     force_refresh=True,
@@ -415,6 +437,8 @@ def refresh_all_trends(
     batch_delay_seconds=None,
     task_timeout_seconds=None,
     region=None,
+    jp_chunk=None,
+    jp_chunks=None,
 ):
     """
     すべてのトレンドカテゴリを強制更新するユーティリティ関数
@@ -428,6 +452,8 @@ def refresh_all_trends(
         batch_delay_seconds (float|None): バッチ間の待機秒数。Noneの場合は環境変数 TREND_REFRESH_BATCH_DELAY_SECONDS（デフォルト2）
         task_timeout_seconds (float|None): 1タスクの最大待ち秒数。Noneの場合は TREND_REFRESH_TASK_TIMEOUT_SECONDS（デフォルト600）
         region (str|None): None で JP+US。'jp' / 'us' で片方のみ（OOM 対策の subprocess 分割用）
+        jp_chunk (int|None): region='jp' 時、JP タスクの分割番号（1始まり）
+        jp_chunks (int|None): region='jp' 時、JP タスクの分割数
 
     Returns:
         dict: 各カテゴリの更新結果
@@ -479,8 +505,15 @@ def refresh_all_trends(
     run_us = refresh_region in (None, "us")
 
     if run_jp:
-        logger.info("🇯🇵 日本のデータを更新中（並列実行）...")
-        jp_tasks = _build_jp_refresh_tasks(force_refresh)
+        chunk_label = ""
+        if jp_chunk is not None and jp_chunks is not None and jp_chunks > 1:
+            chunk_label = f" [chunk {jp_chunk}/{jp_chunks}]"
+        logger.info("🇯🇵 日本のデータを更新中（並列実行）%s...", chunk_label)
+        jp_tasks = _build_jp_refresh_tasks(
+            force_refresh,
+            chunk_index=jp_chunk,
+            chunk_count=jp_chunks,
+        )
         jp_results = _execute_task_batches(
             jp_tasks,
             call_manager,

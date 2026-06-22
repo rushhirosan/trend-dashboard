@@ -311,9 +311,12 @@ def execute_scheduler():
         low_memory_mode = request.args.get('low_memory', 'true').lower() in ('1', 'true', 'yes')
         run_async = request.args.get('async', 'true').lower() in ('1', 'true', 'yes')
 
+        app_obj = current_app._get_current_object()
+        scheduler_ref = scheduler
+
         def _run_fetch():
-            with current_app.app_context():
-                scheduler._fetch_all_trends(
+            with app_obj.app_context():
+                scheduler_ref._fetch_all_trends(
                     force=True,
                     trigger_source='api',
                     low_memory_mode=low_memory_mode,

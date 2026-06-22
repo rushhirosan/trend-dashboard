@@ -4,6 +4,7 @@ import logging
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import signal
@@ -101,7 +102,7 @@ SCHEDULER_SUBPROCESS_PHASES = os.environ.get(
 ).lower() in ("1", "true", "yes")
 try:
     SCHEDULER_JP_SUBCHUNKS = max(
-        1, min(4, int(os.environ.get("TRENDS_SCHEDULER_JP_SUBCHUNKS", "2")))
+        1, min(8, int(os.environ.get("TRENDS_SCHEDULER_JP_SUBCHUNKS", "2")))
     )
 except (TypeError, ValueError):
     SCHEDULER_JP_SUBCHUNKS = 2
@@ -117,7 +118,7 @@ except (TypeError, ValueError):
 def _parse_refresh_subprocess_stdout(stdout: str) -> dict:
     """refresh_trends_region.py の REFRESH_RESULT_JSON 行をパース。"""
     if not stdout:
-        return {"success": False, "results": {}}
+        return {"success": False, "results": {}, "error": "missing_refresh_result_json"}
     for line in reversed(stdout.splitlines()):
         line = line.strip()
         if line.startswith(_REFRESH_RESULT_PREFIX):
@@ -126,6 +127,30 @@ def _parse_refresh_subprocess_stdout(stdout: str) -> dict:
             except json.JSONDecodeError:
                 break
     return {"success": False, "results": {}, "error": "missing_refresh_result_json"}
+
+
+def _load_refresh_subprocess_result(stdout: str, result_file: str | None) -> dict:
+    """stdout 優先。OOM 直前に書き出した REFRESH_RESULT_FILE があればフォールバック。"""
+    parsed = _parse_refresh_subprocess_stdout(stdout)
+    if not parsed.get("error") == "missing_refresh_result_json":
+        return parsed
+    if not result_file or not os.path.isfile(result_file):
+        return parsed
+    try:
+        with open(result_file, encoding="utf-8") as fh:
+            for line in reversed(fh.read().splitlines()):
+                line = line.strip()
+                if line.startswith(_REFRESH_RESULT_PREFIX):
+                    recovered = json.loads(line[len(_REFRESH_RESULT_PREFIX) :])
+                    recovered["recovered_from_result_file"] = True
+                    logger.warning(
+                        "♻️ refresh subprocess: stdout 欠落のため結果ファイルから復元 %s",
+                        result_file,
+                    )
+                    return recovered
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("⚠️ refresh 結果ファイル読み取り失敗 %s: %s", result_file, exc)
+    return parsed
 
 
 def _merge_jp_chunk_results(chunks: list[dict]) -> dict:
@@ -178,6 +203,8 @@ def _subprocess_phase_ok(phase_result: dict, timed_out: bool) -> bool:
     if timed_out:
         return False
     if phase_result.get("oom_killed"):
+        if phase_result.get("recovered_from_result_file") and phase_result.get("success"):
+            return bool(phase_result.get("results"))
         return False
     if not phase_result.get("success"):
         return False
@@ -975,6 +1002,13 @@ class TrendsScheduler:
         env = os.environ.copy()
         env["ENABLE_SCHEDULER"] = "false"
         env.setdefault("SKIP_STARTUP_EXECUTION", "true")
+        result_file = None
+        if region == "jp" and jp_chunk is not None:
+            result_file = os.path.join(
+                tempfile.gettempdir(),
+                f"trends_refresh_jp_{jp_chunk}_{jp_chunks or 1}.json",
+            )
+            env["REFRESH_RESULT_FILE"] = result_file
 
         logger.info(
             "🔄 refresh subprocess 開始 region=%s jp_chunk=%s/%s timeout=%ss cmd=%s",
@@ -1018,7 +1052,12 @@ class TrendsScheduler:
 
         from managers.trend_managers import compact_refresh_result
 
-        result = compact_refresh_result(_parse_refresh_subprocess_stdout(proc.stdout or ""))
+        result = compact_refresh_result(_load_refresh_subprocess_result(proc.stdout or "", result_file))
+        if result_file and os.path.isfile(result_file):
+            try:
+                os.remove(result_file)
+            except OSError:
+                pass
         if proc.returncode != 0 and result.get("success"):
             result = dict(result)
             result["success"] = False
@@ -1095,6 +1134,8 @@ class TrendsScheduler:
                 )
                 merged["success"] = False
                 merged["jp_phase_failed"] = True
+                merged["failed_jp_chunk"] = chunk_idx
+                merged["failed_jp_chunks"] = jp_subchunks
                 merged["us_phase_skipped"] = True
                 return merged, False
             if chunk_idx < jp_subchunks:
@@ -1492,6 +1533,14 @@ class TrendsScheduler:
             total_count = len(results)
             failed_count = total_count - success_count
             region_stats = result.get('region_stats') or region_refresh_stats(results)
+            if result.get('jp_phase_failed'):
+                from utils.jp_refresh_chunks import expected_jp_result_key_count_from_env
+
+                jp_expected = expected_jp_result_key_count_from_env()
+                region_stats = dict(region_stats)
+                jp_bucket = dict(region_stats.get('JP') or {})
+                jp_bucket['expected'] = jp_expected
+                region_stats['JP'] = jp_bucket
             jp_stats = region_stats.get('JP', {})
             us_stats = region_stats.get('US', {})
             logger.info(
@@ -1520,6 +1569,10 @@ class TrendsScheduler:
                 err = jp_phase.get('error') or 'jp_phase_failed'
                 if jp_phase.get('oom_killed'):
                     err = f'OOM killed ({err})'
+                failed_chunk = result.get('failed_jp_chunk')
+                failed_chunks = result.get('failed_jp_chunks')
+                if failed_chunk and failed_chunks:
+                    err = f"{err} (jp_chunk={failed_chunk}/{failed_chunks})"
                 failed_trends_details.append({
                     'source': '_jp_phase',
                     'error': str(err),
@@ -2102,10 +2155,19 @@ class TrendsScheduler:
         elif jp_phase_failed or us_phase_skipped or not refresh_success:
             title = "❌ トレンド取得失敗（部分完了）"
             if us_phase_skipped:
-                message = (
-                    f"JP フェーズ失敗のため US をスキップしました（JP: {jp_line}）。\n"
-                    f"トリガー: {trigger_label}"
-                )
+                jp_expected = jp_stats.get("expected")
+                jp_reported = jp_stats.get("total", 0)
+                if jp_expected and jp_reported < jp_expected:
+                    message = (
+                        f"JP chunk 失敗のため US をスキップ。"
+                        f" 報告済み JP: {jp_line}（全 {jp_expected} 源のうち {jp_reported} 源のみ）。\n"
+                        f"トリガー: {trigger_label}"
+                    )
+                else:
+                    message = (
+                        f"JP フェーズ失敗のため US をスキップしました（JP: {jp_line}）。\n"
+                        f"トリガー: {trigger_label}"
+                    )
             else:
                 message = (
                     f"トレンド取得が完了しませんでした（JP: {jp_line}, US: {us_line}）。\n"

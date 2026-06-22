@@ -853,18 +853,13 @@ def format_daily_slot_rank_mermaid(label: str, ranks: dict[str, int]) -> str:
     rank_vals = [r for _, r in points]
     if len(set(rank_vals)) < 2:
         return ""
-    labels = ", ".join(f'"{h} ({r}位)"' for h, r in points)
-    y_high = sr.mermaid_rank_y_axis_high(rank_vals)
-    chart_values = ", ".join(str(r) for _, r in points)
+    x_labels = [f"{h} ({r}位)" for h, r in points]
     title = _mermaid_safe_label(label)
-    return (
-        "```mermaid\n"
-        "xychart-beta\n"
-        f'    title "{title} — スロット別順位（上=1位）"\n'
-        f"    x-axis [{labels}]\n"
-        f'    y-axis "順位" {y_high} --> 1\n'
-        f"    line [{chart_values}]\n"
-        "```"
+    return sr.format_rank_mermaid_xychart(
+        title,
+        "順位の動き（上ほど上位）",
+        x_labels,
+        rank_vals,
     )
 
 

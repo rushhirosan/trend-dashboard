@@ -630,7 +630,7 @@ def format_weekly_best_rank_mermaid(
     """週内の日別ベスト順位を Mermaid xychart で可視化。
 
     2日以上かつベスト順位に変化があるときのみ（同順の横ばいは表だけ）。
-    y-axis は大→小（``N --> 1``）にし、N はデータ最大順位+1 に合わせる（目盛り表示のため）。
+    プロット値を反転し上ほど上位。Y 軸数字は非表示（順位は点ラベルと表）。
     """
     points: List[tuple[str, int]] = []
     for ds, ev in sorted(rank_evidence_by_day.items()):
@@ -642,18 +642,13 @@ def format_weekly_best_rank_mermaid(
     rank_vals = [r for _, r in points]
     if len(set(rank_vals)) < 2:
         return ""
-    labels = ", ".join(f'"{d} ({r}位)"' for d, r in points)
-    y_high = sr.mermaid_rank_y_axis_high(rank_vals)
-    chart_values = ", ".join(str(r) for _, r in points)
+    x_labels = [f"{d} ({r}位)" for d, r in points]
     title = _mermaid_safe_label(label)
-    return (
-        "```mermaid\n"
-        "xychart-beta\n"
-        f'    title "{title} — 日別ベスト順位（上=1位）"\n'
-        f"    x-axis [{labels}]\n"
-        f'    y-axis "順位" {y_high} --> 1\n'
-        f"    line [{chart_values}]\n"
-        "```"
+    return sr.format_rank_mermaid_xychart(
+        title,
+        "順位の動き（上ほど上位）",
+        x_labels,
+        rank_vals,
     )
 
 

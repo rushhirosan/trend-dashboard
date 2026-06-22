@@ -710,22 +710,24 @@ def test_render_rising_highlights_markdown_lists_items(gads):
     assert "**区分**" not in md
 
 
-def test_format_daily_slot_rank_mermaid_y_axis_rank_one_at_top(gads):
+def test_format_daily_slot_rank_mermaid_hides_y_axis_and_labels_points(gads):
     chart = gads.format_daily_slot_rank_mermaid(
         "Climber",
         {"07": 18, "13": 3, "19": 1},
     )
-    assert 'y-axis "順位" 19 --> 1' in chart
+    assert "showLabel: false" in chart
+    assert 'y-axis "順位"' not in chart
     assert '"7時 (18位)"' in chart
-    assert '"19時 (1位)"' in chart
-    assert "line [18, 3, 1]" in chart
-    assert "上=1位" in chart
+    assert '2 "18位"' in chart
+    assert '19 "1位"' in chart
+    assert "上ほど上位" in chart
 
 
 def test_format_daily_slot_rank_mermaid_tight_y_axis_for_small_ranks(gads):
     chart = gads.format_daily_slot_rank_mermaid("Moved", {"13": 4, "19": 2})
-    assert 'y-axis "順位" 5 --> 1' in chart
-    assert "line [4, 2]" in chart
+    assert '2 "4位"' in chart
+    assert '4 "2位"' in chart
+    assert 'y-axis "順位"' not in chart
 
 
 def test_format_daily_slot_rank_mermaid_skips_single_slot(gads):

@@ -1,6 +1,10 @@
 """JP refresh タスクの重量分散分割。"""
 
-from utils.jp_refresh_chunks import partition_jp_refresh_tasks, select_jp_refresh_tasks
+from utils.jp_refresh_chunks import (
+    expected_jp_result_key_count_from_env,
+    partition_jp_refresh_tasks,
+    select_jp_refresh_tasks,
+)
 
 
 def test_partition_spreads_heavy_sources():
@@ -32,3 +36,27 @@ def test_select_jp_refresh_tasks_covers_all():
         merged.extend(select_jp_refresh_tasks(tasks, i, 2))
     assert len(merged) == len(tasks)
     assert {t[0] for t in merged} == {t[0] for t in tasks}
+
+
+def test_kkj_isolated_when_six_chunks():
+    tasks = [
+        ("google", None, "JP"),
+        ("rakuten", None, "JP"),
+        ("hatena", None, "JP"),
+        ("note", None, "JP"),
+        ("kkj", None, "JP"),
+        ("openalex", None, "JP"),
+        ("youtube", None, "JP"),
+    ]
+    parts = partition_jp_refresh_tasks(tasks, 6)
+    kkj_parts = [i for i, part in enumerate(parts) if any(t[0] == "kkj" for t in part)]
+    assert len(kkj_parts) == 1
+    kkj_part = parts[kkj_parts[0]]
+    assert len(kkj_part) == 1
+    assert kkj_part[0][0] == "kkj"
+
+
+def test_expected_jp_key_count_without_twitch(monkeypatch):
+    monkeypatch.delenv("TWITCH_CLIENT_ID", raising=False)
+    monkeypatch.delenv("TWITCH_CLIENT_SECRET", raising=False)
+    assert expected_jp_result_key_count_from_env() == 26

@@ -29,7 +29,18 @@ RESULT_PREFIX = "REFRESH_RESULT_JSON:"
 
 
 def _emit_result(result: dict) -> None:
-    print(RESULT_PREFIX + json.dumps(result, ensure_ascii=False), flush=True)
+    line = RESULT_PREFIX + json.dumps(result, ensure_ascii=False)
+    print(line, flush=True)
+    result_file = os.environ.get("REFRESH_RESULT_FILE")
+    if not result_file:
+        return
+    try:
+        with open(result_file, "w", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+    except OSError as exc:
+        logger.warning("⚠️ REFRESH_RESULT_FILE 書き込み失敗 %s: %s", result_file, exc)
 
 
 def main() -> int:

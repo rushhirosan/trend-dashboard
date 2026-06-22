@@ -29,7 +29,29 @@ def test_subprocess_phase_ok():
     assert sm._subprocess_phase_ok({"success": True, "results": {"a": {}}}, False)
     assert not sm._subprocess_phase_ok({"success": False, "results": {}}, False)
     assert not sm._subprocess_phase_ok({"success": False, "results": {}, "oom_killed": True}, False)
+    assert sm._subprocess_phase_ok(
+        {
+            "success": True,
+            "results": {"a": {}},
+            "oom_killed": True,
+            "recovered_from_result_file": True,
+        },
+        False,
+    )
     assert not sm._subprocess_phase_ok({"success": True, "results": {}}, True)
+
+
+def test_load_refresh_subprocess_result_from_file(tmp_path):
+    payload = {"success": True, "results": {"google_JP": {"success": True}}}
+    result_file = tmp_path / "refresh.json"
+    result_file.write_text(
+        f"{sm._REFRESH_RESULT_PREFIX}{json.dumps(payload)}\n",
+        encoding="utf-8",
+    )
+    loaded = sm._load_refresh_subprocess_result("", str(result_file))
+    assert loaded["success"] is True
+    assert loaded.get("recovered_from_result_file") is True
+    assert "google_JP" in loaded["results"]
 
 
 def test_merge_jp_chunk_results():

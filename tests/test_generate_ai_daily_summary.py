@@ -716,6 +716,8 @@ def test_format_daily_slot_rank_mermaid_hides_y_axis_and_labels_points(gads):
         {"07": 18, "13": 3, "19": 1},
     )
     assert "showLabel: false" in chart
+    assert "showAxisLine: false" in chart
+    assert "yAxisLabelColor: transparent" in chart
     assert 'y-axis "順位"' not in chart
     assert '"7時 (18位)"' in chart
     assert '2 "18位"' in chart

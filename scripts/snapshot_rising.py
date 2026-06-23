@@ -177,6 +177,12 @@ def format_rank_mermaid_xychart(
         "      showLabel: false\n"
         "      showTitle: false\n"
         "      showTick: false\n"
+        "      showAxisLine: false\n"
+        "  themeVariables:\n"
+        "    xyChart:\n"
+        "      yAxisLabelColor: transparent\n"
+        "      yAxisTickColor: transparent\n"
+        "      yAxisLineColor: transparent\n"
         "---\n"
         "xychart-beta\n"
         f'    title "{safe_title} — {subtitle}"\n'

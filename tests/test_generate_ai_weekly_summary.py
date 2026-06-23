@@ -312,6 +312,8 @@ def test_format_weekly_best_rank_mermaid_hides_y_axis_and_labels_points(gaws):
         },
     )
     assert "showLabel: false" in chart
+    assert "showAxisLine: false" in chart
+    assert "yAxisLabelColor: transparent" in chart
     assert 'y-axis "順位"' not in chart
     assert '"06-08 (8位)"' in chart
     assert '2 "8位"' in chart

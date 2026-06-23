@@ -97,7 +97,9 @@ def main() -> int:
         )
 
     if args.mark_completed and status.get("verified_ok") and hasattr(db, "mark_slot_completed"):
-        db.mark_slot_completed(slot_key)
+        from services.snapshot_slot_health import mark_slot_fully_done
+
+        mark_slot_fully_done(db, slot_key)
 
     print(json.dumps(status, ensure_ascii=False, indent=2))
     return 0 if status.get("verified_ok") else 1

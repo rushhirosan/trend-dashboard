@@ -11,11 +11,14 @@ from services.snapshot_slot_health import (
     format_prior_slot_gaps,
     format_snapshot_status_for_discord,
     iter_scheduled_slots_for_business_day,
+    mark_slot_fully_done,
     prior_slot_codes,
     refresh_succeeded_for_snapshot,
     slot_has_snapshot,
+    slot_is_fully_done,
     slot_key_for,
     slot_needs_recovery,
+    snapshot_verified_slot_key,
     write_and_verify_snapshot,
 )
 
@@ -36,6 +39,9 @@ class FakeDb:
 
     def has_slot_completed(self, slot_key: str) -> bool:
         return slot_key in self.completed
+
+    def mark_slot_completed(self, slot_key: str) -> None:
+        self.completed.add(slot_key)
 
 
 def test_prior_slot_codes():
@@ -138,13 +144,39 @@ def test_slot_has_snapshot_and_needs_recovery():
     assert slot_has_snapshot(db, bd, "07") is False
     assert slot_has_snapshot(db, bd, "13") is True
     assert slot_needs_recovery(db, "7am_2026-06-12") is True
-    assert slot_needs_recovery(db, "1pm_2026-06-12") is False
+    # 旧仕様: 完了マークのみ（snap_verified なし）→ 未完了扱い
+    assert slot_needs_recovery(db, "1pm_2026-06-12") is True
     assert slot_needs_recovery(db, "invalid") is False
+
+
+def test_slot_is_fully_done():
+    bd = date(2026, 6, 12)
+    sk = "1pm_2026-06-12"
+    db = FakeDb(
+        {(bd, "13"): 70},
+        completed={sk, snapshot_verified_slot_key(sk)},
+    )
+    assert slot_is_fully_done(db, sk) is True
+    assert slot_needs_recovery(db, sk) is False
+
+
+def test_mark_slot_fully_done():
+    db = FakeDb()
+    mark_slot_fully_done(db, "7am_2026-06-23")
+    assert "7am_2026-06-23" in db.completed
+    assert snapshot_verified_slot_key("7am_2026-06-23") in db.completed
 
 
 def test_slot_needs_recovery_when_snapshot_exists_but_slot_incomplete():
     bd = date(2026, 6, 23)
     db = FakeDb({(bd, "07"): 70})
+    assert slot_needs_recovery(db, "7am_2026-06-23") is True
+
+
+def test_slot_needs_recovery_legacy_completed_without_snap_verified():
+    """取得完了マークのみ（API 旧仕様）+ 古い snapshot 行 → gap_retry 対象。"""
+    bd = date(2026, 6, 23)
+    db = FakeDb({(bd, "07"): 70}, completed={"7am_2026-06-23"})
     assert slot_needs_recovery(db, "7am_2026-06-23") is True
 
 
@@ -184,3 +216,18 @@ def test_write_and_verify_snapshot(mock_write):
     empty = write_and_verify_snapshot({}, db, None, "scheduler")
     assert empty["verified_ok"] is False
     mock_write.assert_called()
+
+
+@patch("services.trend_snapshot_service.write_snapshots_for_scheduler_run")
+def test_write_and_verify_snapshot_api_trigger(mock_write):
+    bd = date(2026, 6, 12)
+    db = FakeDb({(bd, "07"): 70})
+    mock_write.return_value = True
+    status = write_and_verify_snapshot(
+        managers={},
+        db=db,
+        scheduler_slot_key="7am_2026-06-12",
+        trigger_source="api",
+    )
+    assert status["verified_ok"] is True
+    assert mock_write.call_args.kwargs["trigger_source"] == "api"

@@ -130,27 +130,41 @@ def check_captured_at_in_slot_window(
     return True, ""
 
 
+def snapshot_verified_slot_key(slot_key: str) -> str:
+    """取得+スナップショット検証済みマーカー（scheduler_slot_run）。"""
+    return f"snap_verified_{slot_key}"
+
+
+def slot_is_fully_done(db: Any, slot_key: str) -> bool:
+    """トレンド取得成功かつスナップショット verified のときのみ True。"""
+    if not slot_key or not db or not hasattr(db, "has_slot_completed"):
+        return False
+    if not db.has_slot_completed(slot_key):
+        return False
+    return db.has_slot_completed(snapshot_verified_slot_key(slot_key))
+
+
+def mark_slot_fully_done(db: Any, slot_key: str) -> None:
+    """slot 完了 + スナップショット verified をセットで記録。"""
+    if not slot_key or not db or not hasattr(db, "mark_slot_completed"):
+        return
+    db.mark_slot_completed(slot_key)
+    db.mark_slot_completed(snapshot_verified_slot_key(slot_key))
+
+
 def slot_needs_recovery(
     db: Any,
     slot_key: str,
     *,
     require_completed: bool = False,
 ) -> bool:
-    """refresh 未完了、またはスナップショット行が無ければ復旧対象。"""
-    parsed = parse_slot_key(slot_key)
-    if not parsed:
-        return False
-    business_day, slot_code = parsed
-    # OOM 等で refresh 失敗後に古いキャッシュだけ snapshot された場合も再取得する
-    if db and hasattr(db, "has_slot_completed"):
-        if not db.has_slot_completed(slot_key):
-            return True
-    if slot_has_snapshot(db, business_day, slot_code):
+    """取得+スナップショットが揃っていなければ復旧対象（gap_retry 等）。"""
+    if not parse_slot_key(slot_key):
         return False
     if require_completed and db and hasattr(db, "has_slot_completed"):
         if not db.has_slot_completed(slot_key):
             return False
-    return True
+    return not slot_is_fully_done(db, slot_key)
 
 
 def refresh_succeeded_for_snapshot(refresh_result: dict) -> bool:

@@ -338,7 +338,7 @@ def execute_scheduler():
         _run_fetch()
         return jsonify({
             'success': True,
-            'message': 'スケジューラー実行完了（データ更新のみ、メール送信はスキップ）',
+            'message': 'スケジューラー実行を開始しました（バックグラウンド）',
             'slot_key': slot_key,
         })
     except Exception as e:

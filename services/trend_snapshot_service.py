@@ -563,15 +563,6 @@ def collect_series_snapshots(managers: Dict[str, Any]) -> List[Tuple[str, List[D
     return out
 
 
-def _snapshot_write_allowed(trigger_source: str) -> bool:
-    """スナップショット保存を許可する trigger_source。"""
-    return (trigger_source or "").strip().lower() in (
-        "scheduler",
-        "startup_catchup",
-        "gap_retry",
-    )
-
-
 def write_snapshots_for_scheduler_run(
     managers: Dict[str, Any],
     scheduler_slot_key: Optional[str],
@@ -587,11 +578,6 @@ def write_snapshots_for_scheduler_run(
         return False
     if _dummy_mode():
         logger.info("⏭️ ダミーモードのためスナップショット保存をスキップ")
-        return False
-    if not _snapshot_write_allowed(trigger_source):
-        logger.info(
-            "⏭️ trigger_source=%s のためスナップショット保存をスキップ", trigger_source
-        )
         return False
 
     parsed = parse_scheduler_slot_key(scheduler_slot_key)

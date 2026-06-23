@@ -61,7 +61,10 @@ def test_retry_slot_by_key_marks_gap_retry_only_when_slot_completed():
         with patch(
             "services.snapshot_slot_health.slot_needs_recovery", return_value=True
         ):
-            sched._retry_slot_by_key("7am_2026-06-20")
+            with patch(
+                "services.snapshot_slot_health.slot_is_fully_done", return_value=True
+            ):
+                sched._retry_slot_by_key("7am_2026-06-20")
 
     db.mark_slot_completed.assert_called_once_with("gap_retry_7am_2026-06-20")
 

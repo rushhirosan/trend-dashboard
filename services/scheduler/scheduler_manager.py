@@ -914,7 +914,9 @@ class TrendsScheduler:
         retry_marker = f"gap_retry_{slot_key}"
         if not self.db or not hasattr(self.db, "mark_slot_completed"):
             return
-        if hasattr(self.db, "has_slot_completed") and self.db.has_slot_completed(slot_key):
+        from services.snapshot_slot_health import slot_is_fully_done
+
+        if slot_is_fully_done(self.db, slot_key):
             try:
                 self.db.mark_slot_completed(retry_marker)
             except Exception as e:
@@ -1307,12 +1309,13 @@ class TrendsScheduler:
                 )
             return False
         if trigger_source in AUTO_FETCH_TRIGGERS and self._is_recent_deploy():
+            from services.snapshot_slot_health import slot_is_fully_done
+
             bypass_deploy_guard = (
                 trigger_source == "gap_retry"
                 and slot_key_override
                 and self.db
-                and hasattr(self.db, "has_slot_completed")
-                and not self.db.has_slot_completed(slot_key_override)
+                and not slot_is_fully_done(self.db, slot_key_override)
             )
             if not bypass_deploy_guard:
                 logger.info(
@@ -1804,8 +1807,10 @@ class TrendsScheduler:
                 us_phase_skipped=bool(result.get('us_phase_skipped')),
             )
 
-            # スロットを「完了済み」として記録（全フェーズ成功時のみ）
+            # スロット完了 = 全フェーズ成功 + スナップショット verified（slot_key あり時）
             completed_slot = slot_key  # 開始時に判定したスロット（トリガー時刻ベース）
+            from services.snapshot_slot_health import mark_slot_fully_done
+
             if result.get('job_timed_out'):
                 logger.warning(
                     "⏭️ ジョブ全体タイムアウトのためスロット完了は記録しません（slot=%s）",
@@ -1819,6 +1824,17 @@ class TrendsScheduler:
                     result.get('jp_phase_failed'),
                     result.get('us_phase_skipped'),
                 )
+            elif completed_slot and snapshot_slot_key:
+                if snapshot_status.get("verified_ok"):
+                    mark_slot_fully_done(self.db, completed_slot)
+                    logger.info("✅ スロット完了を記録しました（取得+スナップショット）: %s", completed_slot)
+                else:
+                    logger.warning(
+                        "⏭️ スナップショット未検証のためスロット完了は記録しません（slot=%s write_ok=%s rows=%s）",
+                        completed_slot,
+                        snapshot_status.get("write_ok"),
+                        snapshot_status.get("row_count"),
+                    )
             elif completed_slot and self.db and hasattr(self.db, 'mark_slot_completed'):
                 self.db.mark_slot_completed(completed_slot)
 
@@ -1829,6 +1845,7 @@ class TrendsScheduler:
                 and completed_slot
                 and str(completed_slot).startswith("7pm_")
                 and not result.get("job_timed_out")
+                and snapshot_status.get("verified_ok")
             ):
                 try:
                     from services.daily_x_post_notify import schedule_evening_x_post_discord_notify
@@ -2161,11 +2178,14 @@ class TrendsScheduler:
         if us_phase_skipped:
             us_line = "skipped"
 
+        snapshot_required = bool(snapshot_status and snapshot_status.get("scheduler_slot_key"))
+        snapshot_ok = not snapshot_required or bool(snapshot_status.get("verified_ok"))
         fully_ok = (
             refresh_success
             and not jp_phase_failed
             and not us_phase_skipped
             and failed_count == 0
+            and snapshot_ok
         )
         oom_killed = any(
             d.get("source") == "_jp_phase" and "OOM" in str(d.get("error", ""))

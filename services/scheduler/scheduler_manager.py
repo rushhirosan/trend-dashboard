@@ -1357,6 +1357,7 @@ class TrendsScheduler:
 
         self._fetching_in_progress = True
         executed = False
+        peak_tracker = None
         try:
             jst = pytz.timezone('Asia/Tokyo')
             now_jst = datetime.now(jst)
@@ -1433,6 +1434,11 @@ class TrendsScheduler:
             # 同一秒で複数実行された場合にアラートで区別できるようミリ秒・プロセスIDを含める
             host_short, pid = _process_identity()
             execution_id = f"scheduler_{start_time.strftime('%Y%m%d_%H%M%S')}_{start_time.microsecond // 1000:03d}_p{pid}"
+
+            from utils.memory_peak_tracker import MemoryPeakTracker
+
+            peak_tracker = MemoryPeakTracker()
+            peak_tracker.start()
 
             # 長時間バッチの途中で OOM 等すると「完了」Discordが届かない。任意で開始時に1通送り状態を可視化（課金なし・既定オフ）
             if (
@@ -1795,6 +1801,8 @@ class TrendsScheduler:
             )
             
             # 常にDiscord通知を送信（成功時も失敗時も）
+            memory_peak = peak_tracker.stop() if peak_tracker is not None else None
+            peak_tracker = None
             self._send_execution_notification(
                 execution_id, start_time, end_time,
                 total_count, success_count, failed_count, duration, failed_trends_details, has_anomaly,
@@ -1805,6 +1813,7 @@ class TrendsScheduler:
                 refresh_success=bool(result.get('success')),
                 jp_phase_failed=bool(result.get('jp_phase_failed')),
                 us_phase_skipped=bool(result.get('us_phase_skipped')),
+                memory_peak=memory_peak,
             )
 
             # スロット完了 = 全フェーズ成功 + スナップショット verified（slot_key あり時）
@@ -1912,6 +1921,8 @@ class TrendsScheduler:
             return executed
         finally:
             # 分散ロックを解放し、フラグをリセット
+            if peak_tracker is not None:
+                peak_tracker.stop()
             self._release_scheduler_lock(lock_handle)
             self._fetching_in_progress = False
     
@@ -2150,6 +2161,7 @@ class TrendsScheduler:
         refresh_success: bool = True,
         jp_phase_failed: bool = False,
         us_phase_skipped: bool = False,
+        memory_peak: dict | None = None,
     ) -> None:
         """スケジューラ実行結果をDiscord通知（成功時も失敗時も）"""
         if not self.alert_service:
@@ -2251,6 +2263,7 @@ class TrendsScheduler:
             format_prior_slot_gaps,
             format_snapshot_status_for_discord,
         )
+        from utils.memory_peak_tracker import format_memory_peak_for_discord
 
         details = {
             "実行ID": execution_id,
@@ -2265,6 +2278,7 @@ class TrendsScheduler:
             "実行時間": f"{duration_min:.1f}分 ({duration:.2f}秒)",
             "開始時刻": start_time.strftime("%Y-%m-%d %H:%M:%S JST"),
             "終了時刻": end_time.strftime("%Y-%m-%d %H:%M:%S JST"),
+            "メモリピーク": format_memory_peak_for_discord(memory_peak),
             "スナップショット": format_snapshot_status_for_discord(snapshot_status),
         }
         if gaps_bad and snapshot_status and snapshot_status.get("business_day"):

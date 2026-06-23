@@ -27,6 +27,8 @@ primary_region = "nrt"
   TRENDS_SCHEDULER_JP_SUBCHUNKS = "6"
   # subprocess フェーズ間: 親の gc/malloc_trim + cgroup 安定待ち（秒）
   TRENDS_SCHEDULER_SUBPROCESS_PHASE_PAUSE_SECONDS = "8"
+  # 官公需ランキング取得件数（subprocess 低メモリ時。県別 Top5 には 150 件で十分）
+  KKJ_RANKING_FETCH_COUNT = "150"
   # memory_watchdog の fallback 上限（cgroup と揃える）
   MEMORY_LIMIT_MB = "1536"
   # memory_watchdog: cgroup 全体（subprocess 含む）を 15s 間隔で監視

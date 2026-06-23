@@ -1003,6 +1003,11 @@ class TrendsScheduler:
         env["ENABLE_SCHEDULER"] = "false"
         env.setdefault("SKIP_STARTUP_EXECUTION", "true")
         env.setdefault("MALLOC_ARENA_MAX", "2")
+        if low_memory_mode:
+            env.setdefault(
+                "KKJ_RANKING_FETCH_COUNT",
+                os.environ.get("KKJ_RANKING_FETCH_COUNT", "150"),
+            )
         result_file = None
         if region == "jp" and jp_chunk is not None:
             result_file = os.path.join(
@@ -1087,6 +1092,35 @@ class TrendsScheduler:
             import time
 
             time.sleep(SCHEDULER_SUBPROCESS_PHASE_PAUSE_SECONDS)
+
+    def _shed_parent_managers(self) -> None:
+        """subprocess フェーズ中は親 Gunicorn の全マネージャ参照を解放（同一 cgroup OOM 対策）。"""
+        removed = self.app.config.pop("TREND_MANAGERS", None)
+        if removed:
+            try:
+                removed.clear()
+            except Exception:
+                pass
+            del removed
+        from utils.memory_trim import try_release_rss
+
+        try_release_rss(collect=True)
+        logger.info("🧹 subprocess フェーズ: 親ワーカーの TREND_MANAGERS を解放しました")
+
+    def _ensure_parent_managers(self) -> dict:
+        """スナップショット等のため親ワーカーにマネージャーを再載せ。"""
+        managers = self.app.config.get("TREND_MANAGERS")
+        if managers:
+            return managers
+        from managers.trend_managers import initialize_managers
+
+        managers = initialize_managers()
+        self.app.config["TREND_MANAGERS"] = managers
+        logger.info(
+            "✅ subprocess フェーズ後: 親ワーカーの TREND_MANAGERS を再初期化しました (%s)",
+            len(managers),
+        )
+        return managers
 
     def _run_refresh_all_trends_subprocess_phases(
         self,
@@ -1436,10 +1470,20 @@ class TrendsScheduler:
                 self._fetching_in_progress = False
                 return True
 
-            result, job_timed_out = self._run_refresh_all_trends_with_job_timeout(
-                low_memory_mode=low_memory_mode,
-                job_timeout_seconds=SCHEDULER_JOB_TIMEOUT_SECONDS,
+            shed_parent_managers = bool(
+                low_memory_mode and SCHEDULER_SUBPROCESS_PHASES
             )
+            if shed_parent_managers:
+                self._shed_parent_managers()
+
+            try:
+                result, job_timed_out = self._run_refresh_all_trends_with_job_timeout(
+                    low_memory_mode=low_memory_mode,
+                    job_timeout_seconds=SCHEDULER_JOB_TIMEOUT_SECONDS,
+                )
+            finally:
+                if shed_parent_managers:
+                    self._ensure_parent_managers()
             logger.info(
                 "🔄 refresh_all_trends実行完了: success=%s job_timed_out=%s",
                 result.get('success'),

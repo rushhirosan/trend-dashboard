@@ -6,6 +6,7 @@ APIキー不要。http://www.kkj.go.jp/api/
 
 import calendar
 import gc
+import os
 import re
 import requests
 import xml.etree.ElementTree as ET
@@ -47,6 +48,18 @@ RANKING_QUERIES = [
     ("cyber", "サイバー", "サイバー", "security"),
 ]
 RANKING_COUNT = 1000
+# 低メモリ refresh subprocess 用（県別 Top5 集計には十分な上限）
+LOW_MEMORY_RANKING_COUNT = 150
+
+
+def _ranking_fetch_count() -> int:
+    raw = os.environ.get("KKJ_RANKING_FETCH_COUNT")
+    if raw is not None and str(raw).strip() != "":
+        try:
+            return max(25, min(RANKING_COUNT, int(raw)))
+        except (TypeError, ValueError):
+            pass
+    return RANKING_COUNT
 
 # JIS X 0401 都道府県コード → 都道府県名（APIの LG_Code 用）
 LG_CODE_TO_PREFECTURE = {
@@ -427,7 +440,7 @@ class KKJTrendsManager(BaseTrendsManager):
         ranking_result_count: Dict[str, int] = {}  # 県別集計の元になった一覧取得件数（総件数と異なる場合あり）
         for key, label, query, _ in SIGNALS_QUERIES:
             _, results, ok = _fetch_hits_for_query(
-                query, date_from, count=RANKING_COUNT, rate_limiter=self.rate_limiter
+                query, date_from, count=_ranking_fetch_count(), rate_limiter=self.rate_limiter
             )
             if ok:
                 connection_ok_count += 1

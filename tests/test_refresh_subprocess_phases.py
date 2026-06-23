@@ -96,6 +96,23 @@ def test_jp_failure_skips_us_subprocess(monkeypatch):
     assert "cnn_US" not in result["results"]
 
 
+def test_shed_and_restore_parent_managers(monkeypatch):
+    sentinel = {"google": object()}
+    app = _FakeApp()
+    app.config["TREND_MANAGERS"] = sentinel
+    scheduler = sm.TrendsScheduler(app)
+    reloaded = {"youtube": object()}
+
+    monkeypatch.setattr(
+        "managers.trend_managers.initialize_managers",
+        lambda: reloaded,
+    )
+    scheduler._shed_parent_managers()
+    assert app.config.get("TREND_MANAGERS") is None
+    assert scheduler._ensure_parent_managers() is reloaded
+    assert app.config["TREND_MANAGERS"] is reloaded
+
+
 class _FakeApp:
     config = {"TREND_MANAGERS": {}}
 

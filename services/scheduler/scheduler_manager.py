@@ -1002,6 +1002,7 @@ class TrendsScheduler:
         env = os.environ.copy()
         env["ENABLE_SCHEDULER"] = "false"
         env.setdefault("SKIP_STARTUP_EXECUTION", "true")
+        env.setdefault("MALLOC_ARENA_MAX", "2")
         result_file = None
         if region == "jp" and jp_chunk is not None:
             result_file = os.path.join(

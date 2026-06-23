@@ -28,14 +28,14 @@ def test_get_task_timeout_defaults(monkeypatch):
 def test_execute_task_batches_marks_stalled_tasks_failed():
     tasks = [
         ("fast", 0, "JP"),
-        ("slow", 3, "JP"),
+        ("slow", 35, "JP"),
     ]
     results = tm._execute_task_batches(
         tasks,
         _call_manager_with_delay,
-        max_concurrent=2,
+        max_concurrent=1,
         batch_delay_seconds=0,
-        task_timeout_seconds=1,
+        task_timeout_seconds=30,
     )
     assert results["fast_JP"]["success"] is True
     assert results["slow_JP"]["success"] is False
@@ -43,7 +43,7 @@ def test_execute_task_batches_marks_stalled_tasks_failed():
 
 
 class _FakeApp:
-    config = {"TREND_MANAGERS": {}}
+    config = {"TREND_MANAGERS": {"google": object()}}
 
     @contextmanager
     def app_context(self):

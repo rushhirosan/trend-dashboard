@@ -125,10 +125,13 @@ def _initialize_single_manager(key, manager_class, display_name):
         return None
 
 
-def initialize_managers():
+def initialize_managers(keys: frozenset[str] | set[str] | None = None):
     """
-    全トレンドマネージャーを初期化
+    トレンドマネージャーを初期化
     一部のマネージャーが失敗しても、成功したマネージャーは返す
+
+    Args:
+        keys: 指定時は該当キーのみ初期化（subprocess refresh の RSS 低減用）
 
     Returns:
         dict: 初期化されたマネージャーの辞書（失敗したものはNoneまたは含まれない）
@@ -136,8 +139,11 @@ def initialize_managers():
     managers = {}
     success_count = 0
     fail_count = 0
+    key_filter = frozenset(keys) if keys else None
 
     for key, manager_class, display_name in MANAGER_CONFIGS:
+        if key_filter is not None and key not in key_filter:
+            continue
         manager = _initialize_single_manager(key, manager_class, display_name)
         if manager is not None:
             managers[key] = manager
@@ -146,8 +152,35 @@ def initialize_managers():
             fail_count += 1
             logger.warning(f"⚠️ {display_name} Managerの初期化に失敗しましたが、続行します")
 
-    logger.info(f"✅ マネージャー初期化完了: 成功{success_count}個、失敗{fail_count}個")
+    scope = f"{len(key_filter)} keys" if key_filter is not None else "all"
+    logger.info(
+        "✅ マネージャー初期化完了 (%s): 成功%s個、失敗%s個",
+        scope,
+        success_count,
+        fail_count,
+    )
     return managers
+
+
+def managers_for_refresh(region: str, *, jp_chunk=None, jp_chunks=None) -> dict:
+    """refresh subprocess 用: 当該フェーズで必要なマネージャーのみ初期化。"""
+    refresh_region = _normalize_refresh_region(region)
+    if refresh_region == "jp":
+        tasks = _build_jp_refresh_tasks(True, chunk_index=jp_chunk, chunk_count=jp_chunks)
+        keys = frozenset(task[0] for task in tasks)
+        if not keys:
+            return {}
+        return initialize_managers(keys=keys)
+    if refresh_region == "us":
+        ebay_seed = initialize_managers(keys=frozenset({"ebay"}))
+        tasks = _build_us_refresh_tasks(ebay_seed, True)
+        keys = frozenset(task[0] for task in tasks)
+        if not keys:
+            return {}
+        if keys <= frozenset(ebay_seed.keys()):
+            return ebay_seed
+        return initialize_managers(keys=keys)
+    raise ValueError(f"invalid refresh region: {region!r}")
 
 
 def _get_refresh_concurrency():

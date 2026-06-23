@@ -3,6 +3,7 @@
 定時スケジューラ用: JP または US のみ refresh_all_trends を実行する subprocess エントリ。
 
 親 Gunicorn プロセスの RSS を抑え、フェーズごとに OS へメモリを返す。
+当該 chunk で必要なマネージャーのみ初期化（create_app 全量ロードはしない）。
 結果は stdout 末尾行 `REFRESH_RESULT_JSON:{...}` で返す。
 """
 from __future__ import annotations
@@ -20,7 +21,7 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(_REPO_ROOT, ".env"))
 load_dotenv()
 
-from managers.trend_managers import compact_refresh_result, refresh_all_trends
+from managers.trend_managers import compact_refresh_result, managers_for_refresh, refresh_all_trends
 from utils.logger_config import get_logger
 
 logger = get_logger(__name__)
@@ -67,52 +68,48 @@ def main() -> int:
     os.environ.setdefault("SKIP_STARTUP_EXECUTION", "true")
 
     try:
-        from app import create_app
+        managers = managers_for_refresh(
+            args.region,
+            jp_chunk=args.jp_chunk,
+            jp_chunks=args.jp_chunks,
+        )
     except Exception as exc:
-        logger.error("create_app import failed: %s", exc, exc_info=True)
+        logger.error("managers_for_refresh failed: %s", exc, exc_info=True)
         _emit_result({"success": False, "results": {}, "region": args.region, "error": str(exc)})
         return 1
+
+    if not managers:
+        _emit_result(
+            {
+                "success": True,
+                "results": {},
+                "region": args.region,
+                "message": "no_tasks_for_chunk",
+            }
+        )
+        return 0
 
     try:
-        app, _scheduler = create_app()
+        result = refresh_all_trends(
+            managers,
+            force_refresh=True,
+            max_concurrent=args.max_concurrent,
+            batch_delay_seconds=args.batch_delay,
+            region=args.region,
+            jp_chunk=args.jp_chunk,
+            jp_chunks=args.jp_chunks,
+        )
     except Exception as exc:
-        logger.error("create_app failed: %s", exc, exc_info=True)
-        _emit_result({"success": False, "results": {}, "region": args.region, "error": str(exc)})
+        logger.error("refresh_all_trends failed: %s", exc, exc_info=True)
+        _emit_result(
+            {
+                "success": False,
+                "results": {},
+                "region": args.region,
+                "error": str(exc),
+            }
+        )
         return 1
-
-    with app.app_context():
-        managers = app.config.get("TREND_MANAGERS") or {}
-        if not managers:
-            _emit_result(
-                {
-                    "success": False,
-                    "results": {},
-                    "region": args.region,
-                    "error": "managers_not_initialized",
-                }
-            )
-            return 1
-        try:
-            result = refresh_all_trends(
-                managers,
-                force_refresh=True,
-                max_concurrent=args.max_concurrent,
-                batch_delay_seconds=args.batch_delay,
-                region=args.region,
-                jp_chunk=args.jp_chunk,
-                jp_chunks=args.jp_chunks,
-            )
-        except Exception as exc:
-            logger.error("refresh_all_trends failed: %s", exc, exc_info=True)
-            _emit_result(
-                {
-                    "success": False,
-                    "results": {},
-                    "region": args.region,
-                    "error": str(exc),
-                }
-            )
-            return 1
 
     _emit_result(compact_refresh_result(result))
     return 0 if result.get("success") else 1

@@ -24,7 +24,11 @@ def test_refresh_all_trends_region_jp_only(monkeypatch):
         return {f"{t[0]}_{t[2]}": {"success": True} for t in tasks}
 
     monkeypatch.setattr(tm, "_execute_task_batches", fake_batches)
-    monkeypatch.setattr(tm, "_build_jp_refresh_tasks", lambda fr: [("google", None, "JP")])
+    monkeypatch.setattr(
+        tm,
+        "_build_jp_refresh_tasks",
+        lambda fr, chunk_index=None, chunk_count=None: [("google", None, "JP")],
+    )
     monkeypatch.setattr(tm, "_build_us_refresh_tasks", lambda m, fr: [("cnn", None, "US")])
 
     result = tm.refresh_all_trends({}, region="jp")

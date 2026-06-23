@@ -130,66 +130,27 @@ def daytime_best_rank(ranks: dict[str, int]) -> int:
     return min(vals) if vals else 999
 
 
-def mermaid_rank_y_axis_high(rank_vals: list[int]) -> int:
-    """表示用 Y 上限（実順位の最大+1）。"""
-    if not rank_vals:
-        return 3
-    r_max = max(rank_vals)
-    r_min = min(rank_vals)
-    y_high = r_max + 1
-    if y_high - r_min < 2:
-        y_high = r_min + 2
-    return max(y_high, 3)
-
-
-def mermaid_rank_plot_value(rank: int, y_high: int) -> int:
-    """実順位をプロット値へ（大きいほど上＝上位）。"""
-    return y_high + 1 - int(rank)
-
-
-def format_rank_mermaid_xychart(
-    safe_title: str,
-    subtitle: str,
+def format_rank_trend_markdown(
     x_axis_labels: list[str],
     rank_vals: list[int],
 ) -> str:
-    """順位推移の Mermaid 折れ線（上ほど上位・Y 軸数字なし）。
+    """順位推移の一行（Y 軸なし・全 Markdown ビューア対応）。
 
-    プロット値は ``y_high + 1 - 順位`` で反転し、線が上向き＝順位改善。
-    順位そのものは点ラベル ``N位`` と x 軸・表で示す（Y 軸は Mermaid 都合で非表示）。
+    Mermaid xychart は Y 軸非表示 config がビューア依存のため、
+    表の直下に ``時刻/日付 (N位) → …`` のテキストで示す。
     """
     if len(rank_vals) < 2 or len(set(rank_vals)) < 2:
         return ""
     if len(x_axis_labels) != len(rank_vals):
         return ""
-    labels = ", ".join(f'"{lb}"' for lb in x_axis_labels)
-    y_high = mermaid_rank_y_axis_high(rank_vals)
-    line_parts = [
-        f'{mermaid_rank_plot_value(r, y_high)} "{int(r)}位"' for r in rank_vals
-    ]
-    line_str = ", ".join(line_parts)
-    return (
-        "```mermaid\n"
-        "---\n"
-        "config:\n"
-        "  xyChart:\n"
-        "    yAxis:\n"
-        "      showLabel: false\n"
-        "      showTitle: false\n"
-        "      showTick: false\n"
-        "      showAxisLine: false\n"
-        "  themeVariables:\n"
-        "    xyChart:\n"
-        "      yAxisLabelColor: transparent\n"
-        "      yAxisTickColor: transparent\n"
-        "      yAxisLineColor: transparent\n"
-        "---\n"
-        "xychart-beta\n"
-        f'    title "{safe_title} — {subtitle}"\n'
-        f"    x-axis [{labels}]\n"
-        f"    line [{line_str}]\n"
-        "```"
-    )
+    trend = " → ".join(x_axis_labels)
+    if rank_vals[-1] < rank_vals[0]:
+        arrow = " ↑"
+    elif rank_vals[-1] > rank_vals[0]:
+        arrow = " ↓"
+    else:
+        arrow = ""
+    return f"> **順位の動き**（上ほど良い）: {trend}{arrow}"
 
 def pick_display_from_agg(agg: dict[str, Any]) -> str:
     """表示ラベルは非断片・長い表記を優先し、同点なら最良順位のスロットを使う。"""

@@ -298,30 +298,27 @@ def test_render_weekly_rising_markdown_uses_table_not_prose_evidence(gaws):
     assert "jump **+15.0**" in md
     assert "根拠:" not in md
     assert "jump合計" not in md
-    assert "```mermaid" in md
-    assert "showLabel: false" in md
-    assert '("06-08 (8位)"' in md or '"06-08 (8位)"' in md
+    assert "**順位の動き**" in md
+    assert "```mermaid" not in md
+    assert "06-08 (8位)" in md
 
 
-def test_format_weekly_best_rank_mermaid_hides_y_axis_and_labels_points(gaws):
-    chart = gaws.format_weekly_best_rank_mermaid(
+def test_format_weekly_best_rank_trend_shows_labels_and_direction(gaws):
+    trend = gaws.format_weekly_best_rank_trend(
         "ライラック",
         {
             "2026-06-08": "7時10位 → 13時8位 → 19時8位",
             "2026-06-12": "7時4位 → 13時2位 → 19時2位",
         },
     )
-    assert "showLabel: false" in chart
-    assert "showAxisLine: false" in chart
-    assert "yAxisLabelColor: transparent" in chart
-    assert 'y-axis "順位"' not in chart
-    assert '"06-08 (8位)"' in chart
-    assert '2 "8位"' in chart
-    assert '8 "2位"' in chart
+    assert trend.startswith("> **順位の動き**")
+    assert "06-08 (8位)" in trend
+    assert "06-12 (2位)" in trend
+    assert "↑" in trend
 
 
-def test_format_weekly_best_rank_mermaid_skips_flat_ranks(gaws):
-    assert gaws.format_weekly_best_rank_mermaid(
+def test_format_weekly_best_rank_trend_skips_flat_ranks(gaws):
+    assert gaws.format_weekly_best_rank_trend(
         "Flat",
         {
             "2026-06-08": "7時4位 → 13時4位 → 19時4位",

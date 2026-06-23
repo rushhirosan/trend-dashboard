@@ -833,16 +833,12 @@ def format_daily_rank_table(ranks: dict[str, int]) -> str:
     return "\n".join([header, sep, row])
 
 
-def _mermaid_safe_label(label: str, *, max_len: int = 28) -> str:
-    s = re.sub(r'["\[\]#;|]', "", str(label or "")).strip()
-    return (s[:max_len] or "topic").replace("\n", " ")
-
-
-def format_daily_slot_rank_mermaid(label: str, ranks: dict[str, int]) -> str:
-    """一日のスロット別順位を Mermaid xychart で可視化。
+def format_daily_slot_rank_trend(label: str, ranks: dict[str, int]) -> str:
+    """一日のスロット別順位を一行テキストで示す。
 
     2スロット以上かつ順位に変化があるときのみ（同順の横ばいは表だけ）。
     """
+    del label  # 表・リンク行でラベル済み
     points: List[tuple[str, int]] = []
     for slot in DAYTIME_SLOTS:
         r = ranks.get(slot)
@@ -854,13 +850,7 @@ def format_daily_slot_rank_mermaid(label: str, ranks: dict[str, int]) -> str:
     if len(set(rank_vals)) < 2:
         return ""
     x_labels = [f"{h} ({r}位)" for h, r in points]
-    title = _mermaid_safe_label(label)
-    return sr.format_rank_mermaid_xychart(
-        title,
-        "順位の動き（上ほど上位）",
-        x_labels,
-        rank_vals,
-    )
+    return sr.format_rank_trend_markdown(x_labels, rank_vals)
 
 
 def _compact_daily_link_line(item: Dict[str, Any]) -> str:
@@ -1510,9 +1500,9 @@ def render_rising_highlights_markdown(
         if table:
             lines.append(table)
             lines.append("")
-        chart = format_daily_slot_rank_mermaid(str(it.get("label") or ""), ranks)
-        if chart:
-            lines.append(chart)
+        trend = format_daily_slot_rank_trend(str(it.get("label") or ""), ranks)
+        if trend:
+            lines.append(trend)
             lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
@@ -1545,10 +1535,10 @@ def render_cross_source_highlights_markdown(
         if table:
             lines.append("")
             lines.append(table)
-        chart = format_daily_slot_rank_mermaid(str(h.get("label") or ""), ranks)
-        if chart:
+        trend = format_daily_slot_rank_trend(str(h.get("label") or ""), ranks)
+        if trend:
             lines.append("")
-            lines.append(chart)
+            lines.append(trend)
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 

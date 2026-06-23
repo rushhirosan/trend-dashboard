@@ -705,40 +705,38 @@ def test_render_rising_highlights_markdown_lists_items(gads):
     assert "検索・動画" in md
     assert "| 07 | 13 | 19 |" in md
     assert "| 順位 | 18 | — | 2 |" in md
-    assert "```mermaid" in md
+    assert "**順位の動き**" in md
+    assert "```mermaid" not in md
     assert "**根拠**" not in md
     assert "**区分**" not in md
 
 
-def test_format_daily_slot_rank_mermaid_hides_y_axis_and_labels_points(gads):
-    chart = gads.format_daily_slot_rank_mermaid(
+def test_format_daily_slot_rank_trend_shows_labels_and_direction(gads):
+    trend = gads.format_daily_slot_rank_trend(
         "Climber",
         {"07": 18, "13": 3, "19": 1},
     )
-    assert "showLabel: false" in chart
-    assert "showAxisLine: false" in chart
-    assert "yAxisLabelColor: transparent" in chart
-    assert 'y-axis "順位"' not in chart
-    assert '"7時 (18位)"' in chart
-    assert '2 "18位"' in chart
-    assert '19 "1位"' in chart
-    assert "上ほど上位" in chart
+    assert trend.startswith("> **順位の動き**")
+    assert '"7時 (18位)"' not in trend
+    assert "7時 (18位)" in trend
+    assert "19時 (1位)" in trend
+    assert trend.endswith("↑")
 
 
-def test_format_daily_slot_rank_mermaid_tight_y_axis_for_small_ranks(gads):
-    chart = gads.format_daily_slot_rank_mermaid("Moved", {"13": 4, "19": 2})
-    assert '2 "4位"' in chart
-    assert '4 "2位"' in chart
-    assert 'y-axis "順位"' not in chart
+def test_format_daily_slot_rank_trend_small_ranks(gads):
+    trend = gads.format_daily_slot_rank_trend("Moved", {"13": 4, "19": 2})
+    assert "13時 (4位)" in trend
+    assert "19時 (2位)" in trend
+    assert "↑" in trend
 
 
-def test_format_daily_slot_rank_mermaid_skips_single_slot(gads):
-    assert gads.format_daily_slot_rank_mermaid("Only", {"19": 1}) == ""
+def test_format_daily_slot_rank_trend_skips_single_slot(gads):
+    assert gads.format_daily_slot_rank_trend("Only", {"19": 1}) == ""
 
 
-def test_format_daily_slot_rank_mermaid_skips_flat_ranks(gads):
-    assert gads.format_daily_slot_rank_mermaid("Flat", {"13": 1, "19": 1}) == ""
-    assert gads.format_daily_slot_rank_mermaid("Moved", {"13": 4, "19": 2}) != ""
+def test_format_daily_slot_rank_trend_skips_flat_ranks(gads):
+    assert gads.format_daily_slot_rank_trend("Flat", {"13": 1, "19": 1}) == ""
+    assert gads.format_daily_slot_rank_trend("Moved", {"13": 4, "19": 2}) != ""
 
 
 def test_render_cross_source_highlights_markdown_empty(gads):
@@ -761,7 +759,8 @@ def test_render_cross_source_highlights_markdown_lists_items(gads):
     assert "### 1. 豊臣秀長" in md
     assert "Wikipedia (JA), Google Trends (JP)" in md
     assert "| 07 | 13 | 19 |" in md
-    assert "```mermaid" in md
+    assert "**順位の動き**" in md
+    assert "```mermaid" not in md
     assert "**根拠**" not in md
     assert gads._CROSS_NONE_LINE not in md
 

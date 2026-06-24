@@ -618,15 +618,19 @@ def _best_rank_from_evidence(evidence: str) -> Optional[int]:
     return min(vals) if vals else None
 
 
-def format_weekly_best_rank_trend(
+def _mermaid_safe_label(label: str, *, max_len: int = 28) -> str:
+    s = re.sub(r'["\[\]#;|]', "", str(label or "")).strip()
+    return (s[:max_len] or "topic").replace("\n", " ")
+
+
+def format_weekly_best_rank_mermaid(
     label: str,
     rank_evidence_by_day: Dict[str, str],
 ) -> str:
-    """週内の日別ベスト順位を一行テキストで示す。
+    """週内の日別ベスト順位を Mermaid xychart で可視化。
 
     2日以上かつベスト順位に変化があるときのみ（同順の横ばいは表だけ）。
     """
-    del label
     points: List[tuple[str, int]] = []
     for ds, ev in sorted(rank_evidence_by_day.items()):
         best = _best_rank_from_evidence(ev)
@@ -638,7 +642,13 @@ def format_weekly_best_rank_trend(
     if len(set(rank_vals)) < 2:
         return ""
     x_labels = [f"{d} ({r}位)" for d, r in points]
-    return sr.format_rank_trend_markdown(x_labels, rank_vals)
+    title = _mermaid_safe_label(label)
+    return sr.format_rank_mermaid_xychart(
+        title,
+        "日別ベスト順位（上ほど上位）",
+        x_labels,
+        rank_vals,
+    )
 
 
 def _compact_weekly_link_line(item: Dict[str, Any]) -> str:
@@ -679,9 +689,9 @@ def render_weekly_rising_markdown(
             if table:
                 lines.append(table)
                 lines.append("")
-            trend = format_weekly_best_rank_trend(str(it.get("label") or ""), rank_by_day)
-            if trend:
-                lines.append(trend)
+            chart = format_weekly_best_rank_mermaid(str(it.get("label") or ""), rank_by_day)
+            if chart:
+                lines.append(chart)
                 lines.append("")
     if not any_items:
         return (

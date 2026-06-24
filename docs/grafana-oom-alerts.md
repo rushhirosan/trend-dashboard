@@ -43,9 +43,9 @@ anon-rss
 | 変数 | 値 | 説明 |
 |------|-----|------|
 | `DISCORD_MEMORY_PRESSURE_ALERT` | `true` | 逼迫時 Discord |
-| `MEMORY_LIMIT_MB` | `1536` | cgroup 未取得時の fallback |
+| `MEMORY_LIMIT_MB` | `1024` | cgroup 未取得時の fallback |
 | `MEMORY_WATCHDOG_INTERVAL_SEC` | `15` | 監視間隔（旧 45s → 短縮） |
-| `MEMORY_PRESSURE_WARN_RATIO` | `0.75` | 警告（1536MB で ~1152MB） |
+| `MEMORY_PRESSURE_WARN_RATIO` | `0.75` | 警告（1024MB で ~768MB） |
 | `MEMORY_PRESSURE_CRITICAL_RATIO` | `0.88` | 危険（~1352MB） |
 | `MEMORY_PRESSURE_ALERT_COOLDOWN_SEC` | `600` | 同一レベル再通知間隔 |
 

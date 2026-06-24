@@ -55,6 +55,8 @@ import snapshot_rising as sr
 
 JST = ZoneInfo("Asia/Tokyo")
 REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 DAILY_DIR = REPO_ROOT / "docs" / "summaries" / "daily"
 BASE_DEFAULT = "https://trends-dashboard.fly.dev"
 

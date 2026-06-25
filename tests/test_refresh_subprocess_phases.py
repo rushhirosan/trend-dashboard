@@ -96,6 +96,38 @@ def test_jp_failure_skips_us_subprocess(monkeypatch):
     assert "cnn_US" not in result["results"]
 
 
+def test_subprocess_phase_timeouts_reserves_us_budget():
+    jp_timeout, us_timeout = sm._subprocess_phase_timeouts(8, 5100)
+    assert us_timeout >= 2400
+    assert jp_timeout >= 600
+    assert us_timeout > jp_timeout or us_timeout >= 1200
+
+
+def test_us_subprocess_gets_longer_timeout_than_jp_chunks(monkeypatch):
+    calls = []
+
+    def fake_subprocess(self, region, *, low_memory_mode, timeout_seconds, jp_chunk=None, jp_chunks=None):
+        calls.append((region, timeout_seconds, jp_chunk))
+        return {"success": True, "results": {f"{region}_x": {"success": True}}}, False
+
+    monkeypatch.setattr(sm, "SCHEDULER_JP_SUBCHUNKS", 8)
+    monkeypatch.setattr(sm.TrendsScheduler, "_run_refresh_region_subprocess", fake_subprocess)
+    monkeypatch.setattr(sm.TrendsScheduler, "_pause_between_subprocess_phases", lambda self: None)
+    scheduler = sm.TrendsScheduler(_FakeApp())
+    result, timed_out = scheduler._run_refresh_all_trends_with_job_timeout(
+        low_memory_mode=True,
+        job_timeout_seconds=5100,
+    )
+    assert timed_out is False
+    assert result["success"] is True
+    us_calls = [c for c in calls if c[0] == "us"]
+    jp_calls = [c for c in calls if c[0] == "jp"]
+    assert len(us_calls) == 1
+    assert len(jp_calls) == 8
+    assert us_calls[0][1] >= 2400
+    assert all(call[1] >= 600 for call in jp_calls)
+
+
 def test_shed_and_restore_parent_managers(monkeypatch):
     sentinel = {"google": object()}
     app = _FakeApp()

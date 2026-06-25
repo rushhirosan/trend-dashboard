@@ -113,6 +113,36 @@ try:
     )
 except (TypeError, ValueError):
     SCHEDULER_SUBPROCESS_PHASE_PAUSE_SECONDS = 3.0
+try:
+    SCHEDULER_US_SUBPROCESS_TIMEOUT_SECONDS = max(
+        600,
+        min(3600, int(os.environ.get("TRENDS_SCHEDULER_US_SUBPROCESS_TIMEOUT_SECONDS", "2400"))),
+    )
+except (TypeError, ValueError):
+    SCHEDULER_US_SUBPROCESS_TIMEOUT_SECONDS = 2400
+try:
+    SCHEDULER_JP_CHUNK_TIMEOUT_SECONDS = max(
+        600,
+        min(2400, int(os.environ.get("TRENDS_SCHEDULER_JP_CHUNK_TIMEOUT_SECONDS", "600"))),
+    )
+except (TypeError, ValueError):
+    SCHEDULER_JP_CHUNK_TIMEOUT_SECONDS = 600
+
+
+def _subprocess_phase_timeouts(jp_subchunks: int, job_timeout_seconds: int) -> tuple[int, int]:
+    """JP chunk / US subprocess の timeout（秒）。US 専用枠を先に確保する。"""
+    jp_subchunks = max(1, jp_subchunks)
+    pause_budget = int(SCHEDULER_SUBPROCESS_PHASE_PAUSE_SECONDS * jp_subchunks)
+    us_timeout = SCHEDULER_US_SUBPROCESS_TIMEOUT_SECONDS
+    remaining = job_timeout_seconds - us_timeout - pause_budget
+    jp_timeout = max(SCHEDULER_JP_CHUNK_TIMEOUT_SECONDS, remaining // jp_subchunks)
+    if jp_timeout < SCHEDULER_JP_CHUNK_TIMEOUT_SECONDS:
+        jp_timeout = SCHEDULER_JP_CHUNK_TIMEOUT_SECONDS
+        us_timeout = max(
+            900,
+            job_timeout_seconds - jp_timeout * jp_subchunks - pause_budget,
+        )
+    return jp_timeout, us_timeout
 
 
 def _parse_refresh_subprocess_stdout(stdout: str) -> dict:
@@ -1132,15 +1162,14 @@ class TrendsScheduler:
     ) -> tuple[dict, bool]:
         """JP（必要なら分割）→ US を順に subprocess で実行し、結果をマージ。"""
         jp_subchunks = SCHEDULER_JP_SUBCHUNKS if low_memory_mode else 1
-        phase_count = jp_subchunks + 1
-        phase_timeout = max(600, job_timeout_seconds // phase_count)
+        jp_timeout, us_timeout = _subprocess_phase_timeouts(jp_subchunks, job_timeout_seconds)
         jp_chunk_results: list[dict] = []
 
         for chunk_idx in range(1, jp_subchunks + 1):
             jp_result, jp_timed_out = self._run_refresh_region_subprocess(
                 "jp",
                 low_memory_mode=low_memory_mode,
-                timeout_seconds=phase_timeout,
+                timeout_seconds=jp_timeout,
                 jp_chunk=chunk_idx if jp_subchunks > 1 else None,
                 jp_chunks=jp_subchunks if jp_subchunks > 1 else None,
             )
@@ -1151,6 +1180,10 @@ class TrendsScheduler:
                     {"success": False, "results": {}},
                 )
                 merged["job_timed_out"] = True
+                merged["jp_phase_timed_out"] = True
+                merged["jp_phase_timeout_seconds"] = jp_timeout
+                merged["failed_jp_chunk"] = chunk_idx
+                merged["failed_jp_chunks"] = jp_subchunks
                 merged["success"] = False
                 merged["jp_phase_failed"] = True
                 merged["us_phase_skipped"] = True
@@ -1185,11 +1218,13 @@ class TrendsScheduler:
         us_result, us_timed_out = self._run_refresh_region_subprocess(
             "us",
             low_memory_mode=low_memory_mode,
-            timeout_seconds=phase_timeout,
+            timeout_seconds=us_timeout,
         )
         merged = _merge_phase_refresh_results(jp_result, us_result)
         if us_timed_out:
             merged["job_timed_out"] = True
+            merged["us_phase_timed_out"] = True
+            merged["us_phase_timeout_seconds"] = us_timeout
             merged["success"] = False
             merged["us_phase_failed"] = True
             return merged, True
@@ -1202,11 +1237,13 @@ class TrendsScheduler:
         """refresh_all_trends を実行。低負荷モード時は JP/US を subprocess で分割（OOM 対策）。"""
         if low_memory_mode and SCHEDULER_SUBPROCESS_PHASES:
             _jp_chunks = SCHEDULER_JP_SUBCHUNKS
-            _phase_timeout = max(600, job_timeout_seconds // (_jp_chunks + 1))
+            _jp_timeout, _us_timeout = _subprocess_phase_timeouts(_jp_chunks, job_timeout_seconds)
             logger.info(
-                "🔄 refresh_all_trends: subprocess フェーズ分割 (JP×%s → US, phase_timeout=%ss)",
+                "🔄 refresh_all_trends: subprocess フェーズ分割 "
+                "(JP×%s → US, jp_timeout=%ss us_timeout=%ss)",
                 _jp_chunks,
-                _phase_timeout,
+                _jp_timeout,
+                _us_timeout,
             )
             return self._run_refresh_all_trends_subprocess_phases(
                 low_memory_mode=low_memory_mode,
@@ -1504,21 +1541,58 @@ class TrendsScheduler:
                 )
                 return executed
             if job_timed_out:
-                self._send_alert(
-                    "critical",
-                    "トレンド取得ジョブ全体タイムアウト",
-                    (
-                        f"一括取得が {SCHEDULER_JOB_TIMEOUT_SECONDS} 秒以内に終わりませんでした。"
-                        " _fetching_in_progress は解放済みです。未完了タスクのスレッドはプロセス再起動まで残る可能性があります。"
-                    ),
-                    {
-                        "実行ID": execution_id,
-                        "トリガー": self._trigger_label(trigger_source),
-                        "ジョブ上限（秒）": str(SCHEDULER_JOB_TIMEOUT_SECONDS),
-                        "ホスト": host_short,
-                        "PID": str(pid),
-                    },
-                )
+                if result.get("us_phase_timed_out"):
+                    us_limit = result.get("us_phase_timeout_seconds", "?")
+                    self._send_alert(
+                        "critical",
+                        "US フェーズ subprocess タイムアウト",
+                        (
+                            f"JP は完了しましたが US subprocess が {us_limit} 秒以内に終わりませんでした。"
+                            " 19時スナップショットは保存されません。gap_retry または手動補完を確認してください。"
+                        ),
+                        {
+                            "実行ID": execution_id,
+                            "トリガー": self._trigger_label(trigger_source),
+                            "US上限（秒）": str(us_limit),
+                            "ホスト": host_short,
+                            "PID": str(pid),
+                        },
+                    )
+                elif result.get("jp_phase_timed_out"):
+                    jp_limit = result.get("jp_phase_timeout_seconds", "?")
+                    failed_chunk = result.get("failed_jp_chunk")
+                    failed_chunks = result.get("failed_jp_chunks")
+                    self._send_alert(
+                        "critical",
+                        "JP フェーズ subprocess タイムアウト",
+                        (
+                            f"JP chunk {failed_chunk}/{failed_chunks} が {jp_limit} 秒以内に終わりませんでした。"
+                            " US はスキップされます。"
+                        ),
+                        {
+                            "実行ID": execution_id,
+                            "トリガー": self._trigger_label(trigger_source),
+                            "JP上限（秒）": str(jp_limit),
+                            "ホスト": host_short,
+                            "PID": str(pid),
+                        },
+                    )
+                else:
+                    self._send_alert(
+                        "critical",
+                        "トレンド取得ジョブ全体タイムアウト",
+                        (
+                            f"一括取得が {SCHEDULER_JOB_TIMEOUT_SECONDS} 秒以内に終わりませんでした。"
+                            " _fetching_in_progress は解放済みです。未完了タスクのスレッドはプロセス再起動まで残る可能性があります。"
+                        ),
+                        {
+                            "実行ID": execution_id,
+                            "トリガー": self._trigger_label(trigger_source),
+                            "ジョブ上限（秒）": str(SCHEDULER_JOB_TIMEOUT_SECONDS),
+                            "ホスト": host_short,
+                            "PID": str(pid),
+                        },
+                    )
 
             snapshot_status: dict = {}
             prior_slot_gaps: list[str] = []
@@ -1613,11 +1687,31 @@ class TrendsScheduler:
             failed_trends = []
             failed_trends_details = []
             if result.get('job_timed_out'):
-                failed_trends_details.append({
-                    'source': '_job',
-                    'error': f'job_timeout after {SCHEDULER_JOB_TIMEOUT_SECONDS}s',
-                    'status': 'timeout',
-                })
+                if result.get('us_phase_timed_out'):
+                    us_limit = result.get('us_phase_timeout_seconds', '?')
+                    failed_trends_details.append({
+                        'source': '_us_phase',
+                        'error': f'us_phase_timeout after {us_limit}s',
+                        'status': 'timeout',
+                    })
+                elif result.get('jp_phase_timed_out'):
+                    jp_limit = result.get('jp_phase_timeout_seconds', '?')
+                    err = f'jp_phase_timeout after {jp_limit}s'
+                    failed_chunk = result.get('failed_jp_chunk')
+                    failed_chunks = result.get('failed_jp_chunks')
+                    if failed_chunk and failed_chunks:
+                        err = f"{err} (jp_chunk={failed_chunk}/{failed_chunks})"
+                    failed_trends_details.append({
+                        'source': '_jp_phase',
+                        'error': err,
+                        'status': 'timeout',
+                    })
+                else:
+                    failed_trends_details.append({
+                        'source': '_job',
+                        'error': f'job_timeout after {SCHEDULER_JOB_TIMEOUT_SECONDS}s',
+                        'status': 'timeout',
+                    })
             if result.get('jp_phase_failed'):
                 jp_phase = (result.get('phases') or {}).get('jp') or {}
                 err = jp_phase.get('error') or 'jp_phase_failed'

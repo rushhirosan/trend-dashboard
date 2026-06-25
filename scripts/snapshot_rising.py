@@ -136,7 +136,7 @@ def format_rank_trend_markdown(
 ) -> str:
     """順位推移の一行（日次向け・Y 軸なし・全 Markdown ビューア対応）。
 
-    日次はスロットが少ないためテキストで十分。週次は Mermaid を使う。
+    日次はスロットが少ないためテキストで十分。週次は Mermaid + テキスト一行。
     """
     if len(rank_vals) < 2 or len(set(rank_vals)) < 2:
         return ""
@@ -169,16 +169,95 @@ def mermaid_rank_plot_value(rank: int, y_high: int) -> int:
     return y_high + 1 - int(rank)
 
 
+def _svg_escape(text: str) -> str:
+    return (
+        str(text or "")
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def rank_chart_coordinates(
+    rank_vals: list[int],
+    *,
+    width: int = 560,
+    height: int = 200,
+) -> tuple[list[float], list[float], int, int, int, int]:
+    """順位列から描画座標（上＝数字小＝上位、Y 軸目盛なし）。"""
+    plot_left, plot_right = 24, width - 16
+    plot_top, plot_bottom = 36, 148
+    plot_w = plot_right - plot_left
+    plot_h = plot_bottom - plot_top
+    r_min = min(rank_vals)
+    r_max = max(rank_vals)
+    span = max(r_max - r_min, 1)
+    n = len(rank_vals)
+    xs = [
+        plot_left + (plot_w * i / (n - 1) if n > 1 else plot_w / 2)
+        for i in range(n)
+    ]
+    ys = [plot_top + (r - r_min) / span * plot_h for r in rank_vals]
+    return xs, ys, plot_left, plot_right, plot_top, plot_bottom
+
+
+def format_rank_svg_chart(
+    safe_title: str,
+    subtitle: str,
+    x_axis_labels: list[str],
+    rank_vals: list[int],
+) -> str:
+    """順位推移の SVG 折れ線（週次向け・上ほど上位・Y 軸目盛なし）。
+
+    Mermaid xychart は多くの Markdown プレビューで Y 軸 config が効かないため SVG を使う。
+    """
+    if len(rank_vals) < 2 or len(set(rank_vals)) < 2:
+        return ""
+    if len(x_axis_labels) != len(rank_vals):
+        return ""
+    width, height = 560, 200
+    xs, ys, _, _, _, plot_bottom = rank_chart_coordinates(
+        rank_vals, width=width, height=height
+    )
+    points = " ".join(f"{x:.1f},{y:.1f}" for x, y in zip(xs, ys))
+    stroke = "#0d9488"
+    title = _svg_escape(f"{safe_title} — {subtitle}")
+    parts = [
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 560 200\" role=\"img\" "
+        f"aria-label=\"{title}\">",
+        f"<title>{title}</title>",
+        f"<text x=\"{width / 2:.1f}\" y=\"18\" text-anchor=\"middle\" font-size=\"12\" "
+        f"font-family=\"system-ui,sans-serif\" fill=\"#334155\">{title}</text>",
+        f"<polyline fill=\"none\" stroke=\"{stroke}\" stroke-width=\"2.5\" points=\"{points}\"/>",
+    ]
+    for x, y, rank, x_label in zip(xs, ys, rank_vals, x_axis_labels):
+        parts.append(
+            f"<circle cx=\"{x:.1f}\" cy=\"{y:.1f}\" r=\"4.5\" fill=\"#fff\" stroke=\"{stroke}\" stroke-width=\"2\"/>"
+        )
+        parts.append(
+            f"<text x=\"{x:.1f}\" y=\"{y - 10:.1f}\" text-anchor=\"middle\" font-size=\"11\" "
+            f"font-family=\"system-ui,sans-serif\" fill=\"{stroke}\">{int(rank)}位</text>"
+        )
+        parts.append(
+            f"<text x=\"{x:.1f}\" y=\"{plot_bottom + 18:.1f}\" text-anchor=\"middle\" font-size=\"10\" "
+            f"font-family=\"system-ui,sans-serif\" fill=\"#64748b\">{_svg_escape(x_label)}</text>"
+        )
+    parts.append("</svg>")
+    return "\n".join(parts)
+
+
 def format_rank_mermaid_xychart(
     safe_title: str,
     subtitle: str,
     x_axis_labels: list[str],
     rank_vals: list[int],
 ) -> str:
-    """順位推移の Mermaid 折れ線（週次向け・上ほど上位）。
+    """順位推移の Mermaid 折れ線（週次・Cursor 等のプレビュー向け）。
 
-    プロット値は ``y_high + 1 - 順位`` で反転。順位は点ラベルと x 軸・表で示す。
-    Y 軸数字は config で非表示（ビューア非対応時は点ラベルを参照）。
+    プロット値は ``y_high + 1 - 順位`` で反転（2位が上、8位が下）。各点ラベルは実順位「N位」。
+    Cursor プレビューでは ``yAxis.showLabel: false`` が効かず左目盛が出ることがある。
+    その場合は各点ラベルと直下のテキスト一行（日次と同形式）を参照。
     """
     if len(rank_vals) < 2 or len(set(rank_vals)) < 2:
         return ""
@@ -187,7 +266,7 @@ def format_rank_mermaid_xychart(
     labels = ", ".join(f'"{lb}"' for lb in x_axis_labels)
     y_high = mermaid_rank_y_axis_high(rank_vals)
     line_parts = [
-        f'{mermaid_rank_plot_value(r, y_high)} "{int(r)}位"' for r in rank_vals
+        f'{mermaid_rank_plot_value(int(r), y_high)} "{int(r)}位"' for r in rank_vals
     ]
     line_str = ", ".join(line_parts)
     return (
@@ -195,6 +274,7 @@ def format_rank_mermaid_xychart(
         "---\n"
         "config:\n"
         "  xyChart:\n"
+        "    showLegend: false\n"
         "    yAxis:\n"
         "      showLabel: false\n"
         "      showTitle: false\n"
@@ -203,10 +283,11 @@ def format_rank_mermaid_xychart(
         "  themeVariables:\n"
         "    xyChart:\n"
         "      yAxisLabelColor: transparent\n"
+        "      yAxisTitleColor: transparent\n"
         "      yAxisTickColor: transparent\n"
         "      yAxisLineColor: transparent\n"
         "---\n"
-        "xychart-beta\n"
+        "xychart\n"
         f'    title "{safe_title} — {subtitle}"\n'
         f"    x-axis [{labels}]\n"
         f"    line [{line_str}]\n"

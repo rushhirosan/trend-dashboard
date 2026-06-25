@@ -89,6 +89,10 @@ _GENERIC_RISING_NOTE = re.compile(
     r"(若い世代|話題です|盛り上がり|関心が高ま|人気です|特に.*の間で|急上昇中|注目を集め)",
     re.I,
 )
+_LATE_SLOT_IMPROVE_RE = re.compile(
+    r"(\d+)時(\d+)位(?:に|へ)(?:上昇|上が|跳ね)",
+    re.I,
+)
 # 連日上位の定番（編集候補・一行結論から除外。トップ3根拠リストには残す）
 _KNOWN_STALE_LABEL_KEYS = frozenset(
     {
@@ -1778,6 +1782,8 @@ def teaser_is_acceptable(
     labels = [str(r.get("label") or "").strip() for r in rising_items if r.get("label")]
     if labels and not any(lab in s for lab in labels[:3]):
         return False
+    if _text_misstates_rank_movement(s, rising_items):
+        return False
     return True
 
 
@@ -1926,13 +1932,90 @@ def build_mechanical_spotlights(
     return out[:max_count]
 
 
+def _hour_to_slot(hour: int) -> str:
+    return f"{hour:02d}"
+
+
+def describe_rank_movement(ranks: dict[str, int]) -> str:
+    """07→13→19 の順位推移を1文で説明（圏外含む）。"""
+    observed = [(slot, int(ranks[slot])) for slot in DAYTIME_SLOTS if slot in ranks]
+    if not observed:
+        return ""
+    first_slot, first_rank = observed[0]
+    last_slot, last_rank = observed[-1]
+    if len(observed) == 1:
+        return f"{_slot_hour_label(first_slot)}時{first_rank}位で観測。"
+    if len({r for _, r in observed}) == 1:
+        if first_slot != "07" and ranks.get("07") is None:
+            return (
+                f"7時圏外から{_slot_hour_label(first_slot)}時{first_rank}位へ上昇し、"
+                f"{_slot_hour_label(last_slot)}時も{last_rank}位を維持。"
+            )
+        return (
+            f"{_slot_hour_label(first_slot)}時から{_slot_hour_label(last_slot)}時まで"
+            f"{first_rank}位を維持。"
+        )
+    if last_rank < first_rank:
+        return (
+            f"{_slot_hour_label(first_slot)}時{first_rank}位から"
+            f"{_slot_hour_label(last_slot)}時{last_rank}位へ上昇。"
+        )
+    return f"順位: {_format_rank_evidence(ranks)}。"
+
+
+def build_mechanical_rising_note(item: Dict[str, Any]) -> str:
+    note = describe_rank_movement(_ranks_dict_from_item(item))
+    return note.rstrip("。") + "。" if note else ""
+
+
+def _rising_note_misstates_movement(note: str, ranks: dict[str, int]) -> bool:
+    """「19時1位に上昇」等、実際より遅いスロットだけを強調する文言を検出。"""
+    m = _LATE_SLOT_IMPROVE_RE.search(note or "")
+    if not m:
+        return False
+    claimed_slot = _hour_to_slot(int(m.group(1)))
+    claimed_rank = int(m.group(2))
+    if claimed_slot not in DAYTIME_SLOTS:
+        return False
+    actual = ranks.get(claimed_slot)
+    if actual is None or int(actual) != claimed_rank:
+        return True
+    for slot in DAYTIME_SLOTS:
+        if slot == claimed_slot:
+            break
+        earlier = ranks.get(slot)
+        if earlier is not None and int(earlier) <= claimed_rank:
+            return True
+    return False
+
+
+def _text_misstates_rank_movement(
+    text: str, rising_items: List[Dict[str, Any]]
+) -> bool:
+    if not (text or "").strip() or not rising_items:
+        return False
+    for item in rising_items:
+        label = str(item.get("label") or "").strip()
+        if label and label not in text:
+            continue
+        if _rising_note_misstates_movement(text, _ranks_dict_from_item(item)):
+            return True
+    if _LATE_SLOT_IMPROVE_RE.search(text):
+        return _rising_note_misstates_movement(
+            text, _ranks_dict_from_item(rising_items[0])
+        )
+    return False
+
+
 def filter_rising_notes(
     notes: List[Dict[str, Any]],
     rising_items: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
-    """薄い定型補足を除き、必要なら根拠行ベースの機械補足に差し替える。"""
-    allowed = {_normalize_label_key(str(r.get("label") or "")) for r in rising_items}
-    out: List[Dict[str, Any]] = []
+    """薄い定型補足を除き、順位と矛盾する LLM 補足は機械文に差し替える。"""
+    by_label = {
+        _normalize_label_key(str(r.get("label") or "")): r for r in rising_items
+    }
+    kept: Dict[str, Dict[str, Any]] = {}
     for n in notes or []:
         if not isinstance(n, dict):
             continue
@@ -1940,10 +2023,26 @@ def filter_rising_notes(
         note = str(n.get("note") or "").strip()
         if not ml or not note or _GENERIC_RISING_NOTE.search(note):
             continue
-        if _normalize_label_key(ml) not in allowed:
+        nk = _normalize_label_key(ml)
+        if nk not in by_label:
             continue
-        out.append({"match_label": ml, "note": note})
+        item = by_label[nk]
+        if _rising_note_misstates_movement(note, _ranks_dict_from_item(item)):
+            continue
+        kept[nk] = {"match_label": ml, "note": note}
 
+    out: List[Dict[str, Any]] = []
+    for item in rising_items:
+        ml = str(item.get("label") or "").strip()
+        if not ml:
+            continue
+        nk = _normalize_label_key(ml)
+        if nk in kept:
+            out.append(kept[nk])
+            continue
+        mech = build_mechanical_rising_note(item)
+        if mech:
+            out.append({"match_label": ml, "note": mech})
     return out
 
 

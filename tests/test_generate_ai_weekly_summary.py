@@ -299,12 +299,13 @@ def test_render_weekly_rising_markdown_uses_table_not_prose_evidence(gaws):
     assert "根拠:" not in md
     assert "jump合計" not in md
     assert "```mermaid" in md
-    assert "showLabel: false" in md
-    assert "日別ベスト順位（上ほど上位）" in md
+    assert "**日別ベスト順位**" in md
     assert "06-08 (8位)" in md
+    assert " ↑" in md
+    assert ".png" not in md
 
 
-def test_format_weekly_best_rank_mermaid_hides_y_axis_and_labels_points(gaws):
+def test_format_weekly_best_rank_mermaid_uses_rank_values_and_point_labels(gaws):
     chart = gaws.format_weekly_best_rank_mermaid(
         "ライラック",
         {
@@ -312,13 +313,9 @@ def test_format_weekly_best_rank_mermaid_hides_y_axis_and_labels_points(gaws):
             "2026-06-12": "7時4位 → 13時2位 → 19時2位",
         },
     )
-    assert "showLabel: false" in chart
-    assert "showAxisLine: false" in chart
-    assert 'y-axis "順位"' not in chart
-    assert '"06-08 (8位)"' in chart
+    assert "```mermaid" in chart
     assert '2 "8位"' in chart
     assert '8 "2位"' in chart
-    assert "日別ベスト順位（上ほど上位）" in chart
 
 
 def test_format_weekly_best_rank_mermaid_skips_flat_ranks(gaws):

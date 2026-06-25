@@ -271,6 +271,50 @@ def test_filter_rising_notes_drops_generic_boilerplate(gads):
     assert notes == []
 
 
+def test_rising_note_misstates_when_already_top_at_13(gads):
+    ranks = {"13": 1, "19": 1}
+    assert gads._rising_note_misstates_movement("19時1位に上昇しました。", ranks)
+    assert not gads._rising_note_misstates_movement(
+        "13時3位から19時1位へ上昇。", {"13": 3, "19": 1}
+    )
+
+
+def test_describe_rank_movement_flat_after_oob(gads):
+    assert gads.describe_rank_movement({"13": 1, "19": 1}) == (
+        "7時圏外から13時1位へ上昇し、19時も1位を維持。"
+    )
+    assert gads.describe_rank_movement({"13": 3, "19": 1}) == (
+        "13時3位から19時1位へ上昇。"
+    )
+
+
+def test_filter_rising_notes_replaces_misleading_with_mechanical(gads):
+    rising = [
+        {
+            "label": "森鷗外「舞姫」",
+            "ranks": {"13": 1, "19": 1},
+        },
+    ]
+    notes = gads.filter_rising_notes(
+        [{"match_label": "森鷗外「舞姫」", "note": "19時1位に上昇しました。"}],
+        rising,
+    )
+    assert len(notes) == 1
+    assert "13時1位" in notes[0]["note"]
+    assert "19時1位に上昇" not in notes[0]["note"]
+
+
+def test_teaser_rejects_misleading_late_slot_claim(gads):
+    rising = [
+        {
+            "label": "森鷗外「舞姫」",
+            "ranks": {"13": 1, "19": 1},
+        },
+    ]
+    teaser = "「森鷗外「舞姫」」が19時1位に上昇。"
+    assert not gads.teaser_is_acceptable(teaser, rising)
+
+
 def test_slot_hour_label_strips_leading_zero(gads):
     assert gads._slot_hour_label("07") == "7"
     assert gads._slot_hour_label("13") == "13"

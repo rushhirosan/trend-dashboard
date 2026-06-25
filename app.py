@@ -216,15 +216,20 @@ def create_app():
         if response.content_type and (
             'text/css' in response.content_type or
             'application/javascript' in response.content_type or
+            'text/javascript' in response.content_type or
             'image/' in response.content_type or
             'font/' in response.content_type
         ):
             # 静的ファイルは1年間キャッシュ（バージョニングで更新）
+            # Flask send_file の既定 no_cache を外す（no-cache と max-age の混在を防ぐ）
+            response.cache_control.no_cache = False
+            response.cache_control.must_revalidate = False
             response.cache_control.max_age = 31536000  # 1年
             response.cache_control.public = True
             response.cache_control.immutable = True
         # HTMLファイルは短いキャッシュ（5分）
         elif response.content_type and 'text/html' in response.content_type:
+            response.cache_control.no_cache = False
             response.cache_control.max_age = 300  # 5分
             response.cache_control.public = True
         return response

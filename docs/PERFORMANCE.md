@@ -6,7 +6,7 @@
 - 全体バックログとの関係: [`BACKLOG.md`](BACKLOG.md) の「プロダクト・品質改善」から本ファイルへリンク
 - 参照レポート: [PageSpeed Insights（mobile, 2026-06-24）](https://pagespeed.web.dev/analysis/https-trends-dashboard-fly-dev/8qsxatevwc?form_factor=mobile)
 
-**最終更新:** 2026-06-26
+**最終更新:** 2026-06-26（フェーズ1 実装済み・デプロイ前）
 
 ---
 
@@ -28,11 +28,11 @@
 
 | 領域 | 状態 | 次のアクション |
 |------|------|----------------|
-| **レンダリングブロック** | 未着手 | フェーズ1-1: `<head>` の JS を `defer` + `</body>` 直前へ |
-| **Web フォント** | 未着手 | フェーズ1-2: Noto Sans JP を 400 のみ or システムフォント優先 |
-| **静的キャッシュ** | バグあり | フェーズ1-3: `text/javascript` の Cache-Control 修正 |
-| **初回 API** | 未着手 | フェーズ2: SSR 済みソースの再 fetch スキップ |
-| **PSI スコア** | 未再計測 | フェーズ1 完了後にモバイルで再計測して [スコア記録](#スコア記録) へ |
+| **レンダリングブロック** | 実装済み | デプロイ後 PSI で確認 |
+| **Web フォント** | 実装済み（400 のみ） | デプロイ後 Network で確認 |
+| **静的キャッシュ** | 実装済み | デプロイ後本番ヘッダー確認 |
+| **初回 API** | 未着手 | フェーズ2 |
+| **PSI スコア** | 未再計測 | デプロイ後モバイルで再計測 |
 
 ---
 
@@ -83,37 +83,37 @@
 
 ### 1-1 レンダリングブロック JS の解消
 
-- [ ] `templates/index.html` — `<head>` 内の自前 JS を `</body>` 直前へ移動
-- [ ] `templates/us_trends.html` — 同上
-- [ ] Bootstrap JS を `defer` で読み込み（`DOMContentLoaded` 依存のため順序を確認）
-- [ ] 他テンプレート（`about.html` 等）で同パターンがあれば揃える
+- [x] `templates/index.html` — `<head>` 内の自前 JS を `</body>` 直前へ移動
+- [x] `templates/us_trends.html` — 同上
+- [x] Bootstrap JS を `defer` で読み込み（`DOMContentLoaded` 依存のため順序を確認）
+- [x] 他テンプレート（`about.html` 等）— ブロッキング JS なしのため対象外
 - [ ] 本番デプロイ後、モバイル PSI で「レンダリングをブロックしているリソース」を確認
 
 **触るファイル（想定）:** `templates/index.html`, `templates/us_trends.html`
 
 ### 1-2 Web フォントの軽量化
 
-- [ ] Noto Sans JP を **400 のみ** に絞る（`fw-bold` / `fw-semibold` はブラウザ合成）
-- [ ] またはシステムフォントスタック優先に切り替え（`static/css/common.css`）
-- [ ] `font-display: optional` または `swap` の方針を決めて統一
+- [x] Noto Sans JP を **400 のみ** に絞る（`fw-bold` / `fw-semibold` はブラウザ合成）
+- [x] US ページ: Inter も **400 のみ** に統一
+- [x] `display=swap` を維持
 - [ ] 本番で Network タブのフォント転送量を確認
 
 **触るファイル（想定）:** `templates/index.html`, `templates/us_trends.html`, `static/css/common.css`
 
 ### 1-3 静的ファイル Cache-Control の修正
 
-- [ ] `app.py` `set_cache_headers` — `text/javascript` を判定に追加
-- [ ] `response.cache_control.no_cache = False` を明示（`no-cache` と `max-age` の混在を解消）
+- [x] `app.py` `set_cache_headers` — `text/javascript` を判定に追加
+- [x] `response.cache_control.no_cache = False` を明示（`no-cache` と `max-age` の混在を解消）
 - [ ] 本番で `static/js/*.js` が `max-age=31536000, public, immutable` になることを確認
-- [ ] テスト追加（任意）: 静的レスポンスの Cache-Control アサーション
+- [x] テスト: `tests/test_cache_headers.py`
 
 **触るファイル（想定）:** `app.py`, `tests/test_pages.py`（任意）
 
 ### 1-4 不要 CSS の除去（index / us）
 
-- [ ] `index.html` から `data-status.css` / `subscription.css` を外す（該当ページのみで読み込む）
-- [ ] `us_trends.html` も同様に整理
-- [ ] 見た目の退行がないことを確認
+- [x] `index.html` から `data-status.css` / `subscription.css` を外す（該当ページのみで読み込む）
+- [x] `us_trends.html` — もともと未読み込み（コメントで明記済み）
+- [ ] デプロイ後、見た目の退行がないことを確認
 
 **触るファイル（想定）:** `templates/index.html`, `templates/us_trends.html`, `templates/data-status.html`, `templates/subscription.html`
 
@@ -210,4 +210,5 @@
 | 日付 | 決定内容 |
 |------|----------|
 | 2026-06-26 | PageSpeed 改善タスクを `docs/PERFORMANCE.md` に一本化。フェーズ1（JS defer / フォント / Cache-Control / 不要 CSS）から着手。 |
+| 2026-06-26 | フェーズ1 実装: `index.html` / `us_trends.html` の JS defer 化、フォント 400 のみ、`app.py` Cache-Control 修正、`tests/test_cache_headers.py` 追加。 |
 | | |

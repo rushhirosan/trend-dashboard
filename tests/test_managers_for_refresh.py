@@ -31,7 +31,7 @@ def test_managers_for_refresh_jp_kkj_chunk_only():
         return MagicMock(name=key)
 
     with patch.object(tm, "_initialize_single_manager", side_effect=fake_init):
-        managers = tm.managers_for_refresh("jp", jp_chunk=2, jp_chunks=6)
+        managers = tm.managers_for_refresh("jp", jp_chunk=6, jp_chunks=6)
     assert set(managers.keys()) == {"kkj"}
     assert created == ["kkj"]
 

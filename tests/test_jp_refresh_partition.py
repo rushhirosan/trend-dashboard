@@ -56,6 +56,18 @@ def test_kkj_isolated_when_six_chunks():
     assert kkj_part[0][0] == "kkj"
 
 
+def test_kkj_moves_to_last_chunk_when_six_chunks():
+    tasks = [
+        ("google", None, "JP"),
+        ("note", None, "JP"),
+        ("kkj", None, "JP"),
+        ("youtube", None, "JP"),
+    ]
+    parts = partition_jp_refresh_tasks(tasks, 6)
+    assert any(t[0] == "note" for t in parts[0])
+    assert any(t[0] == "kkj" for t in parts[-1])
+
+
 def test_expected_jp_key_count_without_twitch(monkeypatch):
     monkeypatch.delenv("TWITCH_CLIENT_ID", raising=False)
     monkeypatch.delenv("TWITCH_CLIENT_SECRET", raising=False)

@@ -18,6 +18,16 @@ def _isolate_key_for_chunk_count(key: str, chunk_count: int) -> bool:
     return False
 
 
+def _isolated_bucket_index(key: str, chunk_count: int) -> int:
+    """隔離対象 key の配置先バケット（0-based）。"""
+    if key == "kkj":
+        # OOM が出やすい kkj は末尾へ寄せ、先行 chunk の完走率を上げる。
+        return max(0, chunk_count - 1)
+    if key == "note":
+        return 0
+    return 0
+
+
 def expected_jp_result_key_count(tasks: list) -> int:
     """refresh 結果 dict に含まれるべき JP ソースキー数（book/openalex 等は1キーに集約）。"""
     return len({task[0] for task in tasks})
@@ -57,12 +67,17 @@ def partition_jp_refresh_tasks(tasks: list, chunk_count: int) -> list[list]:
             multis.setdefault(key, []).append(task)
         else:
             rest.append(task)
-    idx = 0
     isolated_bucket_ids: set[int] = set()
     for task in isolated:
-        buckets[idx].append(task)
-        isolated_bucket_ids.add(idx)
-        idx += 1
+        bucket_id = _isolated_bucket_index(task[0], chunk_count)
+        # 競合時は次の空きへ送る（chunk 数不足時の保険）。
+        if bucket_id in isolated_bucket_ids:
+            for i in range(chunk_count):
+                if i not in isolated_bucket_ids:
+                    bucket_id = i
+                    break
+        buckets[bucket_id].append(task)
+        isolated_bucket_ids.add(bucket_id)
     free_buckets = [i for i in range(chunk_count) if i not in isolated_bucket_ids]
     if not free_buckets:
         free_buckets = list(range(chunk_count))

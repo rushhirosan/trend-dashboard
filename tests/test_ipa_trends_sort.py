@@ -162,3 +162,47 @@ class TestIPADateNormalization:
         url = 'https://www.ipa.go.jp/security/announce/2026/alert20260610.html'
         resolved = manager._resolve_original_published_date(url)
         assert resolved == datetime(2026, 6, 10)
+
+
+class TestIPAUrlDateExtraction:
+    def test_jvn_filename_year_overrides_path_year(self, manager):
+        url = 'https://www.ipa.go.jp/security/security-alert/2025/20260225-jvn.html'
+        assert manager._extract_published_date_from_url(url) == datetime(2026, 2, 25)
+
+    def test_ms_path_year_corrected_by_title(self, manager):
+        url = 'https://www.ipa.go.jp/security/security-alert/2025/0212-ms.html'
+        title = 'Microsoft 製品の脆弱性対策について(2026年2月)'
+        assert manager._extract_published_date_from_url(url, title=title) == datetime(2026, 2, 12)
+
+    def test_ms_path_year_without_title_uses_path(self, manager):
+        url = 'https://www.ipa.go.jp/security/security-alert/2025/0910-ms.html'
+        title = 'Microsoft 製品の脆弱性対策について(2025年9月)'
+        assert manager._extract_published_date_from_url(url, title=title) == datetime(2025, 9, 10)
+
+    def test_normalize_fixes_wrong_ms_year_from_cache(self, manager):
+        data = [
+            _item(
+                'Microsoft 製品の脆弱性対策について(2026年2月)',
+                '2025-02-12T00:00:00',
+                original_published_date='2025-02-12T00:00:00',
+                url='https://www.ipa.go.jp/security/security-alert/2025/0212-ms.html',
+            ),
+        ]
+        normalized = manager._normalize_dates_for_sort(data)
+        assert normalized[0]['published_date'] == '2026-02-12T00:00:00'
+        assert normalized[0]['original_published_date'] == '2026-02-12T00:00:00'
+
+    def test_feb_ms_ranks_before_jan_bind_in_top25(self, manager):
+        data = [
+            _item('「Movable Type」…', '2026-04-08T00:00:00'),
+            _item('BIND 9…', '2026-01-23T00:00:00'),
+            _item(
+                'Microsoft 製品の脆弱性対策について(2026年2月)',
+                '2025-02-12T00:00:00',
+                url='https://www.ipa.go.jp/security/security-alert/2025/0212-ms.html',
+            ),
+        ]
+        normalized = manager._normalize_dates_for_sort(data)
+        sorted_data = manager._sort_ipa_items(normalized)
+        titles = [x['title'] for x in sorted_data]
+        assert titles.index('Microsoft 製品の脆弱性対策について(2026年2月)') < titles.index('BIND 9…')

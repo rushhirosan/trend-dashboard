@@ -26,13 +26,38 @@ class IPATrendsManager(BaseTrendsManager):
         logger.info("IPA Trends Manager初期化:")
         logger.info(f"  RSS URL: {self.rss_url}")
     
-    def _extract_published_date_from_url(self, url):
+    def _extract_published_date_from_title(self, title, url=None):
+        """タイトルの (YYYY年M月) と URL の MMDD を組み合わせて公開日を得る（月次注意喚起用）。"""
+        if not title:
+            return None
+        match = re.search(r'\((\d{4})年(\d{1,2})月\)', title)
+        if not match:
+            return None
+        title_year = int(match.group(1))
+        title_month = int(match.group(2))
+        if not url:
+            return None
+        filename = url.rsplit('/', 1)[-1]
+        mmdd_match = re.match(r'^(\d{4})-[\w-]+\.html$', filename)
+        if not mmdd_match:
+            return None
+        mmdd = mmdd_match.group(1)
+        month = int(mmdd[:2])
+        day = int(mmdd[2:4])
+        if month != title_month:
+            return None
+        try:
+            return datetime(title_year, month, day)
+        except ValueError:
+            return None
+
+    def _extract_published_date_from_url(self, url, title=None):
         """
         IPAのURLパターンから実際の公開日を抽出
         対応パターン:
         - /YYYY/alertYYYYMMDD.html → /2025/alert20250827.html
-        - /YYYY/YYYYMMDD-suffix.html → /2025/20250827-jvn.html
-        - /YYYY/MMDD-suffix.html → /2025/0910-ms.html（年はパスから）
+        - /YYYY/YYYYMMDD-suffix.html → /2025/20250827-jvn.html（ファイル名8桁の年を優先）
+        - /YYYY/MMDD-suffix.html → /2025/0910-ms.html（タイトル (YYYY年M月) があれば年を上書き）
         - alertYYYYMMDD_suffix.html → alert20251031_router.html
         """
         if not url:
@@ -58,27 +83,29 @@ class IPATrendsManager(BaseTrendsManager):
                         logger.debug(f"IPA URL日付パースエラー: {url}, {e}")
             
             # パターン2: /YYYY/YYYYMMDD-suffix.html
-            # 例: /2025/20250827-jvn.html → 2025年8月27日
+            # 例: /2025/20260225-jvn.html → 2026年2月25日（パス年と異なってもファイル名8桁を優先）
             pattern2 = r'/(\d{4})/(\d{8})-[\w-]+\.html'
             match2 = re.search(pattern2, url)
             if match2:
-                year = int(match2.group(1))
                 date_str = match2.group(2)  # YYYYMMDD形式
                 if len(date_str) == 8:
-                    year_from_date = int(date_str[:4])
+                    year = int(date_str[:4])
                     month = int(date_str[4:6])
                     day = int(date_str[6:8])
-                    if year_from_date == year:
-                        try:
-                            return datetime(year, month, day)
-                        except ValueError as e:
-                            logger.debug(f"IPA URL日付パースエラー: {url}, {e}")
+                    try:
+                        return datetime(year, month, day)
+                    except ValueError as e:
+                        logger.debug(f"IPA URL日付パースエラー: {url}, {e}")
             
             # パターン3: /YYYY/MMDD-suffix.html
-            # 例: /2025/0910-ms.html → 2025年9月10日（年はパスから）
+            # 例: /2025/0212-ms.html → パス年のみだと2025年になるが、タイトル (2026年2月) で補正
             pattern3 = r'/(\d{4})/(\d{4})-[\w-]+\.html'
             match3 = re.search(pattern3, url)
             if match3:
+                if title:
+                    from_title = self._extract_published_date_from_title(title, url)
+                    if from_title:
+                        return from_title
                 year = int(match3.group(1))
                 date_str = match3.group(2)  # MMDD形式
                 if len(date_str) == 4:
@@ -105,21 +132,19 @@ class IPATrendsManager(BaseTrendsManager):
                         logger.debug(f"IPA URL日付パースエラー: {url}, {e}")
             
             # パターン5: /YYYY/YYYYMMDD.html（サフィックスなし）
-            # 例: /2025/20251208.html → 2025年12月8日
+            # 例: /2025/20251208.html → 2025年12月8日（8桁の年を優先）
             pattern5 = r'/(\d{4})/(\d{8})\.html'
             match5 = re.search(pattern5, url)
             if match5:
-                year = int(match5.group(1))
                 date_str = match5.group(2)  # YYYYMMDD形式
                 if len(date_str) == 8:
-                    year_from_date = int(date_str[:4])
+                    year = int(date_str[:4])
                     month = int(date_str[4:6])
                     day = int(date_str[6:8])
-                    if year_from_date == year:
-                        try:
-                            return datetime(year, month, day)
-                        except ValueError as e:
-                            logger.debug(f"IPA URL日付パースエラー: {url}, {e}")
+                    try:
+                        return datetime(year, month, day)
+                    except ValueError as e:
+                        logger.debug(f"IPA URL日付パースエラー: {url}, {e}")
             
             # パターン6: alertYYYYMMDD.html（年がパスにない場合のフォールバック）
             pattern7 = r'alert(\d{8})\.html'
@@ -162,9 +187,11 @@ class IPATrendsManager(BaseTrendsManager):
             and dt.microsecond == 0
         )
 
-    def _resolve_original_published_date(self, url):
-        """URL → HTML の順で初出公開日を解決（RSS 日付は使わない）。"""
-        original = self._extract_published_date_from_url(url)
+    def _resolve_original_published_date(self, url, title=None):
+        """URL（+タイトル）→ HTML の順で初出公開日を解決（RSS 日付は使わない）。"""
+        original = self._extract_published_date_from_url(url, title=title)
+        if not original and title:
+            original = self._extract_published_date_from_title(title, url)
         if not original:
             original = self._fetch_original_published_date_from_html(url)
         return original
@@ -175,12 +202,17 @@ class IPATrendsManager(BaseTrendsManager):
             return data
         for item in data:
             url = item.get('url') or ''
+            title = item.get('title') or ''
             original = item.get('original_published_date')
-            if not original and url:
-                extracted = self._extract_published_date_from_url(url)
+            if url:
+                extracted = self._extract_published_date_from_url(url, title=title)
+                if not extracted and title:
+                    extracted = self._extract_published_date_from_title(title, url)
                 if extracted:
-                    original = extracted.isoformat()
-                    item['original_published_date'] = original
+                    resolved_iso = extracted.isoformat()
+                    if not original or original != resolved_iso:
+                        original = resolved_iso
+                        item['original_published_date'] = original
 
             published = item.get('published_date')
             if original:
@@ -518,10 +550,10 @@ class IPATrendsManager(BaseTrendsManager):
                         rss_published_date = datetime.now()
                     
                     entry_url = entry.get('link', '')
-                    original_published_date = self._resolve_original_published_date(entry_url)
-                    
-                    # タイトルを取得
                     title = entry.get('title', 'No Title')
+                    original_published_date = self._resolve_original_published_date(
+                        entry_url, title=title
+                    )
                     
                     # 更新情報かどうかを判定
                     is_updated = self._is_updated_alert(title)

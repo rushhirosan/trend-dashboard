@@ -10,7 +10,7 @@
 - 週次の数値 → [週次メモ](#週次メモ)
 - 日次サマリー品質・SLA の詳細手順 → [`summary_pattern_a_phase1.md`](summary_pattern_a_phase1.md)
 
-**最終更新:** 2026-06-22
+**最終更新:** 2026-06-26
 
 ---
 
@@ -218,6 +218,13 @@
 - [x] Core Web Vitals / 内部リンク / Search Console 基本設定
 - [ ] Search Console 定期レビュー（カバレッジ・パフォーマンス）
 
+**PageSpeed / フロントエンド（詳細は [`PERFORMANCE.md`](PERFORMANCE.md)）**
+
+- [ ] フェーズ1: JS defer / フォント軽量化 / Cache-Control 修正 / 不要 CSS 除去
+- [ ] フェーズ2: Font Awesome サブセット / SSR 済み API スキップ
+- [ ] フェーズ3: 非アクティブタブ遅延レンダリング / DOM 削減
+- [ ] PSI スコアの定期記録（`PERFORMANCE.md` スコア表）
+
 ### 優先度: 中
 
 - [x] API レート制限（主要マネージャー）
@@ -249,6 +256,7 @@
 | 日付 | メモ |
 |------|------|
 | 2026-06-22 | `todo.md` + `monetization.md` を本 BACKLOG に統合。1536MB 安定・retention purge デプロイ済。 |
+| 2026-06-26 | PageSpeed 改善の進捗管理を `docs/PERFORMANCE.md` に分離。BACKLOG からリンク。 |
 | | |
 
 ### 決定ログ

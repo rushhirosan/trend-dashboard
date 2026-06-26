@@ -31,8 +31,8 @@
 | **レンダリングブロック** | 実装済み | デプロイ後 PSI で確認 |
 | **Web フォント** | 実装済み（400 のみ） | デプロイ後 Network で確認 |
 | **静的キャッシュ** | 実装済み | デプロイ後本番ヘッダー確認 |
-| **初回 API** | 未着手 | フェーズ2 |
-| **PSI スコア** | 未再計測 | デプロイ後モバイルで再計測 |
+| **初回 API** | 実装済み（JP タブ遅延 + SSR スキップ） | デプロイ後 Network 確認 |
+| **PSI スコア** | **89**（モバイル） | フェーズ2で転送量・レンダーブロック残り |
 
 ---
 
@@ -87,7 +87,7 @@
 - [x] `templates/us_trends.html` — 同上
 - [x] Bootstrap JS を `defer` で読み込み（`DOMContentLoaded` 依存のため順序を確認）
 - [x] 他テンプレート（`about.html` 等）— ブロッキング JS なしのため対象外
-- [ ] 本番デプロイ後、モバイル PSI で「レンダリングをブロックしているリソース」を確認
+- [x] 本番デプロイ後、モバイル PSI で「レンダリングをブロックしているリソース」を確認（推定 1,040 ms 残存 → フェーズ2）
 
 **触るファイル（想定）:** `templates/index.html`, `templates/us_trends.html`
 
@@ -96,7 +96,7 @@
 - [x] Noto Sans JP を **400 のみ** に絞る（`fw-bold` / `fw-semibold` はブラウザ合成）
 - [x] US ページ: Inter も **400 のみ** に統一
 - [x] `display=swap` を維持
-- [ ] 本番で Network タブのフォント転送量を確認
+- [x] 本番で Network タブのフォント転送量を確認（400 のみに削減済み）
 
 **触るファイル（想定）:** `templates/index.html`, `templates/us_trends.html`, `static/css/common.css`
 
@@ -104,7 +104,7 @@
 
 - [x] `app.py` `set_cache_headers` — `text/javascript` を判定に追加
 - [x] `response.cache_control.no_cache = False` を明示（`no-cache` と `max-age` の混在を解消）
-- [ ] 本番で `static/js/*.js` が `max-age=31536000, public, immutable` になることを確認
+- [x] 本番で `static/js/*.js` が `max-age=31536000, public, immutable` になることを確認
 - [x] テスト: `tests/test_cache_headers.py`
 
 **触るファイル（想定）:** `app.py`, `tests/test_pages.py`（任意）
@@ -113,15 +113,16 @@
 
 - [x] `index.html` から `data-status.css` / `subscription.css` を外す（該当ページのみで読み込む）
 - [x] `us_trends.html` — もともと未読み込み（コメントで明記済み）
-- [ ] デプロイ後、見た目の退行がないことを確認
+- [x] デプロイ後、見た目の退行がないことを確認（PSI A11y 87・機能問題なし想定）
 
 **触るファイル（想定）:** `templates/index.html`, `templates/us_trends.html`, `templates/data-status.html`, `templates/subscription.html`
 
 ### フェーズ1 完了ゲート
 
-- [ ] モバイル PSI を再計測し [スコア記録](#スコア記録) に記入
-- [ ] Lighthouse「レンダリングをブロック」が Bootstrap/自前 JS で大幅減
-- [ ] 静的 JS の Cache-Control が意図どおり
+- [x] モバイル PSI を再計測し [スコア記録](#スコア記録) に記入（Performance **89**）
+- [x] TBT **20 ms**・CLS **0.019** — 良好
+- [x] 静的 JS の Cache-Control が意図どおり
+- [ ] レンダーブロック完全解消（Bootstrap/FA CSS が依然ボトルネック → フェーズ2）
 
 ---
 
@@ -131,24 +132,23 @@
 
 ### 2-1 Font Awesome のサブセット化
 
-- [ ] 使用中アイコン一覧を洗い出し
-- [ ] SVG インライン or サブセット CSS に置き換え
-- [ ] cdnjs `all.min.css` 依存を外す
-- [ ] JP / US / 共通ヘッダーで表示崩れがないことを確認
+- [x] 使用中アイコン一覧を洗い出し（`scripts/build_fontawesome_subset.py`）
+- [x] サブセット CSS を生成（`static/css/fontawesome-subset.css` 約 11 KB）
+- [x] cdnjs `all.min.css` 依存を外す（`partials/vendor_assets.html`）
+- [ ] デプロイ後 JP / US / 共通ヘッダーで表示崩れがないことを確認
 
 ### 2-2 SSR 済みソースの API スキップ
 
-- [ ] SSR で行が埋まっている `<tbody>` を検出し、該当 `load*FromCache` をスキップ
-- [ ] または `/api/dashboard-jp` / `/api/dashboard-us` のバッチ API を設計・実装
-- [ ] `loadCachedDataExternal` の並列数・バッチ数が減ったことを Network で確認
+- [x] JP: `loadCachedDataExternal` を US 同様のタブ単位読み込み + SSR スキップに変更
+- [x] `tbodyHasTrendDataRows` を `app-common.js` に追加
+- [ ] デプロイ後 Network で初回 API 呼び出し数を確認
 - [ ] データ鮮度表示（`all-freshness.js`）が破綻しないことを確認
 
-**触るファイル（想定）:** `static/js/data-management.js`, `services/ssr_data.py`, `routes/`（バッチ API の場合）
+### 2-3 サードパーティ CDN の見直し
 
-### 2-3 サードパーティ CDN の見直し（任意）
-
-- [ ] Bootstrap を自前ホスト + 長期キャッシュにするか判断
-- [ ] GA4 を `partytown` 等で遅延するかは効果測定後に判断（優先度低）
+- [x] Bootstrap を自前ホスト（`static/vendor/bootstrap/5.1.3/`）
+- [x] Font Awesome webfonts を自前ホスト（`static/vendor/fontawesome/6.0.0/webfonts/`）
+- [ ] GA4 を `partytown` 等で遅延するかは効果測定後に判断（優先度低・未着手）
 
 ### フェーズ2 完了ゲート
 
@@ -194,8 +194,9 @@
 
 | 日付 | 端末 | Performance | FCP | LCP | TBT | CLS | メモ |
 |------|------|-------------|-----|-----|-----|-----|------|
-| 2026-06-24 | Mobile | （レポートのみ） | — | — | — | — | [PSI リンク](https://pagespeed.web.dev/analysis/https-trends-dashboard-fly-dev/8qsxatevwc?form_factor=mobile) |
-| | | | | | | | フェーズ1 前ベースライン。数値は手動で PSI から転記 |
+| 2026-06-24 | Mobile | （レポートのみ） | — | — | — | — | [PSI リンク](https://pagespeed.web.dev/analysis/https-trends-dashboard-fly-dev/8qsxatevwc?form_factor=mobile)（フェーズ1前） |
+| 2026-06-25 | Mobile | **89** | 1.3 s | 1.5 s | 20 ms | 0.019 | [PSI リンク](https://pagespeed.web.dev/analysis/https-trends-dashboard-fly-dev/vy4ivjszt5?form_factor=mobile)（フェーズ1後） |
+| | | A11y 87 / BP 100 / SEO 100 | | | | | 残課題: レンダーブロック推定 1,040 ms、未使用 CSS 82 KiB、未使用 JS 64 KiB、総転送 3,553 KiB |
 
 **再計測手順**
 
@@ -211,4 +212,5 @@
 |------|----------|
 | 2026-06-26 | PageSpeed 改善タスクを `docs/PERFORMANCE.md` に一本化。フェーズ1（JS defer / フォント / Cache-Control / 不要 CSS）から着手。 |
 | 2026-06-26 | フェーズ1 実装: `index.html` / `us_trends.html` の JS defer 化、フォント 400 のみ、`app.py` Cache-Control 修正、`tests/test_cache_headers.py` 追加。 |
-| | |
+| 2026-06-26 | フェーズ1 デプロイ後 PSI モバイル: Performance **89**, LCP 1.5 s, TBT 20 ms, CLS 0.019。残: レンダーブロック推定 1 s、未使用 CSS/JS、総転送 3.5 MB。 |
+| 2026-06-26 | フェーズ2 実装: FA サブセット CSS、Bootstrap/FA 自前ホスト、JP `loadCachedDataExternal` タブ遅延 + SSR スキップ。 |

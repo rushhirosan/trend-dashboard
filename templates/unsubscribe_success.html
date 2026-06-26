@@ -7,9 +7,8 @@
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
     <link rel="apple-touch-icon" sizes="512x512" href="{{ url_for('static', filename='images/icon-512.png') }}">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="/static/css/common.css" rel="stylesheet">
+    {% include 'partials/vendor_assets.html' %}
+    <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
 </head>
 <body>
     <div class="container mt-5">
@@ -32,6 +31,6 @@
         </div>
     </div>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+    <script defer src="{{ url_for('static', filename='vendor/bootstrap/5.1.3/bootstrap.bundle.min.js') }}"></script>
 </body>
 </html>

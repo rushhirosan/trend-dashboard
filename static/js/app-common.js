@@ -656,6 +656,22 @@ function updateTrendMetaDisplay(containerId, payload, _metaOverride) {
 // シンプルパターン用の共通関数
 // ============================================
 
+/** SSR 行または API 済みの実データ行があるか（空メッセージ1行は除外） */
+function tbodyHasTrendDataRows(tbodyId) {
+    try {
+        var el = document.getElementById(tbodyId);
+        if (!el) return false;
+        var rows = el.querySelectorAll ? Array.from(el.querySelectorAll('tr:not(.skeleton-row)')) : [];
+        if (rows.length === 0) return false;
+        return rows.some(function (tr) {
+            var tds = tr.querySelectorAll ? tr.querySelectorAll('td') : [];
+            return tds.length > 1;
+        });
+    } catch (_) {
+        return false;
+    }
+}
+
 /**
  * シンプルパターンのキャッシュデータ読み込み関数
  * @param {Object} config - 設定オブジェクト

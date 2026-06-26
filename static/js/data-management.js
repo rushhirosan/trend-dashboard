@@ -34,43 +34,153 @@ function loadAdminTrendsFromCache() {
 }
 
 // キャッシュデータを自動読み込み（外部から呼び出し用）
-// 並び順: 全部入り（All）タブの表示順に合わせる（上からバッチで読み込み）
+// アクティブタブのみ先に読み、SSR 済みの全部入り行は再 fetch をスキップ（US と同方針）
 function loadCachedDataExternal() {
     console.log('📦 キャッシュデータの読み込み処理開始');
-    var allCategories = [
-        loadAdminTrendsFromCache,
-        loadNewsBundleFromCache,
-        loadWikipediaTrendsFromCache,
-        loadGoogleTrendsFromCache,
-        loadYouTubeTrendsFromCache,
-        loadPRTimesHatenaTrendsFromCache,
-        loadQiitaTrendsFromCache,
-        loadHatenaTrendsFromCache,
-        loadZennTrendsFromCache,
-        loadNoteTrendsFromCache,
-        loadGitHubTrendsFromCache,
-        loadIPATrendsFromCache,
-        loadJPCERTTrendsFromCache,
-        loadCryptoTrendsFromCache,
-        loadStockTrendsFromCache,
-        loadAppStoreTrendsFromCache,
-        loadMusicTrendsFromCache,
-        loadPodcastTrendsFromCache,
-        loadMovieTrendsFromCache,
-        loadBookTrendsFromCache,
-        loadRakutenTrendsFromCache,
-        loadOpenAlexTrendsFromCache,
-        loadBlueskyTrendsFromCache,
-        loadTwitchTrendsFromCache
-    ];
-    console.log('🚀 全カテゴリのバッチ読み込み開始（並列数: 4）');
-    console.log('🚀 実行する関数:', allCategories.map(function(f) { return f.name; }));
-    if (typeof runBatchLoad === 'function') {
-        runBatchLoad(allCategories, { batchSize: 4, delayMs: 200 });
-    } else {
-        allCategories.forEach(function(fn) { fn(); });
+
+    var _jpLoaded = window.__jpLoadedFlags || (window.__jpLoadedFlags = {});
+
+    function markLoaded(key) { _jpLoaded[key] = true; }
+    function alreadyLoaded(key) { return !!_jpLoaded[key]; }
+
+    function onceOrRetry(key, fn, mainTbodyId, allTbodyId) {
+        var hasMainRows = mainTbodyId ? tbodyHasTrendDataRows(mainTbodyId) : false;
+        var hasAllRows = allTbodyId ? tbodyHasTrendDataRows(allTbodyId) : false;
+        if (alreadyLoaded(key) && (hasMainRows || hasAllRows)) return;
+        markLoaded(key);
+        try { fn(); } catch (e) { console.warn('loadCachedDataExternal:', key, e); }
     }
-    console.log('✅ キャッシュデータの読み込み処理完了');
+
+    function loadSource(key, fn, mainTbodyId, allTbodyId) {
+        onceOrRetry(key, fn, mainTbodyId, allTbodyId);
+    }
+
+    function getActiveTabId() {
+        var active = document.querySelector('#trendCategoryTabs .nav-link.active');
+        return active && active.id ? active.id : 'tab-all';
+    }
+
+    function loadNewsBundleUnlessSsr() {
+        var nhkSsr = tbodyHasTrendDataRows('all-nhkTrendsTableBody');
+        var newsSsr = tbodyHasTrendDataRows('all-newsTrendsTableBody');
+        if (nhkSsr && newsSsr) {
+            console.log('📊 News Bundle: SSR 済みのためスキップ');
+            return;
+        }
+        loadSource('news-bundle', loadNewsBundleFromCache, 'nhkTrendsTableBody', 'all-nhkTrendsTableBody');
+    }
+
+    function loadForTab(tabId) {
+        if (!tabId) tabId = 'tab-all';
+
+        if (tabId === 'tab-news') {
+            loadSource('news-bundle', loadNewsBundleFromCache, 'nhkTrendsTableBody', 'all-nhkTrendsTableBody');
+            return;
+        }
+        if (tabId === 'tab-search') {
+            loadSource('wikipedia', loadWikipediaTrendsFromCache, 'wikipediaTrendsTableBody', 'all-wikipediaTrendsTableBody');
+            loadSource('google', loadGoogleTrendsFromCache, 'googleTrendsTableBody', 'all-googleTrendsTableBody');
+            loadSource('youtube', loadYouTubeTrendsFromCache, 'youtubeTrendsTableBody', 'all-youtubeTrendsTableBody');
+            return;
+        }
+        if (tabId === 'tab-tech') {
+            loadSource('prtimes_hatena', loadPRTimesHatenaTrendsFromCache, 'prtimesHatenaTrendsTableBody', 'all-prtimesHatenaTrendsTableBody');
+            loadSource('qiita', loadQiitaTrendsFromCache, 'qiitaTrendsTableBody', 'all-qiitaTrendsTableBody');
+            loadSource('hatena', loadHatenaTrendsFromCache, 'hatenaTrendsTableBody', 'all-hatenaTrendsTableBody');
+            loadSource('zenn', loadZennTrendsFromCache, 'zennTrendsTableBody', 'all-zennTrendsTableBody');
+            loadSource('note', loadNoteTrendsFromCache, 'noteTrendsTableBody', 'all-noteTrendsTableBody');
+            loadSource('github', loadGitHubTrendsFromCache, 'githubTrendsTableBody', 'all-githubTrendsTableBody');
+            loadSource('ipa', loadIPATrendsFromCache, 'ipaTrendsTableBody', 'all-ipaTrendsTableBody');
+            loadSource('jpcert', loadJPCERTTrendsFromCache, 'jpcertTrendsTableBody', 'all-jpcertTrendsTableBody');
+            return;
+        }
+        if (tabId === 'tab-market') {
+            loadSource('crypto', loadCryptoTrendsFromCache, 'cryptoTrendsTableBody', 'all-cryptoTrendsTableBody');
+            loadSource('stock', loadStockTrendsFromCache, 'stockTrendsTableBody', 'all-stockTrendsTableBody');
+            loadSource('appstore', loadAppStoreTrendsFromCache, 'appstoreTrendsTableBody', 'all-appstoreTrendsTableBody');
+            return;
+        }
+        if (tabId === 'tab-entertainment') {
+            loadSource('music', loadMusicTrendsFromCache, 'musicTrendsTableBody', 'all-musicTrendsTableBody');
+            loadSource('podcast', loadPodcastTrendsFromCache, 'podcastTrendsTableBody', 'all-podcastTrendsTableBody');
+            loadSource('movie', loadMovieTrendsFromCache, 'movieTrendsTableBody', 'all-movieTrendsTableBody');
+            loadSource('book', loadBookTrendsFromCache, 'bookTrendsTableBody', 'all-bookTrendsTableBody');
+            loadSource('rakuten', loadRakutenTrendsFromCache, 'rakutenTrendsTableBody', 'all-rakutenTrendsTableBody');
+            loadSource('openalex', loadOpenAlexTrendsFromCache, 'openalexTrendsTableBody', 'all-openalexTrendsTableBody');
+            loadSource('bluesky', loadBlueskyTrendsFromCache, 'blueskyTrendsTableBody', 'all-blueskyTrendsTableBody');
+            loadSource('twitch', loadTwitchTrendsFromCache, 'twitchTrendsTableBody', 'all-twitchTrendsTableBody');
+            return;
+        }
+        if (tabId === 'tab-admin') {
+            loadSource('admin', loadAdminTrendsFromCache, null, null);
+            return;
+        }
+
+        // tab-all: SSR 済みコアはスキップ、残りは idle で低並列
+        loadNewsBundleUnlessSsr();
+        if (!tbodyHasTrendDataRows('all-wikipediaTrendsTableBody') && !tbodyHasTrendDataRows('wikipediaTrendsTableBody')) {
+            loadSource('wikipedia', loadWikipediaTrendsFromCache, 'wikipediaTrendsTableBody', 'all-wikipediaTrendsTableBody');
+        }
+        if (!tbodyHasTrendDataRows('all-googleTrendsTableBody') && !tbodyHasTrendDataRows('googleTrendsTableBody')) {
+            loadSource('google', loadGoogleTrendsFromCache, 'googleTrendsTableBody', 'all-googleTrendsTableBody');
+        }
+        if (!tbodyHasTrendDataRows('all-youtubeTrendsTableBody') && !tbodyHasTrendDataRows('youtubeTrendsTableBody')) {
+            loadSource('youtube', loadYouTubeTrendsFromCache, 'youtubeTrendsTableBody', 'all-youtubeTrendsTableBody');
+        }
+
+        var idle = (typeof requestIdleCallback === 'function')
+            ? requestIdleCallback
+            : function (cb) { return setTimeout(cb, 1200); };
+        idle(function () {
+            var rest = [
+                ['prtimes_hatena', loadPRTimesHatenaTrendsFromCache],
+                ['qiita', loadQiitaTrendsFromCache],
+                ['hatena', loadHatenaTrendsFromCache],
+                ['zenn', loadZennTrendsFromCache],
+                ['note', loadNoteTrendsFromCache],
+                ['github', loadGitHubTrendsFromCache],
+                ['ipa', loadIPATrendsFromCache],
+                ['jpcert', loadJPCERTTrendsFromCache],
+                ['crypto', loadCryptoTrendsFromCache],
+                ['stock', loadStockTrendsFromCache],
+                ['appstore', loadAppStoreTrendsFromCache],
+                ['music', loadMusicTrendsFromCache],
+                ['podcast', loadPodcastTrendsFromCache],
+                ['movie', loadMovieTrendsFromCache],
+                ['book', loadBookTrendsFromCache],
+                ['rakuten', loadRakutenTrendsFromCache],
+                ['openalex', loadOpenAlexTrendsFromCache],
+                ['bluesky', loadBlueskyTrendsFromCache],
+                ['twitch', loadTwitchTrendsFromCache],
+                ['admin', loadAdminTrendsFromCache]
+            ];
+            var i = 0;
+            (function next() {
+                if (i >= rest.length) {
+                    console.log('✅ 全部入りタブ: 遅延バッチ完了');
+                    return;
+                }
+                var pair = rest[i++];
+                if (!alreadyLoaded(pair[0])) {
+                    markLoaded(pair[0]);
+                    try { pair[1](); } catch (e) { console.warn('idle load:', pair[0], e); }
+                }
+                setTimeout(next, 180);
+            })();
+        });
+    }
+
+    loadForTab(getActiveTabId());
+
+    var tabsEl = document.getElementById('trendCategoryTabs');
+    if (tabsEl) {
+        tabsEl.addEventListener('shown.bs.tab', function (e) {
+            var tabId = e && e.target && e.target.id ? e.target.id : null;
+            loadForTab(tabId);
+        });
+    }
+
+    console.log('✅ キャッシュデータの読み込み処理完了（タブ単位 + SSR スキップ）');
 }
 
 // Google Trendsキャッシュデータの読み込み（共通化）

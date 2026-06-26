@@ -58,3 +58,24 @@ def test_data_status_and_subscription_keep_own_css():
     sub = (TEMPLATES / "subscription.html").read_text(encoding="utf-8")
     assert "data-status.css" in ds
     assert "subscription.css" in sub
+
+
+def test_vendor_assets_self_hosted():
+    index = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    assert "partials/vendor_assets.html" in index
+    assert "cdnjs.cloudflare.com/ajax/libs/bootstrap" not in index
+    assert "cdnjs.cloudflare.com/ajax/libs/font-awesome" not in index
+    assert "vendor/bootstrap/5.1.3/bootstrap.bundle.min.js" in index
+
+
+def test_fontawesome_subset_exists():
+    css = (ROOT / "static" / "css" / "fontawesome-subset.css").read_text(encoding="utf-8")
+    assert "fa-chart-line" in css
+    assert len(css) < 50_000
+
+
+def test_jp_lazy_load_has_ssr_skip():
+    dm = (ROOT / "static" / "js" / "data-management.js").read_text(encoding="utf-8")
+    assert "loadNewsBundleUnlessSsr" in dm
+    assert "loadForTab" in dm
+    assert "tbodyHasTrendDataRows" in (ROOT / "static" / "js" / "app-common.js").read_text(encoding="utf-8")

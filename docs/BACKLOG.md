@@ -221,7 +221,7 @@
 **PageSpeed / フロントエンド（詳細は [`PERFORMANCE.md`](PERFORMANCE.md)）**
 
 - [x] フェーズ1: JS defer / フォント軽量化 / Cache-Control 修正 / 不要 CSS 除去（デプロイ・PSI 確認は未）
-- [ ] フェーズ2: Font Awesome サブセット / SSR 済み API スキップ
+- [x] フェーズ2: Font Awesome サブセット / SSR 済み API スキップ / Bootstrap 自前ホスト（デプロイ・PSI 確認は未）
 - [ ] フェーズ3: 非アクティブタブ遅延レンダリング / DOM 削減
 - [ ] PSI スコアの定期記録（`PERFORMANCE.md` スコア表）
 

@@ -71,6 +71,9 @@ def test_vendor_assets_self_hosted():
 def test_fontawesome_subset_exists():
     css = (ROOT / "static" / "css" / "fontawesome-subset.css").read_text(encoding="utf-8")
     assert "fa-chart-line" in css
+    assert ".fa-solid,.fas{font-family:" in css
+    assert ".fa-brands,.fab{font-family:" in css
+    assert ".ttf" not in css
     assert len(css) < 50_000
 
 

@@ -891,13 +891,17 @@ function syncAllPaneOrPlaceholder(mainTableBodyId, allTableBodyId, limit, emptyM
     const mainRows = mainBody.querySelectorAll('tr:not(.skeleton-row)');
     if (mainRows.length > 0) {
         syncToAllPane(mainTableBodyId, allTableBodyId, limit || 5);
-    } else {
-        setAllPaneEmptyMessage(
-            allTableBodyId,
-            null,
-            emptyMessage || (typeof getTrendEmptyTableMessage === 'function' ? getTrendEmptyTableMessage() : 'データがありません')
-        );
+        return;
     }
+    // メインが空でも All に SSR / 既存行があれば上書きしない（reSyncAllPanes 対策）
+    if (typeof tbodyHasTrendDataRows === 'function' && tbodyHasTrendDataRows(allTableBodyId)) {
+        return;
+    }
+    setAllPaneEmptyMessage(
+        allTableBodyId,
+        null,
+        emptyMessage || (typeof getTrendEmptyTableMessage === 'function' ? getTrendEmptyTableMessage() : 'データがありません')
+    );
 }
 
 /**

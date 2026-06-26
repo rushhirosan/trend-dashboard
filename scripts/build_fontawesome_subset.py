@@ -53,20 +53,23 @@ def _extract_blocks(css: str, classes: set[str]) -> list[str]:
 
 
 def _rewrite_webfont_paths(css: str) -> str:
-    return css.replace("../webfonts/", f"{WEBFONT_PREFIX}/")
+    css = css.replace("../webfonts/", f"{WEBFONT_PREFIX}/")
+    # 自前ホストでは woff2 のみ配布（ttf 404 で iOS がフォント読み込みに失敗するのを防ぐ）
+    css = re.sub(r",url\([^)]+\.ttf\)\s*format\(\"truetype\"\)", "", css)
+    return css
 
 
 def build() -> None:
     classes = _collect_icon_classes()
     css = _fetch_all_css()
     blocks = _extract_blocks(css, classes)
-    # ベースユーティリティ（サイズ・回転など Bootstrap 併用で使う最小セット）
+    # ベースユーティリティ（.fas/.fab の font-family が無いとアイコンが□になる）
     for marker in (
         ":root,:host{--fa-style-family-classic",
         ".fa{font-family:var(--fa-style-family",
-        ".fa-solid,.fas{font-weight:900}",
-        ".fa-regular,.far{font-weight:400}",
-        ".fa-brands,.fab{font-weight:400}",
+        ".fa-solid,.fas{font-family:",
+        ".fa-regular,.far{font-family:",
+        ".fa-brands,.fab{font-family:",
         ".fa-fw{text-align:center;width:1.25em}",
         ".fa-spin{animation:fa-spin 2s infinite linear}",
         "@keyframes fa-spin{0%{transform:rotate(0deg)}to{transform:rotate(1turn)}}",

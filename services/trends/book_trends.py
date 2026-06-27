@@ -179,6 +179,37 @@ class BookTrendsManager(BaseTrendsManager):
         except Exception:
             # パース失敗時は元URLを返す
             return url
+
+    @staticmethod
+    def _normalize_https_url(url: str) -> str:
+        """Google Books 等が返す http:// 画像 URL を https:// に揃える（mixed content 回避）。"""
+        if not url or not isinstance(url, str):
+            return url or ''
+        if url.startswith('http://'):
+            return 'https://' + url[7:]
+        return url
+
+    def _normalize_us_book_record(self, book_data: dict) -> dict:
+        """US 書籍レコード内の画像 URL を HTTPS に正規化。"""
+        for key in ('image_url', 'thumbnail', 'small_thumbnail', 'medium', 'large'):
+            if book_data.get(key):
+                book_data[key] = self._normalize_https_url(book_data[key])
+        image_links = book_data.get('image_links')
+        if isinstance(image_links, dict):
+            book_data['image_links'] = {
+                k: self._normalize_https_url(v) for k, v in image_links.items() if v
+            }
+        return book_data
+
+    def _normalize_us_book_records(self, records: list) -> list:
+        return [self._normalize_us_book_record(dict(r)) for r in (records or [])]
+
+    def _finalize_us_book_result(self, result: dict) -> dict:
+        """US 向け API レスポンスの画像 URL を正規化して返す。"""
+        if result.get('data'):
+            result = dict(result)
+            result['data'] = self._normalize_us_book_records(result['data'])
+        return result
     
     def _fetch_trends(self, country='JP', limit=25, *args, **kwargs):
         """外部APIから書籍データを取得"""
@@ -231,7 +262,9 @@ class BookTrendsManager(BaseTrendsManager):
             if country == 'JP':
                 return self._get_rakuten_books_trends(limit, force_refresh, category=category)
             elif country == 'US':
-                return self._get_google_books_trends(limit, force_refresh, category=category)
+                return self._finalize_us_book_result(
+                    self._get_google_books_trends(limit, force_refresh, category=category)
+                )
             else:
                 return {
                     'success': False,
@@ -737,6 +770,7 @@ class BookTrendsManager(BaseTrendsManager):
                     book_data['large'] = image_links.get('large', '')
                     # サムネイル画像URLを設定（優先順位: medium > thumbnail > small_thumbnail）
                     book_data['image_url'] = image_links.get('medium', '') or image_links.get('thumbnail', '') or image_links.get('smallThumbnail', '')
+                    book_data = self._normalize_us_book_record(book_data)
                     
                     trends_data.append(book_data)
                     success_count += 1

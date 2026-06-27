@@ -40,16 +40,10 @@
     <link rel="apple-touch-icon" sizes="512x512" href="{{ url_for('static', filename='images/icon-512.png') }}">
     
     <!-- Performance Optimization: Preconnect to external domains -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin>
-    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
-    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
     <link rel="dns-prefetch" href="https://www.googletagmanager.com">
     
-    <!-- Modern web font: Inter (400 only — bold/semi use browser synthesis) -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400&display=swap" rel="stylesheet">
-    
+    {% include 'partials/us_web_font.html' %}
     <!-- Performance Optimization: Preload critical CSS -->
     <link rel="preload" href="{{ url_for('static', filename='css/common.css') }}" as="style">
     <link rel="preload" href="{{ url_for('static', filename='css/main.css') }}" as="style">

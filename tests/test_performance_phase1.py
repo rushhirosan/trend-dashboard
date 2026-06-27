@@ -93,6 +93,20 @@ def test_noto_sans_jp_self_hosted():
     assert font.stat().st_size > 100_000
 
 
+def test_inter_self_hosted():
+    us = (TEMPLATES / "us_trends.html").read_text(encoding="utf-8")
+    head = _head_section(us)
+    assert "partials/us_web_font.html" in us
+    assert "fonts.googleapis.com" not in head
+    assert "fonts.gstatic.com" not in head
+    css = (ROOT / "static" / "css" / "inter.css").read_text(encoding="utf-8")
+    assert "Inter" in css
+    assert "font-display: swap" in css
+    font = ROOT / "static" / "vendor" / "inter" / "latin-400-normal.woff2"
+    assert font.is_file()
+    assert font.stat().st_size > 10_000
+
+
 def test_jp_lazy_load_has_ssr_skip():
     dm = (ROOT / "static" / "js" / "data-management.js").read_text(encoding="utf-8")
     assert "loadNewsBundleUnlessSsr" in dm

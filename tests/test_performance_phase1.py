@@ -74,7 +74,23 @@ def test_fontawesome_subset_exists():
     assert ".fa-solid,.fas{font-family:" in css
     assert ".fa-brands,.fab{font-family:" in css
     assert ".ttf" not in css
+    assert "font-display:swap" in css
+    assert "v4compatibility" not in css
     assert len(css) < 50_000
+
+
+def test_noto_sans_jp_self_hosted():
+    index = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    head = _head_section(index)
+    assert "partials/jp_web_font.html" in index
+    assert "fonts.googleapis.com" not in head
+    assert "fonts.gstatic.com" not in head
+    css = (ROOT / "static" / "css" / "noto-sans-jp.css").read_text(encoding="utf-8")
+    assert "Noto Sans JP" in css
+    assert "font-display: swap" in css
+    font = ROOT / "static" / "vendor" / "noto-sans-jp" / "japanese-400-normal.woff2"
+    assert font.is_file()
+    assert font.stat().st_size > 100_000
 
 
 def test_jp_lazy_load_has_ssr_skip():

@@ -44,25 +44,64 @@ def _extract_blocks(css: str, classes: set[str]) -> list[str]:
         chunk = chunk.strip()
         if not chunk:
             continue
-        if "@font-face" in chunk:
-            blocks.append(chunk)
-            continue
         if any(f".{cls}" in chunk for cls in classes):
             blocks.append(chunk)
     return blocks
+
+
+def _font_face_needs() -> tuple[bool, bool, bool]:
+    out = subprocess.check_output(
+        ["rg", "-o", r"fa[srb]? fa-[a-z0-9-]+", "templates", "static", "--no-filename"],
+        cwd=ROOT,
+        text=True,
+    )
+    prefixes: set[str] = set()
+    for line in out.strip().splitlines():
+        parts = line.strip().split()
+        if parts:
+            prefixes.add(parts[0])
+    need_brands = "fab" in prefixes
+    need_regular = "far" in prefixes
+    need_solid = "fas" in prefixes or not prefixes  # fas が大半
+    return need_brands, need_solid, need_regular
+
+
+def _extract_font_faces(css: str, need_brands: bool, need_solid: bool, need_regular: bool) -> list[str]:
+    """FA6 の必要ウェイトのみ。v4 / FA5 互換・存在しない webfont は除外。"""
+    faces: list[str] = []
+    for chunk in re.split(r"(?<=\})", css):
+        chunk = chunk.strip()
+        if "@font-face" not in chunk:
+            continue
+        if "v4compatibility" in chunk:
+            continue
+        if "Font Awesome 5" in chunk:
+            continue
+        if re.search(r'font-family:\s*"FontAwesome"', chunk):
+            continue
+        if '"Font Awesome 6 Brands"' in chunk and need_brands:
+            faces.append(chunk)
+        elif '"Font Awesome 6 Free"' in chunk and "font-weight:900" in chunk and need_solid:
+            faces.append(chunk)
+        elif '"Font Awesome 6 Free"' in chunk and "font-weight:400" in chunk and need_regular:
+            faces.append(chunk)
+    return faces
 
 
 def _rewrite_webfont_paths(css: str) -> str:
     css = css.replace("../webfonts/", f"{WEBFONT_PREFIX}/")
     # 自前ホストでは woff2 のみ配布（ttf 404 で iOS がフォント読み込みに失敗するのを防ぐ）
     css = re.sub(r",url\([^)]+\.ttf\)\s*format\(\"truetype\"\)", "", css)
+    css = css.replace("font-display:block", "font-display:swap")
     return css
 
 
 def build() -> None:
     classes = _collect_icon_classes()
     css = _fetch_all_css()
+    need_brands, need_solid, need_regular = _font_face_needs()
     blocks = _extract_blocks(css, classes)
+    blocks.extend(_extract_font_faces(css, need_brands, need_solid, need_regular))
     # ベースユーティリティ（.fas/.fab の font-family が無いとアイコンが□になる）
     for marker in (
         ":root,:host{--fa-style-family-classic",

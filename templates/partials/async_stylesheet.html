@@ -1,0 +1,3 @@
+{# 非クリティカル CSS — LCP（冒頭テキスト）待ちのレンダーブロックを減らす #}
+<link rel="preload" href="{{ async_css_href }}" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="{{ async_css_href }}"></noscript>

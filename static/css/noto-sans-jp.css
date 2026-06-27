@@ -2,7 +2,7 @@
 @font-face {
   font-family: "Noto Sans JP";
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
   font-weight: 400;
   src: url(../vendor/noto-sans-jp/japanese-400-normal.woff2) format("woff2");
 }

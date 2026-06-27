@@ -405,7 +405,7 @@ function displayMovieResultsUS(data) {
             row.innerHTML = `
                 <td>${item.rank || index + 1}</td>
                 <td>
-                    ${posterUrl ? `<img src="${posterUrl}" alt="${item.title}" style="width: 50px; height: 75px; object-fit: cover; margin-right: 10px; float: left;">` : ''}
+                    ${posterUrl ? `<img src="${posterUrl}" alt="${item.title}" loading="lazy" decoding="async" style="width: 50px; height: 75px; object-fit: cover; margin-right: 10px; float: left;">` : ''}
                     <strong><a href="${tmdbLink}" target="_blank" rel="noopener noreferrer">${item.title || 'N/A'}</a></strong>
                     ${item.original_title && item.original_title !== item.title ? `<br><small class="text-muted">${item.original_title}</small>` : ''}
                     ${amazonButton}
@@ -542,7 +542,7 @@ function displayBookResultsUS(data) {
             row.innerHTML = `
                 <td><span class="badge bg-info">${item.rank || index + 1}</span></td>
                 <td>
-                    ${imageUrl ? `<img src="${imageUrl}" alt="${item.title}" style="width: 40px; height: 60px; object-fit: cover; margin-right: 10px; float: left;">` : ''}
+                    ${imageUrl ? `<img src="${imageUrl}" alt="${item.title}" loading="lazy" decoding="async" style="width: 40px; height: 60px; object-fit: cover; margin-right: 10px; float: left;">` : ''}
                     <strong><a href="${bookLink}" target="_blank" rel="noopener noreferrer">${item.title || 'N/A'}</a></strong>
                 </td>
                 <td>${author}</td>

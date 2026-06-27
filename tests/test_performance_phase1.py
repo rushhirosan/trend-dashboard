@@ -87,7 +87,7 @@ def test_noto_sans_jp_self_hosted():
     assert "fonts.gstatic.com" not in head
     css = (ROOT / "static" / "css" / "noto-sans-jp.css").read_text(encoding="utf-8")
     assert "Noto Sans JP" in css
-    assert "font-display: swap" in css
+    assert "font-display: optional" in css
     font = ROOT / "static" / "vendor" / "noto-sans-jp" / "japanese-400-normal.woff2"
     assert font.is_file()
     assert font.stat().st_size > 100_000
@@ -112,3 +112,20 @@ def test_jp_lazy_load_has_ssr_skip():
     assert "loadNewsBundleUnlessSsr" in dm
     assert "loadForTab" in dm
     assert "tbodyHasTrendDataRows" in (ROOT / "static" / "js" / "app-common.js").read_text(encoding="utf-8")
+
+
+def test_index_async_non_critical_stylesheets():
+    index = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    vendor = (TEMPLATES / "partials" / "vendor_assets.html").read_text(encoding="utf-8")
+    async_css = (TEMPLATES / "partials" / "async_stylesheet.html").read_text(encoding="utf-8")
+    assert "async_stylesheet.html" in index
+    assert "async_stylesheet.html" in vendor
+    assert 'filename=\'css/trends.css\') }}" rel="stylesheet"' not in index
+    assert "fontawesome-subset.css" in vendor
+    assert "onload=" in async_css
+
+
+def test_jp_noto_preload_fetchpriority():
+    jp_font = (TEMPLATES / "partials" / "jp_web_font.html").read_text(encoding="utf-8")
+    assert "fetchpriority" in jp_font
+    assert "noto-optional" in jp_font or "20260627-noto-optional" in jp_font

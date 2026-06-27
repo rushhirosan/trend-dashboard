@@ -82,10 +82,12 @@
     
     {% include 'partials/vendor_assets.html' %}
     <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/trends.css') }}" rel="stylesheet">
+    {% set async_css_href = url_for('static', filename='css/trends.css') %}
+    {% include 'partials/async_stylesheet.html' %}
     <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
     <!-- data-status.css, subscription.css は /data-status, /subscription 専用。USトレンドには不要（日本ページと同じレイアウトにするため） -->
-    <link href="{{ url_for('static', filename='css/us-trends.css') }}?v=20260401-active-pane-opacity-mount" rel="stylesheet">
+    {% set async_css_href = url_for('static', filename='css/us-trends.css') + '?v=20260401-active-pane-opacity-mount' %}
+    {% include 'partials/async_stylesheet.html' %}
 </head>
 <body id="trends-us" class="bg-light" data-trend-meta-tz="America/New_York">
     <!-- ヘッダー -->

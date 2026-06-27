@@ -23,7 +23,7 @@ CSS_TEMPLATE = """\
 @font-face {{
   font-family: "Noto Sans JP";
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
   font-weight: 400;
   src: url({webfont}) format("woff2");
 }}

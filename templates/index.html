@@ -41,7 +41,9 @@
     
     <!-- Performance Optimization: Preconnect to external domains -->
     <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin>
+    <link rel="preconnect" href="https://thumbnail.image.rakuten.co.jp" crossorigin>
     <link rel="dns-prefetch" href="https://www.googletagmanager.com">
+    <link rel="dns-prefetch" href="https://thumbnail.image.rakuten.co.jp">
     
     {% include 'partials/jp_web_font.html' %}
     <!-- Performance Optimization: Preload critical CSS -->
@@ -116,7 +118,8 @@
     
     {% include 'partials/vendor_assets.html' %}
     <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/trends.css') }}" rel="stylesheet">
+    {% set async_css_href = url_for('static', filename='css/trends.css') %}
+    {% include 'partials/async_stylesheet.html' %}
     <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
 </head>
 <body id="trends-jp" class="bg-light">

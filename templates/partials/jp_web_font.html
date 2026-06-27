@@ -1,3 +1,3 @@
 {# Noto Sans JP — 自前ホスト（Google Fonts のレンダーブロック + 多数 woff2 分割を回避） #}
-<link rel="preload" href="{{ url_for('static', filename='vendor/noto-sans-jp/japanese-400-normal.woff2') }}" as="font" type="font/woff2" crossorigin>
-<link href="{{ url_for('static', filename='css/noto-sans-jp.css') }}?v=20260628-noto-self" rel="stylesheet">
+<link rel="preload" href="{{ url_for('static', filename='vendor/noto-sans-jp/japanese-400-normal.woff2') }}" as="font" type="font/woff2" crossorigin fetchpriority="high">
+<link href="{{ url_for('static', filename='css/noto-sans-jp.css') }}?v=20260627-noto-optional" rel="stylesheet">

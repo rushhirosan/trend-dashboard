@@ -6,7 +6,7 @@
 - 全体バックログとの関係: [`BACKLOG.md`](BACKLOG.md) の「プロダクト・品質改善」から本ファイルへリンク
 - 参照レポート: [PageSpeed Insights（mobile, 2026-06-24）](https://pagespeed.web.dev/analysis/https-trends-dashboard-fly-dev/8qsxatevwc?form_factor=mobile)
 
-**最終更新:** 2026-06-27（US `/us` と JP `/` の差分・改善候補を追記）
+**最終更新:** 2026-06-27（JP PSI 60 対応 — 非クリティカル CSS 非同期化・Noto optional）
 
 ---
 
@@ -38,8 +38,8 @@
 | **Font Awesome** | サブセット + `font-display:swap` | — |
 | **静的キャッシュ** | 実装済み | — |
 | **初回 API** | JP タブ遅延 + SSR スキップ済み | Network で API 件数確認 |
-| **PSI モバイル（JP `/`）** | **82**（2026-06-28） | [フェーズ4](#フェーズ4--計測運用) で月次計測 |
-| **PSI モバイル（US `/us`）** | **75**（2026-06-27） | JP より **-7**。下記 [US 差分](#us-us--jp-との差分) |
+| **PSI モバイル（JP `/`）** | **60**（2026-06-27 PSI）→ 改善中 | 82 から下落。LH CLI は **91**（環境差）。下記 [JP 2c](#フェーズ2c--jp-psi-60-対応2026-06-27) |
+| **PSI モバイル（US `/us`）** | **93** / Desktop **96**（2026-06-27 デプロイ後） | Inter 自前 + Books HTTPS 化で改善 |
 | **PSI デスクトップ** | **97**（2026-06-28） | 同上 |
 | **フェーズ3 以降** | **保留** | スコアが基準を下回ったら着手（下記 [運用方針](#運用方針フェーズ3以降)） |
 
@@ -194,6 +194,21 @@
 - [ ] 初回 API 呼び出し数を Network で確認
 - [x] **モバイル** PSI 再計測（**82**、目標 70 台を達成）
 - [x] **デスクトップ** PSI 再計測（**97**、89 から **+8 点**）
+
+---
+
+## フェーズ2c — JP PSI 60 対応（2026-06-27）
+
+**背景:** デプロイ後 PSI Mobile `/` が **82 → 60** に下落（警戒ライン 75 未満）。同一時刻の LH CLI では **91** と乖離 — PSI の厳しい throttling 下で **Noto 1.3 MB** と **レンダーブロック CSS** が LCP を悪化させていると判断。
+
+**実装（デプロイ待ち）:**
+
+- [x] Noto `font-display: optional` + preload `fetchpriority="high"`（LCP テキストが webfont 待ちしない）
+- [x] `trends.css` / `fontawesome-subset.css` / `us-trends.css` を非同期読み込み（`partials/async_stylesheet.html`）
+- [x] 楽天サムネ CDN へ `preconnect`（JP `/`）
+- [x] 書籍・映画・アプリ画像に `loading="lazy" decoding="async"`
+
+**完了ゲート:** デプロイ後 PSI Mobile `/` が **75 以上**（目標 80 台復帰）
 
 ---
 
@@ -442,8 +457,10 @@ JP フェーズ2b と同様の **ピンポイント改修** で `/us` を `/` �
 | 2026-06-28 | `/` | Desktop | PSI | **97** | — | — | — | — | フェーズ2b 後。89 → **+8 点** |
 | 2026-06-27 | `/` | Mobile | LH | **71** | 3.4 s | 4.9 s | 30 ms | 0 | CLI v13.4・[改善ポイント](#lighthouse-改善ポイントjp-) |
 | 2026-06-27 | `/` | Desktop | LH | **90** | — | — | — | — | CLI v13.4・参考値 |
-| 2026-06-27 | `/us` | Mobile | PSI | **75** | — | — | — | — | A11y 87 / **BP 77** / SEO 100。[US 差分](#us-us--jp-との差分) |
-| 2026-06-27 | `/us` | Mobile | LH | **68** | 4.0 s | 5.5 s | 10 ms | 0 | CLI v13.4・Inter Google Fonts + Books HTTP 22 件 |
+| 2026-06-27 | `/us` | Mobile | PSI | **93** | — | — | — | — | Inter 自前 + Books HTTPS 後。Desktop **96** |
+| 2026-06-27 | `/us` | Mobile | LH | **93** | 2.1 s | 2.1 s | 20 ms | 0 | デプロイ後 CLI |
+| 2026-06-27 | `/` | Mobile | PSI | **60** | — | — | — | — | **82 から下落**。LH CLI 同日 **91**（計測環境差） |
+| 2026-06-27 | `/` | Mobile | LH | **91** | 2.0 s | 3.2 s | 0 ms | 0.002 | デプロイ直後 CLI（PSI より高い） |
 
 **再計測手順（月次 — PSI）**
 
@@ -473,4 +490,5 @@ JP フェーズ2b と同様の **ピンポイント改修** で `/us` を `/` �
 | 2026-06-28 | **運用方針:** フェーズ3以降は保留。月次 PSI で監視し、Mobile &lt; 75 または Desktop &lt; 90 が続く場合のみフェーズ3以降を検討。 |
 | 2026-06-27 | **計測ツール:** [Lighthouse CLI](https://github.com/GoogleChrome/lighthouse) を追加。月次記録は PSI のまま、LH は before/after と監査深掘り用。 |
 | 2026-06-27 | **LH 改善ポイント:** 初回 CLI 計測を [Lighthouse 改善ポイント（JP）](#lighthouse-改善ポイントjp-) に整理。CSS ブロック・DOM 7,634・third-party 画像が残存、TBT/CLS は良好。 |
-| 2026-06-27 | **US `/us` 改善:** Inter 自前ホスト（`build_inter.py`）、Google Books 画像 HTTPS 正規化。デプロイ後 PSI 再計測予定。 |
+| 2026-06-27 | **US `/us` 改善:** Inter 自前ホスト、Google Books 画像 HTTPS 正規化。PSI Mobile **93** / Desktop **96**。 |
+| 2026-06-27 | **JP PSI 60:** 警戒ライン割れ。LH CLI は 91 と乖離。フェーズ2c: Noto optional、非クリティカル CSS 非同期化、画像 lazy、Rakuten preconnect。 |

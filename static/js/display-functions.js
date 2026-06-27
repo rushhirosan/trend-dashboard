@@ -176,7 +176,7 @@ function displayMovieResults(data) {
             row.innerHTML = `
                 <td><span class="badge bg-primary">${item.rank || index + 1}</span></td>
                 <td>
-                    ${posterUrl ? `<img src="${posterUrl}" alt="${movieTitle}" style="width: 50px; height: 75px; object-fit: cover; margin-right: 10px; float: left;">` : ''}
+                    ${posterUrl ? `<img src="${posterUrl}" alt="${movieTitle}" loading="lazy" decoding="async" style="width: 50px; height: 75px; object-fit: cover; margin-right: 10px; float: left;">` : ''}
                     <strong><a href="${tmdbLink}" target="_blank" rel="noopener noreferrer">${movieTitle}</a></strong>
                     ${item.original_title && item.original_title !== item.title ? `<br><small class="text-muted">${item.original_title}</small>` : ''}
                     ${amazonButton}
@@ -231,7 +231,7 @@ function displayBookResults(data) {
             row.innerHTML = `
                 <td><span class="badge bg-info">${item.rank || index + 1}</span></td>
                 <td>
-                    ${imageUrl ? `<img src="${imageUrl}" alt="${bookTitle}" style="width: 40px; height: 60px; object-fit: cover; margin-right: 10px; float: left;">` : ''}
+                    ${imageUrl ? `<img src="${imageUrl}" alt="${bookTitle}" loading="lazy" decoding="async" style="width: 40px; height: 60px; object-fit: cover; margin-right: 10px; float: left;">` : ''}
                     <strong><a href="${bookLink}" target="_blank" rel="noopener noreferrer">${bookTitle}</a></strong>
                 </td>
                 <td>${author}</td>
@@ -345,7 +345,7 @@ function displayAppStoreResults(data) {
             row.innerHTML = `
                 <td><span class="badge bg-success">${item.rank || index + 1}</span></td>
                 <td>
-                    ${iconUrl ? `<img src="${iconUrl}" alt="${appName}" style="width: 50px; height: 50px; object-fit: cover; margin-right: 10px; float: left; border-radius: 10px;">` : ''}
+                    ${iconUrl ? `<img src="${iconUrl}" alt="${appName}" loading="lazy" decoding="async" style="width: 50px; height: 50px; object-fit: cover; margin-right: 10px; float: left; border-radius: 10px;">` : ''}
                     <strong><a href="${appUrl}" target="_blank" rel="noopener noreferrer">${appName}</a></strong>
                 </td>
                 <td>${developer}</td>

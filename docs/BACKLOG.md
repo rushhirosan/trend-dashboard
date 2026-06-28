@@ -31,7 +31,7 @@
 |------|------|----------------|
 | **AIサマリー** | フェーズ2a（Waitlist 稼働） | 本番 Waitlist E2E + 2〜4週の関心検証 |
 | **定時取得** | 1536MB で JP/US 54/54 安定 | Grafana OOM アラートの手動設定（未なら） |
-| **データ保持** | DB / 原稿 10日・週次30日 purge 実装済 | 03:00 JST 自動 + git 原稿は `--summaries-only` で必要時 |
+| **データ保持** | DB / 原稿 10日・週次30日 purge 実装済 | DB: 03:00 JST 自動。git 原稿: GHA `summary-retention-purge.yml`（08:00 JST） |
 
 ---
 
@@ -173,7 +173,7 @@
 - [x] Fly **1536MB** + cgroup memory_watchdog
 - [x] `captured_at` スロット窓チェック + Discord 警告
 - [x] `trend_daily_snapshots` / `scheduler_slot_run` **10日 purge**（03:00 JST）
-- [x] `docs/summaries` 日次10日・週次30日 purge（同一スクリプト）
+- [x] `docs/summaries` 日次10日・週次30日 purge（DB: 03:00 JST / git: GHA `summary-retention-purge.yml`）
 - [x] `scripts/inspect_scheduler_slots.py --business-day`
 - [x] `docs/grafana-oom-alerts.md`
 

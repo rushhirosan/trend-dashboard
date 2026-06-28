@@ -160,6 +160,19 @@ python scripts/generate_ai_weekly_summary.py --write --force --weekly-for-date 2
 
 ---
 
+## 原稿の保持とクリーンアップ
+
+| 種別 | 保持日数（既定） | 環境変数 |
+|------|------------------|----------|
+| 日次 `daily/*.md`（+ `.generation.json`） | 10 日 | `SUMMARY_DAILY_RETENTION_DAYS`（未設定時は `TREND_SNAPSHOT_RETENTION_DAYS`） |
+| 週次 `weekly/*.md` | 30 日 | `SUMMARY_WEEKLY_RETENTION_DAYS` |
+
+- **DB**（`trend_daily_snapshots` / `scheduler_slot_run`）: 本番 APScheduler が毎日 **03:00 JST** に `purge_expired_snapshots` を実行。
+- **git 原稿**: GitHub Actions **Summary retention purge**（`.github/workflows/summary-retention-purge.yml`、JST **08:00** 前後）。日次生成（06:50）・週次生成（月 07:30）のあとに古いファイルを削除してコミット。
+- **手元**: `python scripts/purge_snapshot_retention.py --summaries-only --dry-run` で確認後、必要なら実行して commit。
+
+---
+
 ## Git
 
 - コミットメッセージ例: `docs(summaries): add daily 2026-05-06` / `docs(summaries): weekly 2026-W19` / `docs(summaries): approve weekly 2026-W19`

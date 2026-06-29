@@ -49,7 +49,36 @@ def test_parse_rakuten_ranking_items_format_version_2(manager):
     assert result[0]['title'] == '商品A'
     assert result[0]['rank'] == 1
     assert result[0]['sales_rank'] == 1
+    assert result[0]['image_url'] == 'https://img.example/a.jpg'
     assert result[1]['rank'] == 2
+
+
+def test_parse_rakuten_ranking_items_descending_rank_and_string_image(manager):
+    """APIが rank 降順・画像URL文字列配列のときも正しく変換する"""
+    items = [
+        {
+            'itemName': '2位商品',
+            'itemCode': 'shop:2',
+            'itemPrice': 200,
+            'rank': 2,
+            'mediumImageUrls': ['https://img.example/2.jpg'],
+        },
+        {
+            'itemName': '1位商品',
+            'itemCode': 'shop:1',
+            'itemPrice': 100,
+            'rank': 1,
+            'mediumImageUrls': ['https://img.example/1.jpg'],
+        },
+    ]
+    result = manager._parse_rakuten_ranking_items(items, limit=25)
+    assert result[0]['title'] == '1位商品'
+    assert result[0]['rank'] == 1
+    assert result[0]['sales_rank'] == 1
+    assert result[0]['image_url'] == 'https://img.example/1.jpg'
+    assert result[1]['title'] == '2位商品'
+    assert result[1]['rank'] == 2
+    assert result[1]['sales_rank'] == 2
 
 
 @patch('services.trends.rakuten_trends.requests.get')

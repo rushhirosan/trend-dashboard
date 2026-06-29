@@ -238,8 +238,8 @@ class RakutenTrendsManager(BaseTrendsManager):
             limit=limit,
             force_refresh=force_refresh,
             auto_fetch_on_cache_miss=True,  # キャッシュ未ヒット時はAPI呼び出し（レート制限1秒1回で制御）
-            sort_key='sales_count',
-            sort_reverse=True,
+            sort_key='rank',
+            sort_reverse=False,
             genre_id=cache_scope
         )
         if result and isinstance(result, dict):
@@ -323,17 +323,50 @@ class RakutenTrendsManager(BaseTrendsManager):
             logger.error(f"❌ 楽天商品: 全カテゴリキャッシュ保存エラー: {e}", exc_info=True)
             return 0
 
+    def _extract_rakuten_image_url(self, item_info: dict) -> str:
+        """楽天APIの画像URLを抽出（formatVersion 1/2・配列要素の dict/str 両対応）"""
+        if not isinstance(item_info, dict):
+            return ''
+        for key in ('mediumImageUrls', 'smallImageUrls', 'MediumImageUrls', 'SmallImageUrls'):
+            urls = item_info.get(key)
+            if not urls:
+                continue
+            if isinstance(urls, str):
+                return urls.strip()
+            if isinstance(urls, dict):
+                url = urls.get('imageUrl') or urls.get('ImageUrl') or ''
+                if url:
+                    return str(url).strip()
+                continue
+            if isinstance(urls, list) and urls:
+                first = urls[0]
+                if isinstance(first, str):
+                    return first.strip()
+                if isinstance(first, dict):
+                    url = first.get('imageUrl') or first.get('ImageUrl') or ''
+                    if url:
+                        return str(url).strip()
+        direct = item_info.get('imageUrl') or item_info.get('ImageUrl') or ''
+        return str(direct).strip() if direct else ''
+
+    def _coerce_rakuten_rank(self, value):
+        """楽天APIの rank を int に正規化（失敗時は None）"""
+        if value is None or value == 'N/A':
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
     def _parse_rakuten_ranking_items(self, items, limit=25):
         """ランキングAPIレスポンスを共通形式に変換"""
-        trends_data = []
+        parsed = []
         for item in items:
             item_info = (
                 item.get('Item') or item.get('item') or item
                 if isinstance(item, dict) else {}
             )
-            rank = item_info.get('rank')
-            if rank is None:
-                rank = len(trends_data) + 1
+            api_rank = self._coerce_rakuten_rank(item_info.get('rank'))
             sales_count = item_info.get('salesCount', 0)
             if isinstance(sales_count, str) and sales_count != 'N/A':
                 try:
@@ -343,29 +376,32 @@ class RakutenTrendsManager(BaseTrendsManager):
             elif sales_count == 'N/A' or sales_count is None:
                 sales_count = 0
 
-            image_urls = item_info.get('mediumImageUrls') or item_info.get('smallImageUrls') or []
-            image_url = ''
-            if image_urls and isinstance(image_urls[0], dict):
-                image_url = image_urls[0].get('imageUrl', '')
-
-            trends_data.append({
+            parsed.append({
                 'item_id': item_info.get('itemCode', ''),
                 'title': item_info.get('itemName', ''),
                 'price': item_info.get('itemPrice', 0),
                 'review_count': item_info.get('reviewCount', 0),
                 'review_average': item_info.get('reviewAverage', 0),
-                'image_url': image_url,
+                'image_url': self._extract_rakuten_image_url(item_info),
                 'url': self._add_affiliate_params(
                     item_info.get('itemUrl') or item_info.get('affiliateUrl', '')
                 ),
                 'shop_name': item_info.get('shopName', ''),
                 'genre_id': item_info.get('genreId', ''),
-                'sales_rank': rank,
                 'sales_count': sales_count,
-                'rank': rank,
+                '_api_rank': api_rank,
             })
-            if len(trends_data) >= limit:
-                break
+
+        # 楽天ランキングAPIは1ページ内を rank 降順（30→1）で返すことがあるため昇順に揃える
+        parsed.sort(key=lambda x: x['_api_rank'] if x['_api_rank'] is not None else 999999)
+
+        trends_data = []
+        for i, row in enumerate(parsed[:limit]):
+            api_rank = row.pop('_api_rank', None)
+            display_rank = api_rank if api_rank is not None else i + 1
+            row['rank'] = display_rank
+            row['sales_rank'] = display_rank
+            trends_data.append(row)
         return trends_data
 
     def _get_rakuten_ranking(self, genre_id=None, limit=25, _retry_count=0):
@@ -470,35 +506,7 @@ class RakutenTrendsManager(BaseTrendsManager):
                     err_desc = data.get('error_description', data.get('error', ''))
                     return {'data': [], 'error': f'楽天API エラー: {err_desc}'}
                 items = data.get('Items') or data.get('items', [])
-
-                trends_data = []
-                for item in items:
-                    item_info = (
-                        item.get('Item') or item.get('item') or item
-                        if isinstance(item, dict) else {}
-                    )
-                    image_urls = item_info.get('mediumImageUrls') or item_info.get('smallImageUrls') or []
-                    image_url = ''
-                    if image_urls and isinstance(image_urls[0], dict):
-                        image_url = image_urls[0].get('imageUrl', '')
-                    rank = len(trends_data) + 1
-                    trends_data.append({
-                        'rank': rank,
-                        'item_id': item_info.get('itemCode', ''),
-                        'title': item_info.get('itemName', ''),
-                        'price': item_info.get('itemPrice', 0),
-                        'review_count': item_info.get('reviewCount', 0),
-                        'review_average': item_info.get('reviewAverage', 0),
-                        'image_url': image_url,
-                        'url': self._add_affiliate_params(item_info.get('itemUrl', '')),
-                        'shop_name': item_info.get('shopName', ''),
-                        'genre_id': item_info.get('genreId', ''),
-                        'sales_rank': item_info.get('salesRank', rank),
-                        'sales_count': item_info.get('salesCount', 0),
-                    })
-                    if len(trends_data) >= limit:
-                        break
-
+                trends_data = self._parse_rakuten_ranking_items(items, limit=limit)
                 return {
                     'data': trends_data,
                     'status': 'success',

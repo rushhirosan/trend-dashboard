@@ -37,6 +37,17 @@ RAKUTEN_CATEGORY_LABELS = {
     'knowledge': '学び',
 }
 
+# 2026-05 移行後の楽天市場API（旧 app.rakuten.co.jp / 20170628 は廃止）
+RAKUTEN_RANKING_URL = (
+    'https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601'
+)
+RAKUTEN_SEARCH_URL = (
+    'https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20220601'
+)
+RAKUTEN_GENRE_URL = (
+    'https://openapi.rakuten.co.jp/ichibagt/api/IchibaGenre/Search/20170711'
+)
+
 
 class RakutenTrendsManager(BaseTrendsManager):
     """楽天のトレンドを取得・管理するクラス"""
@@ -49,15 +60,38 @@ class RakutenTrendsManager(BaseTrendsManager):
         self.rate_limiter = get_rakuten_api_rate_limiter()
         
         self.rakuten_app_id = os.getenv('RAKUTEN_APP_ID')
+        self.rakuten_access_key = (os.getenv('RAKUTEN_ACCESS_KEY') or '').strip()
         self.rakuten_affiliate_id = (os.getenv('RAKUTEN_AFFILIATE_ID') or '').strip()
         
         logger.info(f"Rakuten Trends Manager初期化:")
         logger.info(f"  App ID: {'設定済み' if self.rakuten_app_id else '未設定'}")
+        logger.info(f"  Access Key: {'設定済み' if self.rakuten_access_key else '未設定'}")
         if self.rakuten_affiliate_id:
             logger.info(f"  Affiliate ID: 設定済み")
         else:
             logger.warning(f"  Affiliate ID: 未設定（.env の RAKUTEN_AFFILIATE_ID を設定するとアフィリエイトリンクが有効になります）")
     
+    def _rakuten_credentials_ok(self) -> bool:
+        return bool(self.rakuten_app_id and self.rakuten_access_key)
+
+    def _rakuten_auth_params(self) -> dict:
+        params = {
+            'applicationId': self.rakuten_app_id,
+            'accessKey': self.rakuten_access_key,
+            'format': 'json',
+        }
+        if self.rakuten_affiliate_id:
+            params['affiliateId'] = self.rakuten_affiliate_id
+        return params
+
+    def _rakuten_credentials_error(self) -> str:
+        missing = []
+        if not self.rakuten_app_id:
+            missing.append('RAKUTEN_APP_ID')
+        if not self.rakuten_access_key:
+            missing.append('RAKUTEN_ACCESS_KEY')
+        return f"{' と '.join(missing)} が未設定です（楽天API移行後は両方必須）"
+
     def _add_affiliate_params(self, url: str) -> str:
         """楽天アイテムURLにaffiliateIdを付与（既に付与済みなら何もしない）"""
         if not url or not self.rakuten_affiliate_id:
@@ -174,6 +208,22 @@ class RakutenTrendsManager(BaseTrendsManager):
                     'source': '楽天商品ランキングAPI',
                     'success': True
                 }
+            stale = self._get_from_cache(genre_id='all')
+            if stale and len(stale) > 0:
+                self._normalize_sales_count(stale)
+                logger.info(
+                    "✅ 楽天商品: API失敗のため既存キャッシュを返します (%d件)",
+                    len(stale),
+                )
+                return {
+                    'data': stale[:limit],
+                    'status': 'stale_cache_preserved',
+                    'genre_id': 'all',
+                    'source': 'database_cache',
+                    'success': True,
+                    'message': '楽天API取得に失敗したため、保存済みのキャッシュを表示しています。',
+                    'error': last_error,
+                }
             error_msg = last_error or '全カテゴリのデータ取得に失敗しました'
             return {
                 'data': [],
@@ -213,9 +263,9 @@ class RakutenTrendsManager(BaseTrendsManager):
         Returns:
             tuple: (rows_for_all_genre: list, last_error: str|None, any_saved: bool)
         """
-        if not self.rakuten_app_id:
-            logger.warning("楽天ランキングAPI: RAKUTEN_APP_ID が未設定です")
-            return [], 'RAKUTEN_APP_ID が未設定です', False
+        if not self._rakuten_credentials_ok():
+            logger.warning("楽天ランキングAPI: %s", self._rakuten_credentials_error())
+            return [], self._rakuten_credentials_error(), False
         rows_for_all_genre = []
         last_error = None
         any_saved = False
@@ -273,39 +323,79 @@ class RakutenTrendsManager(BaseTrendsManager):
             logger.error(f"❌ 楽天商品: 全カテゴリキャッシュ保存エラー: {e}", exc_info=True)
             return 0
 
+    def _parse_rakuten_ranking_items(self, items, limit=25):
+        """ランキングAPIレスポンスを共通形式に変換"""
+        trends_data = []
+        for item in items:
+            item_info = (
+                item.get('Item') or item.get('item') or item
+                if isinstance(item, dict) else {}
+            )
+            rank = item_info.get('rank')
+            if rank is None:
+                rank = len(trends_data) + 1
+            sales_count = item_info.get('salesCount', 0)
+            if isinstance(sales_count, str) and sales_count != 'N/A':
+                try:
+                    sales_count = int(sales_count)
+                except Exception:
+                    sales_count = 0
+            elif sales_count == 'N/A' or sales_count is None:
+                sales_count = 0
+
+            image_urls = item_info.get('mediumImageUrls') or item_info.get('smallImageUrls') or []
+            image_url = ''
+            if image_urls and isinstance(image_urls[0], dict):
+                image_url = image_urls[0].get('imageUrl', '')
+
+            trends_data.append({
+                'item_id': item_info.get('itemCode', ''),
+                'title': item_info.get('itemName', ''),
+                'price': item_info.get('itemPrice', 0),
+                'review_count': item_info.get('reviewCount', 0),
+                'review_average': item_info.get('reviewAverage', 0),
+                'image_url': image_url,
+                'url': self._add_affiliate_params(
+                    item_info.get('itemUrl') or item_info.get('affiliateUrl', '')
+                ),
+                'shop_name': item_info.get('shopName', ''),
+                'genre_id': item_info.get('genreId', ''),
+                'sales_rank': rank,
+                'sales_count': sales_count,
+                'rank': rank,
+            })
+            if len(trends_data) >= limit:
+                break
+        return trends_data
+
     def _get_rakuten_ranking(self, genre_id=None, limit=25, _retry_count=0):
         """楽天商品ランキングAPIを使用（429/503時はリトライ）"""
         max_retries = 2
         retry_delay = 30  # 秒（楽天APIのレート制限緩和待ち）
 
-        if not self.rakuten_app_id:
-            logger.warning("楽天ランキングAPI: RAKUTEN_APP_ID が未設定です")
-            return {'data': [], 'error': 'RAKUTEN_APP_ID が未設定です'}
+        if not self._rakuten_credentials_ok():
+            logger.warning("楽天ランキングAPI: %s", self._rakuten_credentials_error())
+            return {'data': [], 'error': self._rakuten_credentials_error()}
         try:
-            url = "https://app.rakuten.co.jp/services/api/IchibaItem/Ranking/20170628"
             params = {
-                'applicationId': self.rakuten_app_id,
-                'format': 'json',
-                'hits': limit,
-                'sort': 'standard'  # 楽天の標準的な並び順
+                **self._rakuten_auth_params(),
+                'formatVersion': 2,
+                'page': 1,
             }
-            
-            if self.rakuten_affiliate_id:
-                params['affiliateId'] = self.rakuten_affiliate_id
-            
+
             # 楽天APIのgenreIdは数値形式のみ。'all'や空は渡さない（全ジャンルランキングになる）
             if genre_id and str(genre_id).strip() != 'all' and str(genre_id).isdigit():
                 params['genreId'] = str(genre_id).strip()
-            
-            logger.debug(f"楽天ランキングAPIリクエストURL: {url}")
+
+            logger.debug(f"楽天ランキングAPIリクエストURL: {RAKUTEN_RANKING_URL}")
             logger.debug(f"楽天ランキングAPIリクエストパラメータ: {params}")
-            
+
             # レート制限をチェック
             self.rate_limiter.wait_if_needed()
-            
-            response = requests.get(url, params=params, timeout=15)
+
+            response = requests.get(RAKUTEN_RANKING_URL, params=params, timeout=15)
             logger.debug(f"楽天ランキングAPIレスポンスステータス: {response.status_code}")
-            
+
             # 429(レート制限) / 503(メンテ) の場合はリトライ
             if response.status_code in (429, 503) and _retry_count < max_retries:
                 try:
@@ -319,154 +409,120 @@ class RakutenTrendsManager(BaseTrendsManager):
                 )
                 time.sleep(retry_delay)
                 return self._get_rakuten_ranking(genre_id, limit, _retry_count=_retry_count + 1)
-            
+
             if response.status_code == 200:
                 data = response.json()
                 # 200でもerrorが含まれる場合がある（一部エラーケース）
                 if isinstance(data, dict) and data.get('error'):
                     err_desc = data.get('error_description', data.get('error', ''))
                     return {'data': [], 'error': f'楽天API エラー: {err_desc}'}
-                # Items（旧形式）または items（formatVersion=2）の両方に対応
                 items = data.get('Items') or data.get('items', [])
-                
-                trends_data = []
-                for item in items:
-                    # Item（PascalCase）または item（小文字）のネスト、あるいは直接フィールド
-                    item_info = (
-                        item.get('Item') or item.get('item') or item
-                        if isinstance(item, dict) else {}
-                    )
-                    # sales_countを数値に変換（'N/A'の場合は0）
-                    sales_count = item_info.get('salesCount', 'N/A')
-                    if isinstance(sales_count, str) and sales_count != 'N/A':
-                        try:
-                            sales_count = int(sales_count)
-                        except:
-                            sales_count = 0
-                    elif sales_count == 'N/A' or sales_count is None:
-                        sales_count = 0
-                    
-                    trends_data.append({
-                        'item_id': item_info.get('itemCode', ''),  # itemCodeをitem_idとして追加
-                        'title': item_info.get('itemName', ''),
-                        'price': item_info.get('itemPrice', 0),
-                        'review_count': item_info.get('reviewCount', 0),
-                        'review_average': item_info.get('reviewAverage', 0),
-                        'image_url': item_info.get('mediumImageUrls', [{}])[0].get('imageUrl', ''),
-                        'url': self._add_affiliate_params(item_info.get('itemUrl', '')),
-                        'shop_name': item_info.get('shopName', ''),
-                        'genre_id': item_info.get('genreId', ''),
-                        'sales_rank': item_info.get('salesRank', 'N/A'),  # 売上ランク
-                        'sales_count': sales_count  # 売上数（数値に変換済み）
-                    })
-                
-                # 売上数でソート（降順）、同じ場合はレビュー数でソート
-                trends_data.sort(key=lambda x: (x.get('sales_count', 0), x.get('review_count', 0)), reverse=True)
-                
-                # ランクを再設定
-                for i, item in enumerate(trends_data, 1):
-                    item['rank'] = i
-                
+                trends_data = self._parse_rakuten_ranking_items(items, limit=limit)
                 return {
                     'data': trends_data,
                     'status': 'success',
                     'source': '楽天商品ランキングAPI',
                     'total_count': len(trends_data)
                 }
-            else:
-                err_text = (response.text or '')[:500]
-                logger.error(f"楽天ランキングAPIエラー: {err_text}")
-                return {'data': [], 'error': f'楽天API HTTP {response.status_code}: {err_text}'}
-                
+
+            err_text = (response.text or '')[:500]
+            logger.error(f"楽天ランキングAPIエラー: {err_text}")
+            # ランキングAPI失敗時は検索APIへフォールバック
+            if response.status_code in (400, 404, 503):
+                logger.info("楽天ランキングAPI失敗のため検索APIへフォールバックします (genre_id=%s)", genre_id)
+                return self._get_rakuten_search(genre_id, limit)
+            return {'data': [], 'error': f'楽天API HTTP {response.status_code}: {err_text}'}
+
         except Exception as e:
             logger.error(f"楽天ランキングAPIエラー: {str(e)}", exc_info=True)
             return {'data': [], 'error': f'楽天API 例外: {str(e)}'}
     
     def _get_rakuten_search(self, genre_id=None, limit=25):
-        """楽天商品検索APIを使用"""
+        """楽天商品検索APIを使用（ランキングAPI失敗時のフォールバック）"""
+        if not self._rakuten_credentials_ok():
+            return {'data': [], 'error': self._rakuten_credentials_error()}
         try:
-            # 楽天商品検索API (最新バージョン)
-            url = "https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601"
             params = {
-                'applicationId': self.rakuten_app_id,
-                'format': 'json',
-                'sort': '+sales',  # 売上順（より人気の商品）
+                **self._rakuten_auth_params(),
+                'sort': '+sales',
                 'hits': limit,
-                'availability': 1,  # 在庫あり
-                'field': 1  # 商品情報を詳細に
+                'availability': 1,
+                'formatVersion': 2,
             }
-            
-            # アフィリエイトIDが設定されている場合のみ追加
-            if self.rakuten_affiliate_id:
-                params['affiliateId'] = self.rakuten_affiliate_id
-            
+
             # genreIdは数値形式のみ。'all'や空は渡さず、keywordで検索
             if genre_id and str(genre_id).strip() != 'all' and str(genre_id).isdigit():
                 params['genreId'] = str(genre_id).strip()
             else:
                 params['keyword'] = '人気'
-            
-            logger.debug(f"楽天APIリクエストURL: {url}")
-            logger.debug(f"楽天APIリクエストパラメータ: {params}")
-            
-            # レート制限をチェック
+
+            logger.debug(f"楽天検索APIリクエストURL: {RAKUTEN_SEARCH_URL}")
+            logger.debug(f"楽天検索APIリクエストパラメータ: {params}")
+
             self.rate_limiter.wait_if_needed()
-            
-            response = requests.get(url, params=params, timeout=10)
-            logger.debug(f"楽天APIレスポンスステータス: {response.status_code}")
-            logger.debug(f"楽天APIレスポンス内容: {response.text[:500]}...")
-            
+
+            response = requests.get(RAKUTEN_SEARCH_URL, params=params, timeout=10)
+            logger.debug(f"楽天検索APIレスポンスステータス: {response.status_code}")
+
             if response.status_code == 200:
                 data = response.json()
-                items = data.get('Items', [])
-                
-                # データを整形
+                if isinstance(data, dict) and data.get('error'):
+                    err_desc = data.get('error_description', data.get('error', ''))
+                    return {'data': [], 'error': f'楽天API エラー: {err_desc}'}
+                items = data.get('Items') or data.get('items', [])
+
                 trends_data = []
                 for item in items:
-                    item_info = item.get('Item', {})
+                    item_info = (
+                        item.get('Item') or item.get('item') or item
+                        if isinstance(item, dict) else {}
+                    )
+                    image_urls = item_info.get('mediumImageUrls') or item_info.get('smallImageUrls') or []
+                    image_url = ''
+                    if image_urls and isinstance(image_urls[0], dict):
+                        image_url = image_urls[0].get('imageUrl', '')
+                    rank = len(trends_data) + 1
                     trends_data.append({
-                        'rank': len(trends_data) + 1,
+                        'rank': rank,
+                        'item_id': item_info.get('itemCode', ''),
                         'title': item_info.get('itemName', ''),
                         'price': item_info.get('itemPrice', 0),
                         'review_count': item_info.get('reviewCount', 0),
                         'review_average': item_info.get('reviewAverage', 0),
-                        'image_url': item_info.get('mediumImageUrls', [{}])[0].get('imageUrl', ''),
+                        'image_url': image_url,
                         'url': self._add_affiliate_params(item_info.get('itemUrl', '')),
                         'shop_name': item_info.get('shopName', ''),
                         'genre_id': item_info.get('genreId', ''),
-                        'sales_rank': item_info.get('salesRank', 'N/A'),  # 売上ランク
-                        'sales_count': item_info.get('salesCount', 'N/A')  # 売上数
+                        'sales_rank': item_info.get('salesRank', rank),
+                        'sales_count': item_info.get('salesCount', 0),
                     })
-                
+                    if len(trends_data) >= limit:
+                        break
+
                 return {
                     'data': trends_data,
                     'status': 'success',
                     'source': '楽天商品検索API',
-                    'total_count': data.get('count', 0)
+                    'total_count': data.get('count', len(trends_data))
                 }
             else:
-                logger.error(f"楽天APIエラーレスポンス: {response.text}")
-                return {'error': f'楽天API エラー: {response.status_code} - {response.text}'}
-                
+                logger.error(f"楽天検索APIエラーレスポンス: {response.text}")
+                return {'data': [], 'error': f'楽天API エラー: {response.status_code} - {response.text[:500]}'}
+
         except Exception as e:
-            return {'error': f'楽天トレンド取得エラー: {str(e)}'}
+            return {'data': [], 'error': f'楽天トレンド取得エラー: {str(e)}'}
     
     def get_genres(self):
         """楽天ジャンル一覧を取得"""
-        if not self.rakuten_app_id:
-            return {'error': '楽天アプリケーションIDが設定されていません'}
-        
+        if not self._rakuten_credentials_ok():
+            return {'error': self._rakuten_credentials_error()}
+
         try:
-            url = "https://app.rakuten.co.jp/services/api/IchibaGenre/Search/20140222"
-            params = {
-                'applicationId': self.rakuten_app_id,
-                'format': 'json'
-            }
-            
-            # レート制限をチェック
+            params = self._rakuten_auth_params()
+
             self.rate_limiter.wait_if_needed()
-            
-            response = requests.get(url, params=params, timeout=10)
+
+            response = requests.get(RAKUTEN_GENRE_URL, params=params, timeout=10)
             
             if response.status_code == 200:
                 data = response.json()

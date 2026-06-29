@@ -81,6 +81,7 @@ fly secrets set \
   WORLD_NEWS_API_KEY="your-world-news-api-key" \
   LISTEN_API_KEY="your-listen-api-key" \
   RAKUTEN_APP_ID="your-rakuten-app-id" \
+  RAKUTEN_ACCESS_KEY="your-rakuten-access-key" \
   RAKUTEN_AFFILIATE_ID="your-rakuten-affiliate-id" \
   AMAZON_AFFILIATE_ID="your-amazon-affiliate-id" \
   EBAY_CLIENT_ID="your-ebay-client-id" \

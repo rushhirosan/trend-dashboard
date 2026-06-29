@@ -216,9 +216,20 @@ def _compact_task_result(result_data: dict) -> dict:
     """集約用に最小フィールドだけ残す（大きな response.data を持たない）。"""
     if not result_data.get('success'):
         compact = {'success': False}
+        resp = result_data.get('response')
         err = result_data.get('error')
+        if not err and isinstance(resp, dict):
+            err = resp.get('error')
         if err:
             compact['error'] = err
+        if isinstance(resp, dict):
+            response_compact = {}
+            if resp.get('status') is not None:
+                response_compact['status'] = resp.get('status')
+            if err:
+                response_compact['error'] = err
+            if response_compact:
+                compact['response'] = response_compact
         return compact
     resp = result_data.get('response')
     if isinstance(resp, dict) and 'data' in resp:

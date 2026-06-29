@@ -229,19 +229,19 @@ def _merge_phase_refresh_results(jp_result: dict, us_result: dict) -> dict:
 
 
 def _subprocess_phase_ok(phase_result: dict, timed_out: bool) -> bool:
-    """subprocess 1フェーズが完走成功したか。"""
-    if timed_out:
+    """subprocess 1フェーズが異常終了なく完走したか（個別ソース失敗は許容）。"""
+    if timed_out or phase_result.get("phase_timed_out"):
         return False
     if phase_result.get("oom_killed"):
-        if phase_result.get("recovered_from_result_file") and phase_result.get("success"):
-            return bool(phase_result.get("results"))
-        return False
-    if not phase_result.get("success"):
+        if phase_result.get("recovered_from_result_file") and phase_result.get("results"):
+            return True
         return False
     err = str(phase_result.get("error") or "")
     if err.startswith("subprocess_exit_") and err != "subprocess_exit_0":
         return False
-    return bool(phase_result.get("results"))
+    if phase_result.get("results"):
+        return True
+    return bool(phase_result.get("message"))
 
 
 class TrendsScheduler:
@@ -1188,9 +1188,17 @@ class TrendsScheduler:
                 merged["jp_phase_failed"] = True
                 merged["us_phase_skipped"] = True
                 return merged, True
+            if not jp_result.get("success"):
+                logger.warning(
+                    "⚠️ JP chunk %s/%s: 一部ソース失敗 — 残り chunk を継続 "
+                    "(error=%s)",
+                    chunk_idx,
+                    jp_subchunks,
+                    jp_result.get("error"),
+                )
             if not _subprocess_phase_ok(jp_result, jp_timed_out):
                 logger.error(
-                    "❌ JP フェーズ失敗 (chunk=%s/%s) — US subprocess をスキップ "
+                    "❌ JP フェーズ異常終了 (chunk=%s/%s) — US subprocess をスキップ "
                     "(success=%s error=%s oom=%s)",
                     chunk_idx,
                     jp_subchunks,

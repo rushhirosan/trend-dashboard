@@ -112,7 +112,8 @@ def main() -> int:
         return 1
 
     _emit_result(compact_refresh_result(result))
-    return 0 if result.get("success") else 1
+    # 個別ソース失敗でも subprocess は正常終了（残り JP chunk / US を継続する）
+    return 0
 
 
 if __name__ == "__main__":

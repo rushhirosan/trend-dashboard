@@ -27,17 +27,26 @@ def test_merge_phase_refresh_results():
 
 def test_subprocess_phase_ok():
     assert sm._subprocess_phase_ok({"success": True, "results": {"a": {}}}, False)
+    assert sm._subprocess_phase_ok(
+        {"success": False, "results": {"rakuten_JP": {"success": False, "error": "api_error"}}},
+        False,
+    )
     assert not sm._subprocess_phase_ok({"success": False, "results": {}}, False)
+    assert not sm._subprocess_phase_ok(
+        {"success": False, "results": {}, "error": "subprocess_exit_1"},
+        False,
+    )
     assert not sm._subprocess_phase_ok({"success": False, "results": {}, "oom_killed": True}, False)
     assert sm._subprocess_phase_ok(
         {
-            "success": True,
+            "success": False,
             "results": {"a": {}},
             "oom_killed": True,
             "recovered_from_result_file": True,
         },
         False,
     )
+    assert sm._subprocess_phase_ok({"success": True, "results": {}, "message": "no_tasks_for_chunk"}, False)
     assert not sm._subprocess_phase_ok({"success": True, "results": {}}, True)
 
 
@@ -173,6 +182,47 @@ def test_scheduler_subprocess_phases_merges_results(monkeypatch):
     assert result["success"] is True
     assert "google_JP" in result["results"]
     assert "cnn_US" in result["results"]
+
+
+def test_jp_partial_source_failure_continues_all_chunks_and_us(monkeypatch):
+    calls = []
+    jp1 = {"success": True, "results": {"note_JP": {"success": True}}, "region": "jp"}
+    jp2 = {
+        "success": False,
+        "results": {
+            "rakuten_JP": {"success": False, "error": "api_error"},
+            "stock_JP": {"success": True},
+        },
+        "region": "jp",
+    }
+    jp3 = {"success": True, "results": {"google_JP": {"success": True}}, "region": "jp"}
+    us_payload = {"success": True, "results": {"cnn_US": {"success": True}}, "region": "us"}
+
+    def fake_subprocess(self, region, *, low_memory_mode, timeout_seconds, jp_chunk=None, jp_chunks=None):
+        calls.append((region, jp_chunk))
+        if region == "jp":
+            if jp_chunk == 1:
+                return jp1, False
+            if jp_chunk == 2:
+                return jp2, False
+            return jp3, False
+        return us_payload, False
+
+    monkeypatch.setattr(sm, "SCHEDULER_JP_SUBCHUNKS", 3)
+    monkeypatch.setattr(sm.TrendsScheduler, "_run_refresh_region_subprocess", fake_subprocess)
+    monkeypatch.setattr(sm.TrendsScheduler, "_pause_between_subprocess_phases", lambda self: None)
+    scheduler = sm.TrendsScheduler(_FakeApp())
+    result, timed_out = scheduler._run_refresh_all_trends_with_job_timeout(
+        low_memory_mode=True,
+        job_timeout_seconds=1200,
+    )
+    assert timed_out is False
+    assert calls == [("jp", 1), ("jp", 2), ("jp", 3), ("us", None)]
+    assert result.get("jp_phase_failed") is not True
+    assert result.get("us_phase_skipped") is not True
+    assert "cnn_US" in result["results"]
+    assert "google_JP" in result["results"]
+    assert result["results"]["rakuten_JP"]["success"] is False
 
 
 def test_jp_two_chunks_then_us(monkeypatch):

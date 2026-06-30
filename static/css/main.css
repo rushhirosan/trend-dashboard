@@ -3977,11 +3977,35 @@ ul.trend-category-tabs li.nav-item button.nav-link.active {
 
 /* モバイル: タブを横スクロール・タップしやすく */
 @media (max-width: 767.98px) {
+    body#trends-jp,
+    body#trends-us {
+        overflow-x: hidden;
+        max-width: 100%;
+    }
+    body#trends-jp main.main-content-compact,
+    body#trends-us main.main-content-compact {
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+    .page-header-compact,
+    .dashboard-summary-grid,
+    .dashboard-summary-panel {
+        max-width: 100%;
+        min-width: 0;
+    }
+    body#trends-jp section#trends,
+    body#trends-us section#trends {
+        max-width: 100%;
+        min-width: 0;
+    }
     .trend-tabs-wrapper {
         overflow-x: auto;
         overflow-y: hidden;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: thin;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
     }
     .trend-tabs-wrapper::-webkit-scrollbar {
         height: 4px;
@@ -3989,7 +4013,8 @@ ul.trend-category-tabs li.nav-item button.nav-link.active {
     .trend-category-tabs {
         flex-wrap: nowrap;
         padding-bottom: 2px;
-        min-width: min-content;
+        width: max-content;
+        box-sizing: border-box;
     }
     .trend-category-tabs .nav-link {
         min-height: 44px;
@@ -3999,11 +4024,6 @@ ul.trend-category-tabs li.nav-item button.nav-link.active {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-    }
-    #mainContent .container-fluid,
-    #mainContent main .container-fluid {
-        padding-left: 0.5rem;
-        padding-right: 0.5rem;
     }
 }
 @media (max-width: 575.98px) {

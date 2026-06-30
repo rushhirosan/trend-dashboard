@@ -298,28 +298,35 @@ def test_render_weekly_rising_markdown_uses_table_not_prose_evidence(gaws):
     assert "jump **+15.0**" in md
     assert "根拠:" not in md
     assert "jump合計" not in md
-    assert "```mermaid" in md
+    assert "<svg " in md
     assert "**日別ベスト順位**" in md
     assert "06-08 (8位)" in md
     assert " ↑" in md
     assert ".png" not in md
 
 
-def test_format_weekly_best_rank_mermaid_uses_rank_values_and_point_labels(gaws):
-    chart = gaws.format_weekly_best_rank_mermaid(
+def test_format_weekly_best_rank_chart_places_better_rank_higher(gaws):
+    chart = gaws.format_weekly_best_rank_chart(
         "ライラック",
         {
             "2026-06-08": "7時10位 → 13時8位 → 19時8位",
             "2026-06-12": "7時4位 → 13時2位 → 19時2位",
         },
     )
-    assert "```mermaid" in chart
-    assert '2 "8位"' in chart
-    assert '8 "2位"' in chart
+    assert "<svg " in chart
+    assert ">8位</text>" in chart
+    assert ">2位</text>" in chart
+    import re
+
+    y_by_rank = {
+        int(m.group(2)): float(m.group(1))
+        for m in re.finditer(r'<text [^>]*y="([\d.]+)"[^>]*>(\d+)位</text>', chart)
+    }
+    assert y_by_rank[2] < y_by_rank[8]
 
 
-def test_format_weekly_best_rank_mermaid_skips_flat_ranks(gaws):
-    assert gaws.format_weekly_best_rank_mermaid(
+def test_format_weekly_best_rank_chart_skips_flat_ranks(gaws):
+    assert gaws.format_weekly_best_rank_chart(
         "Flat",
         {
             "2026-06-08": "7時4位 → 13時4位 → 19時4位",

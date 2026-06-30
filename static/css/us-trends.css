@@ -151,7 +151,25 @@ body#trends-us .header-admin-latest-value {
 }
 body#trends-us .header-admin-latest-line {
     display: block;
-    white-space: normal;
-    overflow: visible;
-    text-overflow: clip;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+@media (max-width: 767.98px) {
+    body#trends-us #header-admin-unified {
+        padding-right: 4.25rem;
+        max-width: 100%;
+        overflow: hidden;
+    }
+    body#trends-us .header-admin-latest-title,
+    body#trends-us .header-admin-latest-value {
+        overflow: visible;
+        text-overflow: clip;
+    }
+    body#trends-us .header-admin-latest-line {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        word-break: break-word;
+    }
 }

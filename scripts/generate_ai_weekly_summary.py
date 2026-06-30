@@ -626,7 +626,7 @@ def _mermaid_safe_label(label: str, *, max_len: int = 28) -> str:
 
 def _weekly_rank_chart_series(
     rank_evidence_by_day: Dict[str, str],
-) -> Optional[Tuple[List[str], List[int]]]:
+) -> Optional[Tuple[List[str], List[str], List[int]]]:
     points: List[tuple[str, int]] = []
     for ds, ev in sorted(rank_evidence_by_day.items()):
         best = _best_rank_from_evidence(ev)
@@ -637,48 +637,49 @@ def _weekly_rank_chart_series(
     rank_vals = [r for _, r in points]
     if len(set(rank_vals)) < 2:
         return None
+    date_labels = [d for d, _ in points]
     x_labels = [f"{d} ({r}位)" for d, r in points]
-    return x_labels, rank_vals
+    return x_labels, date_labels, rank_vals
 
 
 def format_weekly_best_rank_block(
     label: str,
     rank_evidence_by_day: Dict[str, str],
 ) -> str:
-    """週内ベスト順位: Mermaid 折れ線 + テキスト一行（Cursor 等で画像が出ない環境向け）。"""
+    """週内ベスト順位: SVG 折れ線 + テキスト一行。"""
     series = _weekly_rank_chart_series(rank_evidence_by_day)
     if not series:
         return ""
-    x_labels, rank_vals = series
+    x_labels, date_labels, rank_vals = series
     title = _mermaid_safe_label(label)
     parts: List[str] = []
-    mermaid = sr.format_rank_mermaid_xychart(
+    svg = sr.format_rank_svg_chart(
         title,
         "日別ベスト順位（上ほど上位）",
-        x_labels,
+        date_labels,
         rank_vals,
     )
-    if mermaid:
-        parts.append(mermaid)
+    if svg:
+        parts.append(svg)
     trend = sr.format_rank_trend_markdown(x_labels, rank_vals)
     if trend:
         parts.append(trend.replace("**順位の動き**", "**日別ベスト順位**", 1))
     return "\n\n".join(parts) + "\n" if parts else ""
 
 
-def format_weekly_best_rank_mermaid(
+def format_weekly_best_rank_chart(
     label: str,
     rank_evidence_by_day: Dict[str, str],
 ) -> str:
-    """Mermaid ブロックのみ（テスト用）。"""
+    """SVG チャートのみ（テスト用）。"""
     series = _weekly_rank_chart_series(rank_evidence_by_day)
     if not series:
         return ""
-    x_labels, rank_vals = series
-    return sr.format_rank_mermaid_xychart(
+    _, date_labels, rank_vals = series
+    return sr.format_rank_svg_chart(
         _mermaid_safe_label(label),
         "日別ベスト順位（上ほど上位）",
-        x_labels,
+        date_labels,
         rank_vals,
     )
 

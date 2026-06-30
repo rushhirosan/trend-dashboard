@@ -619,11 +619,6 @@ def _best_rank_from_evidence(evidence: str) -> Optional[int]:
 
 
 
-def _mermaid_safe_label(label: str, *, max_len: int = 28) -> str:
-    s = re.sub(r'["\[\]#;|]', "", str(label or "")).strip()
-    return (s[:max_len] or "topic").replace("\n", " ")
-
-
 def _weekly_rank_chart_series(
     rank_evidence_by_day: Dict[str, str],
 ) -> Optional[Tuple[List[str], List[str], List[int]]]:
@@ -642,46 +637,28 @@ def _weekly_rank_chart_series(
     return x_labels, date_labels, rank_vals
 
 
+def format_weekly_rank_trend_block(
+    label: str,
+    rank_evidence_by_day: Dict[str, str],
+) -> str:
+    """週内ベスト順位のテキスト一行（Markdown / メール共通。画像なし）。"""
+    series = _weekly_rank_chart_series(rank_evidence_by_day)
+    if not series:
+        return ""
+    x_labels, _, rank_vals = series
+    trend = sr.format_rank_trend_markdown(x_labels, rank_vals)
+    if not trend:
+        return ""
+    return trend.replace("**順位の動き**", "**日別ベスト順位**", 1) + "\n"
+
+
 def format_weekly_best_rank_block(
     label: str,
     rank_evidence_by_day: Dict[str, str],
+    **_: Any,
 ) -> str:
-    """週内ベスト順位: SVG 折れ線 + テキスト一行。"""
-    series = _weekly_rank_chart_series(rank_evidence_by_day)
-    if not series:
-        return ""
-    x_labels, date_labels, rank_vals = series
-    title = _mermaid_safe_label(label)
-    parts: List[str] = []
-    svg = sr.format_rank_svg_chart(
-        title,
-        "日別ベスト順位（上ほど上位）",
-        date_labels,
-        rank_vals,
-    )
-    if svg:
-        parts.append(svg)
-    trend = sr.format_rank_trend_markdown(x_labels, rank_vals)
-    if trend:
-        parts.append(trend.replace("**順位の動き**", "**日別ベスト順位**", 1))
-    return "\n\n".join(parts) + "\n" if parts else ""
-
-
-def format_weekly_best_rank_chart(
-    label: str,
-    rank_evidence_by_day: Dict[str, str],
-) -> str:
-    """SVG チャートのみ（テスト用）。"""
-    series = _weekly_rank_chart_series(rank_evidence_by_day)
-    if not series:
-        return ""
-    _, date_labels, rank_vals = series
-    return sr.format_rank_svg_chart(
-        _mermaid_safe_label(label),
-        "日別ベスト順位（上ほど上位）",
-        date_labels,
-        rank_vals,
-    )
+    """後方互換エイリアス（``format_weekly_rank_trend_block``）。"""
+    return format_weekly_rank_trend_block(label, rank_evidence_by_day)
 
 
 def _compact_weekly_link_line(item: Dict[str, Any]) -> str:
@@ -722,11 +699,9 @@ def render_weekly_rising_markdown(
             if table:
                 lines.append(table)
                 lines.append("")
-            chart = format_weekly_best_rank_block(
-                str(it.get("label") or ""), rank_by_day
-            )
-            if chart:
-                lines.append(chart)
+            trend = format_weekly_rank_trend_block(str(it.get("label") or ""), rank_by_day)
+            if trend:
+                lines.append(trend)
                 lines.append("")
     if not any_items:
         return (
@@ -1033,7 +1008,13 @@ def run_generate_snapshots(
         meta["editorial_warning"] = "; ".join(warnings)
 
     inner = assemble_weekly_markdown(
-        stem, week_mon, week_sun, editorial, weekly_rising, weekly_cross, meta
+        stem,
+        week_mon,
+        week_sun,
+        editorial,
+        weekly_rising,
+        weekly_cross,
+        meta,
     )
     meta["model"] = model
     full = merge_front_matter(stem, week_mon, week_sun, model, inner, meta)

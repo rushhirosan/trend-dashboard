@@ -1,0 +1,20 @@
+{# 兄弟サイトリンク（フッター右カラム内）
+   footer_lang: 'ja' | 'en' | 'bilingual'（省略時 ja）
+#}
+{% set footer_lang = footer_lang|default('ja') %}
+<h6 class="h6 mb-3 mt-3">
+    {%- if footer_lang == 'en' -%}
+        Related sites
+    {%- elif footer_lang == 'bilingual' -%}
+        関連サイト / Related sites
+    {%- else -%}
+        関連サイト
+    {%- endif -%}
+</h6>
+<ul class="list-unstyled small">
+    <li class="mb-2">
+        <a href="https://g7-dashboard.vercel.app/" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-muted">
+            🌍 World Front Page<i class="fas fa-external-link-alt ms-1" style="font-size: 0.75rem;"></i>
+        </a>
+    </li>
+</ul>

@@ -167,13 +167,23 @@ def slot_needs_recovery(
     return not slot_is_fully_done(db, slot_key)
 
 
+def all_refresh_sources_succeeded(refresh_result: dict) -> bool:
+    """個別ソースがすべて成功したか（フェーズ/subprocess の success フラグとは独立）。"""
+    results = refresh_result.get("results") or {}
+    if not results:
+        return False
+    return all(r.get("success") for r in results.values())
+
+
 def refresh_succeeded_for_snapshot(refresh_result: dict) -> bool:
-    """全フェーズ成功時のみスナップショットを書く（失敗時の gap_retry 阻害を防ぐ）。"""
+    """全ソース成功かつフェーズ異常なしのときのみスナップショットを書く。"""
     if refresh_result.get("job_timed_out"):
         return False
     if refresh_result.get("jp_phase_failed") or refresh_result.get("us_phase_failed"):
         return False
-    return bool(refresh_result.get("success"))
+    if refresh_result.get("us_phase_skipped"):
+        return False
+    return all_refresh_sources_succeeded(refresh_result)
 
 
 def write_and_verify_snapshot(

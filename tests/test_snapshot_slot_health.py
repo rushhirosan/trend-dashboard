@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytz
 
 from services.snapshot_slot_health import (
+    all_refresh_sources_succeeded,
     check_captured_at_in_slot_window,
     find_missing_prior_slots,
     format_prior_slot_gaps,
@@ -181,10 +182,32 @@ def test_slot_needs_recovery_legacy_completed_without_snap_verified():
 
 
 def test_refresh_succeeded_for_snapshot():
-    assert refresh_succeeded_for_snapshot({"success": True}) is True
+    assert refresh_succeeded_for_snapshot(
+        {"success": True, "results": {"google_JP": {"success": True}}}
+    ) is True
     assert refresh_succeeded_for_snapshot({"success": False, "jp_phase_failed": True}) is False
     assert refresh_succeeded_for_snapshot({"success": False, "job_timed_out": True}) is False
     assert refresh_succeeded_for_snapshot({"success": True, "us_phase_failed": True}) is False
+    assert refresh_succeeded_for_snapshot({"success": False, "us_phase_skipped": True}) is False
+    assert refresh_succeeded_for_snapshot(
+        {
+            "success": False,
+            "results": {
+                "google_JP": {"success": True},
+                "cnn_US": {"success": True},
+            },
+        }
+    ) is True
+
+
+def test_all_refresh_sources_succeeded():
+    assert all_refresh_sources_succeeded({}) is False
+    assert all_refresh_sources_succeeded(
+        {"results": {"a": {"success": True}, "b": {"success": False}}}
+    ) is False
+    assert all_refresh_sources_succeeded(
+        {"results": {"a": {"success": True}, "b": {"success": True}}}
+    ) is True
 
 
 @patch("services.trend_snapshot_service.write_snapshots_for_scheduler_run")

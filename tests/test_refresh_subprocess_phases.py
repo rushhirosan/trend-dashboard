@@ -18,11 +18,21 @@ def test_merge_phase_refresh_results():
     us = {"success": False, "results": {"b_US": {"success": False, "error": "x"}}}
     merged = sm._merge_phase_refresh_results(jp, us)
     assert merged["success"] is False
+    assert merged["phase_success"] is False
     assert "a_JP" in merged["results"]
     assert "b_US" in merged["results"]
     assert merged["phases"]["jp"]["success"] is True
     assert merged["region_stats"]["JP"]["success"] == 1
     assert merged["region_stats"]["US"]["success"] == 0
+
+
+def test_merge_phase_refresh_results_phase_flag_mismatch():
+    jp = {"success": False, "results": {"a_JP": {"success": True}}}
+    us = {"success": False, "results": {"b_US": {"success": True}}}
+    merged = sm._merge_phase_refresh_results(jp, us)
+    assert merged["success"] is True
+    assert merged["phase_success"] is False
+    assert merged.get("phase_success_mismatch") is True
 
 
 def test_subprocess_phase_ok():

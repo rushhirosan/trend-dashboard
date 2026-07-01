@@ -183,26 +183,37 @@ def _load_refresh_subprocess_result(stdout: str, result_file: str | None) -> dic
     return parsed
 
 
+def _refresh_sources_all_succeeded(results: dict) -> bool:
+    """マージ済み results から個別ソース成功を判定。"""
+    if not results:
+        return False
+    return all(r.get("success") for r in results.values())
+
+
 def _merge_jp_chunk_results(chunks: list[dict]) -> dict:
     """JP subprocess 分割の結果を1つの jp フェーズ結果にまとめる。"""
     merged_results: dict = {}
-    all_success = True
+    phase_success = True
     oom_killed = False
     errors: list[str] = []
     for chunk in chunks:
         merged_results.update(chunk.get("results") or {})
         if not chunk.get("success"):
-            all_success = False
+            phase_success = False
         if chunk.get("oom_killed"):
             oom_killed = True
         err = chunk.get("error")
         if err:
             errors.append(str(err))
+    sources_success = _refresh_sources_all_succeeded(merged_results)
     out = {
-        "success": all_success,
+        "success": sources_success,
+        "phase_success": phase_success,
         "results": merged_results,
         "region": "jp",
     }
+    if phase_success != sources_success:
+        out["phase_success_mismatch"] = True
     if oom_killed:
         out["oom_killed"] = True
     if errors:
@@ -219,11 +230,16 @@ def _merge_phase_refresh_results(jp_result: dict, us_result: dict) -> dict:
     merged = {}
     merged.update(jp.get("results") or {})
     merged.update(us.get("results") or {})
+    phase_success = bool(jp.get("success")) and bool(us.get("success"))
+    sources_success = _refresh_sources_all_succeeded(merged)
     out = {
-        "success": bool(jp.get("success")) and bool(us.get("success")),
+        "success": sources_success,
+        "phase_success": phase_success,
         "results": merged,
         "phases": {"jp": jp, "us": us},
     }
+    if phase_success != sources_success:
+        out["phase_success_mismatch"] = True
     out["region_stats"] = region_refresh_stats(merged)
     return out
 
@@ -1107,12 +1123,32 @@ class TrendsScheduler:
             result["oom_killed"] = True
         result.setdefault("region", region)
 
+        results_map = result.get("results") or {}
+        sources_ok = _refresh_sources_all_succeeded(results_map)
+        phase_flag = bool(result.get("success"))
         logger.info(
-            "🔄 refresh subprocess 完了 region=%s success=%s exit=%s",
+            "🔄 refresh subprocess 完了 region=%s exit=%s phase_success=%s sources_ok=%s "
+            "results=%s jp_chunk=%s/%s error=%s",
             region,
-            result.get("success"),
             proc.returncode,
+            phase_flag,
+            sources_ok,
+            len(results_map),
+            jp_chunk,
+            jp_chunks,
+            result.get("error"),
         )
+        if phase_flag != sources_ok:
+            logger.warning(
+                "⚠️ subprocess フェーズ/ソース判定不一致 region=%s phase_success=%s sources_ok=%s "
+                "exit=%s error=%s oom=%s",
+                region,
+                phase_flag,
+                sources_ok,
+                proc.returncode,
+                result.get("error"),
+                result.get("oom_killed"),
+            )
         return result, timed_out
 
     def _pause_between_subprocess_phases(self) -> None:
@@ -1174,6 +1210,17 @@ class TrendsScheduler:
                 jp_chunks=jp_subchunks if jp_subchunks > 1 else None,
             )
             jp_chunk_results.append(jp_result)
+            chunk_results = jp_result.get("results") or {}
+            chunk_sources_ok = _refresh_sources_all_succeeded(chunk_results)
+            logger.info(
+                "🔄 JP chunk %s/%s 完了 exit_phase_success=%s sources_ok=%s results=%s error=%s",
+                chunk_idx,
+                jp_subchunks,
+                jp_result.get("success"),
+                chunk_sources_ok,
+                len(chunk_results),
+                jp_result.get("error"),
+            )
             if jp_timed_out:
                 merged = _merge_phase_refresh_results(
                     _merge_jp_chunk_results(jp_chunk_results),
@@ -1220,6 +1267,14 @@ class TrendsScheduler:
                 self._pause_between_subprocess_phases()
 
         jp_result = _merge_jp_chunk_results(jp_chunk_results)
+        if jp_result.get("phase_success_mismatch"):
+            logger.warning(
+                "⚠️ JP フェーズ: subprocess phase_success とソース成功数が不一致 "
+                "(phase_success=%s sources_success=%s chunks=%s)",
+                jp_result.get("phase_success"),
+                jp_result.get("success"),
+                len(jp_chunk_results),
+            )
         jp_chunk_results.clear()
         self._pause_between_subprocess_phases()
 
@@ -1229,6 +1284,13 @@ class TrendsScheduler:
             timeout_seconds=us_timeout,
         )
         merged = _merge_phase_refresh_results(jp_result, us_result)
+        if merged.get("phase_success_mismatch"):
+            logger.warning(
+                "⚠️ refresh マージ: phase_success とソース成功数が不一致 "
+                "(phase_success=%s sources_success=%s)",
+                merged.get("phase_success"),
+                merged.get("success"),
+            )
         if us_timed_out:
             merged["job_timed_out"] = True
             merged["us_phase_timed_out"] = True
@@ -1920,18 +1982,18 @@ class TrendsScheduler:
 
             # スロット完了 = 全フェーズ成功 + スナップショット verified（slot_key あり時）
             completed_slot = slot_key  # 開始時に判定したスロット（トリガー時刻ベース）
-            from services.snapshot_slot_health import mark_slot_fully_done
+            from services.snapshot_slot_health import mark_slot_fully_done, all_refresh_sources_succeeded
 
             if result.get('job_timed_out'):
                 logger.warning(
                     "⏭️ ジョブ全体タイムアウトのためスロット完了は記録しません（slot=%s）",
                     completed_slot,
                 )
-            elif result.get('jp_phase_failed') or result.get('us_phase_failed') or not result.get('success'):
+            elif result.get('jp_phase_failed') or result.get('us_phase_failed') or not all_refresh_sources_succeeded(result):
                 logger.warning(
-                    "⏭️ 部分失敗のためスロット完了は記録しません（slot=%s success=%s jp_failed=%s us_skipped=%s）",
+                    "⏭️ 部分失敗のためスロット完了は記録しません（slot=%s sources_ok=%s jp_failed=%s us_skipped=%s）",
                     completed_slot,
-                    result.get('success'),
+                    all_refresh_sources_succeeded(result),
                     result.get('jp_phase_failed'),
                     result.get('us_phase_skipped'),
                 )
@@ -2294,11 +2356,11 @@ class TrendsScheduler:
 
         snapshot_required = bool(snapshot_status and snapshot_status.get("scheduler_slot_key"))
         snapshot_ok = not snapshot_required or bool(snapshot_status.get("verified_ok"))
+        sources_all_ok = failed_count == 0 and total_count > 0
         fully_ok = (
-            refresh_success
+            sources_all_ok
             and not jp_phase_failed
             and not us_phase_skipped
-            and failed_count == 0
             and snapshot_ok
         )
         oom_killed = any(
@@ -2309,7 +2371,7 @@ class TrendsScheduler:
         # アラートタイプを決定
         if jp_phase_failed and oom_killed:
             alert_type = "critical"
-        elif jp_phase_failed or us_phase_skipped or not refresh_success:
+        elif jp_phase_failed or us_phase_skipped or failed_count > 0:
             alert_type = "warning"
         elif has_anomaly or snapshot_bad or gaps_bad:
             alert_type = "warning"
@@ -2331,7 +2393,7 @@ class TrendsScheduler:
                 f"トレンド取得は完了しましたが、スナップショットに問題があります。\n"
                 f"トリガー: {trigger_label}"
             )
-        elif jp_phase_failed or us_phase_skipped or not refresh_success:
+        elif jp_phase_failed or us_phase_skipped:
             title = "❌ トレンド取得失敗（部分完了）"
             if us_phase_skipped:
                 jp_expected = jp_stats.get("expected")

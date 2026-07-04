@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
     <!-- SEO Meta Tags -->
-    <title>US Trends Dashboard - Latest Trends in America | Google Trends, YouTube, Spotify, OpenAlex, Bluesky</title>
-    <meta name="description" content="U.S. trends in one dashboard: Google Trends, YouTube, Spotify, Hacker News, OpenAlex, Bluesky, S&P 500, cryptocurrency. America-focused trends updated 4 times daily (JST).">
+    <title>Compare U.S. trends across 20+ sources | Trends Dashboard</title>
+    <meta name="description" content="See U.S. interest at a glance. Free dashboard comparing search, news, tech, and markets across 20+ public sources in one screen. Refreshed 4 times daily (1/7/13/19 JST).">
     <meta name="keywords" content="trends, Google Trends, YouTube, Spotify, Hacker News, OpenAlex, Bluesky, Twitch, Podcast, US trends, America trends, Stock, Cryptocurrency, Bitcoin, Investment, Market trends, S&P 500, NASDAQ">
     <meta name="author" content="Trends Dashboard">
     <meta name="robots" content="index, follow">
@@ -14,8 +14,8 @@
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://trends-dashboard.fly.dev/us">
-    <meta property="og:title" content="US Trends Dashboard - Latest Trends in America">
-    <meta property="og:description" content="U.S. trends in one dashboard: Google Trends, YouTube, Hacker News, OpenAlex, Bluesky, S&P 500, cryptocurrency. America-focused trends updated 4 times daily.">
+    <meta property="og:title" content="Compare U.S. trends across 20+ sources | Trends Dashboard">
+    <meta property="og:description" content="See U.S. interest at a glance. Free dashboard comparing search, news, tech, and markets across 20+ public sources in one screen. Refreshed 4 times daily.">
     <meta property="og:image" content="https://trends-dashboard.fly.dev/static/images/og-image.png">
     <meta property="og:locale" content="en_US">
     <meta property="og:site_name" content="Trends Dashboard">
@@ -23,8 +23,8 @@
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:url" content="https://trends-dashboard.fly.dev/us">
-    <meta name="twitter:title" content="US Trends Dashboard - Latest Trends in America">
-    <meta name="twitter:description" content="U.S. trends in one dashboard: Google Trends, YouTube, Hacker News, OpenAlex, Bluesky, S&P 500, cryptocurrency. America-focused trends updated 4 times daily.">
+    <meta name="twitter:title" content="Compare U.S. trends across 20+ sources | Trends Dashboard">
+    <meta name="twitter:description" content="See U.S. interest at a glance. Free dashboard comparing search, news, tech, and markets across 20+ public sources in one screen. Refreshed 4 times daily.">
     <meta name="twitter:image" content="https://trends-dashboard.fly.dev/static/images/og-image.png">
     
     <!-- Canonical URL -->
@@ -52,9 +52,39 @@
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
+      "@type": "Organization",
+      "@id": "https://trends-dashboard.fly.dev/#organization",
+      "name": "Trends Dashboard",
+      "url": "https://trends-dashboard.fly.dev/"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "@id": "https://trends-dashboard.fly.dev/#website",
+      "name": "Trends Dashboard",
+      "description": "See U.S. interest at a glance. Free dashboard comparing search, news, tech, and markets across 20+ public sources in one screen. Refreshed 4 times daily (1/7/13/19 JST).",
+      "url": "https://trends-dashboard.fly.dev/",
+      "publisher": { "@id": "https://trends-dashboard.fly.dev/#organization" }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "name": "Compare U.S. trends across 20+ sources | Trends Dashboard",
+      "description": "See U.S. interest at a glance. Free dashboard comparing search, news, tech, and markets across 20+ public sources in one screen. Refreshed 4 times daily (1/7/13/19 JST).",
+      "url": "https://trends-dashboard.fly.dev/us",
+      "isPartOf": { "@id": "https://trends-dashboard.fly.dev/#website" }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
       "@type": "WebApplication",
       "name": "US Trends Dashboard",
-      "description": "U.S. trends in one dashboard: Google Trends, YouTube, Hacker News, OpenAlex, Bluesky, S&P 500, cryptocurrency. America-focused trends updated 4 times daily.",
+      "description": "See U.S. interest at a glance. Free dashboard comparing search, news, tech, and markets across 20+ public sources in one screen. Refreshed 4 times daily (1/7/13/19 JST).",
       "url": "https://trends-dashboard.fly.dev/us",
       "applicationCategory": "InformationApplication",
       "operatingSystem": "Web",
@@ -98,8 +128,49 @@
     {% include 'partials/header.html' with context %}
 
     <noscript>
-        <div class="alert alert-info mx-3 mt-3 mb-0" role="alert">
-            To view the trends dashboard, please enable JavaScript. Track U.S. trends from Google Trends, YouTube, Hacker News, OpenAlex, Bluesky, Spotify, and more.
+        <div class="alert alert-info mx-3 mt-3 mb-4" role="alert">
+            <h2 class="h5 mb-3">About Trends Dashboard</h2>
+            <p class="mb-3">Trends Dashboard is a free web app that surfaces U.S. trend signals from many public sources in one place. Enable JavaScript to load live trend data.</p>
+            <h3 class="h6 fw-bold mb-2">Trend sources on this page</h3>
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <h4 class="h6 fw-bold mb-2">Search &amp; video</h4>
+                    <ul class="small mb-0">
+                        <li>Google Trends — popular U.S. search keywords</li>
+                        <li>YouTube — trending videos and channels</li>
+                        <li>Wikipedia — popular English Wikipedia articles</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h4 class="h6 fw-bold mb-2">Tech &amp; development</h4>
+                    <ul class="small mb-0">
+                        <li>Hacker News — developer community headlines</li>
+                        <li>GitHub — trending open-source projects</li>
+                        <li>Product Hunt — new product launches</li>
+                        <li>Dev.to &amp; Medium — popular tech articles</li>
+                        <li>OpenAlex — academic research trends</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h4 class="h6 fw-bold mb-2">News</h4>
+                    <ul class="small mb-0">
+                        <li>CNN — U.S. and world news</li>
+                        <li>World News — major headlines</li>
+                        <li>GlobeNewswire — corporate press releases</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h4 class="h6 fw-bold mb-2">Markets &amp; entertainment</h4>
+                    <ul class="small mb-0">
+                        <li>Stocks — U.S. market movers (S&amp;P 500, NASDAQ)</li>
+                        <li>Cryptocurrency — major coin price trends</li>
+                        <li>Spotify &amp; Apple Music — popular tracks</li>
+                        <li>Podcasts, movies, and books — trending titles</li>
+                        <li>Twitch, eBay, and Bluesky — platform trends</li>
+                    </ul>
+                </div>
+            </div>
+            <p class="mb-0"><strong>Update schedule:</strong> refresh starts four times daily at 1, 7, 13, and 19 JST (typically 10–15 minutes to complete). Enable JavaScript and reload for the latest data.</p>
         </div>
     </noscript>
     <main class="container-fluid main-content-compact">

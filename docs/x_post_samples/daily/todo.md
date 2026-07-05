@@ -1,5 +1,7 @@
 # TODO — 急上昇3つ × 一覧 URL の UX
 
+> **保留（2026-07）:** Daily X post series 停止に伴い **本 TODO は着手しない**。X / Discord 文案の自動運用は使用していない。
+
 ## 課題
 
 Discord / X 文案の末尾:

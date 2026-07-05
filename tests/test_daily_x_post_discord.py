@@ -1,4 +1,4 @@
-"""Tests for scripts/daily_x_post_discord.py."""
+"""Tests for scripts/daily_x_post_discord.py (module inactive in prod since 2026-07)."""
 
 import importlib.util
 from pathlib import Path

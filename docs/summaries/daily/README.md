@@ -20,7 +20,7 @@
 - 見出し `# 日次サマリー — YYYY-MM-DD` と **対象** 行も同じ日付にする（モデルがずれたら `--force` で再生成）。
 - 入力データは `trend_daily_snapshots` の **`business_day`**（[`docs/summaries/README.md`](../README.md) のタイムライン参照）。
 
-**X 投稿案**（`docs/x_post_samples/daily/`）も、夜の投稿は **その暦日** のファイル名です。日次サマリーと **同じ `YYYY-MM-DD` なら同じ「一日」の話題** を指します（サマリーは翌朝に届く）。
+**X 投稿案**（`docs/x_post_samples/daily/`）— **使用していない（2026-07 停止）**。日次サマリーと同じ `YYYY-MM-DD` の命名規則だったが、自動生成・投稿は行わない。
 
 ## 運用
 

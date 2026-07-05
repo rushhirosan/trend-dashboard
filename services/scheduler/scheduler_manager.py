@@ -2011,6 +2011,9 @@ class TrendsScheduler:
             elif completed_slot and self.db and hasattr(self.db, 'mark_slot_completed'):
                 self.db.mark_slot_completed(completed_slot)
 
+            # Daily X post Discord（services/daily_x_post_notify）— 2026-07 運用停止。
+            # GHA workflow 削除・ENABLE_EVENING_X_POST_DISCORD 既定 false。ここからの呼び出しなし。
+
             # データ保存完了後、メール自動送信を実行
             # スケジューラー実行時（深夜1時・朝7時・昼13時・夜19時）のみメール送信
             # デプロイ時や手動実行時は、明示的に指示された場合のみメール送信

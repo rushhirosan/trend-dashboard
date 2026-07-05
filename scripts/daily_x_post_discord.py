@@ -1,7 +1,9 @@
 """
 Discord Webhook へ日次 X 投稿案（JP / US）を送る。
 
-``generate_daily_x_post_series.py --discord`` から利用。
+**運用停止（2026-07）— 本番・GHA・スケジューラからは呼ばれない。**
+手動で ``generate_daily_x_post_series.py --discord`` を実行したときのみ利用。
+
 Webhook URL はスケジューラ通知と同じ ``DISCORD_WEBHOOK_URL``（``utils/alert_service`` と共通）。
 
 JP / US 各1通のプレーン ``content`` のみ（Embed・読む用の長文・US 返信は送らない）。

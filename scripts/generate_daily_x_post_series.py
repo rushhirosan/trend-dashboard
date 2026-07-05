@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
 """
+**運用停止（2026-07）— 本脚本は自動運用では使用していない。**
+
+Daily X post series / Discord evening 通知 / GHA workflow は停止済み。
+``snapshot_rising`` の選定ロジックは AI 日次サマリー（``generate_ai_daily_summary``）が引き続き利用。
+本脚本は **手動で文案を試すときだけ** 実行する（``--write`` / ``--discord`` はいずれも非本番）。
+
+---
+
 Writes **one Markdown file per calendar day** under ``docs/x_post_samples/daily/{YYYY-MM-DD}.md``
 (same JP/US fenced layout as before).
 
@@ -12,23 +20,25 @@ better). No extra upstream API traffic from this script.
 ``GET /api/summaries/daily-snapshots?business_day=…`` (``trend_daily_snapshots``, slots 07/13/19),
 then composes JP/US blocks. No per-source ``/api/google-trends`` traffic.
 
-**business_day (default):** JST ``now − 12h`` の暦日（夕方 X 投稿向け）。GHA schedule が
-翌未明まで遅れても **実行日ではなく観測日** の 07/13/19 を読む。上書きは ``--date YYYY-MM-DD``。
+**business_day (default):** JST ``now − 12h`` の暦日（旧・夕方 X 投稿向け）。上書きは ``--date YYYY-MM-DD``。
 
 **Legacy per-source HTTP** (no ``DATABASE_URL`` and **without** ``--from-api``): each
 ``/api/*`` with ``force_refresh`` (default false).
+
+手動実行例（非本番）:
 
   export DATABASE_URL=...
   python scripts/generate_daily_x_post_series.py --write
 
   python scripts/generate_daily_x_post_series.py --from-api --write
 
+  # --discord も停止中（手動デバッグのみ）
   python scripts/generate_daily_x_post_series.py --from-api --write --discord
 
 Env:
   DATABASE_URL             直接 PostgreSQL から 07/13/19 を読む（``--from-api`` なしのとき）
   TREND_DASHBOARD_BASE_URL ``--from-api`` またはレガシー HTTP 用ベース URL（既定: https://trends-dashboard.fly.dev）
-  DISCORD_WEBHOOK_URL       ``--discord`` 用（スケジューラ通知と同じ Webhook）
+  DISCORD_WEBHOOK_URL       ``--discord`` 用（**運用停止中**・手動デバッグのみ）
 
 夜の X 文案は **急上昇3つ**（07→13→19・AI 日次サマリーと同じ jump / 資格 / ノイズ判定。
 全ソースから最大3件）。JP / US とも X 無料枠（加重 280 相当）に収める。
@@ -1064,10 +1074,13 @@ def compose_daily_markdown(date_str: str, jp_inner: str, us_inner: str) -> str:
     lines = [
         f"# 日次 X ツイート案 — {date_str}",
         "",
-        "`docs/x_post_samples/daily_guide.md` の **夜用・急上昇3つ** 型。**朝の読み物は AI 日次サマリー**（`docs/summaries/daily/`）のみ。",
+        "> **運用停止（2026-07）:** 本ファイルは自動生成・X 投稿・Discord 通知の対象外。参考用。",
         "",
-        "- **自動投入:** `scripts/generate_daily_x_post_series.py --write` が **`trend_daily_snapshots`** の **07 / 13 / 19** を読み、**AI 日次サマリーと同じ急上昇判定**で全ソース横断・最大3件（JP/US 各ブロック）選びます。入力は **`DATABASE_URL`** か **`--from-api`**（`GET /api/summaries/daily-snapshots`）。",
-        "- **GitHub Actions:** `.github/workflows/daily-x-post-series.yml` が **JST 20:10 前後（UTC 11:10）** に **`docs/x_post_samples/daily/{日付}.md`** を更新します。",
+        "`docs/x_post_samples/daily_guide.md` の **夜用・急上昇3つ** 型（停止前の設計）。**読み物の本体は AI 日次サマリー**（`docs/summaries/daily/`）。",
+        "",
+        "- **自動投入（使用していない）:** GHA `Daily X post series` は workflow 削除済み。Fly 19時 Discord・スケジューラ連携もなし。",
+        "- **手動のみ:** `scripts/generate_daily_x_post_series.py --write` でこの md を生成できる（非本番）。",
+        "- **選定ロジック:** `trend_daily_snapshots` の **07 / 13 / 19** + **AI 日次サマリーと同じ急上昇判定**（全ソース横断・最大3件）。",
         f"- {JP_LIST_LINE}",
         "- 鮮度: https://trends-dashboard.fly.dev/data-status",
         "",
@@ -1181,8 +1194,8 @@ def main() -> int:
         "--discord",
         action="store_true",
         help=(
-            "Send JP/US blocks to Discord "
-            "(DISCORD_WEBHOOK_URL or --discord-webhook-url)"
+            "Send JP/US blocks to Discord (INACTIVE in prod; manual debug only). "
+            "Uses DISCORD_WEBHOOK_URL or --discord-webhook-url."
         ),
     )
     p.add_argument(
@@ -1367,6 +1380,11 @@ def main() -> int:
         return 0
 
     if args.discord:
+        print(
+            "WARN: Daily X post Discord 通知は運用停止中（2026-07）。"
+            " 手動デバッグとして送信します。",
+            file=sys.stderr,
+        )
         from daily_x_post_discord import notify_daily_x_post_discord, resolve_discord_webhook_url
 
         webhook = resolve_discord_webhook_url(args.discord_webhook_url)

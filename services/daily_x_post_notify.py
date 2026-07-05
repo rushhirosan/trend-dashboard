@@ -1,9 +1,12 @@
 """
-X 投稿案を Discord へ送る（**既定: 無効**）。
+X 投稿案を Discord へ送る（**運用停止・本番未使用**）。
 
-Daily X post series は一旦停止（2026-07）。スケジューラからの自動トリガーは外してあり、
-手動で ``ENABLE_EVENING_X_POST_DISCORD=true`` を付けたうえで
-``run_evening_x_post_discord_notify`` を呼ぶ場合のみ利用可。
+Daily X post series は 2026-07 に停止。GHA workflow 削除済み。
+スケジューラ（19時スロット）からの自動トリガーは **コード上も削除済み**。
+``ENABLE_EVENING_X_POST_DISCORD`` 既定は ``false``。
+手動で ``ENABLE_EVENING_X_POST_DISCORD=true`` を付けて
+``run_evening_x_post_discord_notify`` を呼ぶ場合のみ利用可（非本番）。
+
 同一 business_day への重複送信は ``scheduler_slot_run`` の ``xpost_discord_{date}`` で防止。
 """
 

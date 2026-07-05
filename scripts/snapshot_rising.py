@@ -1,8 +1,8 @@
 """
 07 / 13 / 19 スナップショット横断の「急上昇」選定ロジック。
 
-``generate_ai_daily_summary`` と ``generate_daily_x_post_series`` で
-判断軸（jump 計算・候補資格・ノイズ除外・表示ラベル）を共有する。
+``generate_ai_daily_summary`` が本番で利用（日次サマリーの急上昇3つ等）。
+``generate_daily_x_post_series`` も同じ判断軸を **共有していたが、X 投稿系列は 2026-07 運用停止**。
 """
 
 from __future__ import annotations

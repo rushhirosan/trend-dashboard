@@ -1,4 +1,4 @@
-"""Tests for scripts/generate_daily_x_post_series.py."""
+"""Tests for scripts/generate_daily_x_post_series.py (series inactive in prod since 2026-07)."""
 
 import importlib.util
 from datetime import date, datetime
@@ -319,6 +319,7 @@ def test_is_weak_rising_label_filters_pickup(gx):
 def test_compose_daily_markdown_includes_date_and_fenced_blocks(gx):
     md = gx.compose_daily_markdown("2026-05-20", "【2026-05-20】jp", "us body")
     assert "# 日次 X ツイート案 — 2026-05-20" in md
+    assert "運用停止" in md
     assert "## 2026-05-20" in md
     assert "### JP — 今日の急上昇3つ" in md
     assert "【2026-05-20】jp" in md

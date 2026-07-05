@@ -1,4 +1,4 @@
-"""Tests for services/daily_x_post_notify.py."""
+"""Tests for services/daily_x_post_notify.py (module inactive in prod since 2026-07)."""
 
 from unittest.mock import MagicMock, patch
 

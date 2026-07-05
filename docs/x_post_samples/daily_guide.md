@@ -1,16 +1,24 @@
 # X 日次投稿ガイド
 
-> **運用停止（2026-07）:** Daily X post series（自動 md 生成・Discord 通知・X 投稿）は一旦停止。以下は参考用テンプレ・過去例。読み物の本体は **AI 日次サマリー**（`docs/summaries/daily/`）。
+> **運用停止（2026-07）— 本ドキュメントの自動運用はすべて使用していない。**
+> Daily X post series（GHA workflow 削除済み・Discord 通知停止・X 投稿なし）。
+> 以下は **停止前の設計メモ・手書きテンプレ・過去例** のみ。読み物の本体は **AI 日次サマリー**（`docs/summaries/daily/`）。
 
 Trend Dashboard 向け **1日1ツイート（20時 JST）** の運用メモ・コピペテンプレ・過去に本番キャッシュで作った参考例を1つにまとめたものです。週1振り返りは [`weekly_template.md`](weekly_template.md)。**あくまでサンプル** — 投稿前にダッシュの更新時刻・文言を確認してください。
 
 ## 運用メモ（プロダクト仕様との整合）
 
-- トレンド一括取得は **1 / 7 / 13 / 19 時（JST）** のスケジューラ実行がベース。
-- **20時投稿**なら、本文の「反映」は例として **「当日 13:00・19:00 更新を中心に反映」** のように書くと誤解が少ない。
-- **JP / US を同じ JST 20:00** に出す運用にすると、US 向け英語ポストは現地ではだいたい**朝**になる。**US 投稿の冒頭（または返信）にその前提**を書いておくと時差の誤解が減る（このファイル内「同時刻運用」参照）。
-- **夜（X）と朝（AI）の分担（停止前の設計）:** 20時 JST 前後の X 文案は **急上昇3つ**（`07→13→19`・AI サマリーと同じ判定）。**朝 6:50 JST** の **AI 日次サマリー**（`docs/summaries/daily/`）が読み物の本体。
-- **自動投入（停止中）:** `scripts/generate_daily_x_post_series.py --write` / GHA `Daily X post series` / Fly 19時 Discord（`services/daily_x_post_notify.py`）は無効。手動で `--write` する場合のみ md を生成可。
+<!-- 以下: 停止前の設計。現行運用では使用していない。 -->
+
+- トレンド一括取得は **1 / 7 / 13 / 19 時（JST）** のスケジューラ実行がベース（**ダッシュボード更新は継続**）。
+- ~~**20時投稿**~~ — **X 日次投稿は停止（2026-07）**
+- ~~**JP / US を同じ JST 20:00**~~ — 停止前の設計メモ（`同時刻運用` 節参照）
+- **現行の日次読み物:** **朝 6:50 JST** の **AI 日次サマリー**（`docs/summaries/daily/`）のみ
+- **使用していない（停止済み）:**
+  - GHA `Daily X post series` — workflow ファイル削除済み
+  - Fly 19時 Discord — `services/daily_x_post_notify.py`（スケジューラ連携削除・env 既定 `false`）
+  - X への手動投稿 — 運用なし
+- **手動のみ（非本番）:** `scripts/generate_daily_x_post_series.py --write` で md を試せる
 
 ## ファイルの置き場
 
@@ -18,7 +26,7 @@ Trend Dashboard 向け **1日1ツイート（20時 JST）** の運用メモ・�
 |------|------|
 | **このガイド** | `daily_guide.md`（運用・テンプレ・過去の参考例） |
 | **週次** | `weekly_template.md` |
-| **自動生成（停止中）** | `daily/YYYY-MM-DD.md`（手動 `--write` または GHA 再開時） |
+| **自動生成** | ~~`daily/YYYY-MM-DD.md`~~ — **使用していない**（手動 `--write` のみ） |
 
 サマリー原稿の運用は [`docs/summaries/README.md`](../summaries/README.md) を参照。
 
@@ -26,6 +34,8 @@ Trend Dashboard 向け **1日1ツイート（20時 JST）** の運用メモ・�
 ---
 
 ## テンプレート（毎日 20:00 · デイリー1ツイート）
+
+<!-- 停止前のテンプレ。現行運用では使用していない。 -->
 
 ### 同時刻運用（JP + US）
 
@@ -67,9 +77,9 @@ US: ・ハイテク決算・AI関連 ・選挙・政策ニュース ・エンタ
 
 ---
 
-### 1ポスト＝「今日の急上昇3つ」（夜の自動生成・推奨）
+### 1ポスト＝「今日の急上昇3つ」（旧・自動生成テンプレ — **使用していない**）
 
-GitHub Actions / `generate_daily_x_post_series.py` の **既定出力**。スナップショット **07 / 13 / 19** を突き合わせ、**AI 日次サマリーと同じ急上昇判定**（`scripts/snapshot_rising.py`）で全ソースから最大3件。出典は括弧1語（検索・動画・ニュース・IT・エンタメ）。
+停止前は `generate_daily_x_post_series.py` の出力型。選定ロジック自体は `scripts/snapshot_rising.py` 経由で **AI 日次サマリーが引き続き利用**。
 
 ```
 【YYYY-MM-DD】今日の急上昇3つ（JP）

@@ -1,7 +1,9 @@
 """
-19 時 JST スケジューラ完了後に X 投稿案を Discord へ送る。
+X 投稿案を Discord へ送る（**既定: 無効**）。
 
-トリガーは ``TrendsScheduler`` の 7pm スロット成功時のみ（``ENABLE_EVENING_X_POST_DISCORD``）。
+Daily X post series は一旦停止（2026-07）。スケジューラからの自動トリガーは外してあり、
+手動で ``ENABLE_EVENING_X_POST_DISCORD=true`` を付けたうえで
+``run_evening_x_post_discord_notify`` を呼ぶ場合のみ利用可。
 同一 business_day への重複送信は ``scheduler_slot_run`` の ``xpost_discord_{date}`` で防止。
 """
 
@@ -38,7 +40,7 @@ def run_evening_x_post_discord_notify(db: Any | None = None) -> bool:
     スナップショット 07/13/19 から JP/US 文案（記事 URL 付き）を生成し Discord に POST。
     成功時 True。送信済み・設定無効・失敗時 False。
     """
-    if os.getenv("ENABLE_EVENING_X_POST_DISCORD", "true").lower() not in (
+    if os.getenv("ENABLE_EVENING_X_POST_DISCORD", "false").lower() not in (
         "1",
         "true",
         "yes",

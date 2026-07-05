@@ -42,7 +42,7 @@
 | 5/19（月） | 同上 | **5/20 06:50** 前後 |
 
 - スクリプト既定: `generate_ai_daily_summary.py` は **JST の昨日** を `business_day` にする（`--business-day` で上書き可）。
-- **夜の X 投稿案**（`docs/x_post_samples/daily/YYYY-MM-DD.md`）は **その暦日の 20:10 前後** に同じ日付で出る。サマリーと **同じ `YYYY-MM-DD` なら同じ「一日」** の話題（サマリーは翌朝）。
+- **夜の X 投稿案**（`docs/x_post_samples/daily/`）は **一旦停止（2026-07）**。再開前は AI 日次サマリーのみが日次の読み物。
 
 ### 週次のタイムライン（JST）
 

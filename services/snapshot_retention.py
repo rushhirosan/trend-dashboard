@@ -7,15 +7,14 @@ import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
-
-import pytz
+from zoneinfo import ZoneInfo
 
 from database_config import TrendsCache
 from utils.logger_config import get_logger
 
 logger = get_logger(__name__)
 
-JST = pytz.timezone("Asia/Tokyo")
+JST = ZoneInfo("Asia/Tokyo")
 
 DEFAULT_RETENTION_DAYS = 10
 MIN_RETENTION_DAYS = 7
@@ -117,7 +116,7 @@ def scheduler_slot_cutoff(
     """この時刻より古い scheduler_slot_run を削除対象とする（未満）。"""
     ref = now or datetime.now(JST)
     if ref.tzinfo is None:
-        ref = JST.localize(ref)
+        ref = ref.replace(tzinfo=JST)
     else:
         ref = ref.astimezone(JST)
     keep = days if days is not None else retention_days()

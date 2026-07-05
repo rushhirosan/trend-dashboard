@@ -1,5 +1,5 @@
-# Discord 通知は Fly 19時ジョブ完了後 (services/daily_x_post_notify.py)。
-# この workflow は docs 更新用。手動実行のみ。
+# PAUSED (2026-07-06): Daily X post series と Discord 通知を一旦停止。
+# 再開時は jobs.fill.if の false を外し、スケジューラ連携も復活させる（scheduler_manager.py）。
 name: Daily X post series
 
 on:
@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   fill:
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,9 +22,6 @@ jobs:
       - name: Install script dependencies
         run: pip install "requests>=2.31" "psycopg2-binary>=2.9"
 
-      # DATABASE_URL with *.flycast (Fly private DNS) does not resolve on GitHub-hosted
-      # runners. Read the same trend_daily_snapshots rows as AI daily summary via
-      # GET /api/summaries/daily-snapshots?business_day=… (slots 07/13/19).
       - name: Fill today's block (daily-snapshots API)
         env:
           TREND_DASHBOARD_BASE_URL: https://trends-dashboard.fly.dev

@@ -14,6 +14,11 @@ def test_xpost_discord_dedup_key():
     assert xpost_discord_dedup_key("2026-06-04") == "xpost_discord_2026-06-04"
 
 
+def test_run_skips_by_default(monkeypatch):
+    monkeypatch.delenv("ENABLE_EVENING_X_POST_DISCORD", raising=False)
+    assert run_evening_x_post_discord_notify() is False
+
+
 def test_run_skips_when_disabled(monkeypatch):
     monkeypatch.setenv("ENABLE_EVENING_X_POST_DISCORD", "false")
     assert run_evening_x_post_discord_notify() is False

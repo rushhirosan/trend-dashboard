@@ -22,7 +22,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install "python-dotenv>=0.19" "psycopg2-binary>=2.9"
+        run: pip install "python-dotenv>=0.19" "psycopg2-binary>=2.9" "pytz>=2023.3"
 
       - name: Purge expired summary drafts
         run: python scripts/purge_snapshot_retention.py --summaries-only

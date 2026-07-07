@@ -862,18 +862,6 @@ def _compact_daily_link_line(item: Dict[str, Any]) -> str:
     return re.sub(r"（[^）]*）\s*$", "", link)
 
 
-def format_daily_rising_summary_line(item: Dict[str, Any]) -> str:
-    """1行サマリー（jump・区分）。"""
-    parts: List[str] = []
-    jump = item.get("jump")
-    if jump is not None:
-        parts.append(f"jump **+{jump}**")
-    cat = (item.get("category") or "").strip()
-    if cat:
-        parts.append(cat)
-    return "> " + " · ".join(parts) if parts else ""
-
-
 def _daytime_label_sort_key(
     ranks: dict[str, int],
     *,
@@ -1484,23 +1472,10 @@ def render_rising_highlights_markdown(
     for i, it in enumerate(items, 1):
         lines.append(f"{i}. {_compact_daily_link_line(it)}")
         lines.append("")
-        summary = format_daily_rising_summary_line(it)
-        if summary:
-            lines.append(summary)
-            lines.append("")
         label_nk = _normalize_label_key(str(it.get("label") or ""))
         note = notes_by_label.get(label_nk)
         if note:
             lines.append(f"   - **補足**: {note}")
-            lines.append("")
-        ranks = _ranks_dict_from_item(it)
-        table = format_daily_rank_table(ranks)
-        if table:
-            lines.append(table)
-            lines.append("")
-        trend = format_daily_slot_rank_trend(str(it.get("label") or ""), ranks)
-        if trend:
-            lines.append(trend)
             lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
@@ -1640,7 +1615,7 @@ def render_editorial_markdown(
     editorial: Dict[str, Any],
     label_index: Dict[str, Dict[str, Any]],
 ) -> str:
-    """一行結論のみ（急上昇は別セクションで表・図付き）。"""
+    """一行結論のみ（急上昇は別セクション）。"""
     _ = label_index
     lines: List[str] = []
     one_liner = str(editorial.get("one_liner") or "").strip()

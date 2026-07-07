@@ -752,16 +752,15 @@ def test_render_rising_highlights_markdown_lists_items(gads):
             "category": "検索・動画",
         },
     ]
-    md = gads.render_rising_highlights_markdown(items)
+    md = gads.render_rising_highlights_markdown(
+        items,
+        [{"match_label": "Climber", "note": "7時18位から19時2位へ上昇。"}],
+    )
     assert "1. [Climber]" in md
-    assert "jump **+16.0**" in md
-    assert "検索・動画" in md
-    assert "| 07 | 13 | 19 |" in md
-    assert "| 順位 | 18 | — | 2 |" in md
-    assert "**順位の動き**" in md
-    assert "```mermaid" not in md
-    assert "**根拠**" not in md
-    assert "**区分**" not in md
+    assert "**補足**: 7時18位から19時2位へ上昇。" in md
+    assert "jump" not in md
+    assert "| 07 | 13 | 19 |" not in md
+    assert "**順位の動き**" not in md
 
 
 def test_format_daily_slot_rank_trend_shows_labels_and_direction(gads):

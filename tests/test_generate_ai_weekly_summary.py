@@ -274,7 +274,7 @@ def test_format_weekly_rank_table(gaws):
     assert "| 06-09 | — | 6 | 6 |" in table
 
 
-def test_render_weekly_rising_markdown_uses_table_not_prose_evidence(gaws):
+def test_render_weekly_rising_markdown_compact_no_table(gaws):
     rising = {
         "jp": [
             {
@@ -282,6 +282,7 @@ def test_render_weekly_rising_markdown_uses_table_not_prose_evidence(gaws):
                 "days": ["2026-06-08", "2026-06-09"],
                 "day_count": 2,
                 "jump_sum": 15.0,
+                "best_rank": 6,
                 "weekly_score": 145.0,
                 "category": "エンタメ",
                 "link_line": "[ライラック](https://example.com)",
@@ -294,16 +295,32 @@ def test_render_weekly_rising_markdown_uses_table_not_prose_evidence(gaws):
         "us": [],
     }
     md = gaws.render_weekly_rising_markdown(rising)
-    assert "| 06-08 | 10 | 8 | 8 |" in md
-    assert "jump **+15.0**" in md
-    assert "根拠:" not in md
-    assert "jump合計" not in md
-    assert "**日別ベスト順位**" in md
+    assert "| 06-08 |" not in md
+    assert "jump" not in md
+    assert "各1件" not in md
+    assert "**週内の動き**" in md
     assert "06-08 (8位)" in md
-    assert " ↑" in md
-    assert ".png" not in md
-    assert "```mermaid" not in md
-    assert "![ライラック" not in md
+    assert "06-09 (6位)" in md
+    assert "↑" not in md
+    assert "↓" not in md
+    assert "上ほど良い" not in md
+
+
+def test_format_weekly_rising_movement_block_no_arrow(gaws):
+    block = gaws.format_weekly_rising_movement_block(
+        {
+            "rank_evidence_by_day": {
+                "2026-06-08": "7時10位 → 13時10位 → 19時10位",
+                "2026-06-12": "7時4位 → 13時4位 → 19時4位",
+            }
+        }
+    )
+    assert "**週内の動き**" in block
+    assert "06-08 (10位)" in block
+    assert "06-12 (4位)" in block
+    assert "↑" not in block
+    assert "↓" not in block
+    assert "上ほど良い" not in block
 
 
 def test_format_weekly_rank_trend_block_shows_trend_line(gaws):
@@ -330,13 +347,268 @@ def test_format_weekly_rank_trend_block_skips_flat_ranks(gaws):
     ) == ""
 
 
+def test_pick_diverse_weekly_category_items_news_weather(gaws):
+    pool = [
+        {
+            "label": "九州など非常に激しい雨のおそれ",
+            "weekly_score": 25,
+            "day_count": 1,
+            "best_rank": 1,
+            "series_key": "nhk_jp",
+            "rank_display_by_day": {"2026-07-01": "7時1位 → 13時1位 → 19時1位"},
+        },
+        {
+            "label": "前線活動活発に 九州北部は激しい雨おそれ",
+            "weekly_score": 25,
+            "day_count": 1,
+            "best_rank": 1,
+            "series_key": "nhk_jp",
+            "rank_display_by_day": {"2026-07-03": "7時1位 → 13時1位 → 19時1位"},
+        },
+        {
+            "label": "生食用の鶏肉 ガイドライン策定へ",
+            "weekly_score": 25,
+            "day_count": 1,
+            "best_rank": 1,
+            "series_key": "nhk_jp",
+            "rank_display_by_day": {"2026-07-02": "7時1位 → 13時1位 → 19時1位"},
+        },
+        {
+            "label": "記録的水準の円安 今後は？",
+            "weekly_score": 25,
+            "day_count": 1,
+            "best_rank": 1,
+            "series_key": "nhk_jp",
+            "rank_display_by_day": {"2026-07-04": "7時1位 → 13時1位 → 19時1位"},
+        },
+    ]
+    picked = gaws.pick_diverse_weekly_category_items(pool, "ニュース", 3)
+    labels = [x["label"] for x in picked]
+    assert len(picked) == 3
+    assert sum("雨" in lab for lab in labels) == 1
+    assert "生食用の鶏肉 ガイドライン策定へ" in labels
+    assert "記録的水準の円安 今後は？" in labels
+    rain = next(x for x in picked if "雨" in x["label"])
+    assert "2026-07-01" in rain["rank_display_by_day"]
+    assert "2026-07-03" in rain["rank_display_by_day"]
+
+
+def test_pick_diverse_weekly_category_items_market_series(gaws):
+    pool = [
+        {
+            "label": "Rakuten A",
+            "weekly_score": 30,
+            "day_count": 2,
+            "best_rank": 1,
+            "series_key": "rakuten_jp",
+        },
+        {
+            "label": "Rakuten B",
+            "weekly_score": 25,
+            "day_count": 1,
+            "best_rank": 1,
+            "series_key": "rakuten_jp",
+        },
+        {
+            "label": "App Store C",
+            "weekly_score": 25,
+            "day_count": 1,
+            "best_rank": 1,
+            "series_key": "appstore_jp",
+        },
+    ]
+    picked = gaws.pick_diverse_weekly_category_items(pool, "マーケット", 3)
+    labels = [x["label"] for x in picked]
+    assert len(picked) == 3
+    assert labels[0] == "Rakuten A"
+    assert "App Store C" in labels
+    assert labels.count("Rakuten A") == 1
+    assert "Rakuten B" in labels
+
+
+def test_weekly_item_belongs_to_category_rejects_cross_category(gaws):
+    assert gaws._weekly_item_belongs_to_category(
+        "テック・開発",
+        {"series_key": "zenn_jp", "label": "Zenn article"},
+    )
+    assert not gaws._weekly_item_belongs_to_category(
+        "テック・開発",
+        {"series_key": "rakuten_jp", "label": "楽天商品"},
+    )
+    assert not gaws._weekly_item_belongs_to_category(
+        "マーケット",
+        {"series_key": "nhk_jp", "label": "NHK headline"},
+    )
+    assert gaws._weekly_item_belongs_to_category(
+        "検索・動画",
+        {"series_key": "google_trends_jp", "label": "Trend"},
+    )
+    assert not gaws._weekly_item_belongs_to_category(
+        "検索・動画",
+        {"series_key": "hatena_jp", "label": "はてな"},
+    )
+
+
+def test_filter_weekly_category_pool_drops_foreign_series(gaws):
+    pool = [
+        {"label": "Tech", "series_key": "zenn_jp", "weekly_score": 25, "day_count": 1, "best_rank": 1},
+        {"label": "Shop", "series_key": "rakuten_jp", "weekly_score": 30, "day_count": 1, "best_rank": 1},
+    ]
+    picked = gaws.pick_diverse_weekly_category_items(pool, "テック・開発", 3)
+    assert [x["label"] for x in picked] == ["Tech"]
+
+
+def test_filter_weekly_search_video_pool_allows_core_sources_only(gaws):
+    pool = [
+        {"label": "Trend A", "series_key": "google_trends_jp", "weekly_score": 25, "day_count": 1, "best_rank": 1},
+        {"label": "Wiki B", "series_key": "wikipedia_ja", "weekly_score": 25, "day_count": 1, "best_rank": 1},
+        {"label": "はてな記事", "series_key": "hatena_jp", "weekly_score": 25, "day_count": 1, "best_rank": 1},
+        {"label": "LoL", "series_key": "twitch_jp", "weekly_score": 24, "day_count": 1, "best_rank": 1},
+        {"label": "YouTube C", "series_key": "youtube_trends_jp", "weekly_score": 24, "day_count": 1, "best_rank": 1},
+        {"label": "Trend D", "series_key": "google_trends_jp", "weekly_score": 23, "day_count": 1, "best_rank": 2},
+    ]
+    picked = gaws.pick_diverse_weekly_category_items(pool, "検索・動画", 3)
+    labels = [x["label"] for x in picked]
+    series = {x["series_key"] for x in picked}
+    assert "はてな記事" not in labels
+    assert "LoL" not in labels
+    assert "Trend A" in labels
+    assert "Wiki B" in labels
+    assert "YouTube C" in labels
+    assert series <= {"google_trends_jp", "wikipedia_ja", "youtube_trends_jp"}
+
+
+def test_pick_regional_weekly_rising_skips_duplicate_across_regions(gaws):
+    pools = {
+        "jp": [
+            {"label": "Counter-Strike", "weekly_score": 100},
+            {"label": "League of Legends", "weekly_score": 90},
+        ],
+        "us": [
+            {"label": "Counter-Strike", "weekly_score": 100},
+            {"label": "League of Legends", "weekly_score": 90},
+        ],
+    }
+    out = gaws.pick_regional_weekly_rising(pools)
+    assert out["jp"][0]["label"] == "Counter-Strike"
+    assert out["us"][0]["label"] == "League of Legends"
+
+
+def test_aggregate_weekly_category_top3_prefers_multi_day(gaws):
+    daily = {
+        "2026-06-08": [
+            {
+                "category": "ニュース",
+                "items": [
+                    {
+                        "label": "Topic A",
+                        "series_key": "nhk_jp",
+                        "rank_display": "7時3位 → 13時2位 → 19時2位",
+                        "link_line": "[Topic A](https://example.com/a)",
+                    }
+                ],
+            }
+        ],
+        "2026-06-09": [
+            {
+                "category": "ニュース",
+                "items": [
+                    {
+                        "label": "Topic A",
+                        "series_key": "nhk_jp",
+                        "rank_display": "7時2位 → 13時1位 → 19時1位",
+                        "link_line": "[Topic A](https://example.com/a)",
+                    },
+                    {
+                        "label": "Topic B",
+                        "series_key": "worldnews_jp",
+                        "rank_display": "7時1位 → 13時1位 → 19時1位",
+                        "link_line": "[Topic B](https://example.com/b)",
+                    },
+                ],
+            }
+        ],
+    }
+    blocks = gaws.aggregate_weekly_category_top3(daily, count=2)
+    news = next(b for b in blocks if b["category"] == "ニュース")
+    assert news["items"][0]["label"] == "Topic A"
+    assert news["items"][0]["day_count"] == 2
+    assert news["items"][0]["best_rank"] == 1
+
+
+def test_render_weekly_category_markdown_fallback_mechanical(gaws):
+    category = {
+        "jp": [
+            {
+                "category": "ニュース",
+                "items": [
+                    {
+                        "label": "Topic A",
+                        "day_count": 1,
+                        "best_rank": 1,
+                        "peak_day": "2026-07-01",
+                        "peak_rank_display": "7時1位 → 13時1位 → 19時1位",
+                        "rank_display_by_day": {
+                            "2026-07-01": "7時1位 → 13時1位 → 19時1位",
+                        },
+                        "cross_source": True,
+                        "link_line": "[Topic A](https://example.com/a)（Google Trends）",
+                    }
+                ],
+                "pool": [],
+            }
+        ],
+        "us": [],
+    }
+    editorial = {"category_themes": {"jp": {}, "us": {}}}
+    md = gaws.render_weekly_category_markdown(category, editorial)
+    assert "カテゴリ別 — 今週の top3" in md
+    assert "[Topic A](https://example.com/a)" in md
+    assert "07-01 1位" in md
+    assert " — " not in md.split("#### ニュース")[1].split("###")[0]
+
+
+def test_resolve_region_category_themes_returns_mechanical_top3(gaws):
+    weekly_blocks = [
+        {
+            "category": "テック・開発",
+            "items": [
+                {"label": "AI Topic", "best_rank": 1, "day_count": 3, "link_line": "[AI Topic](https://example.com/ai)"},
+                {"label": "GitHub Trend", "best_rank": 2, "day_count": 2, "link_line": "[GitHub Trend](https://example.com/gh)"},
+                {"label": "Zenn Article", "best_rank": 1, "day_count": 1, "link_line": "[Zenn Article](https://example.com/z)"},
+            ],
+            "pool": [],
+        }
+    ]
+    editorial = {"category_themes": {"jp": {}, "us": {}}}
+    out = gaws.resolve_region_category_themes("jp", editorial, weekly_blocks)
+    tech = next(b for b in out if b["category"] == "テック・開発")
+    assert len(tech["themes"]) == 3
+    assert tech["themes"][0]["items"][0]["label"] == "AI Topic"
+
+
+def test_format_theme_display_line_uses_source_label(gaws):
+    line = gaws.format_theme_display_line(
+        {
+            "items": [
+                {
+                    "label": "九州など非常に激しい雨のおそれ",
+                    "best_rank": 1,
+                    "link_line": "[九州など非常に激しい雨のおそれ](https://example.com/rain)（NHK）",
+                }
+            ],
+        }
+    )
+    assert line == "[九州など非常に激しい雨のおそれ](https://example.com/rain)（NHK）"
+
+
 def test_assemble_weekly_markdown_includes_regional_sections(gaws):
     mon = date(2026, 6, 8)
     sun = date(2026, 6, 14)
     editorial = {
         "flow_jp": "今週は日本のテスト話題が動いた。",
         "flow_us": "今週は米国のテスト話題が動いた。",
-        "carryover": ["論点A — 続く見込み"],
+        "category_themes": {"jp": {}, "us": {}},
     }
     rising = {
         "jp": [
@@ -362,16 +634,50 @@ def test_assemble_weekly_markdown_includes_regional_sections(gaws):
             }
         ],
     }
-    cross: dict = {"jp": [], "us": []}
+    meta = {"missing_snapshot_dates": [], "partial_snapshot_dates": [], "missing_dates": []}
+    category = {
+        "jp": [
+            {
+                "category": "ニュース",
+                "items": [
+                    {
+                        "label": "Cat JP",
+                        "day_count": 2,
+                        "best_rank": 3,
+                        "link_line": "[Cat JP](https://example.com/cat)",
+                        "rank_display_by_day": {"2026-06-08": "7時3位 → 13時3位 → 19時3位"},
+                    }
+                ],
+            }
+        ],
+        "us": [
+            {
+                "category": "テック・開発",
+                "items": [
+                    {
+                        "label": "Cat US",
+                        "day_count": 1,
+                        "best_rank": 1,
+                        "link_line": "[Cat US](https://example.com/uscat)",
+                    }
+                ],
+            }
+        ],
+    }
     meta = {"missing_snapshot_dates": [], "partial_snapshot_dates": [], "missing_dates": []}
     md = gaws.assemble_weekly_markdown(
-        "2026-W24", mon, sun, editorial, rising, cross, meta
+        "2026-W24", mon, sun, editorial, rising, category, meta
     )
     assert "🇯🇵 日本" in md
     assert "🇺🇸 アメリカ" in md
     assert "今週いちばん動いた話題" in md
+    assert "（各1件）" not in md
+    assert "カテゴリ別 — 今週の top3" in md
     assert "Rising JP" in md
-    assert "Rising US" in md
+    assert "[Cat JP](https://example.com/cat)" in md
+    assert "[Cat US](https://example.com/uscat)" in md
+    assert "複数ソースで週を通じて重なった話題" not in md
+    assert "来週に残る論点" not in md
     assert "ソース一覧" not in md
     assert "週のホットトピック" not in md
 
@@ -394,7 +700,12 @@ def test_build_mechanical_llm_payload_splits_regions(gaws):
         "us": [{"label": "US Topic", "day_count": 1, "jump_sum": 4.0, "days": ["2026-06-09"]}],
     }
     cross = {"jp": [], "us": []}
-    payload = gaws.build_mechanical_llm_payload(rising, cross)
+    category = {
+        "jp": [{"category": "ニュース", "items": [{"label": "JP Cat"}], "pool": [], "quiet": False}],
+        "us": [{"category": "ニュース", "items": [], "pool": [], "quiet": True}],
+    }
+    payload = gaws.build_mechanical_llm_payload(rising, cross, category)
     assert "regions" in payload
     assert payload["regions"]["jp"]["weekly_rising"][0]["label"] == "JP Topic"
     assert payload["regions"]["us"]["weekly_rising"][0]["label"] == "US Topic"
+    assert payload["regions"]["jp"]["weekly_category_pool"][0]["category"] == "ニュース"

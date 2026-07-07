@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 直前に終了した ISO 週（月〜日）の trend_daily_snapshots を集計し、
-OpenAI で週次サマリー（今週の流れ・急上昇・クロスソース）を1ファイルに生成する。
+OpenAI で週次サマリー（今週の流れ・急上昇各1件・カテゴリ別 top3）を1ファイルに生成する。
 
 既定入力は **スナップショット**（DB 直読 or ``--from-api``）。日次 Markdown は
 補助コンテキストとして読む（欠損可）。``--daily-only`` で旧挙動（日次 md のみ）。
@@ -45,8 +45,13 @@ BASE_DEFAULT = "https://trends-dashboard.fly.dev"
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 MAX_USER_CHARS = 100_000
 EXPECTED_SLOTS = ("01", "07", "13", "19")
-WEEKLY_RISING_PER_REGION = 3
+WEEKLY_RISING_PER_REGION = 1
+WEEKLY_RISING_POOL_SIZE = 10
 WEEKLY_CROSS_PER_REGION = 3
+WEEKLY_CATEGORY_TOP_N = 3
+WEEKLY_CATEGORY_POOL_LLM_MAX = 20
+WEEKLY_CATEGORY_SCORE_DAY = 10
+WEEKLY_CATEGORY_SCORE_CROSS = 15
 WEEKLY_REGIONS = ("jp", "us")
 WEEKLY_REGION_LABELS = {"jp": "🇯🇵 日本", "us": "🇺🇸 アメリカ"}
 # 週次 rising スコア（jump 同率時の tie-break 用）
@@ -56,7 +61,37 @@ WEEKLY_SCORE_JUMP = 1.0
 WEEKLY_SCORE_CROSS = 25
 
 _WEEKLY_RISING_HEADING = "## 📈 今週いちばん動いた話題"
+_WEEKLY_CATEGORY_HEADING = "## 📊 カテゴリ別 — 今週の top3"
 _WEEKLY_CROSS_HEADING = "## 複数ソースで週を通じて重なった話題"
+
+# 週次カテゴリ top3: 同一トピック/ソースの重複を抑える
+_WEEKLY_SERIES_DIVERSITY_CATEGORIES = frozenset(
+    {"マーケット", "テック・開発", "検索・動画", "エンタメ"}
+)
+# 週次 digest の検索・動画: YouTube / Google Trends / Wikipedia のみ（日次カテゴリ分類とは別）
+_WEEKLY_SEARCH_VIDEO_ALLOWED_PREFIXES = (
+    "google_trends_",
+    "youtube_trends_",
+    "youtube_",
+    "wikipedia_",
+)
+_NEWS_WEATHER_RAIN_RE = re.compile(
+    r"豪雨|激しい雨|大雨|土砂崩れ|記録的短時間大雨|梅雨前線|前線活動|断続的に激しい雨"
+)
+_NEWS_WEATHER_RAIN_EN_RE = re.compile(
+    r"\b(rain|flood|storm|hurricane|wildfire|weather alert)\b",
+    re.I,
+)
+_NEWS_ECONOMY_RE = re.compile(r"円安|円高|株価|金融政策|日銀|金利|インフレ|景気")
+_NEWS_ECONOMY_EN_RE = re.compile(
+    r"\b(inflation|fed |interest rate|stock market|economy|gdp)\b",
+    re.I,
+)
+_NEWS_SPORTS_RE = re.compile(r"対\s*\.|vs\.|試合|優勝|決勝|ワールドカップ|W杯")
+_NEWS_SPORTS_EN_RE = re.compile(
+    r"\bvs\.|world cup|match|championship|playoff|tournament\b",
+    re.I,
+)
 
 _daily_mod: Any = None
 
@@ -283,8 +318,13 @@ def build_week_snapshot_rollups(
     base_url: str,
     connect_timeout: int,
     request_timeout: int,
-) -> Tuple[Dict[str, Any], Dict[str, List[Dict[str, Any]]], Dict[str, List[Dict[str, Any]]]]:
-    """7日分スナップショットを読み、地域別の週次急上昇・クロスソース集計とメタを返す。"""
+) -> Tuple[
+    Dict[str, Any],
+    Dict[str, List[Dict[str, Any]]],
+    Dict[str, List[Dict[str, Any]]],
+    Dict[str, List[Dict[str, Any]]],
+]:
+    """7日分スナップショットを読み、地域別の週次急上昇・カテゴリ digest・クロスソース集計とメタを返す。"""
     meta: Dict[str, Any] = {
         "iso_week": iso_week_stem(mon),
         "week_mon": mon.isoformat(),
@@ -299,6 +339,9 @@ def build_week_snapshot_rollups(
         r: {} for r in WEEKLY_REGIONS
     }
     daily_cross_by_region_day: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
+        r: {} for r in WEEKLY_REGIONS
+    }
+    daily_category_by_region_day: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
         r: {} for r in WEEKLY_REGIONS
     }
 
@@ -336,21 +379,33 @@ def build_week_snapshot_rollups(
             daily_cross_by_region_day[region][ds] = daily.build_cross_source_highlights(
                 region_rows, count=None
             )
+            daily_category_by_region_day[region][ds] = daily.build_category_top3(
+                region_rows, count=daily.CATEGORY_TOP_N
+            )
 
+    weekly_rising_pools: Dict[str, List[Dict[str, Any]]] = {}
     weekly_rising: Dict[str, List[Dict[str, Any]]] = {}
     weekly_cross: Dict[str, List[Dict[str, Any]]] = {}
+    weekly_category: Dict[str, List[Dict[str, Any]]] = {}
     for region in WEEKLY_REGIONS:
         cross_keys = cross_label_keys_from_daily(daily_cross_by_region_day[region])
-        weekly_rising[region] = aggregate_weekly_rising(
+        weekly_rising_pools[region] = aggregate_weekly_rising(
             daily_rising_by_region_day[region],
-            count=WEEKLY_RISING_PER_REGION,
+            count=WEEKLY_RISING_POOL_SIZE,
             cross_label_keys=cross_keys,
         )
+    weekly_rising = pick_regional_weekly_rising(weekly_rising_pools)
+    for region in WEEKLY_REGIONS:
+        cross_keys = cross_label_keys_from_daily(daily_cross_by_region_day[region])
         weekly_cross[region] = aggregate_weekly_cross_source(
             daily_cross_by_region_day[region],
             count=WEEKLY_CROSS_PER_REGION,
         )
-        for item in weekly_rising[region]:
+        weekly_category[region] = aggregate_weekly_category_top3(
+            daily_category_by_region_day[region],
+            cross_label_keys=cross_keys,
+        )
+        for item in weekly_rising.get(region) or []:
             item["region"] = region
         for item in weekly_cross[region]:
             item["region"] = region
@@ -358,7 +413,11 @@ def build_week_snapshot_rollups(
     meta["snapshot_days_found"] = sum(1 for x in meta["snapshot_days"] if x.get("found"))
     meta["weekly_rising_counts"] = {r: len(weekly_rising[r]) for r in WEEKLY_REGIONS}
     meta["weekly_cross_counts"] = {r: len(weekly_cross[r]) for r in WEEKLY_REGIONS}
-    return meta, weekly_rising, weekly_cross
+    meta["weekly_category_counts"] = {
+        r: sum(len(b.get("items") or []) for b in weekly_category[r])
+        for r in WEEKLY_REGIONS
+    }
+    return meta, weekly_rising, weekly_cross, weekly_category
 
 
 def aggregate_weekly_rising(
@@ -527,14 +586,307 @@ def aggregate_weekly_cross_source(
     return out
 
 
+def pick_regional_weekly_rising(
+    pools: Dict[str, List[Dict[str, Any]]],
+) -> Dict[str, List[Dict[str, Any]]]:
+    """地域別 rising top1。日本で選んだラベルと同一の話題は米国でスキップし次点を採用。"""
+    used_nks: set[str] = set()
+    out: Dict[str, List[Dict[str, Any]]] = {}
+    for region in WEEKLY_REGIONS:
+        picked: Optional[Dict[str, Any]] = None
+        for item in pools.get(region) or []:
+            nk = sr.normalize_label_key(str(item.get("label") or ""))
+            if region != "jp" and nk in used_nks:
+                continue
+            picked = item
+            used_nks.add(nk)
+            break
+        out[region] = [picked] if picked else []
+    return out
+
+
+def _weekly_category_sort_key(item: Dict[str, Any]) -> tuple:
+    return (
+        -int(item.get("weekly_score") or 0),
+        -int(item.get("day_count") or 0),
+        item.get("best_rank") or 999,
+        str(item.get("label") or ""),
+    )
+
+
+def _news_diversity_bucket(label: str) -> str:
+    """ニュース: 同じ出来事の別見出しを1バケットにまとめる。"""
+    if _NEWS_WEATHER_RAIN_RE.search(label) or _NEWS_WEATHER_RAIN_EN_RE.search(label):
+        return "news:weather"
+    if _NEWS_ECONOMY_RE.search(label) or _NEWS_ECONOMY_EN_RE.search(label):
+        return "news:economy"
+    if _NEWS_SPORTS_RE.search(label) or _NEWS_SPORTS_EN_RE.search(label):
+        return "news:sports"
+    return f"news:{sr.normalize_label_key(label)[:120]}"
+
+
+def weekly_category_diversity_bucket(category: str, item: Dict[str, Any]) -> str:
+    """週次 top3 選定用: カテゴリ内の重複抑制バケット。"""
+    label = str(item.get("label") or "")
+    sk = str(item.get("series_key") or "").strip().lower()
+    if category == "ニュース":
+        return _news_diversity_bucket(label)
+    if category in _WEEKLY_SERIES_DIVERSITY_CATEGORIES:
+        return f"series:{sk}" if sk else f"label:{sr.normalize_label_key(label)}"
+    return f"label:{sr.normalize_label_key(label)}"
+
+
+def _bucket_merges_rank_days(category: str, bucket: str) -> bool:
+    return category == "ニュース" and bucket == "news:weather"
+
+
+def _weekly_item_belongs_to_category(category: str, item: Dict[str, Any]) -> bool:
+    """週次 digest: 日次カテゴリ分類と一致する series のみ許可（検索・動画は週次サブセット）。"""
+    sk = str(item.get("series_key") or "").strip()
+    if not sk:
+        return False
+    daily = _daily()
+    if daily.categorize_series_key(sk) != category:
+        return False
+    if category == "検索・動画":
+        sk_l = sk.lower()
+        return any(sk_l.startswith(p) for p in _WEEKLY_SEARCH_VIDEO_ALLOWED_PREFIXES)
+    return True
+
+
+def _filter_weekly_category_pool(
+    pool: List[Dict[str, Any]], category: str
+) -> List[Dict[str, Any]]:
+    """カテゴリ外 series を週次プールから除外。"""
+    return [item for item in pool if _weekly_item_belongs_to_category(category, item)]
+
+
+def _pick_fill_diverse_by_series(
+    pool: List[Dict[str, Any]],
+    count: int,
+    *,
+    category: str,
+) -> List[Dict[str, Any]]:
+    """Pass1: 各 series から1件。Pass2: スコア順で不足分を埋める（同一 series 可）。"""
+    sorted_pool = sorted(pool, key=_weekly_category_sort_key)
+    picked: List[Dict[str, Any]] = []
+    picked_nks: set[str] = set()
+    series_seen: set[str] = set()
+
+    for item in sorted_pool:
+        if len(picked) >= count:
+            break
+        sk = str(item.get("series_key") or "").strip().lower()
+        series_key = sk or sr.normalize_label_key(str(item.get("label") or ""))
+        if series_key in series_seen:
+            continue
+        series_seen.add(series_key)
+        picked.append(item)
+        picked_nks.add(sr.normalize_label_key(str(item.get("label") or "")))
+
+    if len(picked) >= count:
+        return picked
+
+    for item in sorted_pool:
+        if len(picked) >= count:
+            break
+        nk = sr.normalize_label_key(str(item.get("label") or ""))
+        if nk in picked_nks:
+            continue
+        picked.append(item)
+        picked_nks.add(nk)
+
+    return picked
+
+
+def pick_diverse_weekly_category_items(
+    pool: List[Dict[str, Any]],
+    category: str,
+    count: int,
+) -> List[Dict[str, Any]]:
+    """スコア順プールから、トピック/ソース重複を抑えて最大 count 件を選ぶ。"""
+    pool = _filter_weekly_category_pool(pool, category)
+    if not pool:
+        return []
+
+    if category == "ニュース":
+        by_bucket: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+        for item in pool:
+            by_bucket[weekly_category_diversity_bucket(category, item)].append(item)
+
+        representatives: List[Dict[str, Any]] = []
+        for bucket, items in by_bucket.items():
+            items_sorted = sorted(items, key=_weekly_category_sort_key)
+            rep = dict(items_sorted[0])
+            if _bucket_merges_rank_days(category, bucket) and len(items) > 1:
+                rep["rank_display_by_day"] = merge_theme_rank_by_day(items)
+                rep["day_count"] = len(rep.get("rank_display_by_day") or {})
+                rep["days"] = sorted((rep.get("rank_display_by_day") or {}).keys())
+            representatives.append(rep)
+
+        representatives.sort(key=_weekly_category_sort_key)
+        return representatives[:count]
+
+    if category in _WEEKLY_SERIES_DIVERSITY_CATEGORIES:
+        return _pick_fill_diverse_by_series(pool, count, category=category)
+
+    sorted_pool = sorted(pool, key=_weekly_category_sort_key)
+    return sorted_pool[:count]
+
+
+def _weekly_category_item_payload(item: Dict[str, Any], cat: str) -> Dict[str, Any]:
+    return {
+        "label": item["label"],
+        "category": cat,
+        "day_count": item["day_count"],
+        "days": item["days"],
+        "best_rank": item["best_rank"],
+        "cross_source": item["cross_source"],
+        "url": item.get("url"),
+        "link_line": item.get("link_line"),
+        "series_key": item.get("series_key"),
+        "peak_day": item.get("peak_day"),
+        "peak_rank_display": item.get("peak_rank_display") or "",
+        "rank_display_by_day": item.get("rank_display_by_day") or {},
+    }
+
+
+def aggregate_weekly_category_top3(
+    daily_category_by_day: Dict[str, List[Dict[str, Any]]],
+    *,
+    count: int = WEEKLY_CATEGORY_TOP_N,
+    cross_label_keys: Optional[set[str]] = None,
+) -> List[Dict[str, Any]]:
+    """日次カテゴリ top3 をラベル×カテゴリで週次集約（出現日数・最高順位・系列重み）。"""
+    daily = _daily()
+    cross_keys = cross_label_keys or set()
+    by_category: Dict[str, Dict[str, Dict[str, Any]]] = {
+        cat: {} for cat in daily.CATEGORY_DIGEST_ORDER
+    }
+
+    for ds, blocks in daily_category_by_day.items():
+        for block in blocks:
+            cat = str(block.get("category") or "")
+            if cat not in by_category:
+                continue
+            for item in block.get("items") or []:
+                label = str(item.get("label") or "").strip()
+                if not label:
+                    continue
+                nk = sr.normalize_label_key(label)
+                sk = str(item.get("series_key") or "")
+                sw = weekly_series_weight(sk)
+                day_best = _best_rank_from_evidence(str(item.get("rank_display") or ""))
+
+                agg = by_category[cat].get(nk)
+                if agg is None:
+                    agg = {
+                        "label": label,
+                        "category": cat,
+                        "days": set(),
+                        "best_rank": 999,
+                        "series_weight": sw,
+                        "series_key": sk,
+                        "url": item.get("url"),
+                        "link_line": item.get("link_line"),
+                        "rank_display_by_day": {},
+                        "peak_day": None,
+                        "peak_rank_display": "",
+                    }
+                    by_category[cat][nk] = agg
+                rank_disp = str(item.get("rank_display") or "")
+                agg["rank_display_by_day"][ds] = rank_disp
+                agg["days"].add(ds)
+                if day_best is not None:
+                    if day_best < agg["best_rank"]:
+                        agg["best_rank"] = day_best
+                        agg["peak_day"] = ds
+                        agg["peak_rank_display"] = rank_disp
+                    elif day_best == agg["best_rank"] and not agg.get("peak_day"):
+                        agg["peak_day"] = ds
+                        agg["peak_rank_display"] = rank_disp
+                if sw > agg["series_weight"]:
+                    agg["series_weight"] = sw
+                    agg["series_key"] = sk
+                    if item.get("url"):
+                        agg["url"] = item["url"]
+                    if item.get("link_line"):
+                        agg["link_line"] = item["link_line"]
+                elif not agg.get("link_line") and item.get("link_line"):
+                    agg["link_line"] = item["link_line"]
+
+    out_blocks: List[Dict[str, Any]] = []
+    for cat in daily.CATEGORY_DIGEST_ORDER:
+        pool: List[Dict[str, Any]] = []
+        for raw in by_category[cat].values():
+            day_count = len(raw["days"])
+            cross = sr.normalize_label_key(raw["label"]) in cross_keys
+            score = (
+                day_count * WEEKLY_CATEGORY_SCORE_DAY
+                + (WEEKLY_CATEGORY_SCORE_CROSS if cross else 0)
+                + int(raw["series_weight"])
+            )
+            best = raw["best_rank"] if raw["best_rank"] < 999 else None
+            pool.append(
+                {
+                    **raw,
+                    "day_count": day_count,
+                    "days": sorted(raw["days"]),
+                    "cross_source": cross,
+                    "weekly_score": score,
+                    "best_rank": best,
+                }
+            )
+        pool.sort(key=_weekly_category_sort_key)
+        picked_raw = pick_diverse_weekly_category_items(pool, cat, count)
+        picked = [_weekly_category_item_payload(item, cat) for item in picked_raw]
+        pool_filtered = _filter_weekly_category_pool(pool, cat)
+        pool_all = [_weekly_category_item_payload(item, cat) for item in pool_filtered]
+        out_blocks.append(
+            {
+                "category": cat,
+                "items": picked,
+                "pool": pool_all,
+                "quiet": len(picked) == 0,
+            }
+        )
+    return out_blocks
+
+
+def _category_candidate_for_llm(item: Dict[str, Any]) -> Dict[str, Any]:
+    """LLM テーマ統合用の候補（ラベル・日数・順位のみ）。"""
+    return {
+        "label": item.get("label"),
+        "day_count": item.get("day_count"),
+        "days": item.get("days"),
+        "best_rank": item.get("best_rank"),
+        "cross_source": bool(item.get("cross_source")),
+    }
+
+
 def build_mechanical_llm_payload(
     weekly_rising: Dict[str, List[Dict[str, Any]]],
     weekly_cross: Dict[str, List[Dict[str, Any]]],
+    weekly_category: Dict[str, List[Dict[str, Any]]],
 ) -> Dict[str, Any]:
     """LLM 向けに地域別の週次機械集計を JSON 化。"""
     regions: Dict[str, Any] = {}
     for region in WEEKLY_REGIONS:
+        pool_blocks: List[Dict[str, Any]] = []
+        for block in weekly_category.get(region) or []:
+            candidates = block.get("pool") or block.get("items") or []
+            pool_blocks.append(
+                {
+                    "category": block.get("category"),
+                    "candidates": [
+                        _category_candidate_for_llm(c)
+                        for c in candidates[:WEEKLY_CATEGORY_POOL_LLM_MAX]
+                    ],
+                }
+            )
         regions[region] = {
+            "weekly_category_pool": pool_blocks,
+            "weekly_category_digest": weekly_category.get(region) or [],
             "weekly_rising": weekly_rising.get(region) or [],
             "weekly_cross_source": weekly_cross.get(region) or [],
         }
@@ -569,24 +921,222 @@ def _format_rank_cell(rank: Optional[int]) -> str:
     return "—" if rank is None else str(rank)
 
 
-def format_weekly_rising_summary_line(item: Dict[str, Any]) -> str:
-    """1行サマリー（出現・jump・スコア・区分）。"""
-    days = item.get("days") or []
-    parts: List[str] = []
-    if days:
-        parts.append(f"**{len(days)}日**")
-    jump = item.get("jump_sum")
-    if jump is not None:
-        parts.append(f"jump **+{jump}**")
-    score = item.get("weekly_score")
-    if score is not None:
-        parts.append(f"スコア **{score}**")
-    if item.get("cross_source"):
+def _day_count_for_item(item: Dict[str, Any]) -> int:
+    day_count = item.get("day_count")
+    if day_count is None and item.get("days"):
+        return len(item["days"])
+    return int(day_count or 0)
+
+
+def _compact_rank_display(rank_display: str) -> str:
+    """スロット横断の順位表記を短くする（全スロット同順位なら N位 のみ）。"""
+    ranks = parse_rank_evidence(rank_display)
+    vals = [r for r in ranks.values() if r is not None]
+    if not vals:
+        return (rank_display or "").strip() or "圏外"
+    if len(set(vals)) == 1:
+        return f"{vals[0]}位"
+    return (rank_display or "").strip()
+
+
+def _format_rank_chain(rank_by_day: Dict[str, str]) -> str:
+    """日別ベスト順位を矢印なしの連鎖にする。"""
+    points: List[tuple[str, int]] = []
+    for ds, ev in sorted(rank_by_day.items()):
+        best = _best_rank_from_evidence(ev)
+        if best is not None:
+            points.append((ds, best))
+    if not points:
+        return ""
+    if len(points) == 1:
+        ds, r = points[0]
+        return f"{_short_calendar_date(ds)} {r}位"
+    return " → ".join(f"{_short_calendar_date(ds)} ({r}位)" for ds, r in points)
+
+
+def merge_theme_rank_by_day(items: List[Dict[str, Any]]) -> Dict[str, str]:
+    """テーマ内複数ラベルの日別 rank_display をマージ（同日はベスト順位を採用）。"""
+    merged: Dict[str, str] = {}
+    for item in items:
+        for ds, ev in (item.get("rank_display_by_day") or {}).items():
+            if ds not in merged:
+                merged[ds] = ev
+                continue
+            old_best = _best_rank_from_evidence(merged[ds])
+            new_best = _best_rank_from_evidence(ev)
+            if new_best is not None and (old_best is None or new_best < old_best):
+                merged[ds] = ev
+    return merged
+
+
+def format_theme_evidence_line(items: List[Dict[str, Any]]) -> str:
+    """テーマ1件分の根拠行（日別ベスト順位の連鎖）。"""
+    merged = merge_theme_rank_by_day(items)
+    if not merged:
+        return ""
+    chain = _format_rank_chain(merged)
+    if not chain:
+        return ""
+    parts: List[str] = [chain]
+    if any(item.get("cross_source") for item in items):
         parts.append("複数ソース")
-    cat = (item.get("category") or "").strip()
-    if cat:
-        parts.append(cat)
-    return "> " + " · ".join(parts) if parts else ""
+    return "> " + " · ".join(parts)
+
+
+def build_category_label_index(
+    blocks: List[Dict[str, Any]],
+) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    """category → normalize_label_key → 候補 item。"""
+    index: Dict[str, Dict[str, Dict[str, Any]]] = {}
+    for block in blocks:
+        cat = str(block.get("category") or "")
+        if not cat:
+            continue
+        bucket = index.setdefault(cat, {})
+        for item in (block.get("pool") or []) + (block.get("items") or []):
+            label = str(item.get("label") or "").strip()
+            if not label:
+                continue
+            nk = sr.normalize_label_key(label)
+            if nk not in bucket:
+                bucket[nk] = item
+    return index
+
+
+def _pick_primary_theme_item(items: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """テーマ表示用: 最高順位・出現日数で代表候補を選ぶ。"""
+    if not items:
+        return None
+    return min(
+        items,
+        key=lambda x: (
+            x.get("best_rank") or 999,
+            -(x.get("day_count") or 0),
+            str(x.get("label") or ""),
+        ),
+    )
+
+
+def format_theme_display_line(theme: Dict[str, Any]) -> str:
+    """カテゴリ digest 1件: ソース由来の具体ラベルでリンク表示（抽象タイトルは使わない）。"""
+    items = theme.get("items") or []
+    primary = _pick_primary_theme_item(items)
+    if primary is None:
+        return ""
+    link_line = _compact_weekly_link_line(primary)
+    return link_line or str(primary.get("label") or "")
+
+
+def resolve_region_category_themes(
+    region: str,
+    editorial: Dict[str, Any],
+    weekly_blocks: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """機械週次 top3 をそのまま表示（具体ラベル・リンクを維持。LLM テーマは使わない）。"""
+    daily = _daily()
+    blocks_by_cat = {str(b.get("category") or ""): b for b in weekly_blocks}
+
+    out: List[Dict[str, Any]] = []
+    for cat in daily.CATEGORY_DIGEST_ORDER:
+        block = blocks_by_cat.get(cat) or {}
+        mechanical_items = block.get("items") or []
+        rendered: List[Dict[str, Any]] = []
+        for it in mechanical_items[:WEEKLY_CATEGORY_TOP_N]:
+            label = str(it.get("label") or "").strip()
+            if not label:
+                continue
+            rendered.append({"items": [it]})
+        if rendered:
+            out.append({"category": cat, "themes": rendered})
+    return out
+
+
+def _parse_category_themes_region(
+    data: Dict[str, Any],
+    key: str,
+) -> Dict[str, List[Dict[str, Any]]]:
+    daily = _daily()
+    valid_cats = set(daily.CATEGORY_DIGEST_ORDER)
+    raw = data.get(key)
+    out: Dict[str, List[Dict[str, Any]]] = {}
+    if not isinstance(raw, list):
+        return out
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        cat = str(entry.get("category") or "").strip()
+        if cat not in valid_cats:
+            continue
+        themes_raw = entry.get("themes")
+        if not isinstance(themes_raw, list):
+            continue
+        themes: List[Dict[str, Any]] = []
+        for t in themes_raw[:WEEKLY_CATEGORY_TOP_N]:
+            if not isinstance(t, dict):
+                continue
+            title = str(t.get("title") or "").strip()
+            if not title:
+                continue
+            labels_raw = t.get("labels")
+            if not isinstance(labels_raw, list):
+                labels_raw = [t.get("label")] if t.get("label") else []
+            labels = [str(x).strip() for x in labels_raw if str(x).strip()]
+            if not labels:
+                continue
+            themes.append(
+                {
+                    "title": title,
+                    "blurb": str(t.get("blurb") or "").strip(),
+                    "labels": labels,
+                }
+            )
+        if themes:
+            out[cat] = themes
+    return out
+
+
+def render_weekly_category_markdown(
+    weekly_category: Dict[str, List[Dict[str, Any]]],
+    editorial: Dict[str, Any],
+) -> str:
+    lines: List[str] = [_WEEKLY_CATEGORY_HEADING, ""]
+    any_items = False
+    for region in WEEKLY_REGIONS:
+        blocks = weekly_category.get(region) or []
+        theme_blocks = resolve_region_category_themes(region, editorial, blocks)
+        lines.append(f"### {WEEKLY_REGION_LABELS[region]}")
+        lines.append("")
+        if not theme_blocks:
+            lines.append("（今週、カテゴリ別の注目話題は見つかりませんでした）")
+            lines.append("")
+            continue
+        any_items = True
+        for block in theme_blocks:
+            cat = str(block.get("category") or "")
+            themes = block.get("themes") or []
+            lines.append(f"#### {cat}")
+            lines.append("")
+            for i, theme in enumerate(themes, 1):
+                lines.append(f"{i}. {format_theme_display_line(theme)}")
+                evidence = format_theme_evidence_line(theme.get("items") or [])
+                if evidence:
+                    lines.append(evidence)
+                lines.append("")
+    if not any_items:
+        return (
+            f"{_WEEKLY_CATEGORY_HEADING}\n\n"
+            "（今週、カテゴリ別の注目話題は見つかりませんでした）\n"
+        )
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def format_weekly_rising_movement_block(item: Dict[str, Any]) -> str:
+    """急上昇向け: 週内の日別ベスト順位（矢印・注釈なし）。"""
+    rank_by_day = item.get("rank_evidence_by_day") or {}
+    chain = _format_rank_chain(rank_by_day)
+    if not chain:
+        return ""
+    return f"> **週内の動き**: {chain}\n"
 
 
 def format_weekly_rank_table(rank_evidence_by_day: Dict[str, str]) -> str:
@@ -686,23 +1236,14 @@ def render_weekly_rising_markdown(
             lines.append("")
             continue
         any_items = True
-        for i, it in enumerate(items, 1):
-            link = _compact_weekly_link_line(it)
-            lines.append(f"{i}. {link}")
-            lines.append("")
-            summary = format_weekly_rising_summary_line(it)
-            if summary:
-                lines.append(summary)
-                lines.append("")
-            rank_by_day = it.get("rank_evidence_by_day") or {}
-            table = format_weekly_rank_table(rank_by_day)
-            if table:
-                lines.append(table)
-                lines.append("")
-            trend = format_weekly_rank_trend_block(str(it.get("label") or ""), rank_by_day)
-            if trend:
-                lines.append(trend)
-                lines.append("")
+        it = items[0]
+        link = _compact_weekly_link_line(it)
+        lines.append(f"1. {link}")
+        lines.append("")
+        movement = format_weekly_rising_movement_block(it)
+        if movement:
+            lines.append(movement.rstrip())
+        lines.append("")
     if not any_items:
         return (
             f"{_WEEKLY_RISING_HEADING}\n\n"
@@ -776,15 +1317,13 @@ def parse_editorial_json(raw: str) -> Dict[str, Any]:
     if not flow_jp and not flow_us:
         raise ValueError("editorial JSON missing flow_jp / flow_us")
 
-    carryover = data.get("carryover")
-    if not isinstance(carryover, list):
-        carryover = []
-    carryover = [str(x).strip() for x in carryover if str(x).strip()]
-
     return {
         "flow_jp": flow_jp,
         "flow_us": flow_us,
-        "carryover": carryover[:4],
+        "category_themes": {
+            "jp": _parse_category_themes_region(data, "category_themes_jp"),
+            "us": _parse_category_themes_region(data, "category_themes_us"),
+        },
     }
 
 
@@ -794,7 +1333,7 @@ def assemble_weekly_markdown(
     sun: date,
     editorial: Dict[str, Any],
     weekly_rising: Dict[str, List[Dict[str, Any]]],
-    weekly_cross: Dict[str, List[Dict[str, Any]]],
+    weekly_category: Dict[str, List[Dict[str, Any]]],
     meta: Dict[str, Any],
 ) -> str:
     lines: List[str] = [
@@ -812,18 +1351,13 @@ def assemble_weekly_markdown(
         "",
         (editorial.get("flow_us") or "（アメリカ向けの週次要約を生成できませんでした）").strip(),
         "",
-        "## 来週に残る論点（2〜4）",
+        render_weekly_rising_markdown(weekly_rising).rstrip(),
+        "",
+        render_weekly_category_markdown(weekly_category, editorial).rstrip(),
         "",
     ]
-    for item in editorial.get("carryover") or []:
-        lines.append(f"- {item}")
-    lines.append("")
-    lines.append(render_weekly_rising_markdown(weekly_rising).rstrip())
-    lines.append("")
-    lines.append(render_weekly_cross_markdown(weekly_cross).rstrip())
     premise = render_data_premise(meta)
     if premise:
-        lines.append("")
         lines.append(premise.rstrip())
     return "\n".join(lines).rstrip() + "\n"
 
@@ -915,21 +1449,25 @@ generated_at: "{gen_at}"
 
 
 EDITORIAL_SYSTEM_PROMPT = """あなたはトレンドダッシュボードの週次サマリー編集者だ。
-入力 JSON の weekly_mechanical.regions が事実の正本（JP/US 別のスナップショット週次集計）。
+入力 JSON の weekly_mechanical.regions.{jp,us}.weekly_category_pool がカテゴリ別候補の正本。
+各候補は「その週のうち1日以上、日次カテゴリ top3 に入ったラベル」。
 daily_summaries があれば補助。新しい URL・ラベル・事実を捏造しない。
 
 このダッシュボードは **日本ページ** と **アメリカページ** の2地域を扱う。
 週次サマリーも必ず両地域を対称に扱う（片方だけの要約は禁止）。
 
-**出力は JSON オブジェクトのみ**（Markdown 不可）。キー:
-- `flow_jp` (string): 3〜5文。日本向けソース（_jp / 日本語系列）の「今週の流れ」。
-  weekly_mechanical.regions.jp のラベルを1件以上含める。米国話題だけの文は禁止。
-- `flow_us` (string): 3〜5文。アメリカ向けソース（_us / 英語系列）の「今週の流れ」。
-  weekly_mechanical.regions.us のラベルを1件以上含める。日本話題だけの文は禁止。
-- `carryover` (array, 2〜4件): 来週に残る論点。日本・米国の両方から最低1件ずつ含める。
-  各要素は「論点 — 1〜2文」。
+weekly_rising は「週内で最もジャンプした1件」の参考程度。
+Twitch 等の定番ゲーム配信だけで flow を書かない（カテゴリ pool を優先）。
 
-禁止: 入力に無いラベル・URL・未来予測・Markdown 見出し。"""
+カテゴリ別 top3 の一覧は **機械生成**（候補 label をそのままリンク表示）する。
+flow では pool の **具体ラベル・固有名詞** をそのまま引用すること。
+「エンタメの話題」「トレンドの検索」「新技術の導入」のような抽象表現は禁止。
+
+**出力は JSON オブジェクトのみ**（Markdown 不可）。キーは次の2つのみ:
+- `flow_jp` (string): 3〜5文・日本語。複数カテゴリに触れる週次ストーリー。pool の label を具体名で引用。
+- `flow_us` (string): 3〜5文・**必ず日本語**（米国向けソースの固有名詞・label は英語のままでよい）。
+
+禁止: 入力に無いラベル・URL・未来予測・Markdown 見出し・抽象カテゴリ名だけの記述。"""
 
 
 LEGACY_SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ。入力は、ある1週間（ISO 週・月曜始まり）
@@ -944,7 +1482,6 @@ LEGACY_SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集
   - `# 週次サマリー — ISO_WEEK（対象週 JST WEEK_MON〜WEEK_SUN）`
   - `- **対象週**:` と `- **生成・送信完了**:` の2行（生成時刻は「自動生成（時刻未入力）」でよい）
   - `## 今週の流れ（短文）`
-  - `## 来週に残る論点（2〜4）`
 - 「今週の流れ」は日次の繰り返しにせず、週としての要約にする。
 - 日次ファイルが欠けている日がある場合は `## データ前提` を短く置く。
 - 憶測・未確認の断定は避ける。"""
@@ -965,7 +1502,7 @@ def run_generate_snapshots(
     week_sun = week_mon + timedelta(days=6)
     stem = iso_week_stem(week_mon)
 
-    snap_meta, weekly_rising, weekly_cross = build_week_snapshot_rollups(
+    snap_meta, weekly_rising, weekly_cross, weekly_category = build_week_snapshot_rollups(
         week_mon,
         via_http=via_http,
         database_url=database_url,
@@ -982,7 +1519,7 @@ def run_generate_snapshots(
         meta["error"] = "no_snapshot_days"
         return "", meta
 
-    mechanical = build_mechanical_llm_payload(weekly_rising, weekly_cross)
+    mechanical = build_mechanical_llm_payload(weekly_rising, weekly_cross, weekly_category)
     header = {
         "iso_week": stem,
         "week_mon_jst": week_mon.isoformat(),
@@ -1013,7 +1550,7 @@ def run_generate_snapshots(
         week_sun,
         editorial,
         weekly_rising,
-        weekly_cross,
+        weekly_category,
         meta,
     )
     meta["model"] = model
@@ -1129,7 +1666,7 @@ def main() -> int:
         else:
             if via_http or database_url:
                 try:
-                    snap_meta, rising, cross = build_week_snapshot_rollups(
+                    snap_meta, rising, cross, category = build_week_snapshot_rollups(
                         week_mon,
                         via_http=via_http,
                         database_url=database_url,
@@ -1141,6 +1678,7 @@ def main() -> int:
                     meta = {**snap_meta, **daily_meta}
                     meta["weekly_rising_preview"] = rising
                     meta["weekly_cross_preview"] = cross
+                    meta["weekly_category_preview"] = category
                     print(json.dumps(meta, ensure_ascii=False, indent=2))
                 except Exception as exc:
                     print(json.dumps({"error": str(exc)}, ensure_ascii=False, indent=2))

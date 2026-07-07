@@ -26,7 +26,7 @@
 
 日次カテゴリ top3 候補を週次プール化し、**具体 label・リンク付き**で機械表示（日次 digest と同形式）。
 
-**カテゴリ混在は禁止**: 各区分は `categorize_series_key` でそのカテゴリに属する series のみ（週次でも再検証）。
+**カテゴリ混在は禁止**: 各区分は `categorize_series_key`（ダッシュボードタブ準拠）でそのカテゴリに属する series のみ（週次でも再検証）。
 検索・動画だけ日次より狭く **Google Trends / YouTube / Wikipedia のみ**。
 
 選定時の重複抑制:

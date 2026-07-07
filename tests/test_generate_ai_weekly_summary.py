@@ -396,34 +396,34 @@ def test_pick_diverse_weekly_category_items_news_weather(gaws):
 def test_pick_diverse_weekly_category_items_market_series(gaws):
     pool = [
         {
-            "label": "Rakuten A",
+            "label": "Stock A",
             "weekly_score": 30,
             "day_count": 2,
             "best_rank": 1,
-            "series_key": "rakuten_jp",
+            "series_key": "stock_jp",
         },
         {
-            "label": "Rakuten B",
+            "label": "Stock B",
             "weekly_score": 25,
             "day_count": 1,
             "best_rank": 1,
-            "series_key": "rakuten_jp",
+            "series_key": "stock_jp",
         },
         {
-            "label": "App Store C",
+            "label": "Crypto C",
             "weekly_score": 25,
             "day_count": 1,
             "best_rank": 1,
-            "series_key": "appstore_jp",
+            "series_key": "crypto_jp",
         },
     ]
     picked = gaws.pick_diverse_weekly_category_items(pool, "マーケット", 3)
     labels = [x["label"] for x in picked]
     assert len(picked) == 3
-    assert labels[0] == "Rakuten A"
-    assert "App Store C" in labels
-    assert labels.count("Rakuten A") == 1
-    assert "Rakuten B" in labels
+    assert labels[0] == "Stock A"
+    assert "Crypto C" in labels
+    assert labels.count("Stock A") == 1
+    assert "Stock B" in labels
 
 
 def test_weekly_item_belongs_to_category_rejects_cross_category(gaws):

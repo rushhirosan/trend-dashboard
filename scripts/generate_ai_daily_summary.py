@@ -239,10 +239,10 @@ SUMMARY_CATEGORY_ORDER: tuple[str, ...] = (
 )
 SUMMARY_CATEGORY_HINTS: dict[str, str] = {
     "ニュース": "NHK・ワールドニュース・CNN・プレス等",
-    "検索・動画": "Google トレンド・YouTube・Wikipedia・SNS 等",
-    "テック・開発": "Zenn・Qiita・GitHub・セキュリティ注意・HN 等",
-    "マーケット": "株・暗号・楽天・App Store 等",
-    "エンタメ": "音楽・映画・Podcast・書籍等",
+    "検索・動画": "Google トレンド・YouTube・Wikipedia 等",
+    "テック・開発": "Zenn・Qiita・GitHub・はてな・App Store・セキュリティ注意・HN 等",
+    "マーケット": "株・暗号 等",
+    "エンタメ": "音楽・映画・Podcast・書籍・楽天・Twitch・Bluesky 等",
     "行政": "e-Stat・官公需・米 BLS・政府支出等",
 }
 
@@ -363,15 +363,13 @@ def _thin_items_from_row(row: Dict[str, Any]) -> tuple[str, str, List[Dict[str, 
 
 
 def categorize_series_key(series_key: str) -> str:
-    """snapshot の series_key を日次サマリー用カテゴリへ。"""
+    """snapshot の series_key を日次サマリー用カテゴリへ（ダッシュボードタブ準拠）。"""
     sk = (series_key or "").strip().lower()
     if not sk:
         return "検索・動画"
 
     if sk in ("estat_jp", "kkj_jp", "bls_us", "usaspending_us"):
         return "行政"
-    if sk.startswith("globenewswire_market"):
-        return "マーケット"
     if any(
         sk.startswith(p)
         for p in (
@@ -383,16 +381,7 @@ def categorize_series_key(series_key: str) -> str:
         )
     ):
         return "ニュース"
-    if any(
-        sk.startswith(p)
-        for p in (
-            "stock_",
-            "crypto_",
-            "rakuten_",
-            "ebay_",
-            "appstore_",
-        )
-    ):
+    if any(sk.startswith(p) for p in ("stock_", "crypto_")):
         return "マーケット"
     if any(
         sk.startswith(p)
@@ -401,6 +390,10 @@ def categorize_series_key(series_key: str) -> str:
             "movie_",
             "podcast_",
             "book_",
+            "rakuten_",
+            "twitch_",
+            "bluesky_",
+            "ebay_",
         )
     ):
         return "エンタメ"
@@ -420,6 +413,8 @@ def categorize_series_key(series_key: str) -> str:
             "medium_",
             "note_",
             "openalex_",
+            "appstore_",
+            "hatena_",
         )
     ):
         return "テック・開発"
@@ -429,9 +424,6 @@ def categorize_series_key(series_key: str) -> str:
             "google_trends_",
             "youtube_",
             "wikipedia_",
-            "hatena_",
-            "twitch_",
-            "bluesky_",
         )
     ):
         return "検索・動画"

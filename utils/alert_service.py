@@ -169,8 +169,12 @@ class AlertService:
             details: 追加情報（key -> value）
 
         Returns:
-            送信成功時 True
+            送信成功時 True（success は意図的に送らず True）
         """
+        if alert_type == "success":
+            logger.debug("Discord: success アラートは送信しません（%s）", title)
+            return True
+
         if not self.webhook_url:
             logger.debug("DISCORD_WEBHOOK_URL 未設定のためアラート送信をスキップ")
             self.last_send_error = "DISCORD_WEBHOOK_URL 未設定、または URL に discord が含まれません"

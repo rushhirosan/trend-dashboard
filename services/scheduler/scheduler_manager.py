@@ -1964,7 +1964,7 @@ class TrendsScheduler:
                 total_count, success_count, failed_count, duration, failed_trends, failed_trends_details,
             )
             
-            # 常にDiscord通知を送信（成功時も失敗時も）
+            # 失敗・警告時のみ Discord 通知（正常終了はログのみ）
             memory_peak = peak_tracker.stop() if peak_tracker is not None else None
             peak_tracker = None
             self._send_execution_notification(
@@ -2310,7 +2310,7 @@ class TrendsScheduler:
         us_phase_skipped: bool = False,
         memory_peak: dict | None = None,
     ) -> None:
-        """スケジューラ実行結果をDiscord通知（成功時も失敗時も）"""
+        """スケジューラ実行結果を Discord 通知（正常終了は送らない）"""
         if not self.alert_service:
             return
         
@@ -2346,6 +2346,14 @@ class TrendsScheduler:
             and not us_phase_skipped
             and snapshot_ok
         )
+
+        if fully_ok and not snapshot_bad and not gaps_bad and not has_anomaly:
+            logger.info(
+                "⏭️ トレンド取得正常終了 — Discord 通知をスキップ（execution_id=%s）",
+                execution_id,
+            )
+            return
+
         oom_killed = any(
             d.get("source") == "_jp_phase" and "OOM" in str(d.get("error", ""))
             for d in failed_trends_details

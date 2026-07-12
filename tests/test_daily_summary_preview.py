@@ -22,7 +22,7 @@ snapshot_slots_included: ["07", "13", "19", "01"]
 
 # 日次サマリー — 2026-06-10（JST）
 
-## 今日の一行結論
+## 昨日の一行結論
 
 かつお節の話が一日を通して上位に。順位の動きが大きかったのは「AXIS CAMERAS」。
 
@@ -30,6 +30,11 @@ snapshot_slots_included: ["07", "13", "19", "01"]
 
 ### 1. 見出し
 """
+
+# 旧見出し（今日の一行結論）でも拾えることを担保する後方互換用サンプル。
+SAMPLE_LEGACY_HEADING = SAMPLE.replace(
+    "## 昨日の一行結論", "## 今日の一行結論", 1
+)
 
 SAMPLE_WITH_TEASER = """---
 status: draft
@@ -41,7 +46,7 @@ snapshot_slots_included: ["07", "13", "19", "01"]
 
 # 日次サマリー — 2026-06-10（JST）
 
-## 今日の一行結論
+## 昨日の一行結論
 
 かつお節の話が一日を通して上位に。順位の動きが大きかったのは「AXIS CAMERAS」。
 
@@ -55,6 +60,12 @@ SAMPLE_APPROVED = SAMPLE.replace("status: draft", "status: approved", 1)
 
 def test_extract_one_liner():
     assert extract_one_liner(SAMPLE) == (
+        "かつお節の話が一日を通して上位に。順位の動きが大きかったのは「AXIS CAMERAS」。"
+    )
+
+
+def test_extract_one_liner_legacy_heading():
+    assert extract_one_liner(SAMPLE_LEGACY_HEADING) == (
         "かつお節の話が一日を通して上位に。順位の動きが大きかったのは「AXIS CAMERAS」。"
     )
 

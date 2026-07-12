@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Optional
 
 JST = timezone(timedelta(hours=9))
-_ONE_LINER_HEADING = "## 今日の一行結論"
+# 現行は「昨日の一行結論」。過去に生成済みの原稿は「今日の一行結論」なので両対応する。
+_ONE_LINER_HEADINGS = ("## 昨日の一行結論", "## 今日の一行結論")
 TEASER_MAX_CHARS = 90
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DAILY_DIR = _REPO_ROOT / "docs" / "summaries" / "daily"
@@ -130,11 +131,17 @@ def teaser_for_display(one_liner: str, teaser: str = "") -> str:
 
 
 def extract_one_liner(markdown_body: str) -> str:
-    """``## 今日の一行結論`` 直後の本文（次の見出しまで）。"""
-    idx = markdown_body.find(_ONE_LINER_HEADING)
+    """``## 昨日の一行結論``（旧: ``## 今日の一行結論``）直後の本文（次の見出しまで）。"""
+    idx = -1
+    heading = ""
+    for h in _ONE_LINER_HEADINGS:
+        found = markdown_body.find(h)
+        if found >= 0:
+            idx, heading = found, h
+            break
     if idx < 0:
         return ""
-    rest = markdown_body[idx + len(_ONE_LINER_HEADING) :]
+    rest = markdown_body[idx + len(heading) :]
     lines: list[str] = []
     for line in rest.splitlines():
         stripped = line.strip()

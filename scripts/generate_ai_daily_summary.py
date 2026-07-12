@@ -74,7 +74,7 @@ _CROSS_NONE_LINE = (
 _TOP3_HEADING = "## 📊 カテゴリ別トップ3"
 _TOP1_HEADING = "## 📊 カテゴリ別トップ1"
 _NOTABLE_HEADING = "## 💡 昨日特異だったこと"
-_ONE_LINER_HEADING = "## 今日の一行結論"
+_ONE_LINER_HEADING = "## 昨日の一行結論"
 _SPOTLIGHTS_HEADING = "## 昨日の見どころ（3〜5）"
 EDITORIAL_CANDIDATE_MAX = 12
 SPOTLIGHT_MAX = 5
@@ -1579,7 +1579,7 @@ def render_category_top3_markdown(
             continue
         lines.append(f"### {cat}")
         if intro:
-            lines.append(f"**今日の傾向**: {intro}")
+            lines.append(f"**昨日の傾向**: {intro}")
             lines.append("")
         for i, it in enumerate(items, 1):
             lines.append(f"{i}. {it.get('link_line') or it.get('label')}")

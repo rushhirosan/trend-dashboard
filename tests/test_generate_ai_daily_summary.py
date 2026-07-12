@@ -1187,7 +1187,7 @@ def test_render_category_top3_includes_intro(gads):
         }
     ]
     md = gads.render_category_top3_markdown(blocks, {"ニュース": "気象関連が中心。"})
-    assert "**今日の傾向**" in md
+    assert "**昨日の傾向**" in md
     assert "気象関連が中心。" in md
 
 

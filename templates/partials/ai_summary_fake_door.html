@@ -6,7 +6,7 @@
 {% if loc == 'en' %}
   {% set title_a = "Trend summaries" %}
   {% set badge = "Free preview" %}
-  {% set one_liner_label = "Today's headline" %}
+  {% set one_liner_label = "Yesterday's headline" %}
   {% set locked = "Full daily & weekly briefs (topics, rank moves, categories) — email delivery planned." %}
   {% set cta = "See delivery plan" %}
   {% set modal_title = "Summary delivery (daily & weekly)" %}
@@ -17,6 +17,7 @@
   {% set btn_submit = "Join waitlist" %}
   {% set btn_close = "Close" %}
   {% set sub_hint = "Coming soon" %}
+  {% set read_preview = "Read free preview" %}
   {% set no_preview = "Daily summary is being prepared." %}
   {% set waitlist_success = "You're on the list. We'll email you when the brief launches." %}
   {% set waitlist_error = "Signup failed. Please try again." %}
@@ -24,7 +25,7 @@
 {% else %}
   {% set title_a = "トレンドサマリー" %}
   {% set badge = "無料プレビュー" %}
-  {% set one_liner_label = "今日の要点" %}
+  {% set one_liner_label = "昨日の要点" %}
   {% set locked = "日次・週次の全文（論点・順位の動き・カテゴリ別）をメール配信予定" %}
   {% set cta = "配信内容を見る" %}
   {% set modal_title = "サマリー配信（日次・週次）" %}
@@ -35,6 +36,7 @@
   {% set btn_submit = "事前登録する" %}
   {% set btn_close = "閉じる" %}
   {% set sub_hint = "提供準備中" %}
+  {% set read_preview = "無料プレビューを読む" %}
   {% set no_preview = "日次サマリーを準備中です。" %}
   {% set waitlist_success = "登録を受け付けました。提供開始時にご連絡します。" %}
   {% set waitlist_error = "登録に失敗しました。しばらくしてからお試しください。" %}
@@ -75,8 +77,13 @@
       <p class="small text-muted mb-0{% if not embedded %} mt-2{% endif %}">
         <i class="fas fa-lock me-1" aria-hidden="true"></i>{{ locked }}
       </p>
-      <div class="d-flex flex-wrap align-items-center gap-3 mt-3">
-        <button type="button" class="btn btn-primary btn-sm" id="ai-summary-fake-door-cta"
+      <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
+        {% if fd.has_preview and fd.business_day %}
+        <a class="btn btn-primary btn-sm" href="/summaries/daily/{{ fd.business_day }}">
+          <i class="fas fa-newspaper me-1" aria-hidden="true"></i>{{ read_preview }}
+        </a>
+        {% endif %}
+        <button type="button" class="btn btn-outline-primary btn-sm" id="ai-summary-fake-door-cta"
             data-bs-toggle="modal" data-bs-target="#aiSummaryFakeDoorModal">
           {{ cta }}
         </button>

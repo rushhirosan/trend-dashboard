@@ -333,6 +333,92 @@ def create_app():
         logger.error(f"❌ /about ルート定義エラー: {e}", exc_info=True)
     
     try:
+        @app.route('/summaries/daily/<date_str>')
+        def summary_daily(date_str):
+            """日次サマリーの無料プレビューページ（過去分・approved のみ／ローカルは draft も可）"""
+            from flask import abort
+            try:
+                from services.summary.summary_pages import load_daily_page
+                allow_draft = app.config.get('AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT', False)
+                page = load_daily_page(date_str, allow_draft=allow_draft)
+                if not page:
+                    abort(404)
+                ga_id = app.config.get('GOOGLE_ANALYTICS_ID')
+                return render_template(
+                    'summary_daily.html',
+                    config={'GOOGLE_ANALYTICS_ID': ga_id},
+                    page=page,
+                )
+            except Exception as e:
+                if getattr(e, 'code', None) == 404:
+                    raise
+                logger.error(f"❌ 日次サマリーページレンダリングエラー: {e}", exc_info=True)
+                return f"Error rendering daily summary page: {e}", 500
+    except Exception as e:
+        logger.error(f"❌ /summaries/daily ルート定義エラー: {e}", exc_info=True)
+    
+    try:
+        @app.route('/summaries/weekly/<week_id>')
+        def summary_weekly(week_id):
+            """週次サマリーの無料プレビューページ（先週分・approved のみ／ローカルは draft も可）"""
+            from flask import abort
+            try:
+                from services.summary.summary_pages import load_weekly_page
+                allow_draft = app.config.get('AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT', False)
+                page = load_weekly_page(week_id, allow_draft=allow_draft)
+                if not page:
+                    abort(404)
+                ga_id = app.config.get('GOOGLE_ANALYTICS_ID')
+                return render_template(
+                    'summary_weekly.html',
+                    config={'GOOGLE_ANALYTICS_ID': ga_id},
+                    page=page,
+                )
+            except Exception as e:
+                if getattr(e, 'code', None) == 404:
+                    raise
+                logger.error(f"❌ 週次サマリーページレンダリングエラー: {e}", exc_info=True)
+                return f"Error rendering weekly summary page: {e}", 500
+    except Exception as e:
+        logger.error(f"❌ /summaries/weekly ルート定義エラー: {e}", exc_info=True)
+    
+    try:
+        @app.route('/llms.txt')
+        def llms_txt():
+            """AI クローラー向けのサイト説明（llms.txt）"""
+            try:
+                from flask import Response
+                base = 'https://trends-dashboard.fly.dev'
+                llms_content = f"""# Trends Dashboard（トレンドダッシュボード）
+
+> 日本・米国の20以上の公開ソースを横断比較する無料トレンドダッシュボード。
+> 検索・ニュース・テック・マーケットなどの「いま」を1画面で把握できます。
+
+## 主要ページ
+- 日本トレンド: {base}/
+- USトレンド: {base}/us
+- データ鮮度・更新状況: {base}/data-status
+- このサイトについて: {base}/about
+
+## トレンドサマリー（過去分・無料プレビュー）
+- 日次: {base}/summaries/daily/YYYY-MM-DD （例: 観測日ごとの一行結論と急上昇トピック）
+- 週次: {base}/summaries/weekly/YYYY-Www （例: 週の流れと注目トピック）
+
+## 更新頻度
+毎日 1・7・13・19時 JST に更新処理を開始（完了まで通常10〜15分程度）。
+
+## 引用時のお願い
+「トレンドダッシュボード ({base}/)」として言及してください。
+本サイトは投資助言ではなく、各サービスの正規データの代替でもありません。
+"""
+                return Response(llms_content, mimetype='text/plain; charset=utf-8')
+            except Exception as e:
+                logger.error(f"❌ llms.txt生成エラー: {e}", exc_info=True)
+                return "Trends Dashboard", 200, {'Content-Type': 'text/plain; charset=utf-8'}
+    except Exception as e:
+        logger.error(f"❌ /llms.txt ルート定義エラー: {e}", exc_info=True)
+    
+    try:
         @app.route('/robots.txt')
         def robots_txt():
             """robots.txtを返す"""
@@ -386,7 +472,38 @@ Sitemap: https://trends-dashboard.fly.dev/sitemap.xml
                 trends_lastmod_str = trends_last_update_jst.strftime('%Y-%m-%dT%H:%M:%S') + '+09:00'
                 about_lastmod_str = _template_lastmod('about.html').strftime('%Y-%m-%dT%H:%M:%S') + '+09:00'
                 status_lastmod_str = _template_lastmod('data-status.html').strftime('%Y-%m-%dT%H:%M:%S') + '+09:00'
-                
+
+                # 公開中のサマリー（過去分プレビュー）を sitemap に反映
+                summary_urls = ''
+                try:
+                    from services.summary.summary_pages import (
+                        list_published_daily,
+                        list_published_weekly,
+                    )
+                    allow_draft = app.config.get('AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT', False)
+                    for date_str, lastmod in list_published_daily(allow_draft=allow_draft):
+                        lm = lastmod.strftime('%Y-%m-%dT%H:%M:%S') + '+09:00'
+                        summary_urls += (
+                            f"  <url>\n"
+                            f"    <loc>https://trends-dashboard.fly.dev/summaries/daily/{date_str}</loc>\n"
+                            f"    <lastmod>{lm}</lastmod>\n"
+                            f"    <changefreq>monthly</changefreq>\n"
+                            f"    <priority>0.6</priority>\n"
+                            f"  </url>\n"
+                        )
+                    for week_id, lastmod in list_published_weekly(allow_draft=allow_draft):
+                        lm = lastmod.strftime('%Y-%m-%dT%H:%M:%S') + '+09:00'
+                        summary_urls += (
+                            f"  <url>\n"
+                            f"    <loc>https://trends-dashboard.fly.dev/summaries/weekly/{week_id}</loc>\n"
+                            f"    <lastmod>{lm}</lastmod>\n"
+                            f"    <changefreq>monthly</changefreq>\n"
+                            f"    <priority>0.6</priority>\n"
+                            f"  </url>\n"
+                        )
+                except Exception as sum_err:
+                    logger.debug(f"sitemap サマリーURL生成スキップ: {sum_err}")
+
                 sitemap_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
@@ -413,7 +530,7 @@ Sitemap: https://trends-dashboard.fly.dev/sitemap.xml
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
-</urlset>
+{summary_urls}</urlset>
 """
                 return Response(sitemap_content, mimetype='application/xml')
             except Exception as e:

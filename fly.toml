@@ -55,6 +55,10 @@ primary_region = "nrt"
   # docs/summaries 原稿（Fly 上はデプロイ時点のファイルのみ。git 反映は手元実行）
   SUMMARY_DAILY_RETENTION_DAYS = "10"
   SUMMARY_WEEKLY_RETENTION_DAYS = "30"
+  # AI サマリーは現状 status:draft のみ生成され approved 化の自動運用が無いため、
+  # 本番でも draft を公開する（未指定だと DEBUG=False → approved のみ → 一覧が空になる）。
+  # 人手レビュー gate を再導入する場合はここを false に戻す。
+  AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT = "true"
 
 [http_service]
   internal_port = 8080

@@ -10,7 +10,14 @@ from typing import Optional
 
 JST = timezone(timedelta(hours=9))
 # 現行は「昨日の一行結論」。過去に生成済みの原稿は「今日の一行結論」なので両対応する。
-_ONE_LINER_HEADINGS = ("## 昨日の一行結論", "## 今日の一行結論")
+# US 英語原稿は "## Bottom line" / "## Yesterday's takeaway" など英語見出しを使う。
+_ONE_LINER_HEADINGS = (
+    "## 昨日の一行結論",
+    "## 今日の一行結論",
+    "## Bottom line",
+    "## Yesterday's takeaway",
+    "## Takeaway",
+)
 TEASER_MAX_CHARS = 90
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DAILY_DIR = _REPO_ROOT / "docs" / "summaries" / "daily"
@@ -191,17 +198,23 @@ def _is_publishable_status(status: str, *, allow_draft: bool) -> bool:
     return allow_draft and st == "draft"
 
 
+def _daily_dir_for_region(region: str) -> Path:
+    r = (region or "jp").strip().lower()
+    return _DAILY_DIR if r == "jp" else _DAILY_DIR / r
+
+
 def load_latest_daily_preview(
     daily_dir: Optional[Path] = None,
     delivery_day: Optional[date] = None,
     *,
+    region: str = "jp",
     allow_draft: bool = False,
 ) -> Optional[DailySummaryPreview]:
     """``docs/summaries/daily/`` の最新 AI 生成日次からプレビューを返す。
 
     本番想定では ``allow_draft=False``（``status: approved`` のみ）。
     """
-    root = daily_dir or _DAILY_DIR
+    root = daily_dir or _daily_dir_for_region(region)
     if not root.is_dir():
         return None
     deliver = delivery_day or _today_jst()
@@ -217,9 +230,17 @@ def load_latest_daily_preview(
     return None
 
 
-def preview_for_fake_door(locale: str = "ja", *, allow_draft: bool = False) -> dict:
-    """テンプレート ``AI_SUMMARY_FAKE_DOOR`` 用の dict。"""
-    preview = load_latest_daily_preview(allow_draft=allow_draft)
+def preview_for_fake_door(
+    locale: str = "ja", *, region: str = "jp", allow_draft: bool = False
+) -> dict:
+    """テンプレート ``AI_SUMMARY_FAKE_DOOR`` 用の dict。
+
+    ``region`` に応じて原稿ディレクトリ（jp: 直下 / us: us/）を切り替え、
+    リンク用の URL 接頭辞（jp: '' / us: '/us'）も返す。
+    """
+    region = (region or "jp").strip().lower()
+    url_prefix = "" if region == "jp" else f"/{region}"
+    preview = load_latest_daily_preview(region=region, allow_draft=allow_draft)
     deliver = _today_jst()
     if preview:
         subline = preview.subline_ja() if locale == "ja" else preview.subline_en()
@@ -233,6 +254,7 @@ def preview_for_fake_door(locale: str = "ja", *, allow_draft: bool = False) -> d
             "business_day": preview.business_day.isoformat(),
             "delivery_day": preview.delivery_day.isoformat(),
             "status": preview.status,
+            "url_prefix": url_prefix,
         }
     fallback_headline = (
         f"日次 {deliver.month}/{deliver.day} — 準備中"
@@ -249,4 +271,5 @@ def preview_for_fake_door(locale: str = "ja", *, allow_draft: bool = False) -> d
         "business_day": "",
         "delivery_day": deliver.isoformat(),
         "status": "",
+        "url_prefix": url_prefix,
     }

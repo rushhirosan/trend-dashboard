@@ -192,10 +192,12 @@ def create_app():
 
             ai_summary_fake_door = {
                 'ja': preview_for_fake_door(
-                    'ja', allow_draft=AppConfig.AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT
+                    'ja', region='jp',
+                    allow_draft=AppConfig.AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT,
                 ),
                 'en': preview_for_fake_door(
-                    'en', allow_draft=AppConfig.AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT
+                    'en', region='us',
+                    allow_draft=AppConfig.AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT,
                 ),
             }
         return {
@@ -332,82 +334,130 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ /about ルート定義エラー: {e}", exc_info=True)
     
+    # --- サマリー（日次・週次）: JP は /summaries/...、US は /us/summaries/... ---
+    def _render_summaries_index(region):
+        from services.summary.summary_pages import build_summary_index
+        from services.snapshot_retention import (
+            daily_summary_retention_days,
+            weekly_summary_retention_days,
+        )
+        allow_draft = app.config.get('AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT', False)
+        index = build_summary_index(region=region, allow_draft=allow_draft)
+        ga_id = app.config.get('GOOGLE_ANALYTICS_ID')
+        return render_template(
+            'summary_index.html',
+            config={'GOOGLE_ANALYTICS_ID': ga_id},
+            region=region,
+            daily_items=index['daily'],
+            weekly_items=index['weekly'],
+            daily_retention_days=daily_summary_retention_days(),
+            weekly_retention_days=weekly_summary_retention_days(),
+        )
+
+    def _render_summary_daily(region, date_str):
+        from flask import abort
+        from services.summary.summary_pages import load_daily_page, daily_neighbors
+        allow_draft = app.config.get('AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT', False)
+        page = load_daily_page(date_str, region=region, allow_draft=allow_draft)
+        if not page:
+            abort(404)
+        ga_id = app.config.get('GOOGLE_ANALYTICS_ID')
+        return render_template(
+            'summary_daily.html',
+            config={'GOOGLE_ANALYTICS_ID': ga_id},
+            region=region,
+            page=page,
+            neighbors=daily_neighbors(date_str, region=region, allow_draft=allow_draft),
+        )
+
+    def _render_summary_weekly(region, week_id):
+        from flask import abort
+        from services.summary.summary_pages import load_weekly_page, weekly_neighbors
+        allow_draft = app.config.get('AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT', False)
+        page = load_weekly_page(week_id, region=region, allow_draft=allow_draft)
+        if not page:
+            abort(404)
+        ga_id = app.config.get('GOOGLE_ANALYTICS_ID')
+        return render_template(
+            'summary_weekly.html',
+            config={'GOOGLE_ANALYTICS_ID': ga_id},
+            region=region,
+            page=page,
+            neighbors=weekly_neighbors(week_id, region=region, allow_draft=allow_draft),
+        )
+
     try:
         @app.route('/summaries')
         def summaries_index():
-            """日次・週次サマリーの一覧（保持期間内の直近分のみ）"""
+            """日次・週次サマリーの一覧（JP・保持期間内の直近分のみ）"""
             try:
-                from services.summary.summary_pages import build_summary_index
-                from services.snapshot_retention import (
-                    daily_summary_retention_days,
-                    weekly_summary_retention_days,
-                )
-                allow_draft = app.config.get('AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT', False)
-                index = build_summary_index(allow_draft=allow_draft)
-                ga_id = app.config.get('GOOGLE_ANALYTICS_ID')
-                return render_template(
-                    'summary_index.html',
-                    config={'GOOGLE_ANALYTICS_ID': ga_id},
-                    daily_items=index['daily'],
-                    weekly_items=index['weekly'],
-                    daily_retention_days=daily_summary_retention_days(),
-                    weekly_retention_days=weekly_summary_retention_days(),
-                )
+                return _render_summaries_index('jp')
             except Exception as e:
                 logger.error(f"❌ サマリー一覧ページレンダリングエラー: {e}", exc_info=True)
                 return f"Error rendering summaries index page: {e}", 500
+
+        @app.route('/us/summaries')
+        def summaries_index_us():
+            """日次・週次サマリーの一覧（US・保持期間内の直近分のみ）"""
+            try:
+                return _render_summaries_index('us')
+            except Exception as e:
+                logger.error(f"❌ USサマリー一覧ページレンダリングエラー: {e}", exc_info=True)
+                return f"Error rendering US summaries index page: {e}", 500
     except Exception as e:
         logger.error(f"❌ /summaries ルート定義エラー: {e}", exc_info=True)
 
     try:
         @app.route('/summaries/daily/<date_str>')
         def summary_daily(date_str):
-            """日次サマリーの無料プレビューページ（過去分・approved のみ／ローカルは draft も可）"""
+            """日次サマリーの無料プレビューページ（JP・過去分・approved のみ／ローカルは draft も可）"""
             from flask import abort
             try:
-                from services.summary.summary_pages import load_daily_page, daily_neighbors
-                allow_draft = app.config.get('AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT', False)
-                page = load_daily_page(date_str, allow_draft=allow_draft)
-                if not page:
-                    abort(404)
-                ga_id = app.config.get('GOOGLE_ANALYTICS_ID')
-                return render_template(
-                    'summary_daily.html',
-                    config={'GOOGLE_ANALYTICS_ID': ga_id},
-                    page=page,
-                    neighbors=daily_neighbors(date_str, allow_draft=allow_draft),
-                )
+                return _render_summary_daily('jp', date_str)
             except Exception as e:
                 if getattr(e, 'code', None) == 404:
                     raise
                 logger.error(f"❌ 日次サマリーページレンダリングエラー: {e}", exc_info=True)
                 return f"Error rendering daily summary page: {e}", 500
+
+        @app.route('/us/summaries/daily/<date_str>')
+        def summary_daily_us(date_str):
+            """日次サマリーの無料プレビューページ（US）"""
+            from flask import abort
+            try:
+                return _render_summary_daily('us', date_str)
+            except Exception as e:
+                if getattr(e, 'code', None) == 404:
+                    raise
+                logger.error(f"❌ US日次サマリーページレンダリングエラー: {e}", exc_info=True)
+                return f"Error rendering US daily summary page: {e}", 500
     except Exception as e:
         logger.error(f"❌ /summaries/daily ルート定義エラー: {e}", exc_info=True)
-    
+
     try:
         @app.route('/summaries/weekly/<week_id>')
         def summary_weekly(week_id):
-            """週次サマリーの無料プレビューページ（先週分・approved のみ／ローカルは draft も可）"""
+            """週次サマリーの無料プレビューページ（JP・先週分・approved のみ／ローカルは draft も可）"""
             from flask import abort
             try:
-                from services.summary.summary_pages import load_weekly_page, weekly_neighbors
-                allow_draft = app.config.get('AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT', False)
-                page = load_weekly_page(week_id, allow_draft=allow_draft)
-                if not page:
-                    abort(404)
-                ga_id = app.config.get('GOOGLE_ANALYTICS_ID')
-                return render_template(
-                    'summary_weekly.html',
-                    config={'GOOGLE_ANALYTICS_ID': ga_id},
-                    page=page,
-                    neighbors=weekly_neighbors(week_id, allow_draft=allow_draft),
-                )
+                return _render_summary_weekly('jp', week_id)
             except Exception as e:
                 if getattr(e, 'code', None) == 404:
                     raise
                 logger.error(f"❌ 週次サマリーページレンダリングエラー: {e}", exc_info=True)
                 return f"Error rendering weekly summary page: {e}", 500
+
+        @app.route('/us/summaries/weekly/<week_id>')
+        def summary_weekly_us(week_id):
+            """週次サマリーの無料プレビューページ（US）"""
+            from flask import abort
+            try:
+                return _render_summary_weekly('us', week_id)
+            except Exception as e:
+                if getattr(e, 'code', None) == 404:
+                    raise
+                logger.error(f"❌ US週次サマリーページレンダリングエラー: {e}", exc_info=True)
+                return f"Error rendering US weekly summary page: {e}", 500
     except Exception as e:
         logger.error(f"❌ /summaries/weekly ルート定義エラー: {e}", exc_info=True)
     
@@ -430,9 +480,10 @@ def create_app():
 - このサイトについて: {base}/about
 
 ## トレンドサマリー（過去分・無料プレビュー）
-- 一覧: {base}/summaries （直近分のみ。日次は約10日・週次は約30日で公開終了）
-- 日次: {base}/summaries/daily/YYYY-MM-DD （例: 観測日ごとの一行結論と急上昇トピック）
-- 週次: {base}/summaries/weekly/YYYY-Www （例: 週の流れと注目トピック）
+- 一覧（日本語）: {base}/summaries （直近分のみ。日次は約10日・週次は約30日で公開終了）
+- 日次（日本語）: {base}/summaries/daily/YYYY-MM-DD （例: 観測日ごとの一行結論と急上昇トピック）
+- 週次（日本語）: {base}/summaries/weekly/YYYY-Www （例: 週の流れと注目トピック）
+- Summaries (English/US): {base}/us/summaries , {base}/us/summaries/daily/YYYY-MM-DD , {base}/us/summaries/weekly/YYYY-Www
 
 ## 更新頻度
 毎日 1・7・13・19時 JST に更新処理を開始（完了まで通常10〜15分程度）。
@@ -511,26 +562,33 @@ Sitemap: https://trends-dashboard.fly.dev/sitemap.xml
                         list_published_weekly,
                     )
                     allow_draft = app.config.get('AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT', False)
-                    for date_str, lastmod in list_published_daily(allow_draft=allow_draft):
-                        lm = lastmod.strftime('%Y-%m-%dT%H:%M:%S') + '+09:00'
-                        summary_urls += (
-                            f"  <url>\n"
-                            f"    <loc>https://trends-dashboard.fly.dev/summaries/daily/{date_str}</loc>\n"
-                            f"    <lastmod>{lm}</lastmod>\n"
-                            f"    <changefreq>monthly</changefreq>\n"
-                            f"    <priority>0.6</priority>\n"
-                            f"  </url>\n"
-                        )
-                    for week_id, lastmod in list_published_weekly(allow_draft=allow_draft):
-                        lm = lastmod.strftime('%Y-%m-%dT%H:%M:%S') + '+09:00'
-                        summary_urls += (
-                            f"  <url>\n"
-                            f"    <loc>https://trends-dashboard.fly.dev/summaries/weekly/{week_id}</loc>\n"
-                            f"    <lastmod>{lm}</lastmod>\n"
-                            f"    <changefreq>monthly</changefreq>\n"
-                            f"    <priority>0.6</priority>\n"
-                            f"  </url>\n"
-                        )
+                    # region ごとに URL 接頭辞を分けて（jp: '' / us: '/us'）出力
+                    for region in ('jp', 'us'):
+                        pfx = '' if region == 'jp' else f'/{region}'
+                        for date_str, lastmod in list_published_daily(
+                            region=region, allow_draft=allow_draft
+                        ):
+                            lm = lastmod.strftime('%Y-%m-%dT%H:%M:%S') + '+09:00'
+                            summary_urls += (
+                                f"  <url>\n"
+                                f"    <loc>https://trends-dashboard.fly.dev{pfx}/summaries/daily/{date_str}</loc>\n"
+                                f"    <lastmod>{lm}</lastmod>\n"
+                                f"    <changefreq>monthly</changefreq>\n"
+                                f"    <priority>0.6</priority>\n"
+                                f"  </url>\n"
+                            )
+                        for week_id, lastmod in list_published_weekly(
+                            region=region, allow_draft=allow_draft
+                        ):
+                            lm = lastmod.strftime('%Y-%m-%dT%H:%M:%S') + '+09:00'
+                            summary_urls += (
+                                f"  <url>\n"
+                                f"    <loc>https://trends-dashboard.fly.dev{pfx}/summaries/weekly/{week_id}</loc>\n"
+                                f"    <lastmod>{lm}</lastmod>\n"
+                                f"    <changefreq>monthly</changefreq>\n"
+                                f"    <priority>0.6</priority>\n"
+                                f"  </url>\n"
+                            )
                 except Exception as sum_err:
                     logger.debug(f"sitemap サマリーURL生成スキップ: {sum_err}")
 
@@ -559,6 +617,12 @@ Sitemap: https://trends-dashboard.fly.dev/sitemap.xml
     <lastmod>{status_lastmod_str}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://trends-dashboard.fly.dev/us/summaries</loc>
+    <lastmod>{trends_lastmod_str}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
   </url>
   <url>
     <loc>https://trends-dashboard.fly.dev/summaries</loc>

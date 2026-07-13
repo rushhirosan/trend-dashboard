@@ -26,6 +26,47 @@ _WEEKLY_DIR = _REPO_ROOT / "docs" / "summaries" / "weekly"
 _DAILY_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _WEEKLY_ID_RE = re.compile(r"^\d{4}-W\d{2}$")
 
+# --- リージョン ---------------------------------------------------------
+# JP は従来どおり docs/summaries/{daily,weekly}/ 直下、US は its us/ サブディレクトリ。
+# URL も JP は /summaries/...、US は /us/summaries/... と接頭辞を付ける。
+REGIONS = ("jp", "us")
+
+_EN_MONTHS = (
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+)
+
+
+def _norm_region(region: Optional[str]) -> str:
+    r = (region or "jp").strip().lower()
+    return r if r in REGIONS else "jp"
+
+
+def _daily_dir(region: str) -> Path:
+    return _DAILY_DIR if region == "jp" else _DAILY_DIR / region
+
+
+def _weekly_dir(region: str) -> Path:
+    return _WEEKLY_DIR if region == "jp" else _WEEKLY_DIR / region
+
+
+def _url_prefix(region: str) -> str:
+    return "" if region == "jp" else f"/{region}"
+
+
+# 見出しの言語差を吸収するためのキーワード（JP/EN 両対応）。
+# US 原稿は英語見出しで生成する想定だが、パーサはどちらでも拾えるようにする。
+_ONE_LINER_KEYS = ("一行結論", "takeaway", "bottom line")
+_RISING_KEYS = ("いちばん動いた", "biggest movers", "movers")
+_FLOW_KEYS = ("今週の流れ", "week in review", "this week")
+_JP_SUB_KEYS = ("日本", "Japan", "JP")
+_US_SUB_KEYS = ("アメリカ", "US", "United States")
+
+
+def _title_has(title: str, *keywords: str) -> bool:
+    t = title.lower()
+    return any(k.lower() in t for k in keywords)
+
 # インライン Markdown（リンク・太字）だけを HTML 化する。原稿は AI 生成＋レビュー済みの
 # 管理下コンテンツだが、念のため escape してからリンク/太字のみ復元する。
 _LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
@@ -96,8 +137,10 @@ def _split_sections(body: str, prefix: str) -> list[tuple[str, str]]:
 
 
 def _find_section(sections: list[tuple[str, str]], *keywords: str) -> str:
+    lowered = [k.lower() for k in keywords]
     for title, content in sections:
-        if any(k in title for k in keywords):
+        t = title.lower()
+        if any(k in t for k in lowered):
             return content
     return ""
 
@@ -174,6 +217,10 @@ def _jp_date(d: date) -> str:
     return f"{d.year}年{d.month}月{d.day}日"
 
 
+def _en_date(d: date) -> str:
+    return f"{_EN_MONTHS[d.month - 1]} {d.day}, {d.year}"
+
+
 def _iso_week_id(d: date) -> str:
     year, week, _ = d.isocalendar()
     return f"{year}-W{week:02d}"
@@ -215,10 +262,13 @@ def _parse_daily_rising(content: str) -> list[dict]:
     return items
 
 
-def load_daily_page(date_str: str, *, allow_draft: bool = False) -> Optional[dict]:
+def load_daily_page(
+    date_str: str, *, region: str = "jp", allow_draft: bool = False
+) -> Optional[dict]:
+    region = _norm_region(region)
     if not _DAILY_DATE_RE.match(date_str or ""):
         return None
-    path = _DAILY_DIR / f"{date_str}.md"
+    path = _daily_dir(region) / f"{date_str}.md"
     if not path.is_file():
         return None
     try:
@@ -238,22 +288,23 @@ def load_daily_page(date_str: str, *, allow_draft: bool = False) -> Optional[dic
         return None
 
     sections = _split_sections(body, "## ")
-    one_liner = _join_paragraph(_find_section(sections, "一行結論"))
+    one_liner = _join_paragraph(_find_section(sections, *_ONE_LINER_KEYS))
     # 本文中のリンクを対応表にして、一行結論のトピック名にリンクを張る
     topic_links = _collect_topic_links(body)
     one_liner_sentences = [_linkify(s, topic_links) for s in _split_sentences(one_liner)]
-    rising = _parse_daily_rising(_find_section(sections, "いちばん動いた"))
+    rising = _parse_daily_rising(_find_section(sections, *_RISING_KEYS))
     locked = [
         _clean_title(title)
         for title, _ in sections
-        if not ("一行結論" in title or "いちばん動いた" in title)
+        if not _title_has(title, *_ONE_LINER_KEYS, *_RISING_KEYS)
     ]
 
     week_id = _iso_week_id(business_day)
     return {
         "kind": "daily",
+        "region": region,
         "business_day": business_day.isoformat(),
-        "business_day_display": _jp_date(business_day),
+        "business_day_display": _daily_display(business_day.isoformat(), region),
         "generated_at": meta.get("generated_at", ""),
         "status": status,
         "slots": list(_parse_slots(fm) or ("07", "13", "19", "01")),
@@ -262,7 +313,7 @@ def load_daily_page(date_str: str, *, allow_draft: bool = False) -> Optional[dic
         "rising": rising,
         "locked_sections": locked,
         "week_id": week_id,
-        "week_available": weekly_available(week_id, allow_draft=allow_draft),
+        "week_available": weekly_available(week_id, region=region, allow_draft=allow_draft),
     }
 
 
@@ -292,10 +343,13 @@ def _parse_weekly_rising_item(content: str) -> Optional[dict]:
     return None
 
 
-def load_weekly_page(week_id: str, *, allow_draft: bool = False) -> Optional[dict]:
+def load_weekly_page(
+    week_id: str, *, region: str = "jp", allow_draft: bool = False
+) -> Optional[dict]:
+    region = _norm_region(region)
     if not _WEEKLY_ID_RE.match(week_id or ""):
         return None
-    path = _WEEKLY_DIR / f"{week_id}.md"
+    path = _weekly_dir(region) / f"{week_id}.md"
     if not path.is_file():
         return None
     try:
@@ -311,30 +365,31 @@ def load_weekly_page(week_id: str, *, allow_draft: bool = False) -> Optional[dic
         return None
 
     sections = _split_sections(body, "## ")
-    flow_section = _find_section(sections, "今週の流れ")
+    flow_section = _find_section(sections, *_FLOW_KEYS)
     flow_subs = _split_sections(flow_section, "### ")
     flow = {
-        "jp": render_inline(_join_paragraph(_find_section(flow_subs, "日本"))),
-        "us": render_inline(_join_paragraph(_find_section(flow_subs, "アメリカ", "US"))),
+        "jp": render_inline(_join_paragraph(_find_section(flow_subs, *_JP_SUB_KEYS))),
+        "us": render_inline(_join_paragraph(_find_section(flow_subs, *_US_SUB_KEYS))),
     }
 
-    rising_section = _find_section(sections, "いちばん動いた")
+    rising_section = _find_section(sections, *_RISING_KEYS)
     rising_subs = _split_sections(rising_section, "### ")
     rising = {
-        "jp": _parse_weekly_rising_item(_find_section(rising_subs, "日本")),
-        "us": _parse_weekly_rising_item(_find_section(rising_subs, "アメリカ", "US")),
+        "jp": _parse_weekly_rising_item(_find_section(rising_subs, *_JP_SUB_KEYS)),
+        "us": _parse_weekly_rising_item(_find_section(rising_subs, *_US_SUB_KEYS)),
     }
 
     locked = [
         _clean_title(title)
         for title, _ in sections
-        if not ("今週の流れ" in title or "いちばん動いた" in title)
+        if not _title_has(title, *_FLOW_KEYS, *_RISING_KEYS)
     ]
 
     return {
         "kind": "weekly",
+        "region": region,
         "iso_week": meta.get("iso_week", week_id),
-        "week_range": meta.get("week_range_jst", ""),
+        "week_range": meta.get("week_range_jst") or meta.get("week_range", ""),
         "generated_at": meta.get("generated_at", ""),
         "status": status,
         "flow": flow,
@@ -343,10 +398,13 @@ def load_weekly_page(week_id: str, *, allow_draft: bool = False) -> Optional[dic
     }
 
 
-def weekly_available(week_id: str, *, allow_draft: bool = False) -> bool:
+def weekly_available(
+    week_id: str, *, region: str = "jp", allow_draft: bool = False
+) -> bool:
+    region = _norm_region(region)
     if not _WEEKLY_ID_RE.match(week_id or ""):
         return False
-    path = _WEEKLY_DIR / f"{week_id}.md"
+    path = _weekly_dir(region) / f"{week_id}.md"
     if not path.is_file():
         return False
     try:
@@ -361,29 +419,40 @@ def weekly_available(week_id: str, *, allow_draft: bool = False) -> bool:
 
 # --- 一覧（sitemap 用） -------------------------------------------------
 
-def list_published_daily(*, allow_draft: bool = False) -> list[tuple[str, datetime]]:
+def list_published_daily(
+    *, region: str = "jp", allow_draft: bool = False
+) -> list[tuple[str, datetime]]:
     """公開可能な日次 (date_str, lastmod) を新しい順で返す。"""
-    return _list_published(_DAILY_DIR, _DAILY_DATE_RE, allow_draft=allow_draft)
+    return _list_published(
+        _daily_dir(_norm_region(region)), _DAILY_DATE_RE, allow_draft=allow_draft
+    )
 
 
-def list_published_weekly(*, allow_draft: bool = False) -> list[tuple[str, datetime]]:
-    return _list_published(_WEEKLY_DIR, _WEEKLY_ID_RE, allow_draft=allow_draft)
+def list_published_weekly(
+    *, region: str = "jp", allow_draft: bool = False
+) -> list[tuple[str, datetime]]:
+    return _list_published(
+        _weekly_dir(_norm_region(region)), _WEEKLY_ID_RE, allow_draft=allow_draft
+    )
 
 
-def _weekly_display(week_id: str) -> str:
-    """``2026-W28`` → ``2026年 第28週``。パースできなければそのまま返す。"""
+def _weekly_display(week_id: str, region: str = "jp") -> str:
+    """``2026-W28`` → JP: ``2026年 第28週`` / US: ``2026 · Week 28``。"""
     m = _WEEKLY_ID_RE.match(week_id or "")
     if not m:
         return week_id
     year, week = week_id.split("-W")
+    if region == "us":
+        return f"{year} · Week {int(week)}"
     return f"{year}年 第{int(week)}週"
 
 
-def _daily_display(date_str: str) -> str:
+def _daily_display(date_str: str, region: str = "jp") -> str:
     try:
-        return _jp_date(date.fromisoformat(date_str))
+        d = date.fromisoformat(date_str)
     except ValueError:
         return date_str
+    return _en_date(d) if region == "us" else _jp_date(d)
 
 
 def _neighbor_ids(ids: list[str], current_id: str) -> tuple[Optional[str], Optional[str]]:
@@ -396,45 +465,55 @@ def _neighbor_ids(ids: list[str], current_id: str) -> tuple[Optional[str], Optio
     return older, newer
 
 
-def daily_neighbors(date_str: str, *, allow_draft: bool = False) -> dict:
+def daily_neighbors(
+    date_str: str, *, region: str = "jp", allow_draft: bool = False
+) -> dict:
     """指定日の前後（保持期間内に公開されている隣接分のみ）を返す。
 
     older = より古い日付 / newer = より新しい日付。欠けている日は飛ばして
     「実際に閲覧できる隣接分」を指すので、連続した暦日とは限らない。
     """
-    ids = [d for d, _ in list_published_daily(allow_draft=allow_draft)]
+    region = _norm_region(region)
+    pfx = _url_prefix(region)
+    ids = [d for d, _ in list_published_daily(region=region, allow_draft=allow_draft)]
     older_id, newer_id = _neighbor_ids(ids, date_str)
 
     def _mk(i: Optional[str]) -> Optional[dict]:
         if not i:
             return None
-        return {"id": i, "display": _daily_display(i), "url": f"/summaries/daily/{i}"}
+        return {"id": i, "display": _daily_display(i, region), "url": f"{pfx}/summaries/daily/{i}"}
 
     return {"older": _mk(older_id), "newer": _mk(newer_id)}
 
 
-def weekly_neighbors(week_id: str, *, allow_draft: bool = False) -> dict:
+def weekly_neighbors(
+    week_id: str, *, region: str = "jp", allow_draft: bool = False
+) -> dict:
     """指定週の前後（保持期間内に公開されている隣接分のみ）を返す。"""
-    ids = [w for w, _ in list_published_weekly(allow_draft=allow_draft)]
+    region = _norm_region(region)
+    pfx = _url_prefix(region)
+    ids = [w for w, _ in list_published_weekly(region=region, allow_draft=allow_draft)]
     older_id, newer_id = _neighbor_ids(ids, week_id)
 
     def _mk(i: Optional[str]) -> Optional[dict]:
         if not i:
             return None
-        return {"id": i, "display": _weekly_display(i), "url": f"/summaries/weekly/{i}"}
+        return {"id": i, "display": _weekly_display(i, region), "url": f"{pfx}/summaries/weekly/{i}"}
 
     return {"older": _mk(older_id), "newer": _mk(newer_id)}
 
 
-def build_summary_index(*, allow_draft: bool = False) -> dict:
+def build_summary_index(*, region: str = "jp", allow_draft: bool = False) -> dict:
     """一覧ページ用に、公開中の日次・週次サマリーの見出し情報を新しい順で返す。
 
     保持期間（日次10日・週次30日が既定）を過ぎた原稿はファイルごと削除されるため、
     ここに並ぶのは「いま閲覧できる直近分」だけ。制限は呼び出し側で明示する。
     """
+    region = _norm_region(region)
+    pfx = _url_prefix(region)
     daily: list[dict] = []
-    for date_str, _ in list_published_daily(allow_draft=allow_draft):
-        page = load_daily_page(date_str, allow_draft=allow_draft)
+    for date_str, _ in list_published_daily(region=region, allow_draft=allow_draft):
+        page = load_daily_page(date_str, region=region, allow_draft=allow_draft)
         if not page:
             continue
         daily.append(
@@ -442,21 +521,21 @@ def build_summary_index(*, allow_draft: bool = False) -> dict:
                 "id": date_str,
                 "display": page["business_day_display"],
                 "one_liner": page["one_liner"],
-                "url": f"/summaries/daily/{date_str}",
+                "url": f"{pfx}/summaries/daily/{date_str}",
             }
         )
 
     weekly: list[dict] = []
-    for week_id, _ in list_published_weekly(allow_draft=allow_draft):
-        page = load_weekly_page(week_id, allow_draft=allow_draft)
+    for week_id, _ in list_published_weekly(region=region, allow_draft=allow_draft):
+        page = load_weekly_page(week_id, region=region, allow_draft=allow_draft)
         if not page:
             continue
         weekly.append(
             {
                 "id": week_id,
-                "display": _weekly_display(week_id),
+                "display": _weekly_display(week_id, region),
                 "week_range": page.get("week_range", ""),
-                "url": f"/summaries/weekly/{week_id}",
+                "url": f"{pfx}/summaries/weekly/{week_id}",
             }
         )
 

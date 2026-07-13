@@ -3,22 +3,18 @@
    欠けている分は飛ばして「実際に閲覧できる隣接分」だけをリンクする。
    期待変数: neighbors, older_label, newer_label #}
 {% if neighbors and (neighbors.older or neighbors.newer) %}
-<nav class="d-flex justify-content-between align-items-stretch gap-2 my-4" aria-label="前後のまとめ">
+<nav class="d-flex flex-wrap align-items-stretch gap-2 my-4" aria-label="前後のまとめ">
   {% if neighbors.older %}
   <a href="{{ neighbors.older.url }}" class="btn btn-outline-secondary btn-sm text-start">
     <span class="small"><i class="fas fa-chevron-left me-1" aria-hidden="true"></i>{{ older_label }}</span>
     <span class="d-block small text-muted">{{ neighbors.older.display }}</span>
   </a>
-  {% else %}
-  <span></span>
   {% endif %}
   {% if neighbors.newer %}
-  <a href="{{ neighbors.newer.url }}" class="btn btn-outline-secondary btn-sm text-end">
+  <a href="{{ neighbors.newer.url }}" class="btn btn-outline-secondary btn-sm text-start">
     <span class="small">{{ newer_label }}<i class="fas fa-chevron-right ms-1" aria-hidden="true"></i></span>
     <span class="d-block small text-muted">{{ neighbors.newer.display }}</span>
   </a>
-  {% else %}
-  <span></span>
   {% endif %}
 </nav>
 {% endif %}

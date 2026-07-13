@@ -164,8 +164,17 @@ def collect_expired_summary_files(
     expired_daily: List[Path] = []
     expired_weekly: List[Path] = []
 
-    if daily_dir.is_dir():
-        for path in sorted(daily_dir.iterdir()):
+    def _scan_dirs(base: Path) -> List[Path]:
+        """base 直下と、リージョン用サブディレクトリ（例 us/）を対象にする。"""
+        dirs = [base]
+        if base.is_dir():
+            dirs.extend(sorted(p for p in base.iterdir() if p.is_dir()))
+        return dirs
+
+    for d in _scan_dirs(daily_dir):
+        if not d.is_dir():
+            continue
+        for path in sorted(d.iterdir()):
             if not path.is_file():
                 continue
             day = _parse_daily_summary_date(path.name)
@@ -174,8 +183,10 @@ def collect_expired_summary_files(
             if day < daily_cutoff:
                 expired_daily.append(path)
 
-    if weekly_dir.is_dir():
-        for path in sorted(weekly_dir.iterdir()):
+    for d in _scan_dirs(weekly_dir):
+        if not d.is_dir():
+            continue
+        for path in sorted(d.iterdir()):
             if not path.is_file():
                 continue
             monday = _parse_weekly_summary_monday(path.name)

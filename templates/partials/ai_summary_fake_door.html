@@ -15,7 +15,6 @@
   {% set email_placeholder = "you@example.com" %}
   {% set btn_submit = "Join waitlist" %}
   {% set btn_close = "Close" %}
-  {% set sub_hint = "Coming soon" %}
   {% set read_preview = "Read preview" %}
   {% set past_summaries = "Past summaries" %}
   {% set waitlist_success = "You're on the list. We'll email you when the brief launches." %}
@@ -23,7 +22,6 @@
   {% set waitlist_invalid = "Enter a valid email address." %}
 {% else %}
   {% set title_a = "過去のトレンドサマリー" %}
-  {% set badge = "無料プレビュー" %}
   {% set preview_lead = "過去の更新データを7時/13時/19時/1時を閲覧することができます。" %}
   {% set locked = "日次・週次のサマリー全文をメールで受信することもできます。以下の「メール配信を希望する」を押してください。" %}
   {% set cta = "メール配信を希望する" %}
@@ -34,7 +32,6 @@
   {% set email_placeholder = "example@email.com" %}
   {% set btn_submit = "事前登録する" %}
   {% set btn_close = "閉じる" %}
-  {% set sub_hint = "提供準備中" %}
   {% set read_preview = "プレビューを読む" %}
   {% set past_summaries = "過去のサマリー" %}
   {% set waitlist_success = "登録を受け付けました。提供開始時にご連絡します。" %}
@@ -60,7 +57,7 @@
       </p>
       <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
         {% if fd.has_preview and fd.business_day %}
-        <a class="btn btn-primary btn-sm" href="/summaries/daily/{{ fd.business_day }}">
+        <a class="btn btn-primary btn-sm" href="{{ fd.url_prefix }}/summaries/daily/{{ fd.business_day }}">
           <i class="fas fa-newspaper me-1" aria-hidden="true"></i>{{ read_preview }}
         </a>
         {% endif %}
@@ -68,7 +65,7 @@
             data-bs-toggle="modal" data-bs-target="#aiSummaryFakeDoorModal">
           {{ cta }}
         </button>
-        <a class="btn btn-outline-secondary btn-sm" href="/summaries">
+        <a class="btn btn-outline-secondary btn-sm" href="{{ fd.url_prefix }}/summaries">
           <i class="fas fa-list me-1" aria-hidden="true"></i>{{ past_summaries }}
         </a>
       </div>

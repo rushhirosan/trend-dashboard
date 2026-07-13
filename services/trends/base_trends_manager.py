@@ -481,18 +481,12 @@ class BaseTrendsManager(ABC):
 
                             if is_zero_data:
                                 # 0件取得: warning（RSS不調・一時的な問題の可能性）
-                                # OpenAlexのclimate/quantum(jp)は日本語論文が少なく0件になりやすいためアラート抑制
-                                suppress_zero_alert = (
-                                    self.service_name == "openalex"
-                                    and cache_key in ("openalex_trends_climate_jp", "openalex_trends_quantum_jp")
+                                alert_service.send_alert(
+                                    "warning",
+                                    f"データ0件: {self.service_name}",
+                                    f"{self.service_name}のデータ取得は成功しましたが、取得件数が0件でした。RSS不調または一時的な問題の可能性があります。",
+                                    error_details,
                                 )
-                                if not suppress_zero_alert:
-                                    alert_service.send_alert(
-                                        "warning",
-                                        f"データ0件: {self.service_name}",
-                                        f"{self.service_name}のデータ取得は成功しましたが、取得件数が0件でした。RSS不調または一時的な問題の可能性があります。",
-                                        error_details,
-                                    )
                             else:
                                 # データありでキャッシュ保存失敗: error
                                 alert_service.send_alert(

@@ -41,7 +41,7 @@ function getCacheLastUpdate(platform, platformName, lastUpdateElement, dataCount
             break;
         case 'openalex':
             apiEndpoint = '/api/openalex-trends';
-            // data-freshnessは日本トレンドページで使用→日本語論文
+            // data-freshnessは日本トレンドページで使用→日本の研究機関に所属する論文
             params = '?category=trending&region=jp';
             break;
         case 'bluesky':

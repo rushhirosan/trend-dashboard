@@ -4,11 +4,10 @@
 {% set reg = fake_door_region | default('jp') %}
 {% set fd = AI_SUMMARY_FAKE_DOOR[loc] %}
 {% if loc == 'en' %}
-  {% set title_a = "Trend summaries" %}
-  {% set badge = "Free preview" %}
-  {% set one_liner_label = "Yesterday's headline" %}
-  {% set locked = "Full daily & weekly briefs (topics, rank moves, categories) — email delivery planned." %}
-  {% set cta = "See delivery plan" %}
+  {% set title_a = "Past trend summaries" %}
+  {% set preview_lead = "Browse past updates captured at 7:00 / 13:00 / 19:00 / 1:00 JST." %}
+  {% set locked = "You can also receive the full daily & weekly summaries by email. Tap ‘Request email delivery’ below." %}
+  {% set cta = "Request email delivery" %}
   {% set modal_title = "Summary delivery (daily & weekly)" %}
   {% set modal_lead = "We plan to email daily briefs around 10:30 JST and weekly briefs around 11:00 JST each Monday (topics, rank moves, category highlights). Paid launch timing TBD." %}
   {% set modal_note = "Email signup will open once delivery is ready. Signup is not available yet." %}
@@ -17,17 +16,17 @@
   {% set btn_submit = "Join waitlist" %}
   {% set btn_close = "Close" %}
   {% set sub_hint = "Coming soon" %}
-  {% set read_preview = "Read free preview" %}
-  {% set no_preview = "Daily summary is being prepared." %}
+  {% set read_preview = "Read preview" %}
+  {% set past_summaries = "Past summaries" %}
   {% set waitlist_success = "You're on the list. We'll email you when the brief launches." %}
   {% set waitlist_error = "Signup failed. Please try again." %}
   {% set waitlist_invalid = "Enter a valid email address." %}
 {% else %}
-  {% set title_a = "トレンドサマリー" %}
+  {% set title_a = "過去のトレンドサマリー" %}
   {% set badge = "無料プレビュー" %}
-  {% set one_liner_label = "昨日の要点" %}
-  {% set locked = "日次・週次の全文（論点・順位の動き・カテゴリ別）をメール配信予定" %}
-  {% set cta = "配信内容を見る" %}
+  {% set preview_lead = "過去の更新データを7時/13時/19時/1時を閲覧することができます。" %}
+  {% set locked = "日次・週次のサマリー全文をメールで受信することもできます。以下の「メール配信を希望する」を押してください。" %}
+  {% set cta = "メール配信を希望する" %}
   {% set modal_title = "サマリー配信（日次・週次）" %}
   {% set modal_lead = "日次は毎朝10:30 JST頃、週次は毎週月曜11:00 JST頃を目安に、論点・順位の動き・カテゴリ別トップをメールでお届けする予定です（有料・開始時期未定）。" %}
   {% set modal_note = "配信の準備が整い次第、事前登録を開始します。現時点では登録はお受けしていません。" %}
@@ -36,8 +35,8 @@
   {% set btn_submit = "事前登録する" %}
   {% set btn_close = "閉じる" %}
   {% set sub_hint = "提供準備中" %}
-  {% set read_preview = "無料プレビューを読む" %}
-  {% set no_preview = "日次サマリーを準備中です。" %}
+  {% set read_preview = "プレビューを読む" %}
+  {% set past_summaries = "過去のサマリー" %}
   {% set waitlist_success = "登録を受け付けました。提供開始時にご連絡します。" %}
   {% set waitlist_error = "登録に失敗しました。しばらくしてからお試しください。" %}
   {% set waitlist_invalid = "有効なメールアドレスを入力してください。" %}
@@ -53,27 +52,9 @@
   <div class="card border-secondary h-100">
     <div class="card-header bg-light py-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
       <h2 class="h6 mb-0"><i class="fas fa-newspaper me-1 text-primary" aria-hidden="true"></i>{{ title_a }}</h2>
-      <span class="badge bg-secondary">{{ badge }}</span>
     </div>
     <div class="card-body {% if embedded %}py-2 d-flex flex-column{% else %}py-3{% endif %}">
-      {% if fd.subline %}
-      <p class="small text-muted mb-2 ai-summary-subline">{{ fd.subline }}</p>
-      {% else %}
-      <p class="small fw-semibold mb-1">{{ fd.headline }}</p>
-      {% if fd.observation_meta %}
-      <p class="small text-muted mb-2">{{ fd.observation_meta }}</p>
-      {% endif %}
-      {% endif %}
-      <div class="mb-2">
-        <p class="small text-muted mb-1">{{ one_liner_label }}</p>
-        {% if fd.teaser %}
-        <p class="small mb-0 ai-summary-one-liner">{{ fd.teaser }}</p>
-        {% elif fd.one_liner %}
-        <p class="small mb-0 ai-summary-one-liner">{{ fd.one_liner }}</p>
-        {% else %}
-        <p class="small mb-0 text-muted">{{ no_preview }}</p>
-        {% endif %}
-      </div>
+      <p class="small text-muted mb-2 ai-summary-subline">{{ preview_lead }}</p>
       <p class="small text-muted mb-0{% if not embedded %} mt-2{% endif %}">
         <i class="fas fa-lock me-1" aria-hidden="true"></i>{{ locked }}
       </p>
@@ -87,7 +68,9 @@
             data-bs-toggle="modal" data-bs-target="#aiSummaryFakeDoorModal">
           {{ cta }}
         </button>
-        <span class="small text-muted">{{ sub_hint }}</span>
+        <a class="btn btn-outline-secondary btn-sm" href="/summaries">
+          <i class="fas fa-list me-1" aria-hidden="true"></i>{{ past_summaries }}
+        </a>
       </div>
     </div>
   </div>

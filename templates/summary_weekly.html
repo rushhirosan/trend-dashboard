@@ -144,18 +144,17 @@
                         <p class="small text-muted mb-0">
                             週次の全文は、毎週決まった時間にメールでお届けする予定です（有料・開始時期未定）。
                         </p>
+                        {% include 'partials/summary_email_cta.html' %}
                     </div>
                 </section>
 
-                {% if ENABLE_AI_SUMMARY_FAKE_DOOR and AI_SUMMARY_FAKE_DOOR %}
-                {% set fake_door_locale = 'ja' %}
-                {% set fake_door_region = 'jp' %}
-                {% set fake_door_embedded = false %}
-                {% include 'partials/ai_summary_fake_door.html' %}
-                {% endif %}
+                {% set older_label = '前の週' %}
+                {% set newer_label = '次の週' %}
+                {% include 'partials/summary_pager.html' %}
 
                 <div class="d-flex flex-wrap gap-3 mt-4">
                     <a href="/" class="btn btn-outline-primary btn-sm"><i class="fas fa-chart-line me-1"></i>ダッシュボードで最新データを見る</a>
+                    <a href="/summaries" class="btn btn-outline-secondary btn-sm"><i class="fas fa-list me-1"></i>サマリー一覧</a>
                 </div>
             </div>
         </div>
@@ -179,6 +178,5 @@
     </footer>
 
     <script defer src="{{ url_for('static', filename='vendor/bootstrap/5.1.3/bootstrap.bundle.min.js') }}"></script>
-    <script defer src="{{ url_for('static', filename='js/ai-summary-fake-door.js') }}?v=20260622-waitlist-closed"></script>
 </body>
 </html>

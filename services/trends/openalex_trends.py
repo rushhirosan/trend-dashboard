@@ -219,7 +219,7 @@ class OpenAlexTrendsManager(BaseTrendsManager):
             category: カテゴリ（trending, ai, nlp, climate, biotech, quantum, medical）
             limit: 取得件数
             days: 過去何日間の論文を対象にするか
-            region (kwargs): リージョン（jp=日本語論文のみ、それ以外=言語制限なし）
+            region (kwargs): リージョン（jp=日本の研究機関に所属する論文、それ以外=国制限なし）
 
         Returns:
             Dict: 取得結果
@@ -230,11 +230,13 @@ class OpenAlexTrendsManager(BaseTrendsManager):
             # 日付フィルター
             from_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
 
-            # フィルタ構築（日本向けは language:ja を追加）
+            # フィルタ構築（日本向けは著者所属機関が日本の論文に限定）
+            # NOTE: language:ja だと日本の研究は大半が英語出版のためほぼ0件になる。
+            #       所属機関の国コードで絞る方が「日本の研究トレンド」を正しく捉えられる。
             region = kwargs.get("region")
             filter_parts = [f"from_publication_date:{from_date}"]
             if region == "jp":
-                filter_parts.append("language:ja")
+                filter_parts.append("authorships.institutions.country_code:jp")
 
             # パラメータ構築
             params = {
@@ -313,7 +315,7 @@ class OpenAlexTrendsManager(BaseTrendsManager):
             limit: 取得件数
             days: 過去何日間の論文を対象にするか
             force_refresh: 強制更新フラグ
-            region: リージョン（jp=日本語論文、それ以外=言語制限なし）
+            region: リージョン（jp=日本の研究機関に所属する論文、それ以外=国制限なし）
 
         Returns:
             Dict: トレンドデータ

@@ -115,6 +115,54 @@ def _join_paragraph(content: str) -> str:
     return " ".join(lines).strip()
 
 
+def _split_sentences(text: str) -> list[str]:
+    """句点「。」で文単位に分割（句点は各文末に残す）。長い一行結論を読みやすく改行するための表示用。"""
+    s = (text or "").strip()
+    if not s:
+        return []
+    return [part.strip() for part in re.split(r"(?<=。)", s) if part.strip()]
+
+
+# 本文中の markdown リンク行 [ラベル](http...) からトピック名とURLを拾うための正規表現。
+_MD_LINK_RE = re.compile(r"\[([^\]]+)\]\((https?://[^)\s]+)\)")
+
+
+def _collect_topic_links(body: str) -> list[tuple[str, str]]:
+    """本文全体の [ラベル](url) を集め、一行結論のリンク化に使う (ラベル, url) 一覧を返す。
+
+    同じラベルは最初の URL を採用。長いラベルを優先マッチさせたいので長さ降順で返す。
+    """
+    seen: dict[str, str] = {}
+    for label, url in _MD_LINK_RE.findall(body):
+        label = label.strip()
+        # 1文字ラベルは誤マッチしやすいので除外
+        if len(label) >= 2 and label not in seen:
+            seen[label] = url
+    return sorted(seen.items(), key=lambda kv: len(kv[0]), reverse=True)
+
+
+def _linkify(text: str, links: list[tuple[str, str]]) -> Markup:
+    """text 中に現れる既知トピック名だけを安全にリンク化する（longest-match・全文 escape 済み）。"""
+    if not text:
+        return Markup("")
+    out: list[str] = []
+    i, n = 0, len(text)
+    while i < n:
+        for label, url in links:
+            if text.startswith(label, i):
+                safe_url = str(escape(url))
+                safe_label = str(escape(label))
+                out.append(
+                    f'<a href="{safe_url}" target="_blank" rel="noopener nofollow">{safe_label}</a>'
+                )
+                i += len(label)
+                break
+        else:
+            out.append(str(escape(text[i])))
+            i += 1
+    return Markup("".join(out))
+
+
 def _publishable(status: str, *, allow_draft: bool) -> bool:
     st = (status or "draft").strip().lower()
     if st == "approved":
@@ -191,6 +239,9 @@ def load_daily_page(date_str: str, *, allow_draft: bool = False) -> Optional[dic
 
     sections = _split_sections(body, "## ")
     one_liner = _join_paragraph(_find_section(sections, "一行結論"))
+    # 本文中のリンクを対応表にして、一行結論のトピック名にリンクを張る
+    topic_links = _collect_topic_links(body)
+    one_liner_sentences = [_linkify(s, topic_links) for s in _split_sentences(one_liner)]
     rising = _parse_daily_rising(_find_section(sections, "いちばん動いた"))
     locked = [
         _clean_title(title)
@@ -207,6 +258,7 @@ def load_daily_page(date_str: str, *, allow_draft: bool = False) -> Optional[dic
         "status": status,
         "slots": list(_parse_slots(fm) or ("07", "13", "19", "01")),
         "one_liner": one_liner,
+        "one_liner_sentences": one_liner_sentences,
         "rising": rising,
         "locked_sections": locked,
         "week_id": week_id,
@@ -316,6 +368,99 @@ def list_published_daily(*, allow_draft: bool = False) -> list[tuple[str, dateti
 
 def list_published_weekly(*, allow_draft: bool = False) -> list[tuple[str, datetime]]:
     return _list_published(_WEEKLY_DIR, _WEEKLY_ID_RE, allow_draft=allow_draft)
+
+
+def _weekly_display(week_id: str) -> str:
+    """``2026-W28`` → ``2026年 第28週``。パースできなければそのまま返す。"""
+    m = _WEEKLY_ID_RE.match(week_id or "")
+    if not m:
+        return week_id
+    year, week = week_id.split("-W")
+    return f"{year}年 第{int(week)}週"
+
+
+def _daily_display(date_str: str) -> str:
+    try:
+        return _jp_date(date.fromisoformat(date_str))
+    except ValueError:
+        return date_str
+
+
+def _neighbor_ids(ids: list[str], current_id: str) -> tuple[Optional[str], Optional[str]]:
+    """新しい順に並んだ ID 一覧から (older, newer) を返す。current が無ければ (None, None)。"""
+    if current_id not in ids:
+        return None, None
+    idx = ids.index(current_id)
+    newer = ids[idx - 1] if idx > 0 else None
+    older = ids[idx + 1] if idx + 1 < len(ids) else None
+    return older, newer
+
+
+def daily_neighbors(date_str: str, *, allow_draft: bool = False) -> dict:
+    """指定日の前後（保持期間内に公開されている隣接分のみ）を返す。
+
+    older = より古い日付 / newer = より新しい日付。欠けている日は飛ばして
+    「実際に閲覧できる隣接分」を指すので、連続した暦日とは限らない。
+    """
+    ids = [d for d, _ in list_published_daily(allow_draft=allow_draft)]
+    older_id, newer_id = _neighbor_ids(ids, date_str)
+
+    def _mk(i: Optional[str]) -> Optional[dict]:
+        if not i:
+            return None
+        return {"id": i, "display": _daily_display(i), "url": f"/summaries/daily/{i}"}
+
+    return {"older": _mk(older_id), "newer": _mk(newer_id)}
+
+
+def weekly_neighbors(week_id: str, *, allow_draft: bool = False) -> dict:
+    """指定週の前後（保持期間内に公開されている隣接分のみ）を返す。"""
+    ids = [w for w, _ in list_published_weekly(allow_draft=allow_draft)]
+    older_id, newer_id = _neighbor_ids(ids, week_id)
+
+    def _mk(i: Optional[str]) -> Optional[dict]:
+        if not i:
+            return None
+        return {"id": i, "display": _weekly_display(i), "url": f"/summaries/weekly/{i}"}
+
+    return {"older": _mk(older_id), "newer": _mk(newer_id)}
+
+
+def build_summary_index(*, allow_draft: bool = False) -> dict:
+    """一覧ページ用に、公開中の日次・週次サマリーの見出し情報を新しい順で返す。
+
+    保持期間（日次10日・週次30日が既定）を過ぎた原稿はファイルごと削除されるため、
+    ここに並ぶのは「いま閲覧できる直近分」だけ。制限は呼び出し側で明示する。
+    """
+    daily: list[dict] = []
+    for date_str, _ in list_published_daily(allow_draft=allow_draft):
+        page = load_daily_page(date_str, allow_draft=allow_draft)
+        if not page:
+            continue
+        daily.append(
+            {
+                "id": date_str,
+                "display": page["business_day_display"],
+                "one_liner": page["one_liner"],
+                "url": f"/summaries/daily/{date_str}",
+            }
+        )
+
+    weekly: list[dict] = []
+    for week_id, _ in list_published_weekly(allow_draft=allow_draft):
+        page = load_weekly_page(week_id, allow_draft=allow_draft)
+        if not page:
+            continue
+        weekly.append(
+            {
+                "id": week_id,
+                "display": _weekly_display(week_id),
+                "week_range": page.get("week_range", ""),
+                "url": f"/summaries/weekly/{week_id}",
+            }
+        )
+
+    return {"daily": daily, "weekly": weekly}
 
 
 def _list_published(

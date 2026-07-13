@@ -5,18 +5,6 @@
   var debounced;
   var armed;
 
-  function clearSidePanels() {
-    ['dashboard-summary-intro', 'header-admin-unified'].forEach(function (id) {
-      var el = document.getElementById(id);
-      if (!el) return;
-      el.style.removeProperty('height');
-      el.style.removeProperty('max-height');
-      el.style.removeProperty('overflow-y');
-      el.style.removeProperty('min-height');
-      el.style.removeProperty('box-sizing');
-    });
-  }
-
   function refRoot() {
     return document.getElementById('ai-summary-fake-door-root') ||
       document.getElementById('dashboard-summary-ai');
@@ -32,31 +20,45 @@
     return root;
   }
 
-  function refHeight() {
-    var root = refRoot();
-    var el = refMeasureEl(root);
-    if (!el) return 0;
-    var h = el.getBoundingClientRect().height;
-    return Math.round(h);
+  function clearForcedAll() {
+    ['dashboard-summary-intro', 'header-admin-unified'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.style.removeProperty('height');
+      el.style.removeProperty('max-height');
+      el.style.removeProperty('overflow-y');
+      el.style.removeProperty('min-height');
+      el.style.removeProperty('box-sizing');
+    });
+    var center = refMeasureEl(refRoot());
+    if (center) {
+      center.style.removeProperty('min-height');
+      center.style.removeProperty('box-sizing');
+    }
+  }
+
+  function natural(el) {
+    // サブピクセルの高さを切り上げる。round で切り捨てると内容が数px溢れ、
+    // 左右パネルの overflow-y:auto が発動して不要な縦スクロールバーが出るため。
+    return el ? Math.ceil(el.getBoundingClientRect().height) : 0;
   }
 
   function sync() {
     try {
-      if (!mq.matches) {
-        clearSidePanels();
+      if (!mq.matches || !document.querySelector('.dashboard-summary-grid--3')) {
+        clearForcedAll();
         return;
       }
-      var grid = document.querySelector('.dashboard-summary-grid--3');
-      if (!grid) {
-        clearSidePanels();
-        return;
-      }
-      var root = refRoot();
+      var center = refMeasureEl(refRoot());
       var left = document.getElementById('dashboard-summary-intro');
       var right = document.getElementById('header-admin-unified');
-      if (!root || !left || !right) return;
-      var h = refHeight();
+      if (!center || !left || !right) return;
+      // いったん強制を解除して自然高を測り、3枚の最大に合わせる。
+      // 基準を中央 Fake door 単体にすると、中央が短いとき左右が切り詰められてスクロールが出るため最大採用。
+      clearForcedAll();
+      var h = Math.max(natural(center), natural(left), natural(right));
       if (h < 1) return;
+      // 左右パネル: 高さを固定（万一の溢れに備え overflow-y:auto は安全弁）
       [left, right].forEach(function (el) {
         el.style.setProperty('box-sizing', 'border-box', 'important');
         el.style.setProperty('min-height', '0', 'important');
@@ -64,6 +66,9 @@
         el.style.setProperty('max-height', h + 'px', 'important');
         el.style.setProperty('overflow-y', 'auto', 'important');
       });
+      // 中央（Fake door / CTA）は下端を揃えるため最小高だけ与える（クランプせず＝スクロールさせない）
+      center.style.setProperty('box-sizing', 'border-box', 'important');
+      center.style.setProperty('min-height', h + 'px', 'important');
     } catch (e) {}
   }
 

@@ -433,14 +433,14 @@ def get_hatena_trends():
 @require_manager('openalex')
 def get_openalex_trends(manager):
     """OpenAlex学術論文トレンド APIエンドポイント
-    region=jp: 日本語論文のみ（日本トレンド用）
-    region未指定: 言語制限なし（USトレンド用）
+    region=jp: 日本の研究機関に所属する論文のみ（日本トレンド用）
+    region未指定: 国制限なし（USトレンド用）
     """
     try:
         category = request.args.get('category', 'trending')
         limit = int(request.args.get('limit', 25))
         force_refresh = get_force_refresh()
-        region = request.args.get('region')  # 'jp' で日本語論文のみ
+        region = request.args.get('region')  # 'jp' で日本の研究機関に所属する論文のみ
 
         region_is_jp = (region or '').lower() == 'jp'
         # マネージャーは region == "jp" のみ日本向けキャッシュ（大文字 JP を正規化）

@@ -96,7 +96,15 @@
                 <section class="card shadow-sm mb-4">
                     <div class="card-body p-4">
                         <h2 class="h6 text-uppercase text-muted mb-2">昨日の一行結論</h2>
-                        <p class="lead mb-0">{{ page.one_liner }}</p>
+                        {% if page.one_liner_sentences %}
+                        <ul class="mb-0 ps-3">
+                            {% for sentence in page.one_liner_sentences %}
+                            <li class="{% if not loop.last %}mb-2{% else %}mb-0{% endif %}">{{ sentence }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}
+                        <p class="mb-0">{{ page.one_liner }}</p>
+                        {% endif %}
                     </div>
                 </section>
                 {% endif %}
@@ -133,18 +141,17 @@
                         <p class="small text-muted mb-0">
                             日次の全文と週次まとめは、決まった時間にメールでお届けする予定です（有料・開始時期未定）。
                         </p>
+                        {% include 'partials/summary_email_cta.html' %}
                     </div>
                 </section>
 
-                {% if ENABLE_AI_SUMMARY_FAKE_DOOR and AI_SUMMARY_FAKE_DOOR %}
-                {% set fake_door_locale = 'ja' %}
-                {% set fake_door_region = 'jp' %}
-                {% set fake_door_embedded = false %}
-                {% include 'partials/ai_summary_fake_door.html' %}
-                {% endif %}
+                {% set older_label = '前の日' %}
+                {% set newer_label = '次の日' %}
+                {% include 'partials/summary_pager.html' %}
 
                 <div class="d-flex flex-wrap gap-3 mt-4">
                     <a href="/" class="btn btn-outline-primary btn-sm"><i class="fas fa-chart-line me-1"></i>ダッシュボードで最新データを見る</a>
+                    <a href="/summaries" class="btn btn-outline-secondary btn-sm"><i class="fas fa-list me-1"></i>サマリー一覧</a>
                     {% if page.week_available %}
                     <a href="/summaries/weekly/{{ page.week_id }}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-calendar-week me-1"></i>この週の週次まとめ</a>
                     {% endif %}
@@ -171,6 +178,5 @@
     </footer>
 
     <script defer src="{{ url_for('static', filename='vendor/bootstrap/5.1.3/bootstrap.bundle.min.js') }}"></script>
-    <script defer src="{{ url_for('static', filename='js/ai-summary-fake-door.js') }}?v=20260622-waitlist-closed"></script>
 </body>
 </html>

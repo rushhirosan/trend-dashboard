@@ -9,7 +9,7 @@ if (typeof createDropdownTrendsManager === 'function') {
         defaultValue: 'trending',
         paramName: 'category',
         storageKey: 'openalex',
-        getParams: () => ({ region: 'jp' }),  // 日本トレンド: 日本語論文のみ
+        getParams: () => ({ region: 'jp' }),  // 日本トレンド: 日本の研究機関に所属する論文
         uiIds: {
             loading: 'openalexLoading',
             results: 'openalexResults',

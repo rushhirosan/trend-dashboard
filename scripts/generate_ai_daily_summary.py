@@ -91,6 +91,29 @@ def daily_output_dir() -> Path:
     return DAILY_DIR if _ACTIVE_REGION == "jp" else DAILY_DIR / "us"
 
 
+# 内部カテゴリキー（日本語）→ US 表示名。categorize_series_key は常に JP キーを返す。
+CATEGORY_LABELS_EN: dict[str, str] = {
+    "ニュース": "News",
+    "検索・動画": "Search & Video",
+    "テック・開発": "Tech",
+    "マーケット": "Market",
+    "エンタメ": "Entertainment",
+    "行政": "Gov Data",
+}
+
+
+def category_display_name(cat: str) -> str:
+    c = (cat or "").strip()
+    if _ACTIVE_REGION == "us":
+        return CATEGORY_LABELS_EN.get(c, c)
+    return c
+
+
+def news_category_key() -> str:
+    """editorial / mechanical 判定用のニュース区分名（地域表示に合わせる）。"""
+    return category_display_name("ニュース")
+
+
 BASE_DEFAULT = "https://trends-dashboard.fly.dev"
 
 SLOT_ORDER = ("07", "13", "19", "01")
@@ -570,10 +593,12 @@ def _series_pref_score(series_key: str) -> int:
 
 
 def series_region(series_key: str) -> Optional[str]:
-    """スナップショット series_key の地域（jp / us）。曖昧な系列は None。"""
+    """スナップショット series_key の地域（jp / us / global）。曖昧な系列は None。"""
     sk = (series_key or "").strip().lower()
     if not sk:
         return None
+    if sk.endswith("_global") or "_global_" in sk:
+        return "global"
     if sk.endswith("_jp") or "_jp_" in sk or sk.endswith("_ja"):
         return "jp"
     if sk.endswith("_us") or "_us_" in sk or sk.endswith("_en"):
@@ -612,14 +637,15 @@ def series_region(series_key: str) -> Optional[str]:
 
 
 def filter_rows_by_region(rows: List[Dict[str, Any]], region: str) -> List[Dict[str, Any]]:
-    """series_key の地域が一致するスナップショット行だけ残す。"""
+    """series_key の地域が一致するスナップショット行だけ残す（global は両地域）。"""
     want = (region or "").strip().lower()
     if want not in ("jp", "us"):
         return list(rows)
     out: List[Dict[str, Any]] = []
     for row in rows:
         sk = str(row.get("series_key") or "")
-        if series_region(sk) == want:
+        r = series_region(sk)
+        if r == want or r == "global":
             out.append(row)
     return out
 
@@ -687,10 +713,24 @@ def _format_series_key_display(series_key: str) -> str:
     else:
         provider = _series_provider(sk)
         name = _PROVIDER_DISPLAY.get(provider) or provider.replace("_", " ")
+        if _ACTIVE_REGION == "us":
+            us_name = {
+                "stock": "Stocks",
+                "crypto": "Crypto",
+                "hatena": "Hatena",
+                "rakuten": "Rakuten",
+                "estat": "e-Stat",
+                "kkj": "Gov procurement",
+                "jpcert": "JPCERT/CC",
+            }.get(provider)
+            if us_name:
+                name = us_name
     if sk.endswith("_us"):
         return f"{name} (US)"
     if sk.endswith("_en"):
         return f"{name} (EN)"
+    if sk.endswith("_global") or "_global_" in sk.lower():
+        return name
     return name
 
 
@@ -790,14 +830,20 @@ def _format_digest_link_line(
 
 
 def _format_slot_rank(slot: str, rank: int) -> str:
-    return f"{_slot_hour_label(slot)}時{rank}位"
+    hour = _slot_hour_label(slot)
+    if _ACTIVE_REGION == "us":
+        return f"#{int(rank)}@{hour}"
+    return f"{hour}時{rank}位"
 
 
 def _format_slot_rank_or_oob(slot: str, ranks: dict[str, int]) -> str:
-    """top N に無いスロットは「圏外」。"""
+    """top N に無いスロットは「圏外」/ out。"""
     r = ranks.get(slot)
+    hour = _slot_hour_label(slot)
     if r is None:
-        return f"{_slot_hour_label(slot)}時圏外"
+        if _ACTIVE_REGION == "us":
+            return f"out@{hour}"
+        return f"{hour}時圏外"
     return _format_slot_rank(slot, int(r))
 
 
@@ -830,21 +876,29 @@ def _label_slot_coverage(
 
 
 def _format_rank_evidence(ranks: dict[str, int]) -> str:
-    """07→13→19 を常に3段表示（未掲載は圏外）。"""
+    """07→13→19 を常に3段表示（未掲載は圏外 / out）。"""
     return " → ".join(_format_slot_rank_or_oob(slot, ranks) for slot in DAYTIME_SLOTS)
 
 
 _RANK_EVIDENCE_SLOT_RE = re.compile(r"(\d+)時(?:(\d+)位|圏外)")
+_RANK_EVIDENCE_SLOT_RE_EN = re.compile(r"(?:out|#(\d+))@(\d+)")
 
 
 def _parse_rank_evidence(evidence: str) -> Dict[str, Optional[int]]:
     """rank_evidence 文字列を {07,13,19} → 順位（圏外は None）に分解。"""
     ranks: Dict[str, Optional[int]] = {slot: None for slot in DAYTIME_SLOTS}
-    for m in _RANK_EVIDENCE_SLOT_RE.finditer(evidence or ""):
+    text = evidence or ""
+    for m in _RANK_EVIDENCE_SLOT_RE.finditer(text):
         slot = m.group(1).zfill(2)
         if slot not in ranks:
             continue
         rank_str = m.group(2)
+        ranks[slot] = int(rank_str) if rank_str else None
+    for m in _RANK_EVIDENCE_SLOT_RE_EN.finditer(text):
+        slot = m.group(2).zfill(2)
+        if slot not in ranks:
+            continue
+        rank_str = m.group(1)
         ranks[slot] = int(rank_str) if rank_str else None
     return ranks
 
@@ -866,7 +920,8 @@ def format_daily_rank_table(ranks: dict[str, int]) -> str:
     header = "| | 07 | 13 | 19 |"
     sep = "|:--:|:-:|:-:|:-:|"
     cells = [_format_rank_cell(ranks.get(slot)) for slot in DAYTIME_SLOTS]
-    row = "| 順位 | " + " | ".join(cells) + " |"
+    row_label = "Rank" if _ACTIVE_REGION == "us" else "順位"
+    row = f"| {row_label} | " + " | ".join(cells) + " |"
     return "\n".join([header, sep, row])
 
 
@@ -880,13 +935,20 @@ def format_daily_slot_rank_trend(label: str, ranks: dict[str, int]) -> str:
     for slot in DAYTIME_SLOTS:
         r = ranks.get(slot)
         if r is not None:
-            points.append((f"{_slot_hour_label(slot)}時", int(r)))
+            hour = _slot_hour_label(slot)
+            if _ACTIVE_REGION == "us":
+                points.append((hour, int(r)))
+            else:
+                points.append((f"{hour}時", int(r)))
     if len(points) < 2:
         return ""
     rank_vals = [r for _, r in points]
     if len(set(rank_vals)) < 2:
         return ""
-    x_labels = [f"{h} ({r}位)" for h, r in points]
+    if _ACTIVE_REGION == "us":
+        x_labels = [f"{h} (#{r})" for h, r in points]
+    else:
+        x_labels = [f"{h} ({r}位)" for h, r in points]
     return sr.format_rank_trend_markdown(x_labels, rank_vals)
 
 
@@ -992,7 +1054,9 @@ def build_rising_highlights(
     out: List[Dict[str, Any]] = []
     for raw in items:
         ranks = dict(raw.get("ranks") or {})
-        category = categorize_series_key(str(raw.get("series_key") or ""))
+        category = category_display_name(
+            categorize_series_key(str(raw.get("series_key") or ""))
+        )
         picked = {
             "label": raw["display"],
             "category": category,
@@ -1202,9 +1266,20 @@ def build_category_top3(
             if len(picked) >= count:
                 break
         if picked:
-            out.append({"category": category, "items": picked})
+            out.append(
+                {
+                    "category": category_display_name(category),
+                    "items": picked,
+                }
+            )
         else:
-            out.append({"category": category, "items": [], "quiet": True})
+            out.append(
+                {
+                    "category": category_display_name(category),
+                    "items": [],
+                    "quiet": True,
+                }
+            )
     return out
 
 
@@ -1378,7 +1453,7 @@ def build_category_leaders_from_rows(
                 coverage = len(set(ranks.keys()) & set(DAYTIME_SLOTS))
                 cand = {
                     "label": display,
-                    "category": category,
+                    "category": category_display_name(category),
                     "series_key": series_key,
                     "rank_display": _format_rank_evidence(ranks),
                     "url": _url_for_label_in_series(series_by_slot, series_key, display),
@@ -1504,17 +1579,23 @@ def render_rising_highlights_markdown(
 
     lines: List[str] = [_RISING_HEADING, ""]
     if not items:
-        lines.append(
-            f"（{DAYTIME_SLOTS_ARROW} の間で、順位が大きく上がった話題はありませんでした）"
-        )
+        if _ACTIVE_REGION == "us":
+            lines.append(
+                f"(No topics with large rank gains across {DAYTIME_SLOTS_ARROW}.)"
+            )
+        else:
+            lines.append(
+                f"（{DAYTIME_SLOTS_ARROW} の間で、順位が大きく上がった話題はありませんでした）"
+            )
         return "\n".join(lines).rstrip() + "\n"
+    note_label = "Note" if _ACTIVE_REGION == "us" else "補足"
     for i, it in enumerate(items, 1):
         lines.append(f"{i}. {_compact_daily_link_line(it)}")
         lines.append("")
         label_nk = _normalize_label_key(str(it.get("label") or ""))
         note = notes_by_label.get(label_nk)
         if note:
-            lines.append(f"   - **補足**: {note}")
+            lines.append(f"   - **{note_label}**: {note}")
             lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
@@ -1534,14 +1615,21 @@ def render_cross_source_highlights_markdown(
     if intro:
         lines.append(intro)
         lines.append("")
+    unknown = "(unknown label)" if _ACTIVE_REGION == "us" else "（ラベル不明）"
+    overlap_line = (
+        "The same topic appeared on independent sources."
+        if _ACTIVE_REGION == "us"
+        else "異なる取得元で同じ話題が観測されました。"
+    )
+    sources_label = "Sources" if _ACTIVE_REGION == "us" else "登場ソース"
     for i, h in enumerate(highlights, 1):
-        label = str(h.get("label") or "").strip() or "（ラベル不明）"
+        label = str(h.get("label") or "").strip() or unknown
         lines.append(f"### {i}. {label}")
         lines.append("")
-        lines.append("異なる取得元で同じ話題が観測されました。")
+        lines.append(overlap_line)
         sources = h.get("sources_display")
         if sources:
-            lines.append(f"- **登場ソース**: {sources}")
+            lines.append(f"- **{sources_label}**: {sources}")
         ranks = _ranks_dict_from_item(h)
         table = format_daily_rank_table(ranks)
         if table:
@@ -1588,7 +1676,7 @@ def inject_cross_source_highlights(markdown: str, cross_body: str) -> str:
     if rising_end is not None:
         out = cleaned[:rising_end] + f"\n\n{body}\n" + cleaned[rising_end:].lstrip("\n")
     else:
-        meta_re = re.compile(r"(- \*\*生成・送信完了\*\*:[^\n]*\n)")
+        meta_re = re.compile(r"(- \*\*(?:生成・送信完了|Generated)\*\*:[^\n]*\n)")
         m2 = meta_re.search(cleaned)
         if m2:
             pos = m2.end()
@@ -1609,16 +1697,23 @@ def render_category_top3_markdown(
     """カテゴリ別トップ3の Markdown 本文（機械生成・リンク付き + 区分1文）。"""
     intros = category_intros or {}
     lines: List[str] = [_TOP3_HEADING, ""]
+    empty_label = "(no data)" if _ACTIVE_REGION == "us" else "（データなし）"
+    trend_label = "Yesterday's trend" if _ACTIVE_REGION == "us" else "昨日の傾向"
     for block in blocks:
         cat = block.get("category") or ""
+        cat_disp = category_display_name(str(cat))
         items = block.get("items") or []
-        intro = (intros.get(cat) or "").strip() if isinstance(intros, dict) else ""
+        intro = ""
+        if isinstance(intros, dict):
+            intro = (
+                (intros.get(cat) or intros.get(cat_disp) or "").strip()
+            )
         if block.get("quiet") or not items:
-            lines.append(f"- **{cat}**: （データなし）")
+            lines.append(f"- **{cat_disp}**: {empty_label}")
             continue
-        lines.append(f"### {cat}")
+        lines.append(f"### {cat_disp}")
         if intro:
-            lines.append(f"**昨日の傾向**: {intro}")
+            lines.append(f"**{trend_label}**: {intro}")
             lines.append("")
         for i, it in enumerate(items, 1):
             lines.append(f"{i}. {it.get('link_line') or it.get('label')}")
@@ -1687,11 +1782,13 @@ def build_llm_payload(
     if _ACTIVE_REGION == "us":
         reader_context = (
             "Edit trends for business_day. Readers usually get this the next morning. "
-            '"Yesterday" = business_day. No forecasts. '
-            "rank_evidence shows 07→13→19 daytime moves (including out of list). "
+            '"Yesterday" = business_day. No forecasts. Write English only. '
+            "Category names are English (News, Search & Video, Tech, Market, "
+            "Entertainment, Gov Data). "
+            "rank_evidence uses out@H / #N@H for 07→13→19 daytime moves. "
             "one_liner must include 2+ rising_highlights labels verbatim; "
-            "also include a news category_leader when not already in rising. "
-            "Do not output URLs."
+            "also include a News category_leader when not already in rising. "
+            "Do not output URLs or Japanese UI words."
         )
     else:
         reader_context = (
@@ -1777,7 +1874,7 @@ def one_liner_is_acceptable(
             return False
     rising_nks = {_normalize_label_key(str(r.get("label") or "")) for r in rising_items}
     for c in editorial_candidates:
-        if c.get("reason") != "category_leader" or c.get("category") != "ニュース":
+        if c.get("reason") != "category_leader" or c.get("category") != news_category_key():
             continue
         lab = str(c.get("label") or "")
         if _normalize_label_key(lab) in rising_nks:
@@ -1861,7 +1958,7 @@ def build_mechanical_one_liner(
     news_leaders = [
         c
         for c in editorial_candidates
-        if c.get("reason") == "category_leader" and c.get("category") == "ニュース"
+        if c.get("reason") == "category_leader" and c.get("category") == news_category_key()
     ]
     if news_leaders:
         c = news_leaders[0]
@@ -1921,11 +2018,14 @@ def build_mechanical_spotlight(
     title = _clip_editorial_label(display, max_len=40)
     ev = (rank_evidence or "").strip()
     if ev:
-        body = f"{ev}。"
+        body = f"{ev}." if _ACTIVE_REGION == "us" else f"{ev}。"
     elif category:
-        body = f"{category}で上位に入った。"
+        if _ACTIVE_REGION == "us":
+            body = f"Ranked high in {category}."
+        else:
+            body = f"{category}で上位に入った。"
     else:
-        body = "順位が動いた。"
+        body = "Ranks moved." if _ACTIVE_REGION == "us" else "順位が動いた。"
     return {
         "title": title or display[:40],
         "body": body,
@@ -1999,6 +2099,25 @@ def describe_rank_movement(ranks: dict[str, int]) -> str:
         return ""
     first_slot, first_rank = observed[0]
     last_slot, last_rank = observed[-1]
+    if _ACTIVE_REGION == "us":
+        if len(observed) == 1:
+            return f"Observed at {_format_slot_rank(first_slot, first_rank)}."
+        if len({r for _, r in observed}) == 1:
+            if first_slot != "07" and ranks.get("07") is None:
+                return (
+                    f"Surged from out@7 to {_format_slot_rank(first_slot, first_rank)} "
+                    f"and held {_format_slot_rank(last_slot, last_rank)}."
+                )
+            return (
+                f"Held {_format_slot_rank(first_slot, first_rank)} from "
+                f"{_slot_hour_label(first_slot)} through {_slot_hour_label(last_slot)}."
+            )
+        if last_rank < first_rank:
+            return (
+                f"Rose from {_format_slot_rank(first_slot, first_rank)} to "
+                f"{_format_slot_rank(last_slot, last_rank)}."
+            )
+        return f"Ranks: {_format_rank_evidence(ranks)}."
     if len(observed) == 1:
         return f"{_slot_hour_label(first_slot)}時{first_rank}位で観測。"
     if len({r for _, r in observed}) == 1:
@@ -2021,16 +2140,26 @@ def describe_rank_movement(ranks: dict[str, int]) -> str:
 
 def build_mechanical_rising_note(item: Dict[str, Any]) -> str:
     note = describe_rank_movement(_ranks_dict_from_item(item))
-    return note.rstrip("。") + "。" if note else ""
+    if not note:
+        return ""
+    if _ACTIVE_REGION == "us":
+        return note if note.endswith(".") else note + "."
+    return note.rstrip("。") + "。"
 
 
 def _rising_note_misstates_movement(note: str, ranks: dict[str, int]) -> bool:
     """「19時1位に上昇」等、実際より遅いスロットだけを強調する文言を検出。"""
-    m = _LATE_SLOT_IMPROVE_RE.search(note or "")
-    if not m:
-        return False
-    claimed_slot = _hour_to_slot(int(m.group(1)))
-    claimed_rank = int(m.group(2))
+    text = note or ""
+    m = _LATE_SLOT_IMPROVE_RE.search(text)
+    if m:
+        claimed_slot = _hour_to_slot(int(m.group(1)))
+        claimed_rank = int(m.group(2))
+    else:
+        m_en = re.search(r"#(\d+)@(\d+)", text)
+        if not m_en:
+            return False
+        claimed_rank = int(m_en.group(1))
+        claimed_slot = _hour_to_slot(int(m_en.group(2)))
     if claimed_slot not in DAYTIME_SLOTS:
         return False
     actual = ranks.get(claimed_slot)
@@ -2328,18 +2457,22 @@ SYSTEM_PROMPT_US = """You are the Trends Dashboard editor for the **U.S. page**.
 business_day in the JSON is the **observation day**. Readers usually get this the next morning.
 "Yesterday" = business_day.
 
+**Write all string values in English.** Category names in the input are already English
+(News, Search & Video, Tech, Market, Entertainment, Gov Data) — reuse them as-is; never
+insert Japanese category labels or phrases like 補足 / 圏外 / 時位.
+
 **Output JSON only** (no Markdown). Include:
 
 - `teaser` (string): free preview on the site. One sentence, **max 90 chars**. One topic only.
   Include the **first rising_highlights label** verbatim. Optionally short rank move in parentheses
   (e.g. out@7 → #1@19). Do not mention 2nd+ topics here.
 - `one_liner` (string): up to 3 sentences in **English**. Include **2+ rising_highlights labels** verbatim.
-  If a news category_leader exists and is not already in rising, include that label too.
+  If a News category_leader exists and is not already in rising, include that label too.
   Ban vague fillers ("trending", "gaining attention"). Do not force every category in.
-- `rising_notes` (array): `{ "match_label", "note" }` — one short note per rising label.
+- `rising_notes` (array): `{ "match_label", "note" }` — one short **English** note per rising label.
   Ban restating rank facts or stock phrases. Empty array if no rising_highlights.
-- `cross_intro` (string|null): 1–2 sentences only when cross_source_highlights is non-empty; else null.
-- `category_intros` (object): category name → one sentence. Prefer non-quiet categories.
+- `cross_intro` (string|null): 1–2 English sentences only when cross_source_highlights is non-empty; else null.
+- `category_intros` (object): English category name → one English sentence. Prefer non-quiet categories.
   Ban abstract-only copy without concrete labels.
 
 Forbidden:
@@ -2347,6 +2480,7 @@ Forbidden:
 - URLs or Markdown headings
 - Forecasts
 - Claiming multi-source overlap when cross_source_highlights is empty
+- Any Japanese UI words (補足, 検索・動画, 7時圏外, データなし, etc.)
 
 Stick to facts present in the input."""
 
@@ -2389,7 +2523,7 @@ def inject_rising_highlights(markdown: str, rising_body: str) -> str:
     if m:
         out = cleaned[: m.start(1)] + f"\n\n{body}\n" + cleaned[m.start(1) :]
     else:
-        meta_re = re.compile(r"(- \*\*生成・送信完了\*\*:[^\n]*\n)")
+        meta_re = re.compile(r"(- \*\*(?:生成・送信完了|Generated)\*\*:[^\n]*\n)")
         m2 = meta_re.search(cleaned)
         if m2:
             pos = m2.end()

@@ -61,7 +61,8 @@ def _top_n() -> int:
 
 
 def _exclude_market() -> bool:
-    return os.getenv("TREND_SNAPSHOT_EXCLUDE_MARKET", "true").lower() in (
+    # 既定 false: JP/US 株・暗号を日次サマリー用スナップショットに含める。
+    return os.getenv("TREND_SNAPSHOT_EXCLUDE_MARKET", "false").lower() in (
         "1",
         "true",
         "yes",

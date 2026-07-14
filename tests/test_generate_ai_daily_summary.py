@@ -26,6 +26,13 @@ def gads():
     return mod
 
 
+@pytest.fixture(autouse=True)
+def _reset_daily_region(gads):
+    gads.configure_daily_region("jp")
+    yield
+    gads.configure_daily_region("jp")
+
+
 def test_default_business_day_jst_is_yesterday(gads):
     from zoneinfo import ZoneInfo
 
@@ -1267,12 +1274,19 @@ def test_filter_rows_by_region_keeps_matching_series(gads):
     rows = [
         {"series_key": "nhk_jp", "label": "JP"},
         {"series_key": "hackernews_us", "label": "US"},
+        {"series_key": "crypto_global", "label": "BTC"},
         {"series_key": "unknown_key", "label": "??"},
     ]
     jp = gads.filter_rows_by_region(rows, "jp")
     us = gads.filter_rows_by_region(rows, "us")
-    assert [r["series_key"] for r in jp] == ["nhk_jp"]
-    assert [r["series_key"] for r in us] == ["hackernews_us"]
+    assert [r["series_key"] for r in jp] == ["nhk_jp", "crypto_global"]
+    assert [r["series_key"] for r in us] == ["hackernews_us", "crypto_global"]
+
+
+def test_series_region_stock_and_crypto(gads):
+    assert gads.series_region("stock_jp") == "jp"
+    assert gads.series_region("stock_us") == "us"
+    assert gads.series_region("crypto_global") == "global"
 
 
 def test_configure_daily_region_us_paths_and_headings(gads):
@@ -1286,3 +1300,60 @@ def test_configure_daily_region_us_paths_and_headings(gads):
     gads.configure_daily_region("jp")
     assert gads.daily_output_dir() == gads.DAILY_DIR
     assert "一行結論" in gads._ONE_LINER_HEADING
+
+
+def test_us_render_uses_english_labels_not_japanese(gads):
+    gads.configure_daily_region("us")
+    assert gads.category_display_name("ニュース") == "News"
+    assert gads.category_display_name("検索・動画") == "Search & Video"
+    assert gads._format_rank_evidence({"13": 1}) == "out@7 → #1@13 → out@19"
+    assert gads.describe_rank_movement({"13": 1, "19": 1}).startswith("Surged")
+
+    rising_md = gads.render_rising_highlights_markdown(
+        [
+            {
+                "label": "Lindsey Graham",
+                "link_line": "[Lindsey Graham](https://example.com)（Wikipedia (EN)）",
+            }
+        ],
+        [{"match_label": "Lindsey Graham", "note": "Held the top of Search & Video."}],
+    )
+    assert "**Note**:" in rising_md
+    assert "補足" not in rising_md
+
+    top3_md = gads.render_category_top3_markdown(
+        [
+            {"category": "News", "items": [], "quiet": True},
+            {
+                "category": "Search & Video",
+                "items": [
+                    {
+                        "label": "Lindsey Graham",
+                        "link_line": "[Lindsey Graham](https://example.com)"
+                        "（Wikipedia (EN) · out@7 → #1@13 → #1@19）",
+                    }
+                ],
+            },
+        ],
+        {"Search & Video": "Search interest clustered on politics."},
+    )
+    assert "- **News**: (no data)" in top3_md
+    assert "### Search & Video" in top3_md
+    assert "Yesterday's trend" in top3_md
+    assert "データなし" not in top3_md
+    assert "昨日の傾向" not in top3_md
+    assert "ニュース" not in top3_md
+    assert "検索・動画" not in top3_md
+
+
+def test_exclude_market_default_is_false():
+    import importlib.util
+
+    path = Path(__file__).resolve().parents[1] / "services" / "trend_snapshot_service.py"
+    spec = importlib.util.spec_from_file_location("trend_snapshot_service", path)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    # Avoid importing heavy deps; just eval the function body via reading source
+    text = path.read_text(encoding="utf-8")
+    assert 'TREND_SNAPSHOT_EXCLUDE_MARKET", "false"' in text
+    assert 'TREND_SNAPSHOT_EXCLUDE_MARKET", "true"' not in text

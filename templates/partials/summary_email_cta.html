@@ -2,6 +2,9 @@
    waitlist は準備中のため fake door（登録フォームは出さず案内のみ）。Bootstrap bundle だけで動作する。
    region ('jp'/'us') で日英を切り替える。 #}
 {% set cta_is_us = (region|default('jp')) == 'us' %}
+{# モーダル開閉時にスクロールバーが出没して横幅が変わると、一部環境で再描画のちらつきになる。
+   常にガター分を確保してリフローを防ぐ（このモーダルを含むサマリー系ページのみに適用）。 #}
+<style>html { scrollbar-gutter: stable; }</style>
 <div class="mt-3 d-flex flex-wrap align-items-center gap-2">
   <button type="button" class="btn btn-primary btn-sm" id="summary-email-cta"
       data-bs-toggle="modal" data-bs-target="#summaryEmailModal">
@@ -35,9 +38,14 @@
 
 <script>
 (function () {
+  var modal = document.getElementById('summaryEmailModal');
+  // Bootstrap 推奨: モーダルは body 直下に置く。card 内にネストしたままだと Mac Chrome 等で
+  // backdrop / フォーカスの取り合いにより開閉がちらつくため、初期化前に body へ移設する。
+  if (modal && modal.parentNode !== document.body) {
+    document.body.appendChild(modal);
+  }
   function ga(name) { if (typeof gtag === 'function') gtag('event', name, { location: 'summary_locked_email_cta' }); }
   var cta = document.getElementById('summary-email-cta');
-  var modal = document.getElementById('summaryEmailModal');
   if (cta) cta.addEventListener('click', function () { ga('ai_summary_top5_click'); });
   if (modal) modal.addEventListener('shown.bs.modal', function () { ga('fake_door_view'); });
 })();

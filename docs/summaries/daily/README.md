@@ -2,10 +2,17 @@
 
 [`generate_ai_daily_summary.py`](../../scripts/generate_ai_daily_summary.py) が（`--write` 時）、常に次の **2つを同じ `business_day`** で扱います。
 
+| `--region` | 出力ディレクトリ | 言語 |
+|------------|------------------|------|
+| `jp`（既定） | `docs/summaries/daily/` | 日本語 |
+| `us` | `docs/summaries/daily/us/` | 英語 |
+
 | ファイル | 内容 |
 |----------|------|
 | `YYYY-MM-DD.md` | OpenAI で生成した Markdown（成功時のみ上書き。**`generator: openai`** がフロントマターにあるのが AI 生成の目印）。構成は **一行結論・見どころ（AI、不整合時は機械補完）→ 急上昇3つ（機械+補足）→ 複数ソース重なり（機械・厳密一致）→ カテゴリ別トップ3（機械+区分1文）**（観測日＝ファイル名、読者は通常翌朝に受け取る）。`.generation.json` の `one_liner_source` / `spotlights_filled` で補完の有無を確認できる |
 | `YYYY-MM-DD.generation.json` | その回の **成否ログ**（成功なら `ok: true` と行数・モデル、失敗なら `ok: false` と `error` / `phase`） |
+
+スナップショットは `--region` に応じて日本／米国ソースに絞ります。フロントマターに `region: jp|us` を書き込みます。
 
 ## ファイル名の日付（観測日 = `business_day`）
 
@@ -25,6 +32,6 @@
 ## 運用
 
 - **スキャフォルドだけ**の `.md`（テンプレ文言のまま）は `generator` 行が無く、`.generation.json` も無いことが多いです。差分はここで判別できます。使わないプレースホルダは **削除してよい**（あとから `generate_ai_daily_summary.py --write --force --business-day …` で再生成できる）。
-- GitHub Actions **AI daily summary**（JST **06:50** 前後）は、既定で **JST 昨日** を `business_day` にして `docs/summaries/daily/` を更新します。失敗時も `.generation.json` をコミットしてからジョブを失敗扱いにします。
+- GitHub Actions **AI daily summary**（JST **06:50** 前後）は、既定で **JST 昨日** を `business_day` にして **jp → us** を直列生成します。失敗時も `.generation.json` をコミットしてからジョブを失敗扱いにします。
 
 親ドキュメント: [`docs/summaries/README.md`](../README.md)

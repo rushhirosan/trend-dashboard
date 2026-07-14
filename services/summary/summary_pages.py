@@ -367,17 +367,32 @@ def load_weekly_page(
     sections = _split_sections(body, "## ")
     flow_section = _find_section(sections, *_FLOW_KEYS)
     flow_subs = _split_sections(flow_section, "### ")
-    flow = {
-        "jp": render_inline(_join_paragraph(_find_section(flow_subs, *_JP_SUB_KEYS))),
-        "us": render_inline(_join_paragraph(_find_section(flow_subs, *_US_SUB_KEYS))),
-    }
+    if flow_subs:
+        flow = {
+            "jp": render_inline(_join_paragraph(_find_section(flow_subs, *_JP_SUB_KEYS))),
+            "us": render_inline(_join_paragraph(_find_section(flow_subs, *_US_SUB_KEYS))),
+        }
+    else:
+        # 単一地域ファイル: 「今週の流れ」直下に本文（### なし）
+        content = render_inline(_join_paragraph(flow_section))
+        flow = {
+            "jp": content if region == "jp" else Markup(""),
+            "us": content if region == "us" else Markup(""),
+        }
 
     rising_section = _find_section(sections, *_RISING_KEYS)
     rising_subs = _split_sections(rising_section, "### ")
-    rising = {
-        "jp": _parse_weekly_rising_item(_find_section(rising_subs, *_JP_SUB_KEYS)),
-        "us": _parse_weekly_rising_item(_find_section(rising_subs, *_US_SUB_KEYS)),
-    }
+    if rising_subs:
+        rising = {
+            "jp": _parse_weekly_rising_item(_find_section(rising_subs, *_JP_SUB_KEYS)),
+            "us": _parse_weekly_rising_item(_find_section(rising_subs, *_US_SUB_KEYS)),
+        }
+    else:
+        item = _parse_weekly_rising_item(rising_section)
+        rising = {
+            "jp": item if region == "jp" else None,
+            "us": item if region == "us" else None,
+        }
 
     locked = [
         _clean_title(title)

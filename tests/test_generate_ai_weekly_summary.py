@@ -478,20 +478,17 @@ def test_filter_weekly_search_video_pool_allows_core_sources_only(gaws):
     assert series <= {"google_trends_jp", "wikipedia_ja", "youtube_trends_jp"}
 
 
-def test_pick_regional_weekly_rising_skips_duplicate_across_regions(gaws):
+def test_pick_regional_weekly_rising_picks_top_for_active_region(gaws):
+    gaws.configure_weekly_region("jp")
     pools = {
         "jp": [
-            {"label": "Counter-Strike", "weekly_score": 100},
-            {"label": "League of Legends", "weekly_score": 90},
-        ],
-        "us": [
             {"label": "Counter-Strike", "weekly_score": 100},
             {"label": "League of Legends", "weekly_score": 90},
         ],
     }
     out = gaws.pick_regional_weekly_rising(pools)
     assert out["jp"][0]["label"] == "Counter-Strike"
-    assert out["us"][0]["label"] == "League of Legends"
+    assert "us" not in out or out.get("us") == []
 
 
 def test_aggregate_weekly_category_top3_prefers_multi_day(gaws):
@@ -602,12 +599,13 @@ def test_format_theme_display_line_uses_source_label(gaws):
     assert line == "[九州など非常に激しい雨のおそれ](https://example.com/rain)（NHK）"
 
 
-def test_assemble_weekly_markdown_includes_regional_sections(gaws):
+def test_assemble_weekly_markdown_jp_only(gaws):
+    gaws.configure_weekly_region("jp")
     mon = date(2026, 6, 8)
     sun = date(2026, 6, 14)
     editorial = {
         "flow_jp": "今週は日本のテスト話題が動いた。",
-        "flow_us": "今週は米国のテスト話題が動いた。",
+        "flow_us": "",
         "category_themes": {"jp": {}, "us": {}},
     }
     rising = {
@@ -619,17 +617,6 @@ def test_assemble_weekly_markdown_includes_regional_sections(gaws):
                 "jump_sum": 10.0,
                 "category": "ニュース",
                 "link_line": "[Rising JP](https://example.com/jp)",
-                "rank_evidence_by_day": {},
-            }
-        ],
-        "us": [
-            {
-                "label": "Rising US",
-                "days": ["2026-06-09"],
-                "day_count": 1,
-                "jump_sum": 9.0,
-                "category": "テック・開発",
-                "link_line": "[Rising US](https://example.com/us)",
                 "rank_evidence_by_day": {},
             }
         ],
@@ -650,33 +637,52 @@ def test_assemble_weekly_markdown_includes_regional_sections(gaws):
                 ],
             }
         ],
+    }
+    md = gaws.assemble_weekly_markdown(
+        "2026-W24", mon, sun, editorial, rising, category, meta
+    )
+    assert "🇯🇵 日本" not in md
+    assert "🇺🇸" not in md
+    assert "今週いちばん動いた話題" in md
+    assert "カテゴリ別 — 今週の top3" in md
+    assert "Rising JP" in md
+    assert "[Cat JP](https://example.com/cat)" in md
+    assert "今週は日本のテスト話題が動いた。" in md
+    assert "複数ソースで週を通じて重なった話題" not in md
+
+
+def test_assemble_weekly_markdown_us_english(gaws):
+    gaws.configure_weekly_region("us")
+    mon = date(2026, 6, 8)
+    sun = date(2026, 6, 14)
+    editorial = {
+        "flow_jp": "",
+        "flow_us": "U.S. tech topics moved this week.",
+        "category_themes": {"jp": {}, "us": {}},
+    }
+    rising = {
         "us": [
             {
+                "label": "Rising US",
+                "days": ["2026-06-09"],
+                "day_count": 1,
+                "jump_sum": 9.0,
                 "category": "テック・開発",
-                "items": [
-                    {
-                        "label": "Cat US",
-                        "day_count": 1,
-                        "best_rank": 1,
-                        "link_line": "[Cat US](https://example.com/uscat)",
-                    }
-                ],
+                "link_line": "[Rising US](https://example.com/us)",
+                "rank_evidence_by_day": {},
             }
         ],
     }
+    category = {"us": []}
     meta = {"missing_snapshot_dates": [], "partial_snapshot_dates": [], "missing_dates": []}
     md = gaws.assemble_weekly_markdown(
         "2026-W24", mon, sun, editorial, rising, category, meta
     )
-    assert "🇯🇵 日本" in md
-    assert "🇺🇸 アメリカ" in md
-    assert "今週いちばん動いた話題" in md
-    assert "（各1件）" not in md
-    assert "カテゴリ別 — 今週の top3" in md
-    assert "Rising JP" in md
-    assert "[Cat JP](https://example.com/cat)" in md
-    assert "[Cat US](https://example.com/uscat)" in md
-    assert "複数ソースで週を通じて重なった話題" not in md
+    assert "Weekly summary" in md
+    assert "Week in review" in md
+    assert "U.S. tech topics moved this week." in md
+    assert "Biggest movers this week" in md
+    gaws.configure_weekly_region("jp")  # restore for other tests
     assert "来週に残る論点" not in md
     assert "ソース一覧" not in md
     assert "週のホットトピック" not in md
@@ -694,18 +700,17 @@ def test_openai_api_key_prefers_openai_api_key(monkeypatch, gaws):
     assert gaws.openai_api_key() == "sk-primary"
 
 
-def test_build_mechanical_llm_payload_splits_regions(gaws):
+def test_build_mechanical_llm_payload_active_region_only(gaws):
+    gaws.configure_weekly_region("jp")
     rising = {
         "jp": [{"label": "JP Topic", "day_count": 1, "jump_sum": 5.0, "days": ["2026-06-08"]}],
-        "us": [{"label": "US Topic", "day_count": 1, "jump_sum": 4.0, "days": ["2026-06-09"]}],
     }
-    cross = {"jp": [], "us": []}
+    cross = {"jp": []}
     category = {
         "jp": [{"category": "ニュース", "items": [{"label": "JP Cat"}], "pool": [], "quiet": False}],
-        "us": [{"category": "ニュース", "items": [], "pool": [], "quiet": True}],
     }
     payload = gaws.build_mechanical_llm_payload(rising, cross, category)
     assert "regions" in payload
     assert payload["regions"]["jp"]["weekly_rising"][0]["label"] == "JP Topic"
-    assert payload["regions"]["us"]["weekly_rising"][0]["label"] == "US Topic"
+    assert "us" not in payload["regions"]
     assert payload["regions"]["jp"]["weekly_category_pool"][0]["category"] == "ニュース"

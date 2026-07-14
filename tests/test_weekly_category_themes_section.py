@@ -120,10 +120,18 @@ def test_format_theme_display_line_never_uses_abstract_title(gaws):
 
 
 def test_parse_editorial_json_category_themes_optional(gaws):
+    gaws.configure_weekly_region("jp")
     raw = """{
-      "flow_jp": "jp flow",
-      "flow_us": "us flow"
+      "flow_jp": "jp flow"
     }"""
     data = gaws.parse_editorial_json(raw)
     assert data["flow_jp"] == "jp flow"
     assert data["category_themes"]["jp"] == {}
+
+
+def test_parse_editorial_json_us_flow(gaws):
+    gaws.configure_weekly_region("us")
+    raw = """{"flow_us": "us flow english"}"""
+    data = gaws.parse_editorial_json(raw)
+    assert data["flow_us"] == "us flow english"
+    gaws.configure_weekly_region("jp")

@@ -52,8 +52,31 @@ WEEKLY_CATEGORY_TOP_N = 3
 WEEKLY_CATEGORY_POOL_LLM_MAX = 20
 WEEKLY_CATEGORY_SCORE_DAY = 10
 WEEKLY_CATEGORY_SCORE_CROSS = 15
-WEEKLY_REGIONS = ("jp", "us")
-WEEKLY_REGION_LABELS = {"jp": "🇯🇵 日本", "us": "🇺🇸 アメリカ"}
+# 既定は日本語ページ向け（日本ソースのみ）。US は --region us で別生成。
+WEEKLY_REGIONS = ("jp",)
+WEEKLY_REGION_LABELS = {"jp": "🇯🇵 日本", "us": "🇺🇸 United States"}
+_ACTIVE_REGION = "jp"
+
+
+def configure_weekly_region(region: str) -> None:
+    """生成対象地域を切り替え（jp → weekly/、us → weekly/us/）。"""
+    global WEEKLY_REGIONS, _ACTIVE_REGION
+    r = (region or "jp").strip().lower()
+    if r not in ("jp", "us"):
+        r = "jp"
+    _ACTIVE_REGION = r
+    WEEKLY_REGIONS = (r,)
+
+
+def weekly_output_dir() -> Path:
+    return WEEKLY_DIR if _ACTIVE_REGION == "jp" else WEEKLY_DIR / "us"
+
+
+def weekly_daily_assist_dir(override: Optional[Path] = None) -> Path:
+    """週次の補助コンテキスト用日次ディレクトリ（同地域の日次を読む）。"""
+    if override is not None:
+        return override
+    return DAILY_DIR if _ACTIVE_REGION == "jp" else DAILY_DIR / "us"
 # 週次 rising スコア（jump 同率時の tie-break 用）
 WEEKLY_SCORE_DAY = 10
 WEEKLY_SCORE_SLOT = 5
@@ -1099,15 +1122,27 @@ def render_weekly_category_markdown(
     weekly_category: Dict[str, List[Dict[str, Any]]],
     editorial: Dict[str, Any],
 ) -> str:
-    lines: List[str] = [_WEEKLY_CATEGORY_HEADING, ""]
+    empty_msg = (
+        "(No notable category topics this week.)"
+        if _ACTIVE_REGION == "us"
+        else "（今週、カテゴリ別の注目話題は見つかりませんでした）"
+    )
+    heading = (
+        "## 📊 Category top3 this week"
+        if _ACTIVE_REGION == "us"
+        else _WEEKLY_CATEGORY_HEADING
+    )
+    lines: List[str] = [heading, ""]
     any_items = False
+    single_region = len(WEEKLY_REGIONS) == 1
     for region in WEEKLY_REGIONS:
         blocks = weekly_category.get(region) or []
         theme_blocks = resolve_region_category_themes(region, editorial, blocks)
-        lines.append(f"### {WEEKLY_REGION_LABELS[region]}")
-        lines.append("")
+        if not single_region:
+            lines.append(f"### {WEEKLY_REGION_LABELS[region]}")
+            lines.append("")
         if not theme_blocks:
-            lines.append("（今週、カテゴリ別の注目話題は見つかりませんでした）")
+            lines.append(empty_msg)
             lines.append("")
             continue
         any_items = True
@@ -1123,10 +1158,7 @@ def render_weekly_category_markdown(
                     lines.append(evidence)
                 lines.append("")
     if not any_items:
-        return (
-            f"{_WEEKLY_CATEGORY_HEADING}\n\n"
-            "（今週、カテゴリ別の注目話題は見つかりませんでした）\n"
-        )
+        return f"{heading}\n\n{empty_msg}\n"
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -1225,14 +1257,26 @@ def _compact_weekly_link_line(item: Dict[str, Any]) -> str:
 def render_weekly_rising_markdown(
     weekly_rising: Dict[str, List[Dict[str, Any]]],
 ) -> str:
-    lines: List[str] = [_WEEKLY_RISING_HEADING, ""]
+    heading = (
+        "## 📈 Biggest movers this week"
+        if _ACTIVE_REGION == "us"
+        else _WEEKLY_RISING_HEADING
+    )
+    empty_msg = (
+        "(No big rank movers this week.)"
+        if _ACTIVE_REGION == "us"
+        else "（今週、順位が大きく動いた話題は見つかりませんでした）"
+    )
+    lines: List[str] = [heading, ""]
     any_items = False
+    single_region = len(WEEKLY_REGIONS) == 1
     for region in WEEKLY_REGIONS:
         items = weekly_rising.get(region) or []
-        lines.append(f"### {WEEKLY_REGION_LABELS[region]}")
-        lines.append("")
+        if not single_region:
+            lines.append(f"### {WEEKLY_REGION_LABELS[region]}")
+            lines.append("")
         if not items:
-            lines.append("（今週、順位が大きく動いた話題は見つかりませんでした）")
+            lines.append(empty_msg)
             lines.append("")
             continue
         any_items = True
@@ -1245,10 +1289,7 @@ def render_weekly_rising_markdown(
             lines.append(movement.rstrip())
         lines.append("")
     if not any_items:
-        return (
-            f"{_WEEKLY_RISING_HEADING}\n\n"
-            "（今週、順位が大きく動いた話題は見つかりませんでした）\n"
-        )
+        return f"{heading}\n\n{empty_msg}\n"
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -1313,9 +1354,16 @@ def parse_editorial_json(raw: str) -> Dict[str, Any]:
         raise ValueError("editorial JSON must be an object")
 
     flow_jp = str(data.get("flow_jp") or data.get("flow") or "").strip()
-    flow_us = str(data.get("flow_us") or "").strip()
-    if not flow_jp and not flow_us:
-        raise ValueError("editorial JSON missing flow_jp / flow_us")
+    flow_us = str(data.get("flow_us") or data.get("flow") or "").strip()
+    # 地域別キーがあれば優先。単一 region 生成では flow も受け付ける。
+    if _ACTIVE_REGION == "us":
+        if not flow_us and not flow_jp:
+            raise ValueError("editorial JSON missing flow_us / flow")
+        if not flow_us:
+            flow_us = flow_jp
+    else:
+        if not flow_jp:
+            raise ValueError("editorial JSON missing flow_jp / flow")
 
     return {
         "flow_jp": flow_jp,
@@ -1336,26 +1384,39 @@ def assemble_weekly_markdown(
     weekly_category: Dict[str, List[Dict[str, Any]]],
     meta: Dict[str, Any],
 ) -> str:
-    lines: List[str] = [
-        f"# 週次サマリー — {iso_week}（対象週 JST {mon.isoformat()}〜{sun.isoformat()}）",
-        f"- **対象週**: {mon.isoformat()} 〜 {sun.isoformat()}",
-        "- **生成・送信完了**: 自動生成（時刻未入力）",
-        "",
-        "## 今週の流れ（短文）",
-        "",
-        f"### {WEEKLY_REGION_LABELS['jp']}",
-        "",
-        (editorial.get("flow_jp") or "（日本向けの週次要約を生成できませんでした）").strip(),
-        "",
-        f"### {WEEKLY_REGION_LABELS['us']}",
-        "",
-        (editorial.get("flow_us") or "（アメリカ向けの週次要約を生成できませんでした）").strip(),
-        "",
-        render_weekly_rising_markdown(weekly_rising).rstrip(),
-        "",
-        render_weekly_category_markdown(weekly_category, editorial).rstrip(),
-        "",
-    ]
+    if _ACTIVE_REGION == "us":
+        title = f"# Weekly summary — {iso_week} (observation week JST {mon.isoformat()}–{sun.isoformat()})"
+        meta_lines = [
+            f"- **Week**: {mon.isoformat()} – {sun.isoformat()} (JST)",
+            "- **Generated**: automatic (time not filled)",
+            "",
+            "## Week in review",
+            "",
+            (editorial.get("flow_us") or editorial.get("flow_jp") or "(Could not generate the U.S. weekly brief.)").strip(),
+            "",
+        ]
+    else:
+        title = f"# 週次サマリー — {iso_week}（対象週 JST {mon.isoformat()}〜{sun.isoformat()}）"
+        meta_lines = [
+            f"- **対象週**: {mon.isoformat()} 〜 {sun.isoformat()}",
+            "- **生成・送信完了**: 自動生成（時刻未入力）",
+            "",
+            "## 今週の流れ（短文）",
+            "",
+            # 日本語ページは日本ソースのみ。地域サブ見出しは付けず単一フローにする。
+            (editorial.get("flow_jp") or "（日本向けの週次要約を生成できませんでした）").strip(),
+            "",
+        ]
+
+    lines: List[str] = [title, *meta_lines]
+    lines.extend(
+        [
+            render_weekly_rising_markdown(weekly_rising).rstrip(),
+            "",
+            render_weekly_category_markdown(weekly_category, editorial).rstrip(),
+            "",
+        ]
+    )
     premise = render_data_premise(meta)
     if premise:
         lines.append(premise.rstrip())
@@ -1432,6 +1493,7 @@ reviewer: ""
 reviewed_at: ""
 generator: openai
 model: "{model}"
+region: "{_ACTIVE_REGION}"
 input_mode: "{meta.get('input_mode', 'snapshots')}"
 snapshot_days_found: {snap_found}
 snapshot_days_expected: 7
@@ -1449,12 +1511,11 @@ generated_at: "{gen_at}"
 
 
 EDITORIAL_SYSTEM_PROMPT = """あなたはトレンドダッシュボードの週次サマリー編集者だ。
-入力 JSON の weekly_mechanical.regions.{jp,us}.weekly_category_pool がカテゴリ別候補の正本。
+入力 JSON の weekly_mechanical.regions.jp.weekly_category_pool がカテゴリ別候補の正本。
 各候補は「その週のうち1日以上、日次カテゴリ top3 に入ったラベル」。
 daily_summaries があれば補助。新しい URL・ラベル・事実を捏造しない。
 
-このダッシュボードは **日本ページ** と **アメリカページ** の2地域を扱う。
-週次サマリーも必ず両地域を対称に扱う（片方だけの要約は禁止）。
+この原稿は **日本ページ向け**（日本ソースのみ）。アメリカソースは扱わない。
 
 weekly_rising は「週内で最もジャンプした1件」の参考程度。
 Twitch 等の定番ゲーム配信だけで flow を書かない（カテゴリ pool を優先）。
@@ -1463,11 +1524,30 @@ Twitch 等の定番ゲーム配信だけで flow を書かない（カテゴリ 
 flow では pool の **具体ラベル・固有名詞** をそのまま引用すること。
 「エンタメの話題」「トレンドの検索」「新技術の導入」のような抽象表現は禁止。
 
-**出力は JSON オブジェクトのみ**（Markdown 不可）。キーは次の2つのみ:
+**出力は JSON オブジェクトのみ**（Markdown 不可）。キーは次のみ:
 - `flow_jp` (string): 3〜5文・日本語。複数カテゴリに触れる週次ストーリー。pool の label を具体名で引用。
-- `flow_us` (string): 3〜5文・**必ず日本語**（米国向けソースの固有名詞・label は英語のままでよい）。
 
 禁止: 入力に無いラベル・URL・未来予測・Markdown 見出し・抽象カテゴリ名だけの記述。"""
+
+
+EDITORIAL_SYSTEM_PROMPT_US = """You are the weekly-brief editor for the Trends Dashboard (U.S. page).
+The source of truth is weekly_mechanical.regions.us.weekly_category_pool in the input JSON.
+Each candidate label appeared in the daily category top3 on at least one day that week.
+daily_summaries are optional assist context. Do not invent URLs, labels, or facts.
+
+This brief is **U.S. page only** (U.S. sources). Do not summarize Japan-only sources.
+
+weekly_rising is only a hint (the single biggest jump of the week).
+Do not write the flow around evergreen Twitch titles alone; prefer the category pool.
+
+Category top3 lists are machine-generated (labels shown as links).
+In flow, quote concrete labels/proper nouns from the pool.
+Ban vague phrases like "entertainment topics" or "tech adoption" without labels.
+
+**Output JSON only** (no Markdown). Keys:
+- `flow_us` (string): 3–5 sentences in **English**. Multi-category weekly story; quote pool labels by name.
+
+Forbidden: labels/URLs not in input, forecasts, Markdown headings, abstract category-only prose."""
 
 
 LEGACY_SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ。入力は、ある1週間（ISO 週・月曜始まり）
@@ -1535,7 +1615,8 @@ def run_generate_snapshots(
             "\n--- 以下、日次サマリー Markdown（補助。欠損あり） ---\n\n" + daily_text
         )
     user = "\n".join(user_parts)
-    raw = call_openai(EDITORIAL_SYSTEM_PROMPT, user, api_key, model, json_mode=True)
+    system = EDITORIAL_SYSTEM_PROMPT_US if _ACTIVE_REGION == "us" else EDITORIAL_SYSTEM_PROMPT
+    raw = call_openai(system, user, api_key, model, json_mode=True)
     editorial = parse_editorial_json(raw)
     warnings: List[str] = []
     for region in WEEKLY_REGIONS:
@@ -1615,6 +1696,12 @@ def main() -> int:
     p.add_argument("--write", action="store_true", help="Write docs/summaries/weekly/{ISO}.md")
     p.add_argument("--force", action="store_true", help="Overwrite existing file")
     p.add_argument(
+        "--region",
+        choices=("jp", "us"),
+        default="jp",
+        help="jp → weekly/ (Japanese). us → weekly/us/ (English)",
+    )
+    p.add_argument(
         "--daily-only",
         action="store_true",
         help="Legacy: use daily Markdown only (no snapshots)",
@@ -1634,6 +1721,7 @@ def main() -> int:
     p.add_argument("--connect-timeout", type=int, default=20)
     p.add_argument("--request-timeout", type=int, default=120)
     args = p.parse_args()
+    configure_weekly_region(args.region)
 
     if args.weekly_for_date:
         anchor = date.fromisoformat(args.weekly_for_date)
@@ -1643,7 +1731,7 @@ def main() -> int:
 
     week_sun = week_mon + timedelta(days=6)
     stem = iso_week_stem(week_mon)
-    daily_dir = args.daily_dir if args.daily_dir is not None else DAILY_DIR
+    daily_dir = weekly_daily_assist_dir(args.daily_dir)
 
     database_url = (os.getenv("DATABASE_URL") or "").strip()
     api_key = openai_api_key()
@@ -1745,7 +1833,7 @@ def main() -> int:
         print(text)
         return 0
 
-    out = WEEKLY_DIR / f"{stem}.md"
+    out = weekly_output_dir() / f"{stem}.md"
     out.parent.mkdir(parents=True, exist_ok=True)
     if out.exists() and not args.force:
         print(f"skip (exists): {out.relative_to(REPO_ROOT)}", file=sys.stderr)

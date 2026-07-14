@@ -104,12 +104,14 @@
                 <section class="card shadow-sm mb-4">
                     <div class="card-body p-4">
                         <h2 class="h5 mb-3">{% if is_us %}The week in review{% else %}今週の流れ{% endif %}</h2>
-                        {% if page.flow.jp %}
+                        {% if page.flow.jp and page.flow.us %}
                         <h3 class="h6 mb-2">🇯🇵 {% if is_us %}Japan{% else %}日本{% endif %}</h3>
                         <p class="mb-3">{{ page.flow.jp }}</p>
-                        {% endif %}
-                        {% if page.flow.us %}
                         <h3 class="h6 mb-2">🇺🇸 {% if is_us %}United States{% else %}アメリカ{% endif %}</h3>
+                        <p class="mb-0">{{ page.flow.us }}</p>
+                        {% elif page.flow.jp %}
+                        <p class="mb-0">{{ page.flow.jp }}</p>
+                        {% elif page.flow.us %}
                         <p class="mb-0">{{ page.flow.us }}</p>
                         {% endif %}
                     </div>
@@ -119,17 +121,27 @@
                 <section class="card shadow-sm mb-4">
                     <div class="card-body p-4">
                         <h2 class="h5 mb-3"><i class="fas fa-arrow-trend-up text-primary me-2"></i>{% if is_us %}Biggest movers this week{% else %}今週いちばん動いた話題{% endif %}</h2>
-                        {% if page.rising.jp %}
+                        {% if page.rising.jp and page.rising.us %}
                         <div class="mb-3">
                             <h3 class="h6 mb-1">🇯🇵 {% if is_us %}Japan{% else %}日本{% endif %}</h3>
                             <div>{{ page.rising.jp.title_html }}</div>
                             {% if page.rising.jp.source %}<div class="small text-muted">{{ page.rising.jp.source }}</div>{% endif %}
                             {% if page.rising.jp.move_html %}<div class="small text-secondary mt-1">{{ page.rising.jp.move_html }}</div>{% endif %}
                         </div>
-                        {% endif %}
-                        {% if page.rising.us %}
                         <div class="mb-0">
                             <h3 class="h6 mb-1">🇺🇸 {% if is_us %}United States{% else %}アメリカ{% endif %}</h3>
+                            <div>{{ page.rising.us.title_html }}</div>
+                            {% if page.rising.us.source %}<div class="small text-muted">{{ page.rising.us.source }}</div>{% endif %}
+                            {% if page.rising.us.move_html %}<div class="small text-secondary mt-1">{{ page.rising.us.move_html }}</div>{% endif %}
+                        </div>
+                        {% elif page.rising.jp %}
+                        <div class="mb-0">
+                            <div>{{ page.rising.jp.title_html }}</div>
+                            {% if page.rising.jp.source %}<div class="small text-muted">{{ page.rising.jp.source }}</div>{% endif %}
+                            {% if page.rising.jp.move_html %}<div class="small text-secondary mt-1">{{ page.rising.jp.move_html }}</div>{% endif %}
+                        </div>
+                        {% elif page.rising.us %}
+                        <div class="mb-0">
                             <div>{{ page.rising.us.title_html }}</div>
                             {% if page.rising.us.source %}<div class="small text-muted">{{ page.rising.us.source }}</div>{% endif %}
                             {% if page.rising.us.move_html %}<div class="small text-secondary mt-1">{{ page.rising.us.move_html }}</div>{% endif %}
@@ -149,7 +161,7 @@
                             {% for label in page.locked_sections %}
                             <li class="mb-1">{{ label }}</li>
                             {% endfor %}
-                            <li class="mb-1">{% if is_us %}Within-week rank moves (day-by-day, Japan / U.S.){% else %}週内の順位推移（日別の並び・日本／米国）{% endif %}</li>
+                            <li class="mb-1">{% if is_us %}Within-week rank moves (day-by-day){% else %}週内の順位推移（日別の並び）{% endif %}</li>
                         </ul>
                         <p class="small text-muted mb-0">
                             {% if is_us %}Full weekly briefs are planned to be delivered by email at a set time each week (paid, launch TBD).{% else %}週次の全文は、毎週決まった時間にメールでお届けする予定です（有料・開始時期未定）。{% endif %}

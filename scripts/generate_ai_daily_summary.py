@@ -58,6 +58,39 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 DAILY_DIR = REPO_ROOT / "docs" / "summaries" / "daily"
+_ACTIVE_REGION = "jp"
+
+
+def configure_daily_region(region: str) -> None:
+    """生成対象地域を切り替え（jp → daily/、us → daily/us/）。見出し・プロンプトも切り替える。"""
+    global _ACTIVE_REGION, _RISING_HEADING, _CROSS_HEADING_PREFIX, _CROSS_NONE_LINE
+    global _TOP3_HEADING, _ONE_LINER_HEADING, _NOTABLE_HEADING
+    r = (region or "jp").strip().lower()
+    if r not in ("jp", "us"):
+        r = "jp"
+    _ACTIVE_REGION = r
+    if r == "us":
+        _RISING_HEADING = "## 📈 Biggest movers yesterday"
+        _CROSS_HEADING_PREFIX = "## Topics that overlapped across sources"
+        _CROSS_NONE_LINE = "(No clear multi-source overlaps on this observation day.)"
+        _TOP3_HEADING = "## 📊 Category top3"
+        _ONE_LINER_HEADING = "## Yesterday's takeaway"
+        _NOTABLE_HEADING = "## 💡 What stood out yesterday"
+    else:
+        _RISING_HEADING = "## 📈 昨日いちばん動いた3つ"
+        _CROSS_HEADING_PREFIX = "## 複数ソースで重なった話題"
+        _CROSS_NONE_LINE = (
+            "該当なし（独立した取得元を2つ以上またいだ同一トピックはありませんでした）"
+        )
+        _TOP3_HEADING = "## 📊 カテゴリ別トップ3"
+        _ONE_LINER_HEADING = "## 昨日の一行結論"
+        _NOTABLE_HEADING = "## 💡 昨日特異だったこと"
+
+
+def daily_output_dir() -> Path:
+    return DAILY_DIR if _ACTIVE_REGION == "jp" else DAILY_DIR / "us"
+
+
 BASE_DEFAULT = "https://trends-dashboard.fly.dev"
 
 SLOT_ORDER = ("07", "13", "19", "01")
@@ -521,8 +554,14 @@ def _ascii_ratio(text: str) -> float:
 
 
 def _series_pref_score(series_key: str) -> int:
-    """JP 向け読者向け系列を優先（大きいほど良い）。"""
+    """読者向け系列を優先（大きいほど良い）。地域に応じて JP/US を優先。"""
     sk = (series_key or "").lower()
+    if _ACTIVE_REGION == "us":
+        if sk.endswith("_us") or "_us_" in sk:
+            return 3
+        if sk.endswith("_jp") or "_jp_" in sk:
+            return 0
+        return 1
     if sk.endswith("_jp") or "_jp_" in sk:
         return 3
     if sk.endswith("_us") or "_us_" in sk:
@@ -1601,6 +1640,14 @@ def _format_business_day_ja(business_day: date) -> str:
 
 def render_header_markdown(business_day: date) -> str:
     bd = business_day.isoformat()
+    if _ACTIVE_REGION == "us":
+        return "\n".join(
+            [
+                f"# Daily summary — {bd} (JST)",
+                f"- **Observation day**: {bd}",
+                "- **Generated**: automatic (time not filled)",
+            ]
+        )
     ja = _format_business_day_ja(business_day)
     return "\n".join(
         [
@@ -1637,16 +1684,27 @@ def build_llm_payload(
         rising_items, cross_items, top3_blocks, rows
     )
     quiet_editorial = detect_quiet_editorial_categories(top3_blocks)
-    return {
-        "business_day": business_day.isoformat(),
-        "reader_context": (
+    if _ACTIVE_REGION == "us":
+        reader_context = (
+            "Edit trends for business_day. Readers usually get this the next morning. "
+            '"Yesterday" = business_day. No forecasts. '
+            "rank_evidence shows 07→13→19 daytime moves (including out of list). "
+            "one_liner must include 2+ rising_highlights labels verbatim; "
+            "also include a news category_leader when not already in rising. "
+            "Do not output URLs."
+        )
+    else:
+        reader_context = (
             "観測日（business_day）のトレンドを編集する。読者は通常翌朝に受け取る。"
             "「昨日」= business_day。未来予測は禁止。"
             "候補の rank_evidence は 07→13→19 の一日推移（圏外含む）。"
             "one_liner は rising_highlights の label を2件以上そのまま含め、"
             "ニュースの category_leader があればそれも含める（未達なら機械文に差し替えられる）。"
             "URL は出力しない。"
-        ),
+        )
+    return {
+        "business_day": business_day.isoformat(),
+        "reader_context": reader_context,
         "editorial_candidates": editorial_candidates,
         "quiet_editorial_categories": quiet_editorial,
         "quiet_category_examples": quiet_category_examples(top3_blocks),
@@ -1760,7 +1818,38 @@ def build_mechanical_one_liner(
     cross_items: List[Dict[str, Any]],
 ) -> str:
     """データだけから組み立てる一行結論（LLM 不整合時のフォールバック）。"""
-    sentences: List[str] = []
+    if _ACTIVE_REGION == "us":
+        sentences: List[str] = []
+        if cross_items:
+            lab = _clip_editorial_label(str(cross_items[0].get("label") or ""))
+            ev = str(cross_items[0].get("rank_evidence") or "").strip()
+            if lab:
+                sentences.append(
+                    f"「{lab}」 overlapped across sources{f' ({ev})' if ev else ''}."
+                )
+        labels = [
+            f"「{_clip_editorial_label(str(r.get('label') or ''))}」"
+            for r in rising_items[:3]
+            if str(r.get("label") or "").strip()
+        ]
+        if labels:
+            if len(labels) == 1:
+                sentences.append(f"The biggest mover was {labels[0]}.")
+            else:
+                sentences.append(
+                    f"Biggest movers: {', '.join(labels[:-1])}, and {labels[-1]}."
+                )
+        if not sentences:
+            return (
+                f"Across {DAYTIME_SLOTS_ARROW}, rank jumps were limited. "
+                "Category leaders are listed below."
+            )
+        out = " ".join(sentences)
+        if len(out) > _MECHANICAL_ONE_LINER_MAX:
+            out = out[: _MECHANICAL_ONE_LINER_MAX - 1].rstrip() + "…"
+        return out
+
+    sentences = []
 
     if cross_items:
         lab = _clip_editorial_label(str(cross_items[0].get("label") or ""))
@@ -2197,6 +2286,7 @@ reviewer: ""
 reviewed_at: ""
 generator: openai
 model: "{model}"
+region: "{_ACTIVE_REGION}"
 business_day: "{business_day.isoformat()}"
 snapshot_slots_included: ["07", "13", "19", "01"]
 generated_at: "{gen_at}"
@@ -2232,6 +2322,33 @@ SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ�
 - cross_source_highlights が空なのに「複数ソースで重なった」と書くこと
 
 事実: 入力に無いことは断定しない。"""
+
+
+SYSTEM_PROMPT_US = """You are the Trends Dashboard editor for the **U.S. page**.
+business_day in the JSON is the **observation day**. Readers usually get this the next morning.
+"Yesterday" = business_day.
+
+**Output JSON only** (no Markdown). Include:
+
+- `teaser` (string): free preview on the site. One sentence, **max 90 chars**. One topic only.
+  Include the **first rising_highlights label** verbatim. Optionally short rank move in parentheses
+  (e.g. out@7 → #1@19). Do not mention 2nd+ topics here.
+- `one_liner` (string): up to 3 sentences in **English**. Include **2+ rising_highlights labels** verbatim.
+  If a news category_leader exists and is not already in rising, include that label too.
+  Ban vague fillers ("trending", "gaining attention"). Do not force every category in.
+- `rising_notes` (array): `{ "match_label", "note" }` — one short note per rising label.
+  Ban restating rank facts or stock phrases. Empty array if no rising_highlights.
+- `cross_intro` (string|null): 1–2 sentences only when cross_source_highlights is non-empty; else null.
+- `category_intros` (object): category name → one sentence. Prefer non-quiet categories.
+  Ban abstract-only copy without concrete labels.
+
+Forbidden:
+- Inventing labels/facts not in editorial_candidates / rising / cross
+- URLs or Markdown headings
+- Forecasts
+- Claiming multi-source overlap when cross_source_highlights is empty
+
+Stick to facts present in the input."""
 
 _MACHINE_DIGEST_HEADINGS = (
     _RISING_HEADING,
@@ -2325,11 +2442,19 @@ def run_generate(
         top3_blocks=top3_blocks,
     )
     bd = business_day.isoformat()
-    user = (
-        f"business_day={bd}。観測日は {bd}。「昨日」= {bd}。\n\n"
-        + build_user_payload(payload)
-    )
-    raw_editorial = call_openai(SYSTEM_PROMPT, user, api_key, model, json_mode=True)
+    if _ACTIVE_REGION == "us":
+        user = (
+            f"business_day={bd}. Observation day is {bd}. \"Yesterday\" = {bd}.\n\n"
+            + build_user_payload(payload)
+        )
+        system = SYSTEM_PROMPT_US
+    else:
+        user = (
+            f"business_day={bd}。観測日は {bd}。「昨日」= {bd}。\n\n"
+            + build_user_payload(payload)
+        )
+        system = SYSTEM_PROMPT
+    raw_editorial = call_openai(system, user, api_key, model, json_mode=True)
     editorial = parse_editorial_json(raw_editorial)
     editorial, fin_trace = finalize_editorial(
         editorial,
@@ -2392,6 +2517,12 @@ def main() -> int:
     )
     p.add_argument("--force", action="store_true", help="Overwrite existing file")
     p.add_argument(
+        "--region",
+        choices=("jp", "us"),
+        default="jp",
+        help="jp → daily/ (Japanese). us → daily/us/ (English)",
+    )
+    p.add_argument(
         "--connect-timeout",
         type=int,
         default=20,
@@ -2415,6 +2546,7 @@ def main() -> int:
         help="HTTP timeout seconds for --from-api snapshot fetch",
     )
     args = p.parse_args()
+    configure_daily_region(args.region)
 
     if args.business_day:
         bd = date.fromisoformat(args.business_day)
@@ -2432,7 +2564,7 @@ def main() -> int:
         """``--write`` かつ dry-run でないときだけ sidecar JSON を書く。"""
         if not args.write or args.dry_run:
             return
-        p = write_generation_status(bd, ok=ok, **fields)
+        p = write_generation_status(bd, ok=ok, daily_dir=daily_output_dir(), **fields)
         print(f"wrote status {p.relative_to(REPO_ROOT)}", file=sys.stderr)
 
     via_http = use_http_snapshots(cli_from_api=args.from_api, database_url=database_url)
@@ -2467,6 +2599,8 @@ def main() -> int:
             print(f"❌ DB スナップショット取得失敗: {e}", file=sys.stderr)
             emit_status(False, phase="snapshot_db", error=str(e))
             return 1
+
+    rows = filter_rows_by_region(rows, _ACTIVE_REGION)
 
     if not rows:
         if via_http:
@@ -2533,7 +2667,7 @@ def main() -> int:
         print(text)
         return 0
 
-    out = DAILY_DIR / f"{bd.isoformat()}.md"
+    out = daily_output_dir() / f"{bd.isoformat()}.md"
     out.parent.mkdir(parents=True, exist_ok=True)
     if out.exists() and not args.force:
         print(f"skip (exists): {out.relative_to(REPO_ROOT)}", file=sys.stderr)

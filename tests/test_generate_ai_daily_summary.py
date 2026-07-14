@@ -1261,3 +1261,28 @@ def test_write_generation_status_json(tmp_path, gads):
     assert data["ok"] is True
     assert data["snapshot_row_count"] == 42
     assert "logged_at" in data
+
+
+def test_filter_rows_by_region_keeps_matching_series(gads):
+    rows = [
+        {"series_key": "nhk_jp", "label": "JP"},
+        {"series_key": "hackernews_us", "label": "US"},
+        {"series_key": "unknown_key", "label": "??"},
+    ]
+    jp = gads.filter_rows_by_region(rows, "jp")
+    us = gads.filter_rows_by_region(rows, "us")
+    assert [r["series_key"] for r in jp] == ["nhk_jp"]
+    assert [r["series_key"] for r in us] == ["hackernews_us"]
+
+
+def test_configure_daily_region_us_paths_and_headings(gads):
+    gads.configure_daily_region("us")
+    assert gads._ACTIVE_REGION == "us"
+    assert gads.daily_output_dir().name == "us"
+    assert "takeaway" in gads._ONE_LINER_HEADING.lower()
+    assert "Biggest movers" in gads._RISING_HEADING
+    hdr = gads.render_header_markdown(date(2026, 7, 13))
+    assert "Daily summary" in hdr
+    gads.configure_daily_region("jp")
+    assert gads.daily_output_dir() == gads.DAILY_DIR
+    assert "一行結論" in gads._ONE_LINER_HEADING

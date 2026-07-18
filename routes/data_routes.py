@@ -3,6 +3,7 @@
 キャッシュデータ、統計情報などのAPIエンドポイント
 """
 
+import hmac
 import os
 from datetime import date
 from flask import Blueprint, jsonify, request, current_app
@@ -398,6 +399,48 @@ def get_daily_snapshots_for_ai_summary():
             "data": out,
         }
     )
+
+
+@data_bp.route('/summaries/documents', methods=['POST'])
+def upsert_summary_document():
+    """サマリー原稿（Markdown）を summary_documents に upsert する。
+
+    GitHub Actions（ai-daily-summary / ai-weekly-summary）が生成・コミット後に
+    呼び、deploy を挟まずに閲覧ページへ反映させる。原稿の正本は git のまま。
+    認証: ``Authorization: Bearer $SUMMARY_UPSERT_TOKEN``（Fly secret）。
+    """
+    from services.summary import summary_store
+
+    token = (os.getenv('SUMMARY_UPSERT_TOKEN') or '').strip()
+    if not token:
+        return jsonify({
+            'success': False,
+            'error': 'SUMMARY_UPSERT_TOKEN が未設定のため、このエンドポイントは無効です',
+        }), 503
+    provided = request.headers.get('Authorization') or ''
+    if not hmac.compare_digest(provided, f'Bearer {token}'):
+        return jsonify({'success': False, 'error': 'unauthorized'}), 401
+
+    payload = request.get_json(silent=True) or {}
+    kind = str(payload.get('kind') or '').strip().lower()
+    region = str(payload.get('region') or '').strip().lower()
+    doc_id = str(payload.get('id') or '').strip()
+    body_md = payload.get('body_md')
+
+    if not summary_store.valid_doc(kind, region, doc_id):
+        return jsonify({
+            'success': False,
+            'error': 'kind は daily/weekly、region は jp/us、id は YYYY-MM-DD / YYYY-Www 形式が必要です',
+        }), 400
+    if not isinstance(body_md, str) or not body_md.strip():
+        return jsonify({'success': False, 'error': 'body_md（Markdown 本文）が必要です'}), 400
+    if len(body_md.encode('utf-8')) > summary_store.MAX_BODY_BYTES:
+        return jsonify({'success': False, 'error': 'body_md が大きすぎます'}), 413
+
+    if not summary_store.upsert_document(kind, region, doc_id, body_md):
+        return jsonify({'success': False, 'error': 'summary_documents への保存に失敗しました'}), 500
+    logger.info("📝 summary_documents upsert: %s/%s/%s (%d bytes)", kind, region, doc_id, len(body_md))
+    return jsonify({'success': True, 'kind': kind, 'region': region, 'id': doc_id})
 
 
 @data_bp.route('/alert/test', methods=['GET', 'POST'])

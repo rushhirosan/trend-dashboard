@@ -5,6 +5,11 @@
 - 全文（カテゴリ別・順位推移・週内推移）はメール配信の領分なので、ここでは
   「ロックされたセクション見出し」だけを返し、本文は出さない。
 
+原稿の読み込みは DB（summary_documents・GHA が毎朝 upsert）を優先し、
+無ければリポジトリ内ファイル（deploy 時点のスナップショット）へフォールバック
+する。イメージに残った保持期間超過ファイルを出さないよう、一覧・詳細とも
+保持期間カットオフでフィルタする。
+
 原稿の正本・保持・レビュー gate は docs/summaries/README.md を参照。
 """
 
@@ -16,6 +21,8 @@ from pathlib import Path
 from typing import Optional
 
 from markupsafe import Markup, escape
+
+from services.summary import summary_store
 
 JST = timezone(timedelta(hours=9))
 
@@ -52,6 +59,45 @@ def _weekly_dir(region: str) -> Path:
 
 def _url_prefix(region: str) -> str:
     return "" if region == "jp" else f"/{region}"
+
+
+# --- 原稿の読み込み（DB 優先・ファイル fallback） -----------------------
+
+def _within_retention(kind: str, doc_id: str, *, today: Optional[date] = None) -> bool:
+    """保持期間内の原稿か。イメージ焼き込みで残った古いファイルの表示を防ぐ。"""
+    from services.snapshot_retention import (
+        daily_summary_cutoff_business_day,
+        weekly_summary_cutoff,
+    )
+
+    if kind == "daily":
+        try:
+            d = date.fromisoformat(doc_id)
+        except ValueError:
+            return False
+        return d >= daily_summary_cutoff_business_day(today=today)
+    monday = summary_store.weekly_monday(doc_id)
+    if monday is None:
+        return False
+    return monday >= weekly_summary_cutoff(today=today)
+
+
+def _doc_dir(kind: str, region: str) -> Path:
+    return _daily_dir(region) if kind == "daily" else _weekly_dir(region)
+
+
+def _read_doc(kind: str, region: str, doc_id: str) -> Optional[str]:
+    """原稿本文を返す。DB（summary_documents）優先・リポジトリ内ファイル fallback。"""
+    text = summary_store.get_document(kind, region, doc_id)
+    if text is not None:
+        return text
+    path = _doc_dir(kind, region) / f"{doc_id}.md"
+    if not path.is_file():
+        return None
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError:
+        return None
 
 
 # 見出しの言語差を吸収するためのキーワード（JP/EN 両対応）。
@@ -268,12 +314,10 @@ def load_daily_page(
     region = _norm_region(region)
     if not _DAILY_DATE_RE.match(date_str or ""):
         return None
-    path = _daily_dir(region) / f"{date_str}.md"
-    if not path.is_file():
+    if not _within_retention("daily", date_str):
         return None
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
+    text = _read_doc("daily", region, date_str)
+    if text is None:
         return None
     fm, body = _split_frontmatter(text)
     meta = _parse_frontmatter(fm)
@@ -349,12 +393,10 @@ def load_weekly_page(
     region = _norm_region(region)
     if not _WEEKLY_ID_RE.match(week_id or ""):
         return None
-    path = _weekly_dir(region) / f"{week_id}.md"
-    if not path.is_file():
+    if not _within_retention("weekly", week_id):
         return None
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
+    text = _read_doc("weekly", region, week_id)
+    if text is None:
         return None
     fm, body = _split_frontmatter(text)
     meta = _parse_frontmatter(fm)
@@ -419,13 +461,12 @@ def weekly_available(
     region = _norm_region(region)
     if not _WEEKLY_ID_RE.match(week_id or ""):
         return False
-    path = _weekly_dir(region) / f"{week_id}.md"
-    if not path.is_file():
+    if not _within_retention("weekly", week_id):
         return False
-    try:
-        fm, _ = _split_frontmatter(path.read_text(encoding="utf-8"))
-    except OSError:
+    text = _read_doc("weekly", region, week_id)
+    if text is None:
         return False
+    fm, _ = _split_frontmatter(text)
     meta = _parse_frontmatter(fm)
     if meta.get("generator") != "openai":
         return False
@@ -438,17 +479,13 @@ def list_published_daily(
     *, region: str = "jp", allow_draft: bool = False
 ) -> list[tuple[str, datetime]]:
     """公開可能な日次 (date_str, lastmod) を新しい順で返す。"""
-    return _list_published(
-        _daily_dir(_norm_region(region)), _DAILY_DATE_RE, allow_draft=allow_draft
-    )
+    return _list_published("daily", _norm_region(region), allow_draft=allow_draft)
 
 
 def list_published_weekly(
     *, region: str = "jp", allow_draft: bool = False
 ) -> list[tuple[str, datetime]]:
-    return _list_published(
-        _weekly_dir(_norm_region(region)), _WEEKLY_ID_RE, allow_draft=allow_draft
-    )
+    return _list_published("weekly", _norm_region(region), allow_draft=allow_draft)
 
 
 def _weekly_display(week_id: str, region: str = "jp") -> str:
@@ -558,25 +595,43 @@ def build_summary_index(*, region: str = "jp", allow_draft: bool = False) -> dic
 
 
 def _list_published(
-    directory: Path, id_re: "re.Pattern[str]", *, allow_draft: bool
+    kind: str, region: str, *, allow_draft: bool
 ) -> list[tuple[str, datetime]]:
-    if not directory.is_dir():
-        return []
+    """公開可能な原稿 (doc_id, lastmod) を新しい順で返す。
+
+    リポジトリ内ファイルと DB の候補を集め、同じ ID は DB を優先する
+    （``_read_doc`` と同じ優先順位）。保持期間外は表示しない。
+    """
+    id_re = _DAILY_DATE_RE if kind == "daily" else _WEEKLY_ID_RE
+    directory = _doc_dir(kind, region)
+
+    entries: dict[str, tuple[str, datetime]] = {}
+    if directory.is_dir():
+        for path in directory.glob("*.md"):
+            stem = path.stem
+            if not id_re.match(stem):
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=JST)
+            entries[stem] = (text, mtime)
+    for doc_id, body, updated_at in summary_store.list_documents(kind, region):
+        if not id_re.match(doc_id):
+            continue
+        entries[doc_id] = (body, updated_at)
+
     out: list[tuple[str, datetime]] = []
-    for path in directory.glob("*.md"):
-        stem = path.stem
-        if not id_re.match(stem):
+    for doc_id, (text, lastmod) in entries.items():
+        if not _within_retention(kind, doc_id):
             continue
-        try:
-            fm, _ = _split_frontmatter(path.read_text(encoding="utf-8"))
-        except OSError:
-            continue
+        fm, _ = _split_frontmatter(text)
         meta = _parse_frontmatter(fm)
         if meta.get("generator") != "openai":
             continue
         if not _publishable(meta.get("status", "draft"), allow_draft=allow_draft):
             continue
-        mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=JST)
-        out.append((stem, mtime))
+        out.append((doc_id, lastmod))
     out.sort(key=lambda t: t[0], reverse=True)
     return out

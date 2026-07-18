@@ -164,6 +164,16 @@ def _parse_summary_file(path: Path, delivery_day: date) -> Optional[DailySummary
         text = path.read_text(encoding="utf-8")
     except OSError:
         return None
+    return _parse_summary_text(text, path.stem, delivery_day, source_path=path)
+
+
+def _parse_summary_text(
+    text: str,
+    doc_id: str,
+    delivery_day: date,
+    *,
+    source_path: Optional[Path] = None,
+) -> Optional[DailySummaryPreview]:
     meta = _parse_frontmatter(text)
     if meta.get("generator") != "openai":
         return None
@@ -176,7 +186,7 @@ def _parse_summary_file(path: Path, delivery_day: date) -> Optional[DailySummary
     if not one_liner:
         return None
     try:
-        business_day = date.fromisoformat(meta.get("business_day") or path.stem)
+        business_day = date.fromisoformat(meta.get("business_day") or doc_id)
     except ValueError:
         return None
     slots = meta.get("snapshot_slots") or ("07", "13", "19", "01")
@@ -187,7 +197,7 @@ def _parse_summary_file(path: Path, delivery_day: date) -> Optional[DailySummary
         teaser=str(meta.get("teaser") or "").strip(),
         snapshot_slots=tuple(slots),
         status=str(meta.get("status") or "draft"),
-        source_path=path,
+        source_path=source_path,
     )
 
 
@@ -210,21 +220,33 @@ def load_latest_daily_preview(
     region: str = "jp",
     allow_draft: bool = False,
 ) -> Optional[DailySummaryPreview]:
-    """``docs/summaries/daily/`` の最新 AI 生成日次からプレビューを返す。
+    """最新の AI 生成日次からプレビューを返す（DB 優先・ファイル fallback）。
 
     本番想定では ``allow_draft=False``（``status: approved`` のみ）。
     """
+    from services.summary import summary_store
+
     root = daily_dir or _daily_dir_for_region(region)
-    if not root.is_dir():
-        return None
     deliver = delivery_day or _today_jst()
-    candidates = sorted(
-        (p for p in root.glob("*.md") if p.name != "README.md"),
-        key=lambda p: p.stem,
-        reverse=True,
-    )
-    for path in candidates:
-        preview = _parse_summary_file(path, deliver)
+
+    # doc_id → 原稿本文。ファイルを集めたあと DB（GHA が毎朝 upsert）で上書きする。
+    docs: dict[str, tuple[str, Optional[Path]]] = {}
+    if root.is_dir():
+        for path in root.glob("*.md"):
+            if path.name == "README.md":
+                continue
+            try:
+                docs[path.stem] = (path.read_text(encoding="utf-8"), path)
+            except OSError:
+                continue
+    for doc_id, body, _updated_at in summary_store.list_documents(
+        "daily", (region or "jp").strip().lower()
+    ):
+        docs[doc_id] = (body, None)
+
+    for doc_id in sorted(docs, reverse=True):
+        text, source_path = docs[doc_id]
+        preview = _parse_summary_text(text, doc_id, deliver, source_path=source_path)
         if preview and _is_publishable_status(preview.status, allow_draft=allow_draft):
             return preview
     return None

@@ -280,6 +280,8 @@ def purge_expired_snapshots(
         "scheduler_rows_deleted": 0,
         "daily_summary_files_deleted": 0,
         "weekly_summary_files_deleted": 0,
+        "daily_summary_rows_deleted": 0,
+        "weekly_summary_rows_deleted": 0,
         "daily_summary_cutoff": None,
         "weekly_summary_cutoff": None,
         "ok": True,
@@ -313,6 +315,24 @@ def purge_expired_snapshots(
         except Exception as e:
             logger.error("❌ スナップショット保持クリーンアップ失敗: %s", e, exc_info=True)
             result["ok"] = False
+
+    # 公開用 DB 原稿（summary_documents）も同じカットオフで削除する
+    try:
+        from services.summary import summary_store
+
+        doc_result = summary_store.purge_expired(
+            daily_summary_cutoff_business_day(days=daily_summary_days),
+            weekly_summary_cutoff(days=weekly_summary_days),
+            cache=cache,
+            dry_run=dry_run,
+        )
+        result["daily_summary_rows_deleted"] = doc_result["daily_rows_deleted"]
+        result["weekly_summary_rows_deleted"] = doc_result["weekly_rows_deleted"]
+        if not doc_result["ok"]:
+            result["ok"] = False
+    except Exception as e:
+        logger.error("❌ summary_documents クリーンアップ失敗: %s", e, exc_info=True)
+        result["ok"] = False
 
     if purge_summary_files and result["ok"]:
         try:

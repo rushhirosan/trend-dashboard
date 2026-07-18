@@ -168,6 +168,19 @@ python scripts/generate_ai_weekly_summary.py --write --force --weekly-for-date 2
 
 ---
 
+## 公開経路（Web ページへの反映）
+
+`/summaries/...` の閲覧ページは **DB（`summary_documents` テーブル）を優先して読み**、行が無ければリポジトリ内ファイル（deploy 時点のスナップショット）へフォールバックする。
+
+1. GHA（AI daily / weekly summary）が Markdown を生成し git にコミット（正本はこれまで通り git）
+2. 同じジョブが `scripts/publish_summaries_to_site.py` で `POST /api/summaries/documents` に upsert（認証: `SUMMARY_UPSERT_TOKEN`。GHA Secrets と `fly secrets` の両方に設定）
+3. 閲覧ページは DB を読むため **deploy なしで当日分が公開される**
+4. 保持期間超過の行は毎日 03:00 JST の `purge_expired_snapshots` が削除（ファイルと同じカットオフ）
+
+トークン未設定の場合は publish ステップがスキップされ、従来どおり「次の deploy まで反映されない」挙動に戻るだけで生成は壊れない。
+
+---
+
 ## 原稿の保持とクリーンアップ
 
 | 種別 | 保持日数（既定） | 環境変数 |

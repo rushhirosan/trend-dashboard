@@ -47,3 +47,16 @@ jobs:
           fi
           git commit -m "docs(summaries): ai weekly summary (jp+us)"
           git push
+
+      # 閲覧ページは DB（summary_documents）を優先して読むため、deploy なしで反映される。
+      - name: Publish summaries to site (DB)
+        if: always()
+        env:
+          TREND_DASHBOARD_BASE_URL: https://trends-dashboard.fly.dev
+          SUMMARY_UPSERT_TOKEN: ${{ secrets.SUMMARY_UPSERT_TOKEN }}
+        run: |
+          if [ -z "$SUMMARY_UPSERT_TOKEN" ]; then
+            echo "::warning::SUMMARY_UPSERT_TOKEN not set; skipping site publish (set the secret to enable deploy-less publishing)"
+            exit 0
+          fi
+          python scripts/publish_summaries_to_site.py

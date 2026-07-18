@@ -50,12 +50,13 @@
     <div class="card-header bg-light py-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
       <h2 class="h6 mb-0"><i class="fas fa-newspaper me-1 text-primary" aria-hidden="true"></i>{{ title_a }}</h2>
     </div>
-    <div class="card-body {% if embedded %}py-2 d-flex flex-column{% else %}py-3{% endif %}">
+    <div class="card-body d-flex flex-column {% if embedded %}py-2{% else %}py-3{% endif %}">
       <p class="small text-muted mb-2 ai-summary-subline">{{ preview_lead }}</p>
       <p class="small text-muted mb-0{% if not embedded %} mt-2{% endif %}">
         <i class="fas fa-lock me-1" aria-hidden="true"></i>{{ locked }}
       </p>
-      <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
+      {# mt-auto でボタン行をカード下端に揃える（h-100 で隣カードと高さが揃うときに中途半端に浮かないように） #}
+      <div class="d-flex flex-wrap align-items-center gap-2 mt-auto pt-3">
         {% if fd.has_preview and fd.business_day %}
         <a class="btn btn-primary btn-sm" href="{{ fd.url_prefix }}/summaries/daily/{{ fd.business_day }}">
           <i class="fas fa-newspaper me-1" aria-hidden="true"></i>{{ read_preview }}

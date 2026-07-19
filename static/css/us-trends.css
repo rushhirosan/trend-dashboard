@@ -130,6 +130,8 @@ body#trends-us #header-admin-unified .header-admin-section-title {
     font-weight: 700;
     color: #6c757d !important;
 }
+/* USAspendingセクションはカード下端に寄せる（余った高さは2セクションの間に入る） */
+body#trends-us #header-admin-unified .header-admin-section-title--bottom { margin-top: auto; }
 body#trends-us #header-estat-compact-body,
 body#trends-us #header-kkj-compact-body {
     font-size: 0.7rem;

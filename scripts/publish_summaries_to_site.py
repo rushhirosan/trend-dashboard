@@ -24,7 +24,7 @@ import requests
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SUMMARIES_DIR = REPO_ROOT / "docs" / "summaries"
-DEFAULT_BASE_URL = "https://trends-dashboard.fly.dev"
+DEFAULT_BASE_URL = "https://trends-dashboard.com"
 
 _DOC_ID_RES = {
     "daily": re.compile(r"^\d{4}-\d{2}-\d{2}$"),

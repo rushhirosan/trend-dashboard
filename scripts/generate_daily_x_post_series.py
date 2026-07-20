@@ -37,7 +37,7 @@ then composes JP/US blocks. No per-source ``/api/google-trends`` traffic.
 
 Env:
   DATABASE_URL             直接 PostgreSQL から 07/13/19 を読む（``--from-api`` なしのとき）
-  TREND_DASHBOARD_BASE_URL ``--from-api`` またはレガシー HTTP 用ベース URL（既定: https://trends-dashboard.fly.dev）
+  TREND_DASHBOARD_BASE_URL ``--from-api`` またはレガシー HTTP 用ベース URL（既定: https://trends-dashboard.com）
   DISCORD_WEBHOOK_URL       ``--discord`` 用（**運用停止中**・手動デバッグのみ）
 
 夜の X 文案は **急上昇3つ**（07→13→19・AI 日次サマリーと同じ jump / 資格 / ノイズ判定。
@@ -77,14 +77,14 @@ if str(_SCRIPT_DIR) not in sys.path:
 
 import snapshot_rising as sr
 
-BASE_DEFAULT = "https://trends-dashboard.fly.dev"
+BASE_DEFAULT = "https://trends-dashboard.com"
 DEFAULT_OUTPUT_DIR = "docs/x_post_samples/daily"
 DEFAULT_JP_INNER_MAX = 200
 X_FREE_CHARACTER_LIMIT = 280
 DEFAULT_MAX_US_CHARS = X_FREE_CHARACTER_LIMIT
 X_FREE_URL_WEIGHT = 23
-POST_FOOTER_URL = "https://trends-dashboard.fly.dev/"
-POST_FOOTER_URL_US = "https://trends-dashboard.fly.dev/us"
+POST_FOOTER_URL = "https://trends-dashboard.com/"
+POST_FOOTER_URL_US = "https://trends-dashboard.com/us"
 JP_LIST_LINE = f"全ソース: {POST_FOOTER_URL}"
 US_LIST_LINE = f"Dashboard: {POST_FOOTER_URL_US}"
 
@@ -1082,7 +1082,7 @@ def compose_daily_markdown(date_str: str, jp_inner: str, us_inner: str) -> str:
         "- **手動のみ:** `scripts/generate_daily_x_post_series.py --write` でこの md を生成できる（非本番）。",
         "- **選定ロジック:** `trend_daily_snapshots` の **07 / 13 / 19** + **AI 日次サマリーと同じ急上昇判定**（全ソース横断・最大3件）。",
         f"- {JP_LIST_LINE}",
-        "- 鮮度: https://trends-dashboard.fly.dev/data-status",
+        "- 鮮度: https://trends-dashboard.com/data-status",
         "",
         "**US 返信に足す場合（任意・英語）:**",
         "",

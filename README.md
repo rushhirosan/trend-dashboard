@@ -2,14 +2,14 @@
 
 日本とUSの最新トレンド情報を一括表示するWebアプリケーション
 
-**公式サイト / Live:** [https://trends-dashboard.fly.dev/](https://trends-dashboard.fly.dev/) — 日本（`/`）と米国（`/us`）の公開トレンド信号を1画面でざっと掴む個人製作のダッシュボード。投資助言や各サービスの正規データの代替ではありません。
+**公式サイト / Live:** [https://trends-dashboard.com/](https://trends-dashboard.com/) — 日本（`/`）と米国（`/us`）の公開トレンド信号を1画面でざっと掴む個人製作のダッシュボード。投資助言や各サービスの正規データの代替ではありません。
 
 ## 🌐 ライブサイト
 
-- **日本トレンド**: https://trends-dashboard.fly.dev/
-- **USトレンド**: https://trends-dashboard.fly.dev/us
-- **データ鮮度**: https://trends-dashboard.fly.dev/data-status
-- **このサイトについて**: https://trends-dashboard.fly.dev/about
+- **日本トレンド**: https://trends-dashboard.com/
+- **USトレンド**: https://trends-dashboard.com/us
+- **データ鮮度**: https://trends-dashboard.com/data-status
+- **このサイトについて**: https://trends-dashboard.com/about
 
 ## 📊 機能
 

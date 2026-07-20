@@ -2,7 +2,7 @@
 # Run Lighthouse against a URL (mobile or desktop). Reports go to lighthouse-reports/.
 set -euo pipefail
 
-URL="${1:-https://trends-dashboard.fly.dev/}"
+URL="${1:-https://trends-dashboard.com/}"
 FORM="${2:-mobile}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="$ROOT/lighthouse-reports"

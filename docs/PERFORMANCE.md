@@ -54,7 +54,7 @@
 ### 定期計測
 
 - **頻度:** 月 1 回（デプロイ直後の計測は任意で [スコア記録](#スコア記録) に追記）
-- **対象 URL:** `https://trends-dashboard.fly.dev/`（JP）— 月次はこちらを正本。**`/us` も四半期に 1 回**または JP 改修後に [差分確認](#us-us--jp-との差分)
+- **対象 URL:** `https://trends-dashboard.com/`（JP）— 月次はこちらを正本。**`/us` も四半期に 1 回**または JP 改修後に [差分確認](#us-us--jp-との差分)
 - **端末:** PSI で **携帯電話** と **デスクトップ** を**別々に**実行し、表の端末列を分ける
 - **記録:** Performance スコア + 可能なら FCP / LCP / TBT / CLS
 
@@ -83,7 +83,7 @@
 
 ## ベースライン（2026-06-26 計測）
 
-対象 URL: `https://trends-dashboard.fly.dev/`
+対象 URL: `https://trends-dashboard.com/`
 
 | 指標 | 値 | メモ |
 |------|-----|------|
@@ -271,14 +271,14 @@ PSI の Lab データも Lighthouse エンジンだが、**実行環境・回線
 
 ```bash
 # モバイル（PSI の携帯電話に近い）
-npx lighthouse https://trends-dashboard.fly.dev/ \
+npx lighthouse https://trends-dashboard.com/ \
   --form-factor=mobile \
   --output=html,json \
   --output-path=./lighthouse-reports/mobile \
   --chrome-flags="--headless=new"
 
 # デスクトップ
-npx lighthouse https://trends-dashboard.fly.dev/ \
+npx lighthouse https://trends-dashboard.com/ \
   --preset=desktop \
   --output=html,json \
   --output-path=./lighthouse-reports/desktop \
@@ -292,7 +292,7 @@ npx lighthouse https://trends-dashboard.fly.dev/ \
 ```bash
 ./scripts/run_lighthouse.sh                          # 本番・モバイル
 ./scripts/run_lighthouse.sh http://127.0.0.1:5000/ mobile   # ローカル
-./scripts/run_lighthouse.sh https://trends-dashboard.fly.dev/ desktop
+./scripts/run_lighthouse.sh https://trends-dashboard.com/ desktop
 ```
 
 ### ローカル開発サーバー
@@ -446,7 +446,7 @@ JP フェーズ2b と同様の **ピンポイント改修** で `/us` を `/` �
 ### US — LH 再計測
 
 ```bash
-./scripts/run_lighthouse.sh https://trends-dashboard.fly.dev/us mobile
+./scripts/run_lighthouse.sh https://trends-dashboard.com/us mobile
 ```
 
 ---

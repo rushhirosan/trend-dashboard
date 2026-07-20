@@ -201,6 +201,7 @@ def create_app():
                 ),
             }
         return {
+            'public_base_url': AppConfig.PUBLIC_BASE_URL,
             'ENABLE_SUBSCRIPTION_UI': AppConfig.ENABLE_SUBSCRIPTION_UI,
             'BUY_ME_A_COFFEE_USERNAME': AppConfig.BUY_ME_A_COFFEE_USERNAME,
             'SHOW_LOCAL_AI_SUMMARY_MOCK': show_local_ai_summary_mock,
@@ -467,7 +468,7 @@ def create_app():
             """AI クローラー向けのサイト説明（llms.txt）"""
             try:
                 from flask import Response
-                base = 'https://trends-dashboard.fly.dev'
+                base = AppConfig.PUBLIC_BASE_URL
                 llms_content = f"""# Trends Dashboard（トレンドダッシュボード）
 
 > 日本・米国の20以上の公開ソースを横断比較する無料トレンドダッシュボード。
@@ -505,12 +506,12 @@ def create_app():
             """robots.txtを返す"""
             try:
                 from flask import Response
-                robots_content = """User-agent: *
+                robots_content = f"""User-agent: *
 Allow: /
 Disallow: /api/
 Disallow: /health
 Disallow: /subscription
-Sitemap: https://trends-dashboard.fly.dev/sitemap.xml
+Sitemap: {AppConfig.PUBLIC_BASE_URL}/sitemap.xml
 """
                 return Response(robots_content, mimetype='text/plain')
             except Exception as e:
@@ -571,7 +572,7 @@ Sitemap: https://trends-dashboard.fly.dev/sitemap.xml
                             lm = lastmod.strftime('%Y-%m-%dT%H:%M:%S') + '+09:00'
                             summary_urls += (
                                 f"  <url>\n"
-                                f"    <loc>https://trends-dashboard.fly.dev{pfx}/summaries/daily/{date_str}</loc>\n"
+                                f"    <loc>{AppConfig.PUBLIC_BASE_URL}{pfx}/summaries/daily/{date_str}</loc>\n"
                                 f"    <lastmod>{lm}</lastmod>\n"
                                 f"    <changefreq>monthly</changefreq>\n"
                                 f"    <priority>0.6</priority>\n"
@@ -583,7 +584,7 @@ Sitemap: https://trends-dashboard.fly.dev/sitemap.xml
                             lm = lastmod.strftime('%Y-%m-%dT%H:%M:%S') + '+09:00'
                             summary_urls += (
                                 f"  <url>\n"
-                                f"    <loc>https://trends-dashboard.fly.dev{pfx}/summaries/weekly/{week_id}</loc>\n"
+                                f"    <loc>{AppConfig.PUBLIC_BASE_URL}{pfx}/summaries/weekly/{week_id}</loc>\n"
                                 f"    <lastmod>{lm}</lastmod>\n"
                                 f"    <changefreq>monthly</changefreq>\n"
                                 f"    <priority>0.6</priority>\n"
@@ -592,40 +593,41 @@ Sitemap: https://trends-dashboard.fly.dev/sitemap.xml
                 except Exception as sum_err:
                     logger.debug(f"sitemap サマリーURL生成スキップ: {sum_err}")
 
+                base = AppConfig.PUBLIC_BASE_URL
                 sitemap_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://trends-dashboard.fly.dev/</loc>
+    <loc>{base}/</loc>
     <lastmod>{trends_lastmod_str}</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://trends-dashboard.fly.dev/us</loc>
+    <loc>{base}/us</loc>
     <lastmod>{trends_lastmod_str}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://trends-dashboard.fly.dev/about</loc>
+    <loc>{base}/about</loc>
     <lastmod>{about_lastmod_str}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://trends-dashboard.fly.dev/data-status</loc>
+    <loc>{base}/data-status</loc>
     <lastmod>{status_lastmod_str}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://trends-dashboard.fly.dev/us/summaries</loc>
+    <loc>{base}/us/summaries</loc>
     <lastmod>{trends_lastmod_str}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://trends-dashboard.fly.dev/summaries</loc>
+    <loc>{base}/summaries</loc>
     <lastmod>{trends_lastmod_str}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>

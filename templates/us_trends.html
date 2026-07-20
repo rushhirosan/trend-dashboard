@@ -13,27 +13,27 @@
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://trends-dashboard.fly.dev/us">
+    <meta property="og:url" content="{{ public_base_url }}/us">
     <meta property="og:title" content="Trend Dashboard">
     <meta property="og:description" content="See U.S. interest at a glance. Free dashboard comparing search, news, tech, and markets across 20+ public sources in one screen. Refreshed 4 times daily.">
-    <meta property="og:image" content="https://trends-dashboard.fly.dev/static/images/og-image.png">
+    <meta property="og:image" content="{{ public_base_url }}/static/images/og-image.png">
     <meta property="og:locale" content="en_US">
     <meta property="og:site_name" content="Trends Dashboard">
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:url" content="https://trends-dashboard.fly.dev/us">
+    <meta name="twitter:url" content="{{ public_base_url }}/us">
     <meta name="twitter:title" content="Compare U.S. trends across 20+ sources | Trends Dashboard">
     <meta name="twitter:description" content="See U.S. interest at a glance. Free dashboard comparing search, news, tech, and markets across 20+ public sources in one screen. Refreshed 4 times daily.">
-    <meta name="twitter:image" content="https://trends-dashboard.fly.dev/static/images/og-image.png">
+    <meta name="twitter:image" content="{{ public_base_url }}/static/images/og-image.png">
     
     <!-- Canonical URL -->
-    <link rel="canonical" href="https://trends-dashboard.fly.dev/us">
+    <link rel="canonical" href="{{ public_base_url }}/us">
     
     <!-- hreflang: 日本語/英語の言語別バージョン -->
-    <link rel="alternate" hreflang="ja" href="https://trends-dashboard.fly.dev/">
-    <link rel="alternate" hreflang="en" href="https://trends-dashboard.fly.dev/us">
-    <link rel="alternate" hreflang="x-default" href="https://trends-dashboard.fly.dev/">
+    <link rel="alternate" hreflang="ja" href="{{ public_base_url }}/">
+    <link rel="alternate" hreflang="en" href="{{ public_base_url }}/us">
+    <link rel="alternate" hreflang="x-default" href="{{ public_base_url }}/">
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
@@ -53,20 +53,20 @@
     {
       "@context": "https://schema.org",
       "@type": "Organization",
-      "@id": "https://trends-dashboard.fly.dev/#organization",
+      "@id": "{{ public_base_url }}/#organization",
       "name": "Trends Dashboard",
-      "url": "https://trends-dashboard.fly.dev/"
+      "url": "{{ public_base_url }}/"
     }
     </script>
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "WebSite",
-      "@id": "https://trends-dashboard.fly.dev/#website",
+      "@id": "{{ public_base_url }}/#website",
       "name": "Trends Dashboard",
       "description": "See U.S. interest at a glance. Free dashboard comparing search, news, tech, and markets across 20+ public sources in one screen. Refreshed 4 times daily (1/7/13/19 JST).",
-      "url": "https://trends-dashboard.fly.dev/",
-      "publisher": { "@id": "https://trends-dashboard.fly.dev/#organization" }
+      "url": "{{ public_base_url }}/",
+      "publisher": { "@id": "{{ public_base_url }}/#organization" }
     }
     </script>
     <script type="application/ld+json">
@@ -75,8 +75,8 @@
       "@type": "WebPage",
       "name": "Compare U.S. trends across 20+ sources | Trends Dashboard",
       "description": "See U.S. interest at a glance. Free dashboard comparing search, news, tech, and markets across 20+ public sources in one screen. Refreshed 4 times daily (1/7/13/19 JST).",
-      "url": "https://trends-dashboard.fly.dev/us",
-      "isPartOf": { "@id": "https://trends-dashboard.fly.dev/#website" }
+      "url": "{{ public_base_url }}/us",
+      "isPartOf": { "@id": "{{ public_base_url }}/#website" }
     }
     </script>
     <script type="application/ld+json">
@@ -85,7 +85,7 @@
       "@type": "WebApplication",
       "name": "US Trends Dashboard",
       "description": "See U.S. interest at a glance. Free dashboard comparing search, news, tech, and markets across 20+ public sources in one screen. Refreshed 4 times daily (1/7/13/19 JST).",
-      "url": "https://trends-dashboard.fly.dev/us",
+      "url": "{{ public_base_url }}/us",
       "applicationCategory": "InformationApplication",
       "operatingSystem": "Web",
       "offers": {

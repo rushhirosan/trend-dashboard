@@ -49,7 +49,7 @@ JP: ・○○ ・○○ ・○○
 US: ・○○ ・○○ ・○○
 交差: （両方で見えたら1行 / なければ「—」）
 反映: 当日分は主に13:00・19:00（JST）更新を想定
-一覧: https://trends-dashboard.fly.dev/
+一覧: https://trends-dashboard.com/
 ```
 
 ※ URL は本番の公開 URL に合わせてください。
@@ -72,7 +72,7 @@ JP: ・大型スポーツイベント関連 ・株・為替の短期的な話題
 US: ・ハイテク決算・AI関連 ・選挙・政策ニュース ・エンタメ award シーズン
 交差: —
 反映: 当日分は主に13:00・19:00（JST）更新を想定
-一覧: https://trends-dashboard.fly.dev/
+一覧: https://trends-dashboard.com/
 ```
 
 ---
@@ -86,10 +86,10 @@ US: ・ハイテク決算・AI関連 ・選挙・政策ニュース ・エンタ
 ① …（検索）
 ② …（動画）
 ③ …（ニュース）
-一覧: https://trends-dashboard.fly.dev/
+一覧: https://trends-dashboard.com/
 ```
 
-US 英語ブロックは `Today's rising 3 (US) YYYY-MM-DD · 8pm JST` 見出し。末尾は **`一覧: https://trends-dashboard.fly.dev/us`**（JP はルート URL）。欄名だけのラベル（`Pickup` 等）は選定から除外する。
+US 英語ブロックは `Today's rising 3 (US) YYYY-MM-DD · 8pm JST` 見出し。末尾は **`一覧: https://trends-dashboard.com/us`**（JP はルート URL）。欄名だけのラベル（`Pickup` 等）は選定から除外する。
 
 ---
 
@@ -119,7 +119,7 @@ US 英語ブロックは `Today's rising 3 (US) YYYY-MM-DD · 8pm JST` 見出し
 ① …（Google）
 ② …（World News）
 ③ …（Zenn）
-一覧: https://trends-dashboard.fly.dev/
+一覧: https://trends-dashboard.com/
 ```
 
 出典は **カッコ1語** に留め、本文は **12〜25文字程度** で要約してよい（長い公式タイトルは途中で切る）。
@@ -130,7 +130,7 @@ US 英語ブロックは `Today's rising 3 (US) YYYY-MM-DD · 8pm JST` 見出し
 【YYYY-MM-DD】今日の3つ
 JP: … / … / …
 US: …（HN）
-一覧: https://trends-dashboard.fly.dev/
+一覧: https://trends-dashboard.com/
 ```
 
 文字数が厳しい日は **USは省略**してテンプレ B に戻す。
@@ -152,7 +152,7 @@ US: …（HN）
 ③ …（NHK または WN）
 ④ …（Zenn など Tech）
 ⑤ …（Apple Music チャートなど エンタメ）
-一覧: https://trends-dashboard.fly.dev/
+一覧: https://trends-dashboard.com/
 ```
 
 #### テンプレ F · 5つ（US · 英語）
@@ -166,7 +166,7 @@ Today's 5 (US) YYYY-MM-DD · 8pm JST, same as JP (~US AM)
 ③ … (HN)
 ④ … (Tech)
 ⑤ … (Apple Music / film)
-https://trends-dashboard.fly.dev/
+https://trends-dashboard.com/
 ```
 
 **前提だけ返信に出す場合（英語）:**
@@ -224,7 +224,7 @@ Same post time as our JP tweet: 8pm JST (~US morning). US view reflects the dash
 交差: 地政学・エネルギー（JP側はホルムズ／イラン関連報道、NHKでは米ガソリン価格や米・イラン報道も）
 
 反映: 当日は 7:00 / 13:00 / 19:00（JST）の取得ジョブ由来のキャッシュを前提に要約
-一覧: https://trends-dashboard.fly.dev/
+一覧: https://trends-dashboard.com/
 ```
 
 ---
@@ -237,7 +237,7 @@ JP: Google→森且行・エスワティニ・齊藤京子 / News→ホルムズ
 US: Google→Knicks・Bonnie Tyler・Star Fox / HN→Valve CAD公開・職場ネタ / YT→The Odyssey・Dutton Ranch
 交差: 中東・エネルギー・株・イラン関連が日米ともに顔を出す一日
 反映: 7/13/19時取得ベースのキャッシュ
-一覧: https://trends-dashboard.fly.dev/
+一覧: https://trends-dashboard.com/
 ```
 
 （文字数はクォートの改行・空白を削れば X の上限に寄せられる。）
@@ -257,7 +257,7 @@ US: Google→Knicks・Bonnie Tyler・Star Fox / HN→Valve CAD公開・職場ネ
 
 交差: エネルギー・地政学（ソース横断で「同じテーマが続く」程度の書き方）
 
-一覧: https://trends-dashboard.fly.dev/
+一覧: https://trends-dashboard.com/
 ```
 
 ---
@@ -271,7 +271,7 @@ US: Google→Knicks・Bonnie Tyler・Star Fox / HN→Valve CAD公開・職場ネ
 JPよく出た: （その週のデイリーから集約）
 USよく出た: （同上）
 今週の印象: （1行）
-一覧: https://trends-dashboard.fly.dev/
+一覧: https://trends-dashboard.com/
 ```
 
 ---
@@ -281,8 +281,8 @@ USよく出た: （同上）
 同じ構成で **最新キャッシュ** に差し替えるときは、本番から JSON を取ってキーワード・見出しを差し替えればよい。
 
 ```bash
-curl -sS "https://trends-dashboard.fly.dev/api/google-trends?country=JP&force_refresh=false" | jq '.data[:8]'
-curl -sS "https://trends-dashboard.fly.dev/api/nhk-trends?force_refresh=false" | jq '.data[:5]'
+curl -sS "https://trends-dashboard.com/api/google-trends?country=JP&force_refresh=false" | jq '.data[:8]'
+curl -sS "https://trends-dashboard.com/api/nhk-trends?force_refresh=false" | jq '.data[:5]'
 ```
 
 `jq` が無い環境では、返却 JSON の `data` 配列をブラウザの開発者ツールやエディタで見ても同じ。
@@ -291,7 +291,7 @@ curl -sS "https://trends-dashboard.fly.dev/api/nhk-trends?force_refresh=false" |
 
 ## 参考例 · 2026-05-08
 
-本ファイルのテーブルは、本番 `https://trends-dashboard.fly.dev/api/*` を自動取得したスナップショットです。
+本ファイルのテーブルは、本番 `https://trends-dashboard.com/api/*` を自動取得したスナップショットです。
 
 - **取得時刻:** `GENERATED_AT_UTC` ≈ **2026-05-07T22:29:03Z**
 - **使い方:** 投稿直前にもう一度 API かサイトで確認し、日付と文言を差し替えること。
@@ -305,7 +305,7 @@ curl -sS "https://trends-dashboard.fly.dev/api/nhk-trends?force_refresh=false" |
 | ------------------------- | ------------------------------------------------------------------------------------------- |
 | レスに `cache_as_of` が付かなかった | World News（JP/US）                                                                           |
 | `(データなし)`                 | BLS、USAspending（`/us-admin-trends` 経由）                                                      |
-| `cache_as_of` が他より古い      | 楽天（**2026-02-07** と表示。鮮度は [/data-status](https://trends-dashboard.fly.dev/data-status) で確認） |
+| `cache_as_of` が他より古い      | 楽天（**2026-02-07** と表示。鮮度は [/data-status](https://trends-dashboard.com/data-status) で確認） |
 
 
 ---
@@ -402,7 +402,7 @@ Google・YT・Apple Music、HN・CNN・サイバー（CVE）、Globe／Medium／
 #### 4/4
 
 ```
-一覧: https://trends-dashboard.fly.dev/
+一覧: https://trends-dashboard.com/
 ```
 
 ---
@@ -410,7 +410,7 @@ Google・YT・Apple Music、HN・CNN・サイバー（CVE）、Globe／Medium／
 ### X — 1ツイート圧縮版
 
 ```
-【2026-05-08】JP: 検索・報道〜開発コミュニティ・株/エンタメ・行政。US: 検索・動画・HN/CNN・CVE。カテゴリ別→ https://trends-dashboard.fly.dev/
+【2026-05-08】JP: 検索・報道〜開発コミュニティ・株/エンタメ・行政。US: 検索・動画・HN/CNN・CVE。カテゴリ別→ https://trends-dashboard.com/
 ```
 
 ---
@@ -432,7 +432,7 @@ Google・YT・Apple Music、HN・CNN・サイバー（CVE）、Globe／Medium／
 ③ イラン船舶攻撃／ホルムズ沿岸（NHK・WN）
 ④ Plan Mode記事／PHPUnit注入（Zenn・JPCERT）
 ⑤ 爆裂愛してる／マリオG映画（Apple Music・映画）
-一覧: https://trends-dashboard.fly.dev/
+一覧: https://trends-dashboard.com/
 ```
 
 - **①〜③** … 前段の「根拠重視3つ」と同じ趣旨。World News はこの日 `cache_as_of` が付かなかったため投稿前に鮮度確認。
@@ -448,7 +448,7 @@ Today's 5 (US) 2026-05-08 · 8pm JST, same as JP (~US AM)
 ③ MOOP map / Chrome AI (HN)
 ④ CVE-2026-6973 · CISA/THN · Gemma 4 (Tech)
 ⑤ Choosin' Texas / Mario Galaxy · Apex (Apple Music)
-https://trends-dashboard.fly.dev/
+https://trends-dashboard.com/
 ```
 
 - **1行目** … 日本 20 時＝米国朝であること、JP と同時投稿であることを明示。長文化するなら返信に **「Dashboard refreshes on a JST schedule (1/7/13/19).」** などを足す。
@@ -461,5 +461,5 @@ https://trends-dashboard.fly.dev/
 ### 同じリストを取り直す（例）
 
 ```bash
-curl -sS "https://trends-dashboard.fly.dev/api/google-trends?country=JP&force_refresh=false"
+curl -sS "https://trends-dashboard.com/api/google-trends?country=JP&force_refresh=false"
 ```

@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, Tuple
 from database_config import TrendsCache
 from utils.email_service import EmailService
 from utils.logger_config import get_logger
+from config.app_config import AppConfig
 
 # ロガーの初期化
 logger = get_logger(__name__)
@@ -1005,9 +1006,9 @@ class SubscriptionManager:
             
             # 配信停止URLを生成
             if unsubscribe_token:
-                unsubscribe_url = f"https://trends-dashboard.fly.dev/subscription/unsubscribe/{unsubscribe_token}"
+                unsubscribe_url = f"{AppConfig.PUBLIC_BASE_URL}/subscription/unsubscribe/{unsubscribe_token}"
             else:
-                unsubscribe_url = "https://trends-dashboard.fly.dev/subscription/"
+                unsubscribe_url = f"{AppConfig.PUBLIC_BASE_URL}/subscription/"
             
             html = f"""
             <html>
@@ -1032,7 +1033,7 @@ class SubscriptionManager:
                 </div>
                 
                 <div class="content">
-                    <p>こんにちは！本日の<a href="https://trends-dashboard.fly.dev/" style="color: #007bff; text-decoration: none; font-weight: bold;">トレンド</a>サマリーをお届けします。</p>
+                    <p>こんにちは！本日の<a href="{AppConfig.PUBLIC_BASE_URL}/" style="color: #007bff; text-decoration: none; font-weight: bold;">トレンド</a>サマリーをお届けします。</p>
             """
             
             # カテゴリ名のマッピング
@@ -1249,11 +1250,11 @@ class SubscriptionManager:
             
             # データが1件もない場合のメッセージ
             if not has_data:
-                html += """
+                html += f"""
                     <div class="category">
                         <div class="category-content">
                             <p>現在、トレンドデータが取得できませんでした。しばらくしてから再度お試しください。</p>
-                            <p><a href="https://trends-dashboard.fly.dev/">ダッシュボード</a>で最新のトレンド情報を確認できます。</p>
+                            <p><a href="{AppConfig.PUBLIC_BASE_URL}/">ダッシュボード</a>で最新のトレンド情報を確認できます。</p>
                         </div>
                     </div>
                 """
@@ -1290,13 +1291,13 @@ class SubscriptionManager:
             
             # 配信停止URLを生成
             if unsubscribe_token:
-                unsubscribe_url = f"https://trends-dashboard.fly.dev/subscription/unsubscribe/{unsubscribe_token}"
+                unsubscribe_url = f"{AppConfig.PUBLIC_BASE_URL}/subscription/unsubscribe/{unsubscribe_token}"
             else:
-                unsubscribe_url = "https://trends-dashboard.fly.dev/subscription/"
+                unsubscribe_url = f"{AppConfig.PUBLIC_BASE_URL}/subscription/"
             
             text = f"📊 トレンドサマリー配信 - {datetime.now().strftime('%Y年%m月%d日')}\n\n"
             text += "こんにちは！本日のトレンドサマリーをお届けします。\n"
-            text += "ダッシュボード: https://trends-dashboard.fly.dev/\n\n"
+            text += f"ダッシュボード: {AppConfig.PUBLIC_BASE_URL}/\n\n"
             
             # カテゴリ名のマッピング
             category_names = {
@@ -1506,7 +1507,7 @@ class SubscriptionManager:
             # データが1件もない場合のメッセージ
             if not has_data:
                 text += "現在、トレンドデータが取得できませんでした。しばらくしてから再度お試しください。\n"
-                text += "ダッシュボード: https://trends-dashboard.fly.dev/\n\n"
+                text += f"ダッシュボード: {AppConfig.PUBLIC_BASE_URL}/\n\n"
             
             text += "\nこのメールは自動配信されています。\n"
             text += f"配信を停止したい場合は、以下のURLにアクセスしてください：\n{unsubscribe_url}\n"

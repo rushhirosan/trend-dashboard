@@ -23,7 +23,7 @@ GitHub Actions 等 Fly 外では ``DATABASE_URL`` の ``*.flycast`` が解決で
 既定の対象日: JST の「昨日」（--business-day で上書き可）。
 ``--write`` 時の **``daily/{business_day}.md``** のファイル名は **観測日**（生成を実行した暦日ではない）。
 例: 5/19 朝の GHA 実行 → ``2026-05-18.md``。詳細は ``docs/summaries/daily/README.md``。
-HTTP モードのベース URL: ``TREND_DASHBOARD_BASE_URL``（既定 https://trends-dashboard.fly.dev）。
+HTTP モードのベース URL: ``TREND_DASHBOARD_BASE_URL``（既定 https://trends-dashboard.com）。
 
 ``--write`` 時、その ``business_day`` 向けに **``daily/YYYY-MM-DD.generation.json``** を必ず書く（成功 /
 失敗 / キー欠如 / スナップショット空 / OpenAI 失敗）。CI でコミットするとリポジトリ上で結果が追える。
@@ -114,7 +114,7 @@ def news_category_key() -> str:
     return category_display_name("ニュース")
 
 
-BASE_DEFAULT = "https://trends-dashboard.fly.dev"
+BASE_DEFAULT = "https://trends-dashboard.com"
 
 SLOT_ORDER = ("07", "13", "19", "01")
 # 一日の中での順位変化（07→13→19）。01 は締め用で jump には使わない。

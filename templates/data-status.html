@@ -10,23 +10,23 @@
     <meta name="keywords" content="データ鮮度, トレンド, 更新時刻, Google Trends, YouTube, はてなブックマーク, Qiita, Zenn, NHK, OpenAlex, Bluesky, Wikipedia, 株価, Spotify, トレンドダッシュボード">
     <meta name="author" content="Trends Dashboard">
     <meta name="robots" content="index, follow">
-    <link rel="canonical" href="https://trends-dashboard.fly.dev/data-status">
+    <link rel="canonical" href="{{ public_base_url }}/data-status">
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://trends-dashboard.fly.dev/data-status">
+    <meta property="og:url" content="{{ public_base_url }}/data-status">
     <meta property="og:title" content="データ鮮度情報 - トレンドダッシュボード">
     <meta property="og:description" content="日本・USのトレンドデータ鮮度情報。NHK、CNN、Google Trends、YouTube、はてなブックマーク、Qiita、Zenn、OpenAlex、Bluesky、Wikipedia、株価、Spotifyなどを表示。毎日4回更新（1・7・13・19時 JST）。">
-    <meta property="og:image" content="https://trends-dashboard.fly.dev/static/images/og-image.png">
+    <meta property="og:image" content="{{ public_base_url }}/static/images/og-image.png">
     <meta property="og:locale" content="ja_JP">
     <meta property="og:site_name" content="トレンドダッシュボード">
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:url" content="https://trends-dashboard.fly.dev/data-status">
+    <meta name="twitter:url" content="{{ public_base_url }}/data-status">
     <meta name="twitter:title" content="データ鮮度情報 - トレンドダッシュボード">
     <meta name="twitter:description" content="日本・USのトレンドデータ鮮度情報。NHK、CNN、Google Trends、YouTube、はてなブックマーク、Qiita、Zenn、OpenAlex、Bluesky、Wikipedia、株価、Spotifyなどを表示。毎日4回更新（1・7・13・19時 JST）。">
-    <meta name="twitter:image" content="https://trends-dashboard.fly.dev/static/images/og-image.png">
+    <meta name="twitter:image" content="{{ public_base_url }}/static/images/og-image.png">
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
@@ -47,8 +47,8 @@
       "@type": "WebPage",
       "name": "データ鮮度情報 - トレンドダッシュボード",
       "description": "日本・USのトレンドデータ鮮度情報。NHK、CNN、Google Trends、YouTube、はてなブックマーク、Qiita、Zenn、Note、Wikipedia、Hacker News、OpenAlex、Bluesky、株価、Spotify、楽天、eBay、Twitch、Podcastなどを表示。データは毎日1時、7時、13時、19時（JST）に更新処理を開始します（完了まで通常10〜15分程度（状況により延びる場合があります））。",
-      "url": "https://trends-dashboard.fly.dev/data-status",
-      "isPartOf": { "@id": "https://trends-dashboard.fly.dev/#website" }
+      "url": "{{ public_base_url }}/data-status",
+      "isPartOf": { "@id": "{{ public_base_url }}/#website" }
     }
     </script>
     

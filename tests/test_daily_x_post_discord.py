@@ -40,13 +40,13 @@ def test_build_payloads_jp_us_only_with_suppress_embeds(dxd):
         "【6/9】急上昇3（JP）\n"
         "① foo\n"
         "https://example.com/jp\n"
-        "全ソース: https://trends-dashboard.fly.dev/"
+        "全ソース: https://trends-dashboard.com/"
     )
     us = (
         "Rising 3 (US) 6/9 · 8pm JST\n"
         "① bar\n"
         "https://example.com/us\n"
-        "Dashboard: https://trends-dashboard.fly.dev/us"
+        "Dashboard: https://trends-dashboard.com/us"
     )
     payloads = dxd.build_daily_x_post_discord_payloads(jp, us)
     assert len(payloads) == 2

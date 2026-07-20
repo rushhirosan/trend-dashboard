@@ -20,6 +20,14 @@ class AppConfig:
     DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
     HOST = os.getenv('HOST', '0.0.0.0')
     PORT = int(os.getenv('FLASK_PORT', 5000))
+
+    # 公開サイトのベース URL（末尾スラッシュなし）。canonical / sitemap / メール等で使用
+    # PUBLIC_BASE_URL を優先。未設定時は TREND_DASHBOARD_BASE_URL（スクリプト・CI と共通）
+    PUBLIC_BASE_URL = (
+        os.getenv('PUBLIC_BASE_URL')
+        or os.getenv('TREND_DASHBOARD_BASE_URL')
+        or 'https://trends-dashboard.com'
+    ).strip().rstrip('/')
     
     # データベース設定
     DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://user:password@localhost/trends_db')
@@ -71,6 +79,7 @@ class AppConfig:
             'DEBUG': cls.DEBUG,
             'HOST': cls.HOST,
             'PORT': cls.PORT,
+            'PUBLIC_BASE_URL': cls.PUBLIC_BASE_URL,
             'DATABASE_URL': cls.DATABASE_URL,
             'GOOGLE_APPLICATION_CREDENTIALS': cls.GOOGLE_APPLICATION_CREDENTIALS,
             'GOOGLE_ANALYTICS_ID': cls.GOOGLE_ANALYTICS_ID,

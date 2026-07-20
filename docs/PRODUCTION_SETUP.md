@@ -181,7 +181,7 @@ fly secrets list -a trends-dashboard
 全ての環境変数を設定した後、以下のコマンドで本番環境のデータを更新して確認できます：
 
 ```bash
-curl -X POST "https://trends-dashboard.fly.dev/api/cache/refresh-all?force_refresh=true"
+curl -X POST "https://trends-dashboard.com/api/cache/refresh-all?force_refresh=true"
 ```
 
 成功した場合、各カテゴリの`success: true`が返されます。
@@ -192,11 +192,11 @@ curl -X POST "https://trends-dashboard.fly.dev/api/cache/refresh-all?force_refre
 
 ```bash
 # 全ジャンルランキング（スケジューラと同じ）
-curl -X GET "https://trends-dashboard.fly.dev/api/rakuten-trends?force_refresh=true&genre_id=all"
+curl -X GET "https://trends-dashboard.com/api/rakuten-trends?force_refresh=true&genre_id=all"
 ```
 
 ```bash
 # デフォルトジャンル（101070）で更新
-curl -X GET "https://trends-dashboard.fly.dev/api/rakuten-trends?force_refresh=true"
+curl -X GET "https://trends-dashboard.com/api/rakuten-trends?force_refresh=true"
 ```
 

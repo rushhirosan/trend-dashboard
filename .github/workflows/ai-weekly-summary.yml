@@ -26,13 +26,13 @@ jobs:
 
       - name: Generate JP weekly summary
         env:
-          TREND_DASHBOARD_BASE_URL: https://trends-dashboard.fly.dev
+          TREND_DASHBOARD_BASE_URL: https://trends-dashboard.com
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python scripts/generate_ai_weekly_summary.py --from-api --write --force --region jp
 
       - name: Generate US weekly summary
         env:
-          TREND_DASHBOARD_BASE_URL: https://trends-dashboard.fly.dev
+          TREND_DASHBOARD_BASE_URL: https://trends-dashboard.com
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python scripts/generate_ai_weekly_summary.py --from-api --write --force --region us
 
@@ -62,7 +62,7 @@ jobs:
       - name: Publish summaries to site (DB)
         if: always()
         env:
-          TREND_DASHBOARD_BASE_URL: https://trends-dashboard.fly.dev
+          TREND_DASHBOARD_BASE_URL: https://trends-dashboard.com
           SUMMARY_UPSERT_TOKEN: ${{ secrets.SUMMARY_UPSERT_TOKEN }}
         run: |
           if [ -z "$SUMMARY_UPSERT_TOKEN" ]; then

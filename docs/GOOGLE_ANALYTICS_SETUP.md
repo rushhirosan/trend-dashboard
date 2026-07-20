@@ -20,7 +20,8 @@
 
 1. 「データストリーム」をクリック
 2. 「ウェブ」を選択
-3. ウェブサイトのURLを入力: `https://trends-dashboard.fly.dev`
+3. ウェブサイトのURLを入力: `https://trends-dashboard.com`  
+   （既存プロパティがある場合は管理画面でサイト URL を更新）
 4. ストリーム名を入力（例: "Trends Dashboard Web"）
 5. 「ストリームを作成」をクリック
 

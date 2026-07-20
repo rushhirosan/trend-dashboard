@@ -19,13 +19,13 @@
     {% endif %}
     <meta name="author" content="Trends Dashboard">
     <meta name="robots" content="index, follow">
-    <link rel="canonical" href="https://trends-dashboard.fly.dev{{ sumpfx }}/summaries/daily/{{ page.business_day }}">
+    <link rel="canonical" href="{{ public_base_url }}{{ sumpfx }}/summaries/daily/{{ page.business_day }}">
 
     <!-- Open Graph -->
     <meta property="og:type" content="article">
-    <meta property="og:url" content="https://trends-dashboard.fly.dev{{ sumpfx }}/summaries/daily/{{ page.business_day }}">
+    <meta property="og:url" content="{{ public_base_url }}{{ sumpfx }}/summaries/daily/{{ page.business_day }}">
     <meta property="og:title" content="{% if is_us %}Daily trend brief {{ page.business_day_display }}{% else %}日次トレンドまとめ {{ page.business_day_display }}{% endif %} | Trends Dashboard">
-    <meta property="og:image" content="https://trends-dashboard.fly.dev/static/images/og-image.png">
+    <meta property="og:image" content="{{ public_base_url }}/static/images/og-image.png">
     <meta property="og:locale" content="{% if is_us %}en_US{% else %}ja_JP{% endif %}">
     <meta property="og:site_name" content="Trends Dashboard">
     <meta name="twitter:card" content="summary_large_image">
@@ -43,11 +43,11 @@
       "datePublished": "{{ page.business_day }}",
       "inLanguage": "{{ lang }}",
       "isAccessibleForFree": true,
-      "url": "https://trends-dashboard.fly.dev{{ sumpfx }}/summaries/daily/{{ page.business_day }}",
+      "url": "{{ public_base_url }}{{ sumpfx }}/summaries/daily/{{ page.business_day }}",
       "publisher": {
         "@type": "Organization",
         "name": "Trends Dashboard",
-        "url": "https://trends-dashboard.fly.dev/"
+        "url": "{{ public_base_url }}/"
       }
     }
     </script>

@@ -18,12 +18,12 @@
     {% endif %}
     <meta name="author" content="Trends Dashboard">
     <meta name="robots" content="index, follow">
-    <link rel="canonical" href="https://trends-dashboard.fly.dev{{ sumpfx }}/summaries">
+    <link rel="canonical" href="{{ public_base_url }}{{ sumpfx }}/summaries">
 
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://trends-dashboard.fly.dev{{ sumpfx }}/summaries">
+    <meta property="og:url" content="{{ public_base_url }}{{ sumpfx }}/summaries">
     <meta property="og:title" content="{% if is_us %}Trend summaries | Trends Dashboard{% else %}トレンドサマリー一覧 | トレンドダッシュボード{% endif %}">
-    <meta property="og:image" content="https://trends-dashboard.fly.dev/static/images/og-image.png">
+    <meta property="og:image" content="{{ public_base_url }}/static/images/og-image.png">
     <meta property="og:locale" content="{% if is_us %}en_US{% else %}ja_JP{% endif %}">
     <meta property="og:site_name" content="Trends Dashboard">
     <meta name="twitter:card" content="summary_large_image">

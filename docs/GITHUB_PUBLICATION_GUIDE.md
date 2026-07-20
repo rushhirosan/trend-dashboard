@@ -127,7 +127,7 @@ GitHub Repository: https://github.com/[your-username]/trends-dashboard
 - API routes: `routes/trend_routes.py`
 
 **Live Application:**
-https://trends-dashboard.fly.dev
+https://trends-dashboard.com
 ```
 
 ## 🔒 セキュリティチェックリスト

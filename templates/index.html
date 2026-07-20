@@ -13,27 +13,27 @@
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://trends-dashboard.fly.dev/">
+    <meta property="og:url" content="{{ public_base_url }}/">
     <meta property="og:title" content="トレンドダッシュボード">
     <meta property="og:description" content="日本国内の関心を1画面で把握。検索・ニュース・テック・マーケットなど20以上の公開データを横断比較できる無料ダッシュボード。毎日4回更新。">
-    <meta property="og:image" content="https://trends-dashboard.fly.dev/static/images/og-image.png">
+    <meta property="og:image" content="{{ public_base_url }}/static/images/og-image.png">
     <meta property="og:locale" content="ja_JP">
     <meta property="og:site_name" content="トレンドダッシュボード">
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:url" content="https://trends-dashboard.fly.dev/">
+    <meta name="twitter:url" content="{{ public_base_url }}/">
     <meta name="twitter:title" content="日本のトレンドを20ソース横断比較 | トレンドダッシュボード">
     <meta name="twitter:description" content="日本国内の関心を1画面で把握。検索・ニュース・テック・マーケットなど20以上の公開データを横断比較できる無料ダッシュボード。毎日4回更新。">
-    <meta name="twitter:image" content="https://trends-dashboard.fly.dev/static/images/og-image.png">
+    <meta name="twitter:image" content="{{ public_base_url }}/static/images/og-image.png">
     
     <!-- Canonical URL -->
-    <link rel="canonical" href="https://trends-dashboard.fly.dev/">
+    <link rel="canonical" href="{{ public_base_url }}/">
     
     <!-- hreflang: 日本語/英語の言語別バージョン -->
-    <link rel="alternate" hreflang="ja" href="https://trends-dashboard.fly.dev/">
-    <link rel="alternate" hreflang="en" href="https://trends-dashboard.fly.dev/us">
-    <link rel="alternate" hreflang="x-default" href="https://trends-dashboard.fly.dev/">
+    <link rel="alternate" hreflang="ja" href="{{ public_base_url }}/">
+    <link rel="alternate" hreflang="en" href="{{ public_base_url }}/us">
+    <link rel="alternate" hreflang="x-default" href="{{ public_base_url }}/">
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
@@ -56,9 +56,9 @@
     {
       "@context": "https://schema.org",
       "@type": "Organization",
-      "@id": "https://trends-dashboard.fly.dev/#organization",
+      "@id": "{{ public_base_url }}/#organization",
       "name": "トレンドダッシュボード",
-      "url": "https://trends-dashboard.fly.dev/"
+      "url": "{{ public_base_url }}/"
     }
     </script>
     <!-- WebSite Schema（サイト全体・検索機能） -->
@@ -66,11 +66,11 @@
     {
       "@context": "https://schema.org",
       "@type": "WebSite",
-      "@id": "https://trends-dashboard.fly.dev/#website",
+      "@id": "{{ public_base_url }}/#website",
       "name": "トレンドダッシュボード",
       "description": "日本国内の関心を1画面で把握。検索・ニュース・テック・マーケットなど20以上の公開データを横断比較できる無料ダッシュボード。毎日4回更新（1・7・13・19時 JST）。",
-      "url": "https://trends-dashboard.fly.dev/",
-      "publisher": { "@id": "https://trends-dashboard.fly.dev/#organization" }
+      "url": "{{ public_base_url }}/",
+      "publisher": { "@id": "{{ public_base_url }}/#organization" }
     }
     </script>
     <!-- WebPage Schema（このページの詳細） -->
@@ -80,8 +80,8 @@
       "@type": "WebPage",
       "name": "日本のトレンドを20ソース横断比較 | トレンドダッシュボード",
       "description": "日本国内の関心を1画面で把握。検索・ニュース・テック・マーケットなど20以上の公開データを横断比較できる無料ダッシュボード。毎日4回更新（1・7・13・19時 JST）。",
-      "url": "https://trends-dashboard.fly.dev/",
-      "isPartOf": { "@id": "https://trends-dashboard.fly.dev/#website" }
+      "url": "{{ public_base_url }}/",
+      "isPartOf": { "@id": "{{ public_base_url }}/#website" }
     }
     </script>
     <!-- WebApplication Schema（アプリとしての性質） -->
@@ -91,7 +91,7 @@
       "@type": "WebApplication",
       "name": "トレンドダッシュボード",
       "description": "日本国内の関心を1画面で把握。検索・ニュース・テック・マーケットなど20以上の公開データを横断比較できる無料ダッシュボード。毎日4回更新（1・7・13・19時 JST）。",
-      "url": "https://trends-dashboard.fly.dev/",
+      "url": "{{ public_base_url }}/",
       "applicationCategory": "InformationApplication",
       "operatingSystem": "Web",
       "offers": {

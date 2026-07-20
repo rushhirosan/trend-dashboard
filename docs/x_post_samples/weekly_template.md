@@ -9,7 +9,7 @@
 JPよく出た: ○○ / ○○ / ○○
 USよく出た: ○○ / ○○ / ○○
 今週の印象: （1行だけ）
-一覧: https://trends-dashboard.fly.dev/
+一覧: https://trends-dashboard.com/
 ```
 
 ---
@@ -29,5 +29,5 @@ USよく出た: ○○ / ○○ / ○○
 JPよく出た: 人事・行政ニュース / 株安・円相場 / 連休レジャー
 USよく出た: BigTech・AI / 金利・インフレ指標 / 映画・シリーズ新作
 今週の印象: JPはマクロと国内イベント、USはテック決算と金融が並んで動いた週
-一覧: https://trends-dashboard.fly.dev/
+一覧: https://trends-dashboard.com/
 ```

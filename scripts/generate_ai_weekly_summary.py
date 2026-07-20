@@ -40,7 +40,7 @@ import snapshot_rising as sr
 
 DAILY_DIR = REPO_ROOT / "docs" / "summaries" / "daily"
 WEEKLY_DIR = REPO_ROOT / "docs" / "summaries" / "weekly"
-BASE_DEFAULT = "https://trends-dashboard.fly.dev"
+BASE_DEFAULT = "https://trends-dashboard.com"
 
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 MAX_USER_CHARS = 100_000

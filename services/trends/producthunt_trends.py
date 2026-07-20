@@ -46,7 +46,11 @@ class ProductHuntTrendsManager(BaseTrendsManager):
             
             # Product Hunt APIは application/x-www-form-urlencoded 形式を要求
             # リダイレクトURIを環境変数から取得（設定されていない場合は本番URLを使用）
-            redirect_uri = os.getenv('PRODUCTHUNT_REDIRECT_URI', 'https://trends-dashboard.fly.dev/us')
+            from config.app_config import AppConfig
+            redirect_uri = os.getenv(
+                'PRODUCTHUNT_REDIRECT_URI',
+                f"{AppConfig.PUBLIC_BASE_URL}/us",
+            )
             
             data = {
                 'client_id': self.client_id,

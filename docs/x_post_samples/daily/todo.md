@@ -7,7 +7,7 @@
 Discord / X 文案の末尾:
 
 ```
-一覧: https://trends-dashboard.fly.dev/
+一覧: https://trends-dashboard.com/
 ```
 
 を踏むと **ダッシュボード TOP** に着くが、**その日の急上昇3つだけ** が並んだカードやセクションがない。  
@@ -20,7 +20,7 @@ Discord / X 文案の末尾:
 ① なぜ人は重圧に…（ニュース）
 ② 推薦システムの…（IT）
 ③ TypeScript拡張…（IT）
-一覧: https://trends-dashboard.fly.dev/
+一覧: https://trends-dashboard.com/
 ```
 
 ## やらないこと（決定済み）

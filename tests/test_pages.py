@@ -7,7 +7,7 @@ import requests
 import sys
 from datetime import datetime
 
-BASE_URL = "https://trends-dashboard.fly.dev"
+BASE_URL = "https://trends-dashboard.com"
 # ローカルテスト用
 # BASE_URL = "http://localhost:5000"
 

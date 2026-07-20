@@ -26,7 +26,7 @@ except ImportError:
     print("インストール方法: pip install selenium webdriver-manager")
     sys.exit(1)
 
-BASE_URL = "https://trends-dashboard.fly.dev"
+BASE_URL = "https://trends-dashboard.com"
 # ローカルテスト用
 # BASE_URL = "http://localhost:5000"
 

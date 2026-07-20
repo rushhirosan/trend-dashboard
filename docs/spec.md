@@ -149,7 +149,7 @@ curl -X POST "http://localhost:5000/subscription/api/send-trends-summary" \
   -H "Content-Type: application/json"
 
 # 本番環境
-curl -X POST "https://trends-dashboard.fly.dev/subscription/api/send-trends-summary" \
+curl -X POST "https://trends-dashboard.com/subscription/api/send-trends-summary" \
   -H "Content-Type: application/json"
 ```
 

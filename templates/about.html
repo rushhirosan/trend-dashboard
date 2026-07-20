@@ -10,23 +10,23 @@
     <meta name="keywords" content="トレンドダッシュボード, About, 使い方, このサイトについて, Google Trends, YouTube, はてなブックマーク, Qiita, Zenn, NHK, OpenAlex, Bluesky, 株価, 仮想通貨, トレンド分析">
     <meta name="author" content="Trends Dashboard">
     <meta name="robots" content="index, follow">
-    <link rel="canonical" href="https://trends-dashboard.fly.dev/about">
+    <link rel="canonical" href="{{ public_base_url }}/about">
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://trends-dashboard.fly.dev/about">
+    <meta property="og:url" content="{{ public_base_url }}/about">
     <meta property="og:title" content="このサイトについて / About - トレンドダッシュボード">
     <meta property="og:description" content="日本と米国の最新トレンド情報を表示するトレンドダッシュボード。NHK、CNN、Google Trends、YouTube、はてなブックマーク、Qiita、Zenn、OpenAlex、Bluesky、株価・仮想通貨などを集約。1日4回更新（1・7・13・19時 JST）。">
-    <meta property="og:image" content="https://trends-dashboard.fly.dev/static/images/og-image.png">
+    <meta property="og:image" content="{{ public_base_url }}/static/images/og-image.png">
     <meta property="og:locale" content="ja_JP">
     <meta property="og:site_name" content="トレンドダッシュボード">
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:url" content="https://trends-dashboard.fly.dev/about">
+    <meta name="twitter:url" content="{{ public_base_url }}/about">
     <meta name="twitter:title" content="このサイトについて / About - トレンドダッシュボード">
     <meta name="twitter:description" content="日本と米国の最新トレンド情報を表示するトレンドダッシュボード。NHK、CNN、Google Trends、YouTube、はてなブックマーク、Qiita、Zenn、OpenAlex、Bluesky、株価・仮想通貨などを集約。1日4回更新（1・7・13・19時 JST）。">
-    <meta name="twitter:image" content="https://trends-dashboard.fly.dev/static/images/og-image.png">
+    <meta name="twitter:image" content="{{ public_base_url }}/static/images/og-image.png">
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
@@ -43,8 +43,8 @@
       "@type": "WebPage",
       "name": "このサイトについて / About - トレンドダッシュボード",
       "description": "日本と米国の最新トレンド情報を表示するシンプルなトレンドダッシュボード。NHK、CNN、Google Trends、YouTube、Wikipedia、はてなブックマーク、Qiita、Zenn、Note、Hacker News、OpenAlex、Bluesky、株価・仮想通貨、Spotify、Podcast、楽天、eBay、Twitchなどの公開データを集約。1日4回更新（1・7・13・19時 JST）。",
-      "url": "https://trends-dashboard.fly.dev/about",
-      "isPartOf": { "@id": "https://trends-dashboard.fly.dev/#website" }
+      "url": "{{ public_base_url }}/about",
+      "isPartOf": { "@id": "{{ public_base_url }}/#website" }
     }
     </script>
     
@@ -102,11 +102,11 @@
                             </p>
                             <ul class="mb-3">
                                 <li class="mb-2">
-                                    <strong><a href="https://trends-dashboard.fly.dev/">日本の最新トレンド一覧（Japan Trends Dashboard）</a></strong>（<code>/</code>）：
+                                    <strong><a href="{{ public_base_url }}/">日本の最新トレンド一覧（Japan Trends Dashboard）</a></strong>（<code>/</code>）：
                                     日本語ニュース・国内向け検索/動画・はてな・楽天・e-Stat/政府調達など、<strong>日本の文脈に寄せたソース</strong>をまとめています。
                                 </li>
                                 <li class="mb-0">
-                                    <strong><a href="https://trends-dashboard.fly.dev/us">米国の最新トレンド一覧（US Trends Dashboard）</a></strong>（<code>/us</code>）：
+                                    <strong><a href="{{ public_base_url }}/us">米国の最新トレンド一覧（US Trends Dashboard）</a></strong>（<code>/us</code>）：
                                     CNN・米国向けWorld News・Hacker News・BLS・USAspending など、<strong>米国の文脈に寄せたソース</strong>をまとめています。
                                 </li>
                             </ul>
@@ -291,11 +291,11 @@
                             </p>
                             <ul class="mb-3">
                                 <li class="mb-2">
-                                    <strong><a href="https://trends-dashboard.fly.dev/">Japan Trends Dashboard</a></strong> (<code>/</code>):
+                                    <strong><a href="{{ public_base_url }}/">Japan Trends Dashboard</a></strong> (<code>/</code>):
                                     Japan-focused sources such as Japanese news, domestic search/video signals, Hatena, Rakuten, and Japanese government statistics &amp; procurement (e-Stat / KKJ).
                                 </li>
                                 <li class="mb-0">
-                                    <strong><a href="https://trends-dashboard.fly.dev/us">US Trends Dashboard</a></strong> (<code>/us</code>):
+                                    <strong><a href="{{ public_base_url }}/us">US Trends Dashboard</a></strong> (<code>/us</code>):
                                     US-focused sources such as CNN, US-oriented world news, Hacker News, BLS, and USAspending.
                                 </li>
                             </ul>

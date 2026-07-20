@@ -26,7 +26,8 @@ The source code is currently in a private repository. For Reddit's review purpos
    [主要なコード部分をここに貼り付け]
 
 3. **Live Demo:**
-   - Application URL: https://trends-dashboard.fly.dev
+   - Application URL: https://trends-dashboard.com  
+     （既存アプリがある場合は Reddit 開発者コンソールで URL を更新）
    - You can test the Reddit API integration
    - All API requests are logged and can be reviewed
 
@@ -65,7 +66,7 @@ We are committed to full transparency and will provide any code or documentation
    - We need a unified backend that can query multiple APIs simultaneously
 
 3. **User Experience:**
-   - Our users access the dashboard via a web browser at https://trends-dashboard.fly.dev
+   - Our users access the dashboard via a web browser at https://trends-dashboard.com
    - Devvit apps are primarily accessed through Reddit's interface
    - Our use case requires an external web application, not a Reddit-integrated app
 
@@ -194,7 +195,7 @@ CREATE TABLE reddit_trends_cache (
 
 ```
 **Application URL (Live):**
-https://trends-dashboard.fly.dev
+https://trends-dashboard.com
 
 **Source Code:**
 GitHub Repository: [実際のリポジトリURL]

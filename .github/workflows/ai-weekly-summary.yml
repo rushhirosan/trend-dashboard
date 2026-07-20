@@ -46,7 +46,17 @@ jobs:
             exit 0
           fi
           git commit -m "docs(summaries): ai weekly summary (jp+us)"
-          git push
+          # main が進んでいると rejected になるので、rebase してから push（リトライ付き）
+          for i in 1 2 3; do
+            git pull --rebase origin main
+            if git push; then
+              exit 0
+            fi
+            echo "push rejected (attempt $i); retrying..."
+            sleep 5
+          done
+          echo "git push failed after retries"
+          exit 1
 
       # 閲覧ページは DB（summary_documents）を優先して読むため、deploy なしで反映される。
       - name: Publish summaries to site (DB)

@@ -24,6 +24,15 @@ from utils.logger_config import get_logger
 # ロガーの初期化
 logger = get_logger(__name__)
 
+# Fly ヘルスチェックはカスタムドメインへ飛ばさない
+_FLY_DEV_REDIRECT_SKIP_PATHS = frozenset({"/health", "/healthz"})
+
+
+def _is_fly_dev_host(host: str) -> bool:
+    """Host ヘッダが *.fly.dev かどうか（ポート除去後）。"""
+    hostname = (host or "").split(":", 1)[0].strip().lower()
+    return hostname.endswith(".fly.dev")
+
 
 def create_app():
     """Flaskアプリケーションを作成（エラーが発生しても必ずアプリを返す）"""
@@ -209,6 +218,30 @@ def create_app():
             'ENABLE_AI_SUMMARY_FAKE_DOOR': AppConfig.ENABLE_AI_SUMMARY_FAKE_DOOR,
             'AI_SUMMARY_FAKE_DOOR': ai_summary_fake_door,
         }
+
+    @app.before_request
+    def redirect_fly_dev_to_public_domain():
+        """*.fly.dev へのアクセスを PUBLIC_BASE_URL（カスタムドメイン）へ 301。"""
+        from flask import redirect, request
+        from urllib.parse import urlparse
+
+        if request.path in _FLY_DEV_REDIRECT_SKIP_PATHS:
+            return None
+        if not _is_fly_dev_host(request.host):
+            return None
+
+        base = (app.config.get("PUBLIC_BASE_URL") or AppConfig.PUBLIC_BASE_URL or "").rstrip("/")
+        if not base:
+            return None
+        public_host = (urlparse(base).hostname or "").lower()
+        if public_host.endswith(".fly.dev"):
+            # 公開 URL 自体が fly.dev のときはループ防止
+            return None
+
+        target = f"{base}{request.path}"
+        if request.query_string:
+            target = f"{target}?{request.query_string.decode('utf-8', errors='replace')}"
+        return redirect(target, code=301)
 
     # ルートを定義（エラーが発生しても続行）
     # パフォーマンス最適化: キャッシュヘッダーの設定

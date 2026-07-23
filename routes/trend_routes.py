@@ -93,7 +93,7 @@ def enrich_trend_payload(response, result, cache_key=None):
 trend_bp = Blueprint('trends', __name__, url_prefix='/api')
 
 def get_managers():
-    """マネージャーを取得（app.configから取得、フォールバックで空の辞書）"""
+    """マネージャーを取得（app.configから。shed 中は空 dict — 画面は cache_serving を使う）"""
     try:
         app = current_app._get_current_object() if hasattr(current_app, '_get_current_object') else current_app
         if app and hasattr(app, 'config'):
@@ -101,12 +101,9 @@ def get_managers():
             if managers:
                 return managers
     except RuntimeError:
-        # Flaskアプリケーションコンテキスト外の場合は無視
         pass
     except Exception as e:
         logger.debug(f"app.configからのマネージャー取得をスキップ: {e}")
-    
-    # フォールバック：空の辞書を返す（エラーハンドリングはrequire_managerで行う）
     return {}
 
 
@@ -117,23 +114,29 @@ def get_force_refresh():
 
 def require_manager(manager_key):
     """
-    マネージャーの存在チェックデコレータ
-    
-    Args:
-        manager_key: managers辞書のキー
+    マネージャーの存在チェックデコレータ。
+    shed 中（TREND_MANAGERS なし）は CacheOnlyManagerProxy を渡し、キャッシュ直読みする。
     """
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
+            from services.cache_serving import resolve_manager_for_request
+
             managers = get_managers()
-            manager = managers.get(manager_key)
-            if not manager:
+            manager = resolve_manager_for_request(manager_key, managers)
+            # 実 manager も proxy も無いことは通常ないが、防御
+            if manager is None:
                 manager_name = manager_key.replace('_', ' ').title()
                 logger.error(f"❌ {manager_name} Managerが初期化されていません（利用可能なマネージャー: {list(managers.keys())}）")
                 return jsonify({
                     'success': False,
                     'error': f'{manager_name} Managerが初期化されていません'
                 }), 500
+            if not managers.get(manager_key):
+                logger.debug(
+                    "cache_serving: using CacheOnlyManagerProxy for %s (managers shed or missing)",
+                    manager_key,
+                )
             return func(*args, manager=manager, **kwargs)
         return wrapper
     return decorator
@@ -380,16 +383,12 @@ def get_hatena_trends():
         force_refresh = request.args.get('force_refresh', 'false').lower() == 'true'
         
         managers = get_managers()
+        from services.cache_serving import resolve_manager_for_request
+        hatena_mgr = resolve_manager_for_request('hatena', managers)
         if not managers.get('hatena'):
-            logger.warning("⚠️ Hatena Managerが初期化されていません")
-            return jsonify({
-                'success': False,
-                'data': [],
-                'status': 'manager_not_initialized',
-                'error': 'Hatena Managerが初期化されていません'
-            }), 200  # 500ではなく200を返す（フロントエンドでエラーハンドリング）
+            logger.debug("cache_serving: hatena via CacheOnlyManagerProxy")
         
-        result = managers['hatena'].get_trends(category=category, limit=limit, force_refresh=force_refresh)
+        result = hatena_mgr.get_trends(category=category, limit=limit, force_refresh=force_refresh)
         
         # エラーが含まれている場合でも、空のデータを返す（500エラーを防ぐ）
         if not result.get('success', True):
@@ -607,8 +606,10 @@ def get_news_bundle():
     from concurrent.futures import ThreadPoolExecutor
     try:
         managers = get_managers()
-        nhk_mgr = managers.get('nhk')
-        worldnews_mgr = managers.get('worldnews')
+        from services.cache_serving import resolve_manager_for_request
+
+        nhk_mgr = resolve_manager_for_request('nhk', managers)
+        worldnews_mgr = resolve_manager_for_request('worldnews', managers)
         force_refresh = get_force_refresh()
 
         nhk_result = {'success': False, 'data': [], 'error': 'NHK Managerが初期化されていません'}
@@ -858,8 +859,9 @@ def get_admin_trends():
     通常時はキャッシュ優先。再取得ボタン（force_refresh=true）のときは両方の外部APIを呼ぶ。
     """
     managers = get_managers()
-    estat_mgr = managers.get('estat')
-    kkj_mgr = managers.get('kkj')
+    from services.cache_serving import resolve_manager_for_request
+    estat_mgr = resolve_manager_for_request('estat', managers)
+    kkj_mgr = resolve_manager_for_request('kkj', managers)
     force_refresh = get_force_refresh()
 
     # e-Stat（完全失業率・実質賃金指数・小売販売額など6指標）
@@ -916,8 +918,9 @@ def get_us_admin_trends():
     1タブで US景気（上）＋ US政府支出（下）を返す。
     """
     managers = get_managers()
-    bls_mgr = managers.get('bls')
-    usaspending_mgr = managers.get('usaspending')
+    from services.cache_serving import resolve_manager_for_request
+    bls_mgr = resolve_manager_for_request('bls', managers)
+    usaspending_mgr = resolve_manager_for_request('usaspending', managers)
     force_refresh = get_force_refresh()
 
     bls_result = {"success": False, "data": [], "error": "BLS Managerが初期化されていません"}

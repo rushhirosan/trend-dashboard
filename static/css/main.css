@@ -3761,6 +3761,25 @@ body.data-status-active #data-status .card-body {
     display: none;
 }
 
+/* ========== 定時更新中バナー（通常非表示） ========== */
+.scheduler-refresh-banner {
+    background: #e7f1ff;
+    border-bottom: 1px solid #b6d4fe;
+    color: #084298;
+}
+.scheduler-refresh-banner a {
+    color: #084298;
+    text-decoration: underline;
+}
+.scheduler-refresh-banner__icon {
+    opacity: 0.85;
+    font-size: 0.85rem;
+}
+.scheduler-refresh-banner__close {
+    flex-shrink: 0;
+    margin-top: 0.15rem;
+}
+
 /* ========== メイン・ヘッダー余白の短縮（タブ直下のトレンドが見やすいように） ========== */
 .main-content-compact {
     padding-top: 0.5rem;

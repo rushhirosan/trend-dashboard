@@ -139,6 +139,8 @@
     {% set page_icon = 'fas fa-chart-line' %}
     {% set active_page = 'index' %}
     {% include 'partials/header.html' with context %}
+    {% set banner_locale = 'ja' %}
+    {% include 'partials/scheduler_refresh_banner.html' %}
 
     <noscript>
         <div class="alert alert-info mx-3 mt-3 mb-4" role="alert">
@@ -2867,6 +2869,7 @@
     <script defer src="{{ url_for('static', filename='js/bluesky-trends.js') }}"></script>
     <script defer src="{{ url_for('static', filename='js/app.js') }}?v=20260401-shown-genre-refresh"></script>
     <script defer src="{{ url_for('static', filename='js/all-freshness.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/scheduler-refresh-banner.js') }}?v=20260723-refresh-banner"></script>
     {% if ENABLE_AI_SUMMARY_FAKE_DOOR %}
     <script defer src="{{ url_for('static', filename='js/ai-summary-fake-door.js') }}?v=20260622-waitlist-closed"></script>
     {% endif %}

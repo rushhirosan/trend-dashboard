@@ -126,6 +126,8 @@
     {% set active_page = 'us' %}
     {% set lang = 'en' %}
     {% include 'partials/header.html' with context %}
+    {% set banner_locale = 'en' %}
+    {% include 'partials/scheduler_refresh_banner.html' %}
 
     <noscript>
         <div class="alert alert-info mx-3 mt-3 mb-4" role="alert">
@@ -2733,6 +2735,7 @@
     <script defer src="{{ url_for('static', filename='js/us-trends.js') }}?v=20260401-toolbar-mount-opacity"></script>
     <script defer src="{{ url_for('static', filename='js/bluesky-trends.js') }}"></script>
     <script defer src="{{ url_for('static', filename='js/all-freshness.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/scheduler-refresh-banner.js') }}?v=20260723-refresh-banner"></script>
     <script defer src="{{ url_for('static', filename='js/us-admin-trends.js') }}"></script>
     {% if ENABLE_AI_SUMMARY_FAKE_DOOR %}
     <script defer src="{{ url_for('static', filename='js/ai-summary-fake-door.js') }}?v=20260622-waitlist-closed"></script>

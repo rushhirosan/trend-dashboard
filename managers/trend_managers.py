@@ -162,6 +162,37 @@ def initialize_managers(keys: frozenset[str] | set[str] | None = None):
     return managers
 
 
+def ensure_trend_managers_restored(config) -> dict:
+    """ジョブ終了後など、親ワーカーに TREND_MANAGERS を戻す。
+
+    スケジューラが subprocess 中に pop したあとの finally 用。
+    画面提供中の再載せには使わない（OOM 対策を維持し、cache_serving を使う）。
+
+    - キーが無い → initialize_managers して戻す
+    - キーがあり中身が空 dict → 起動時初期化失敗のまま（毎回再初期化しない）
+    - キーがあり中身あり → そのまま返す
+    """
+    if config is None:
+        return {}
+    if "TREND_MANAGERS" in config:
+        managers = config.get("TREND_MANAGERS")
+        if managers:
+            return managers
+        return managers or {}
+
+    managers = initialize_managers()
+    config["TREND_MANAGERS"] = managers
+    logger.info(
+        "✅ 親ワーカーの TREND_MANAGERS を再初期化しました (%s)",
+        len(managers),
+    )
+    return managers
+
+
+# 後方互換エイリアス（旧名）
+ensure_trend_managers_for_serving = ensure_trend_managers_restored
+
+
 def managers_for_refresh(region: str, *, jp_chunk=None, jp_chunks=None) -> dict:
     """refresh subprocess 用: 当該フェーズで必要なマネージャーのみ初期化。"""
     refresh_region = _normalize_refresh_region(region)

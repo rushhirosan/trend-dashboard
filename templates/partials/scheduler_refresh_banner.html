@@ -1,0 +1,32 @@
+{# 定時更新中の通知バー（通常は非表示。JS が lock-status を見て表示） #}
+{% set banner_locale = banner_locale|default('ja') %}
+<div
+  id="scheduler-refresh-banner"
+  class="scheduler-refresh-banner d-none"
+  role="status"
+  aria-live="polite"
+  hidden
+  data-locale="{{ banner_locale }}"
+>
+  <div class="container-fluid px-3 py-2">
+    <div class="d-flex align-items-start gap-2">
+      <i class="fas fa-sync-alt fa-spin scheduler-refresh-banner__icon mt-1" aria-hidden="true"></i>
+      <div class="flex-grow-1 small">
+        {% if banner_locale == 'en' %}
+        <strong class="d-block">Data refresh in progress</strong>
+        <span>Showing the latest cached data. Updates usually finish in about 10–15 minutes.</span>
+        <a href="{{ url_for('data_status') }}" class="ms-1">Status</a>
+        {% else %}
+        <strong class="d-block">データ更新中です</strong>
+        <span>表示はキャッシュの最新内容です。完了まで通常10〜15分程度かかります。</span>
+        <a href="{{ url_for('data_status') }}" class="ms-1">更新状況</a>
+        {% endif %}
+      </div>
+      <button
+        type="button"
+        class="btn-close btn-close-sm scheduler-refresh-banner__close"
+        aria-label="{% if banner_locale == 'en' %}Dismiss{% else %}閉じる{% endif %}"
+      ></button>
+    </div>
+  </div>
+</div>

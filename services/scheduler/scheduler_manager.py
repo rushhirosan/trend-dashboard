@@ -1177,18 +1177,9 @@ class TrendsScheduler:
 
     def _ensure_parent_managers(self) -> dict:
         """スナップショット等のため親ワーカーにマネージャーを再載せ。"""
-        managers = self.app.config.get("TREND_MANAGERS")
-        if managers:
-            return managers
-        from managers.trend_managers import initialize_managers
+        from managers.trend_managers import ensure_trend_managers_restored
 
-        managers = initialize_managers()
-        self.app.config["TREND_MANAGERS"] = managers
-        logger.info(
-            "✅ subprocess フェーズ後: 親ワーカーの TREND_MANAGERS を再初期化しました (%s)",
-            len(managers),
-        )
-        return managers
+        return ensure_trend_managers_restored(self.app.config)
 
     def _run_refresh_all_trends_subprocess_phases(
         self,

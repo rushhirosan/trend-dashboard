@@ -11,33 +11,89 @@ logger = get_logger(__name__)
 
 # 全部入りタブでSSRするソース一覧（表示順・APIパラメータ）
 SSR_SOURCES = [
-    {'key': 'nhk', 'manager_key': 'nhk', 'fetcher': lambda m: m.get_trends(limit=5, force_refresh=False)},
-    {'key': 'news', 'manager_key': 'worldnews', 'fetcher': lambda m: m.get_trends(country='jp', category='general', force_refresh=False)},
-    {'key': 'wikipedia', 'manager_key': 'wikipedia', 'fetcher': lambda m: m.get_trends(lang='ja', limit=5, force_refresh=False)},
-    {'key': 'google', 'manager_key': 'google', 'fetcher': lambda m: m.get_trends(region='JP', force_refresh=False)},
-    {'key': 'youtube', 'manager_key': 'youtube', 'fetcher': lambda m: m.get_trends(region_code='JP', max_results=5, force_refresh=False)},
+    {
+        'key': 'nhk',
+        'manager_key': 'nhk',
+        'fetcher': lambda m: m.get_trends(limit=5, force_refresh=False),
+        'cache_params': {'limit': 5},
+    },
+    {
+        'key': 'news',
+        'manager_key': 'worldnews',
+        'fetcher': lambda m: m.get_trends(country='jp', category='general', force_refresh=False),
+        'cache_params': {'country': 'jp', 'category': 'general', 'limit': 5},
+    },
+    {
+        'key': 'wikipedia',
+        'manager_key': 'wikipedia',
+        'fetcher': lambda m: m.get_trends(lang='ja', limit=5, force_refresh=False),
+        'cache_params': {'lang': 'ja', 'limit': 5},
+    },
+    {
+        'key': 'google',
+        'manager_key': 'google',
+        'fetcher': lambda m: m.get_trends(region='JP', force_refresh=False),
+        'cache_params': {'region': 'JP', 'limit': 5},
+    },
+    {
+        'key': 'youtube',
+        'manager_key': 'youtube',
+        'fetcher': lambda m: m.get_trends(region_code='JP', max_results=5, force_refresh=False),
+        'cache_params': {'region_code': 'JP', 'max_results': 5},
+    },
 ]
 
 # US全部入りタブでSSRするソース一覧
 SSR_SOURCES_US = [
-    {'key': 'cnn', 'manager_key': 'cnn', 'fetcher': lambda m: m.get_trends(limit=5, force_refresh=False)},
-    {'key': 'worldnews', 'manager_key': 'worldnews', 'fetcher': lambda m: m.get_trends(country='us', category=None, page_size=5, force_refresh=False)},
-    {'key': 'wikipedia', 'manager_key': 'wikipedia', 'fetcher': lambda m: m.get_trends(lang='en', limit=5, force_refresh=False)},
-    {'key': 'google', 'manager_key': 'google', 'fetcher': lambda m: m.get_trends(region='US', force_refresh=False)},
-    {'key': 'youtube', 'manager_key': 'youtube', 'fetcher': lambda m: m.get_trends(region_code='US', max_results=5, force_refresh=False)},
+    {
+        'key': 'cnn',
+        'manager_key': 'cnn',
+        'fetcher': lambda m: m.get_trends(limit=5, force_refresh=False),
+        'cache_params': {'limit': 5},
+    },
+    {
+        'key': 'worldnews',
+        'manager_key': 'worldnews',
+        'fetcher': lambda m: m.get_trends(country='us', category=None, page_size=5, force_refresh=False),
+        'cache_params': {'country': 'us', 'category': None, 'page_size': 5},
+    },
+    {
+        'key': 'wikipedia',
+        'manager_key': 'wikipedia',
+        'fetcher': lambda m: m.get_trends(lang='en', limit=5, force_refresh=False),
+        'cache_params': {'lang': 'en', 'limit': 5},
+    },
+    {
+        'key': 'google',
+        'manager_key': 'google',
+        'fetcher': lambda m: m.get_trends(region='US', force_refresh=False),
+        'cache_params': {'region': 'US', 'limit': 5},
+    },
+    {
+        'key': 'youtube',
+        'manager_key': 'youtube',
+        'fetcher': lambda m: m.get_trends(region_code='US', max_results=5, force_refresh=False),
+        'cache_params': {'region_code': 'US', 'max_results': 5},
+    },
 ]
 
 
 def _fetch_one(managers: dict, config: dict) -> tuple:
-    """1ソースのデータを取得（キャッシュ優先）"""
+    """1ソースのデータを取得（キャッシュ優先。manager 無し時は TrendsCache 直読み）"""
+    from services.cache_serving import cached_trends_result, resolve_manager_for_request
+
     key = config['key']
     manager_key = config['manager_key']
     fetcher = config['fetcher']
-    manager = managers.get(manager_key)
-    if not manager:
-        return key, None
+    manager = resolve_manager_for_request(manager_key, managers or {})
     try:
-        result = fetcher(manager)
+        # CacheOnlyManagerProxy は get_trends シグネチャがルート用なので SSR は reader を直接使う方が安全
+        from services.cache_serving import CacheOnlyManagerProxy
+        if isinstance(manager, CacheOnlyManagerProxy):
+            ssr_params = config.get('cache_params') or {}
+            result = cached_trends_result(manager_key, **ssr_params)
+        else:
+            result = fetcher(manager)
         if isinstance(result, dict) and result.get('success', True) and result.get('data'):
             return key, result
         if isinstance(result, list) and len(result) > 0:
@@ -64,16 +120,15 @@ def fetch_ssr_trends(managers: dict) -> Dict[str, List[dict]]:
     全部入りタブ用のトレンドデータを並列取得（キャッシュのみ、外部APIは呼ばない）
     
     Args:
-        managers: app.config['TREND_MANAGERS']
+        managers: app.config['TREND_MANAGERS']（空でも cache_serving で読む）
     
     Returns:
         { 'nhk': [item,...], 'news': [...], ... }
         各リストは最大5件
     """
     out = {}
-    if not managers:
-        return out
-    
+    managers = managers or {}
+
     with ThreadPoolExecutor(max_workers=5) as executor:
         futures = {executor.submit(_fetch_one, managers, cfg): cfg for cfg in SSR_SOURCES}
         for future in as_completed(futures):
@@ -155,16 +210,15 @@ def fetch_ssr_trends_us(managers: dict) -> Dict[str, List[dict]]:
     US全部入りタブ用のトレンドデータを並列取得（キャッシュのみ、外部APIは呼ばない）
     
     Args:
-        managers: app.config['TREND_MANAGERS']
+        managers: app.config['TREND_MANAGERS']（空でも cache_serving で読む）
     
     Returns:
         { 'cnn': [...], 'worldnews': [...], 'wikipedia': [...], 'google': [...], 'youtube': [...] }
         各リストは最大5件
     """
     out = {}
-    if not managers:
-        return out
-    
+    managers = managers or {}
+
     with ThreadPoolExecutor(max_workers=5) as executor:
         futures = {executor.submit(_fetch_one, managers, cfg): cfg for cfg in SSR_SOURCES_US}
         for future in as_completed(futures):

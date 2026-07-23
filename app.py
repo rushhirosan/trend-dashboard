@@ -294,6 +294,7 @@ def create_app():
                 ssr_itemlist_ld = None
                 try:
                     from services.ssr_data import build_ssr_itemlist_json_ld, fetch_ssr_trends
+                    # shed 中は manager 再載せせずキャッシュ直読み（OOM 対策維持）
                     managers = app.config.get('TREND_MANAGERS') or {}
                     ssr_trends = fetch_ssr_trends(managers)
                     ssr_itemlist_ld = build_ssr_itemlist_json_ld(ssr_trends, variant='jp')

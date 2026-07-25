@@ -11,6 +11,21 @@ from services.trends.base_trends_manager import BaseTrendsManager
 # ロガーの初期化
 logger = get_logger(__name__)
 
+# ログイン壁・bot遮断ページなど、スクレイプ失敗時にタイトルとして混入する文言
+_JUNK_TITLE_RE = re.compile(
+    r'^(?:'
+    r'log\s*in|login|sign\s*in|signin|sign\s*up|signup|'
+    r'log\s*out|logout|'
+    r'ログイン|サインイン|サインアップ|'
+    r'access\s*denied|forbidden|unauthorized|'
+    r'page\s*not\s*found|not\s*found|404|403|'
+    r'just\s*a\s*moment|attention\s*required|please\s*wait|'
+    r'no\s*title|untitled'
+    r')$',
+    re.IGNORECASE,
+)
+
+
 class WorldNewsTrendsManager(BaseTrendsManager):
     """World News APIを使用して日本のニューストレンドを取得・管理するクラス"""
     
@@ -74,33 +89,47 @@ class WorldNewsTrendsManager(BaseTrendsManager):
             logger.warning(f"⚠️ WorldNews: cache_status更新エラー: {e}")
             return False
 
-    def _remove_duplicates(self, items):
-        """重複を排除するヘルパーメソッド（URL・タイトルで判定）"""
-        def normalize_title(title):
-            """タイトルを正規化（重複チェック用）"""
-            if not title:
-                return ''
-            normalized = str(title).strip()
-            normalized = re.sub(r'\s+', ' ', normalized)
-            return normalized
+    @staticmethod
+    def _normalize_title(title) -> str:
+        """タイトルを正規化（重複・ゴミ判定用）"""
+        if not title:
+            return ''
+        normalized = str(title).strip()
+        return re.sub(r'\s+', ' ', normalized)
 
+    @classmethod
+    def _is_junk_title(cls, title) -> bool:
+        """ログイン壁等のスクレイプ失敗タイトルか判定"""
+        normalized = cls._normalize_title(title)
+        if not normalized:
+            return True
+        return bool(_JUNK_TITLE_RE.match(normalized))
+
+    def _remove_duplicates(self, items):
+        """重複・ゴミタイトルを排除するヘルパーメソッド（URL・タイトルで判定）"""
         seen_urls = set()
         seen_titles = set()
         unique_items = []
         duplicate_count = 0
+        junk_count = 0
 
         for item in items:
             url = str(item.get('url', '')).strip()
             title = str(item.get('title', '')).strip()
-            normalized_title = normalize_title(title)
-
-            # URLまたは正規化されたタイトルが既に存在する場合はスキップ
-            if url in seen_urls or normalized_title in seen_titles:
-                duplicate_count += 1
-                continue
+            normalized_title = self._normalize_title(title)
 
             # 空のタイトルやURLはスキップ
             if not normalized_title or not url:
+                duplicate_count += 1
+                continue
+
+            # ログイン壁・bot遮断由来のタイトルはスキップ
+            if self._is_junk_title(normalized_title):
+                junk_count += 1
+                continue
+
+            # URLまたは正規化されたタイトルが既に存在する場合はスキップ
+            if url in seen_urls or normalized_title in seen_titles:
                 duplicate_count += 1
                 continue
 
@@ -108,6 +137,8 @@ class WorldNewsTrendsManager(BaseTrendsManager):
             seen_titles.add(normalized_title)
             unique_items.append(item)
 
+        if junk_count > 0:
+            logger.info(f"🧹 World News: ゴミタイトルを{junk_count}件除外しました（残り: {len(unique_items)}件）")
         if duplicate_count > 0:
             logger.info(f"🔄 World News: {duplicate_count}件の重複を排除しました（残り: {len(unique_items)}件）")
 
@@ -121,6 +152,7 @@ class WorldNewsTrendsManager(BaseTrendsManager):
         """外部APIからWorld Newsデータを取得"""
         result = self._get_worldnews_trends(country, category, page_size)
         if result:
+            result = self._remove_duplicates(result)
             return {
                 'success': True,
                 'data': result,

@@ -41,8 +41,32 @@ def test_weekly_markdown_to_email_html_is_inline_only():
     html = weekly_markdown_to_email_html(_SAMPLE)
     assert "<img" not in html
     assert "06-24 (2位)" in html
-    assert "<table>" in html
+    assert "<table" in html
+    assert "border-collapse:collapse" in html
     assert "<strong>" in html  # **日別ベスト順位**
+
+
+def test_email_daily_rank_table_keeps_four_columns():
+    """空の角セルでも列がずれない（旧原稿 | | 07 | 13 | 19 |）。"""
+    md = """### 1. spider-man: brand new day
+
+The same topic appeared on independent sources.
+- **Sources**: Google Trends (US), 映画 (US)
+
+| | 07 | 13 | 19 |
+|:--:|:-:|:-:|:-:|
+| Rank | 8 | — | — |
+"""
+    html = weekly_markdown_to_email_html(md)
+    assert html.count("<tr>") == 2
+    assert html.count("<th") == 4
+    assert html.count("<td") == 4
+    assert "&nbsp;" in html
+    text = weekly_markdown_to_email_text(md)
+    header = next(l for l in text.splitlines() if "07" in l and "13" in l and "19" in l)
+    # 空角セル分のパディングが残り、07 が左端に来ない
+    assert header.startswith(" ")
+    assert "Rank" in text
 
 
 def test_weekly_markdown_to_email_html_has_anchor_links():

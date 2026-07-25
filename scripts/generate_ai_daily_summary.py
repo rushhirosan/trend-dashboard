@@ -178,6 +178,19 @@ CATEGORY_DIGEST_ORDER: tuple[str, ...] = (
     "マーケット",
     "エンタメ",
 )
+
+# カテゴリ top3 / 急上昇 / クロスソースから除外する系列（人気や話題の代表にならない）
+DIGEST_EXCLUDED_SERIES_PREFIXES: tuple[str, ...] = (
+    "medium_",
+    "openalex_",
+    "globenewswire",
+    "ebay_",
+    "bluesky_",
+    "estat_",
+    "kkj_",
+    "bls_",
+    "usaspending_",
+)
 # クロスソースに使わない汎用カテゴリ名（「Sports」等は中身が分からない）
 _GENERIC_CROSS_LABELS = frozenset(
     {
@@ -485,6 +498,31 @@ def categorize_series_key(series_key: str) -> str:
         return "検索・動画"
 
     return "テック・開発"
+
+
+def series_in_digest_scope(series_key: str) -> bool:
+    """カテゴリ top3・急上昇・クロスソースに載せてよい系列か。"""
+    sk = (series_key or "").strip().lower()
+    if not sk:
+        return False
+    return not any(sk.startswith(p) for p in DIGEST_EXCLUDED_SERIES_PREFIXES)
+
+
+def digest_scope_note_markdown() -> str:
+    """対象 / 対象外の短い注記（日英）。"""
+    if _ACTIVE_REGION == "us":
+        return (
+            "> **In scope:** Sources that reflect public attention "
+            "(including World News, DEV.to, App Store, Twitch). "
+            "**Out of scope:** Medium (tag RSS by recency, not popularity), "
+            "OpenAlex, GlobeNewswire (IR filings), eBay, Bluesky, and government datasets."
+        )
+    return (
+        "> **対象ソース:** 検索・報道・テック・エンタメなど話題が見えるソース"
+        "（World News、DEV.to、App Store、Twitch、はてな、note、PR TIMES を含む）。"
+        "**対象外:** Medium（タグRSS・新着順）、OpenAlex、GlobeNewswire（企業IR）、"
+        "eBay、Bluesky、行政データ。"
+    )
 
 
 def compact_rows(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -917,7 +955,9 @@ def _format_rank_cell(rank: Optional[int]) -> str:
 
 def format_daily_rank_table(ranks: dict[str, int]) -> str:
     """07/13/19 の順位を1行の Markdown 表にする。"""
-    header = "| | 07 | 13 | 19 |"
+    # 角セルを空にすると、メール/プレーンテキストで列がずれて見える
+    corner = "Slot" if _ACTIVE_REGION == "us" else "時"
+    header = f"| {corner} | 07 | 13 | 19 |"
     sep = "|:--:|:-:|:-:|:-:|"
     cells = [_format_rank_cell(ranks.get(slot)) for slot in DAYTIME_SLOTS]
     row_label = "Rank" if _ACTIVE_REGION == "us" else "順位"
@@ -1039,6 +1079,7 @@ def build_rising_highlights(
     series_keys: set[str] = set()
     for slot in DAYTIME_SLOTS:
         series_keys |= set((series_by_slot.get(slot) or {}).keys())
+    series_keys = {sk for sk in series_keys if series_in_digest_scope(sk)}
 
     pool = sr.collect_rising_candidates(
         series_by_slot,
@@ -1100,6 +1141,8 @@ def _collect_label_index(
 
     index: Dict[str, Dict[str, Any]] = {}
     for series_key in series_keys:
+        if not series_in_digest_scope(series_key):
+            continue
         aggs = _aggregate_labels_for_series(series_by_slot, series_key)
         category = categorize_series_key(series_key)
         for nk, agg in aggs.items():
@@ -1208,7 +1251,11 @@ def build_category_top3(
     out: List[Dict[str, Any]] = []
     for category in CATEGORY_DIGEST_ORDER:
         cat_series = sorted(
-            [sk for sk in all_series if categorize_series_key(sk) == category],
+            [
+                sk
+                for sk in all_series
+                if categorize_series_key(sk) == category and series_in_digest_scope(sk)
+            ],
             key=lambda sk: (-_series_pref_score(sk), sk),
         )
         seen: set[str] = set()
@@ -1434,7 +1481,11 @@ def build_category_leaders_from_rows(
     leaders: List[Dict[str, Any]] = []
     for category in CATEGORY_DIGEST_ORDER:
         cat_series = sorted(
-            [sk for sk in all_series if categorize_series_key(sk) == category],
+            [
+                sk
+                for sk in all_series
+                if categorize_series_key(sk) == category and series_in_digest_scope(sk)
+            ],
             key=lambda sk: (-_series_pref_score(sk), sk),
         )
         best: Optional[Dict[str, Any]] = None
@@ -2354,6 +2405,7 @@ def assemble_daily_markdown(
     """ヘッダ + 編集 + 機械根拠セクションを合成。"""
     parts = [
         render_header_markdown(business_day),
+        digest_scope_note_markdown(),
         render_editorial_markdown(editorial, label_index),
         render_rising_highlights_markdown(rising_items, editorial.get("rising_notes")),
         render_cross_source_highlights_markdown(

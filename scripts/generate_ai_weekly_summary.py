@@ -149,7 +149,6 @@ _WEEKLY_SERIES_WEIGHT_12 = (
     "note_",
     "qiita_",
     "thehackernews_",
-    "medium_",
     "devto_",
     "hackernews_",
     "producthunt_",
@@ -163,7 +162,6 @@ _WEEKLY_SERIES_WEIGHT_10 = (
     "github_",
 )
 _WEEKLY_SERIES_WEIGHT_3 = (
-    "openalex_",
     "book_",
 )
 

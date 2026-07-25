@@ -67,13 +67,43 @@ def markdown_to_email_text(markdown: str) -> str:
     body = _BOLD_RE.sub(r"\1", body)
     # 長い段落（今週の流れなど）は句点・ピリオド後で改行
     lines: list[str] = []
+    table_buf: list[list[str]] = []
+
+    def _flush_table() -> None:
+        nonlocal table_buf
+        if not table_buf:
+            return
+        # 区切り行を除き、空角セルはスペースにして列を揃える
+        rows = [
+            [(" " if not c else c) for c in row]
+            for row in table_buf
+            if not all(set(c) <= {"-", ":", ""} for c in row)
+        ]
+        if rows:
+            widths = [max(len(r[i]) for r in rows) for i in range(len(rows[0]))]
+            for row in rows:
+                # 列数が欠けている行は埋めない（壊れた表はそのまま）
+                if len(row) != len(widths):
+                    lines.append("  ".join(row))
+                    continue
+                lines.append(
+                    "  ".join(cell.ljust(widths[i]) for i, cell in enumerate(row))
+                )
+        table_buf = []
+
     for line in body.splitlines():
-        if line.startswith(("#", "|", ">", "-", "*")) or re.match(r"^\d+\.\s", line):
+        if line.startswith("|"):
+            cells = [c.strip() for c in line.strip("|").split("|")]
+            table_buf.append(cells)
+            continue
+        _flush_table()
+        if line.startswith(("#", ">", "-", "*")) or re.match(r"^\d+\.\s", line):
             lines.append(line)
         elif line.strip():
             lines.append(_insert_sentence_breaks_text(line))
         else:
             lines.append(line)
+    _flush_table()
     return "\n".join(lines).strip() + "\n"
 
 
@@ -130,6 +160,11 @@ def _inline_markdown_to_html(text: str) -> str:
     return "".join(parts)
 
 
+_TABLE_STYLE = "border-collapse:collapse;margin:0.75em 0;"
+_TH_STYLE = "border:1px solid #ccc;padding:4px 8px;text-align:center;background:#f7f7f7;"
+_TD_STYLE = "border:1px solid #ccc;padding:4px 8px;text-align:center;"
+
+
 def markdown_to_email_html(
     markdown: str,
     *,
@@ -147,24 +182,19 @@ def markdown_to_email_html(
     for line in body.splitlines():
         if line.startswith("|"):
             if not in_table:
-                parts.append("<table>")
+                parts.append(f'<table style="{_TABLE_STYLE}">')
                 in_table = True
             cells = [c.strip() for c in line.strip("|").split("|")]
             if all(set(c) <= {"-", ":"} for c in cells):
                 continue
-            tag = "th" if not parts or parts[-1] == "<table>" else "td"
-            if tag == "th":
-                parts.append(
-                    "<tr>"
-                    + "".join(f"<th>{_inline_markdown_to_html(c)}</th>" for c in cells)
-                    + "</tr>"
-                )
-            else:
-                parts.append(
-                    "<tr>"
-                    + "".join(f"<td>{_inline_markdown_to_html(c)}</td>" for c in cells)
-                    + "</tr>"
-                )
+            tag = "th" if not parts or parts[-1].startswith("<table") else "td"
+            cell_style = _TH_STYLE if tag == "th" else _TD_STYLE
+            # 角セルが空でも列数を保つ（レイアウト崩れ防止）
+            cell_html = []
+            for c in cells:
+                content = _inline_markdown_to_html(c) if c else "&nbsp;"
+                cell_html.append(f'<{tag} style="{cell_style}">{content}</{tag}>')
+            parts.append("<tr>" + "".join(cell_html) + "</tr>")
             continue
         if in_table:
             parts.append("</table>")

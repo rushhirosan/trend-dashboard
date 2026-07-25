@@ -113,6 +113,72 @@ def test_categorize_series_key(gads, series_key, expected):
     assert gads.categorize_series_key(series_key) == expected
 
 
+@pytest.mark.parametrize(
+    "series_key,expected",
+    [
+        ("medium_us", False),
+        ("openalex_ai_us", False),
+        ("globenewswire_market_us", False),
+        ("ebay_us", False),
+        ("bluesky_jp", False),
+        ("estat_jp", False),
+        ("worldnews_us", True),
+        ("devto_us", True),
+        ("appstore_jp", True),
+        ("twitch_us", True),
+        ("hatena_jp", True),
+        ("note_jp", True),
+        ("prtimes_jp", True),
+        ("nhk_jp", True),
+    ],
+)
+def test_series_in_digest_scope(gads, series_key, expected):
+    assert gads.series_in_digest_scope(series_key) is expected
+
+
+def test_build_category_top3_excludes_medium(gads):
+    rows = [
+        {
+            "slot": "13",
+            "series_key": "medium_us",
+            "items": [{"t": "Arabic Tutorial Spam", "r": 1}],
+            "captured_at": "2026-07-25T13:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "medium_us",
+            "items": [{"t": "Arabic Tutorial Spam", "r": 1}],
+            "captured_at": "2026-07-25T19:00:00+09:00",
+        },
+        {
+            "slot": "13",
+            "series_key": "hackernews_us",
+            "items": [{"t": "Real HN Story", "r": 4}],
+            "captured_at": "2026-07-25T13:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "hackernews_us",
+            "items": [{"t": "Real HN Story", "r": 2}],
+            "captured_at": "2026-07-25T19:00:00+09:00",
+        },
+    ]
+    gads.configure_daily_region("us")
+    top3 = gads.build_category_top3(rows, count=3)
+    tech = next(b for b in top3 if b["category"] == "Tech")
+    labels = [it["label"] for it in tech.get("items") or []]
+    assert "Arabic Tutorial Spam" not in labels
+    assert "Real HN Story" in labels
+
+
+def test_digest_scope_note_mentions_medium_exclusion(gads):
+    gads.configure_daily_region("jp")
+    assert "Medium" in gads.digest_scope_note_markdown()
+    assert "対象外" in gads.digest_scope_note_markdown()
+    gads.configure_daily_region("us")
+    assert "Out of scope" in gads.digest_scope_note_markdown()
+
+
 def test_compact_rows_by_category_groups_series(gads):
     rows = [
         {
@@ -817,11 +883,19 @@ def test_render_cross_source_highlights_markdown_lists_items(gads):
     md = gads.render_cross_source_highlights_markdown(highlights, date(2026, 5, 20))
     assert "### 1. 豊臣秀長" in md
     assert "Wikipedia (JA), Google Trends (JP)" in md
-    assert "| 07 | 13 | 19 |" in md
+    assert "| 時 | 07 | 13 | 19 |" in md
+    assert "| 順位 |" in md
     assert "**順位の動き**" in md
     assert "```mermaid" not in md
     assert "**根拠**" not in md
     assert gads._CROSS_NONE_LINE not in md
+
+
+def test_format_daily_rank_table_us_has_slot_corner(gads):
+    gads.configure_daily_region("us")
+    table = gads.format_daily_rank_table({"07": 8})
+    assert table.startswith("| Slot | 07 | 13 | 19 |")
+    assert "| Rank | 8 | — | — |" in table
 
 
 def test_inject_cross_source_strips_llm_none_when_items_present(gads):
@@ -1205,6 +1279,8 @@ def test_assemble_daily_markdown_structure(gads):
     editorial = {"one_liner": "一行。", "spotlights": [], "rising_notes": [], "category_intros": {}}
     md = gads.assemble_daily_markdown(bd, editorial, {}, [], [], [])
     assert "# 日次サマリー — 2026-05-31" in md
+    assert "対象外" in md
+    assert "Medium" in md
     assert gads._ONE_LINER_HEADING in md
     assert gads._RISING_HEADING in md
     assert "複数ソースで重なった話題" in md

@@ -1723,10 +1723,6 @@ def _category_has_items(cat_block: Dict[str, Any]) -> bool:
     return False
 
 
-def _format_business_day_ja(business_day: date) -> str:
-    return f"{business_day.year}年{business_day.month}月{business_day.day}日"
-
-
 def render_header_markdown(business_day: date) -> str:
     """日次の見出しのみ（観測日はタイトルに含む。メタ行は付けない）。"""
     bd = business_day.isoformat()

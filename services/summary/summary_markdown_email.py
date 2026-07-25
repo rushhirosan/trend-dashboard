@@ -1,0 +1,239 @@
+"""サマリー Markdown → メール本文（HTML / テキスト）。画像・添付なし。
+
+日次・週次共通。レガシーの Mermaid / SVG / 画像参照は除去する。
+"""
+
+from __future__ import annotations
+
+import html
+import re
+from pathlib import Path
+from typing import Optional, Tuple
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_SUMMARIES_ROOT = _REPO_ROOT / "docs" / "summaries"
+
+_FRONTMATTER_RE = re.compile(r"^---\s*\n.*?\n---\s*\n", re.DOTALL)
+_IMAGE_LINE_RE = re.compile(r"^!\[[^\]]*\]\([^)]+\)\s*\n?", re.MULTILINE)
+_MERMAID_BLOCK_RE = re.compile(r"```mermaid[\s\S]*?```\s*\n?", re.MULTILINE)
+_SVG_BLOCK_RE = re.compile(r"<svg[\s\S]*?</svg>\s*\n?", re.MULTILINE)
+_LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+_BOLD_RE = re.compile(r"\*\*([^*]+)\*\*")
+
+
+_CATEGORY_TREND_LINE_RE = re.compile(
+    r"^\*\*(?:昨日の傾向|Yesterday's trend)\*\*:.*\n?",
+    re.MULTILINE,
+)
+
+
+def strip_category_trend_blurbs(markdown: str) -> str:
+    """既存原稿の「昨日の傾向」行を除去（カテゴリ間で有無がバラつくため）。"""
+    text = _CATEGORY_TREND_LINE_RE.sub("", markdown)
+    return re.sub(r"\n{3,}", "\n\n", text)
+
+
+def strip_legacy_charts(markdown: str) -> str:
+    """Mermaid / SVG / 画像参照を除去し、表とテキスト推移だけ残す。"""
+    text = markdown
+    text = _MERMAID_BLOCK_RE.sub("", text)
+    text = _SVG_BLOCK_RE.sub("", text)
+    text = _IMAGE_LINE_RE.sub("", text)
+    text = strip_category_trend_blurbs(text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip() + "\n"
+
+
+def strip_front_matter(markdown: str) -> str:
+    return _FRONTMATTER_RE.sub("", markdown, count=1)
+
+
+def markdown_to_email_text(markdown: str) -> str:
+    """配信用プレーンテキスト（添付なし）。"""
+    body = strip_legacy_charts(strip_front_matter(markdown))
+    body = _LINK_RE.sub(r"\1 (\2)", body)
+    body = _BOLD_RE.sub(r"\1", body)
+    # 長い段落（今週の流れなど）は句点・ピリオド後で改行
+    lines: list[str] = []
+    for line in body.splitlines():
+        if line.startswith(("#", "|", ">", "-", "*")) or re.match(r"^\d+\.\s", line):
+            lines.append(line)
+        elif line.strip():
+            lines.append(_insert_sentence_breaks_text(line))
+        else:
+            lines.append(line)
+    return "\n".join(lines).strip() + "\n"
+
+
+_INLINE_MD_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*")
+# 英文ピリオド: 数字直後（1. や 7.5）は除外。空白＋続きがあるときだけ
+_EN_SENTENCE_END_RE = re.compile(r"(?<!\d)\.(?=\s+\S)")
+
+
+def _insert_sentence_breaks_text(text: str) -> str:
+    """句点・文末ピリオドの後に改行を入れる（プレーンテキスト）。"""
+    out = text.replace("。", "。\n")
+    out = _EN_SENTENCE_END_RE.sub(".\n", out)
+    return re.sub(r"\n{3,}", "\n\n", out).strip()
+
+
+def _insert_sentence_breaks_html(fragment: str) -> str:
+    """句点・文末ピリオドの後に <br> を入れる（HTML 断片。タグ外のみ）。"""
+    # <a>...</a> 等を保護してから句点処理
+    slots: list[str] = []
+
+    def _park(m: re.Match[str]) -> str:
+        slots.append(m.group(0))
+        return f"\x00TAG{len(slots) - 1}\x00"
+
+    parked = re.sub(r"<[^>]+>", _park, fragment)
+    parked = parked.replace("。", "。<br>\n")
+    parked = _EN_SENTENCE_END_RE.sub(".<br>\n", parked)
+    parked = re.sub(r"(?:<br>\n)+$", "", parked)
+
+    def _unpark(m: re.Match[str]) -> str:
+        return slots[int(m.group(1))]
+
+    return re.sub(r"\x00TAG(\d+)\x00", _unpark, parked)
+
+
+def _inline_markdown_to_html(text: str) -> str:
+    """インラインのリンク・太字を HTML にし、それ以外はエスケープ。"""
+    parts: list[str] = []
+    pos = 0
+    for m in _INLINE_MD_RE.finditer(text):
+        parts.append(html.escape(text[pos : m.start()]))
+        if m.group(1) is not None:
+            label, url = m.group(1), (m.group(2) or "").strip()
+            if url.startswith(("http://", "https://", "mailto:")):
+                parts.append(
+                    f'<a href="{html.escape(url, quote=True)}">{html.escape(label)}</a>'
+                )
+            else:
+                parts.append(html.escape(f"{label} ({url})"))
+        else:
+            parts.append(f"<strong>{html.escape(m.group(3))}</strong>")
+        pos = m.end()
+    parts.append(html.escape(text[pos:]))
+    return "".join(parts)
+
+
+def markdown_to_email_html(
+    markdown: str,
+    *,
+    title: str = "サマリー",
+    skip_first_h1: bool = True,
+) -> str:
+    """配信用 HTML（インライン画像・添付なし）。リンクは <a> にする。
+
+    skip_first_h1: ラッパーの <h1>{title}</h1> と原稿先頭の # 見出しが二重になるのを防ぐ。
+    """
+    body = strip_legacy_charts(strip_front_matter(markdown))
+    parts: list[str] = []
+    in_table = False
+    skipped_h1 = False
+    for line in body.splitlines():
+        if line.startswith("|"):
+            if not in_table:
+                parts.append("<table>")
+                in_table = True
+            cells = [c.strip() for c in line.strip("|").split("|")]
+            if all(set(c) <= {"-", ":"} for c in cells):
+                continue
+            tag = "th" if not parts or parts[-1] == "<table>" else "td"
+            if tag == "th":
+                parts.append(
+                    "<tr>"
+                    + "".join(f"<th>{_inline_markdown_to_html(c)}</th>" for c in cells)
+                    + "</tr>"
+                )
+            else:
+                parts.append(
+                    "<tr>"
+                    + "".join(f"<td>{_inline_markdown_to_html(c)}</td>" for c in cells)
+                    + "</tr>"
+                )
+            continue
+        if in_table:
+            parts.append("</table>")
+            in_table = False
+        if line.startswith("> "):
+            inner = _insert_sentence_breaks_html(_inline_markdown_to_html(line[2:]))
+            parts.append(f"<p><em>{inner}</em></p>")
+        elif line.startswith("#"):
+            level = len(line) - len(line.lstrip("#"))
+            content = line.lstrip("#").strip()
+            # 原稿の先頭 H1（例: # 日次サマリー — …（JST））はラッパー title と重複するので省略
+            if (
+                skip_first_h1
+                and not skipped_h1
+                and level == 1
+                and not any(p.startswith("<h") or p.startswith("<p") or p.startswith("<table") for p in parts)
+            ):
+                skipped_h1 = True
+                continue
+            parts.append(
+                f"<h{min(level, 4)}>{_inline_markdown_to_html(content)}</h{min(level, 4)}>"
+            )
+        elif line.strip():
+            # 番号付きリスト行は文分割しない（"1. タイトル" を壊さない）
+            if re.match(r"^\d+\.\s", line) or line.lstrip().startswith(("- ", "* ")):
+                parts.append(f"<p>{_inline_markdown_to_html(line)}</p>")
+            else:
+                inner = _insert_sentence_breaks_html(_inline_markdown_to_html(line))
+                parts.append(f"<p>{inner}</p>")
+        else:
+            parts.append("")
+    if in_table:
+        parts.append("</table>")
+    inner = "\n".join(parts)
+    safe_title = html.escape(title)
+    return (
+        "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
+        f"<title>{safe_title}</title></head><body>"
+        f"<h1>{safe_title}</h1>\n{inner}\n</body></html>"
+    )
+
+
+def summary_markdown_path(
+    kind: str,
+    doc_id: str,
+    *,
+    region: str = "jp",
+    summaries_root: Optional[Path] = None,
+) -> Path:
+    """日次/週次 Markdown のパス（JP は直下、US は us/）。"""
+    root = summaries_root or _SUMMARIES_ROOT
+    region = (region or "jp").strip().lower()
+    kind = (kind or "").strip().lower()
+    if kind == "daily":
+        base = root / "daily"
+        return (base / doc_id).with_suffix(".md") if region == "jp" else base / region / f"{doc_id}.md"
+    if kind == "weekly":
+        base = root / "weekly"
+        return (base / doc_id).with_suffix(".md") if region == "jp" else base / region / f"{doc_id}.md"
+    raise ValueError(f"unsupported kind: {kind}")
+
+
+def load_summary_email_bodies(
+    kind: str,
+    doc_id: str,
+    *,
+    region: str = "jp",
+    summaries_root: Optional[Path] = None,
+    title: Optional[str] = None,
+) -> Tuple[Path, str, str]:
+    """Markdown から (path, text, html) を返す。無ければ FileNotFoundError。"""
+    path = summary_markdown_path(
+        kind, doc_id, region=region, summaries_root=summaries_root
+    )
+    if not path.is_file():
+        raise FileNotFoundError(path)
+    raw = path.read_text(encoding="utf-8")
+    region_u = (region or "jp").upper()
+    if title is None:
+        if kind == "daily":
+            title = f"日次サマリー — {doc_id} ({region_u})"
+        else:
+            title = f"週次サマリー — {doc_id} ({region_u})"
+    return path, markdown_to_email_text(raw), markdown_to_email_html(raw, title=title)

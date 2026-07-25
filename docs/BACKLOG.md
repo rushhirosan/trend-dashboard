@@ -10,7 +10,7 @@
 - 週次の数値 → [週次メモ](#週次メモ)
 - 日次サマリー品質・SLA の詳細手順 → [`summary_pattern_a_phase1.md`](summary_pattern_a_phase1.md)
 
-**最終更新:** 2026-07-12
+**最終更新:** 2026-07-25
 
 ---
 
@@ -37,7 +37,7 @@
 
 | 領域 | 状態 | 次のアクション |
 |------|------|----------------|
-| **AIサマリー** | フェーズ2a（Waitlist 稼働） | 本番 Waitlist E2E + 2〜4週の関心検証 |
+| **AIサマリー** | dogfood メール実装（自分宛・生成直後） | ローカル/GHA で2週間受信 → 問題なければ自動 approve |
 | **定時取得** | 1536MB で JP/US 54/54 安定 | Grafana OOM アラートの手動設定（未なら） |
 | **データ保持** | DB / 原稿 10日・週次30日 purge 実装済 | DB: 03:00 JST 自動。git 原稿: GHA `summary-retention-purge.yml`（08:00 JST） |
 
@@ -246,6 +246,7 @@
 | Fake door | `templates/partials/ai_summary_fake_door.html`, `static/js/ai-summary-fake-door.js` |
 | Waitlist | `routes/waitlist_routes.py`, `services/waitlist/` |
 | サブスク（休眠） | `services/subscription/`, `ENABLE_SUBSCRIPTION_UI` |
+| dogfood メール | `scripts/send_summary_dogfood_email.py`, `services/summary/summary_dogfood_email.py`, GHA `ai-*-summary.yml` |
 
 ---
 
@@ -357,6 +358,7 @@
 | 2026-06-21 | OOM 対策: subprocess + 1536MB。サブカテゴリ全取得維持。 |
 | 2026-06-22 | 将来 To Do を `docs/BACKLOG.md` に一本化。 |
 | 2026-07-12 | **案1 採用**: Web=プレビュー（過去分・approved のみ）、メール=全文。初期はヘッダー nav 増やさずトップカードから導線。週次も別 URL でプレビュー/全文を分離。有料時は欠損明記・短縮配信・重大欠配はクレジット/返金。 |
+| 2026-07-25 | サマリー配信はまず **dogfood（自分宛・draft・生成直後・JP/US 日次+週次）** で2週間品質確認。問題なければ自動 approve へ。送信は **Gmail SMTP**（SendGrid Trial 切れのため）。 |
 | | |
 
 ### KPI（週次記録用）

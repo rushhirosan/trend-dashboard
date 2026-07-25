@@ -1,6 +1,9 @@
 # メール送信サービス
+import json
 import smtplib
 import os
+import urllib.error
+import urllib.request
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
@@ -13,11 +16,72 @@ logger = get_logger(__name__)
 class EmailService:
     def __init__(self):
         # 環境変数からメール設定を読み込む（機密情報は .env で管理）
-        # 未設定時は空文字。メール送信が必要な場合は SENDER_EMAIL, SENDER_PASSWORD 等を設定すること
-        self.sender_email = (os.getenv('SENDER_EMAIL') or '').strip()
-        self.sender_password = (os.getenv('SENDER_PASSWORD') or '').strip()
-        self.smtp_server = (os.getenv('SMTP_SERVER') or '').strip()
+        # EMAIL_PROVIDER=smtp|gmail → Gmail 等の SMTP
+        # EMAIL_PROVIDER=sendgrid → SendGrid Web API
+        # EMAIL_PROVIDER=auto（既定）→ Gmail SMTP が揃っていれば SMTP、なければ SendGrid、それ以外は SMTP
+        provider = (os.getenv('EMAIL_PROVIDER') or 'auto').strip().lower()
+        sendgrid_key = (os.getenv('SENDGRID_API_KEY') or '').strip()
+        smtp_server_env = (os.getenv('SMTP_SERVER') or '').strip()
+        sender_email = (os.getenv('SENDER_EMAIL') or '').strip()
+        sender_password = (os.getenv('SENDER_PASSWORD') or '').strip()
+        self.from_email = (
+            os.getenv('SENDGRID_FROM_EMAIL')
+            or os.getenv('MAIL_FROM')
+            or ''
+        ).strip()
         self.smtp_port = int((os.getenv('SMTP_PORT') or '587').strip())
+
+        use_sendgrid = False
+        if provider in ('sendgrid', 'sg'):
+            use_sendgrid = bool(sendgrid_key)
+        elif provider in ('smtp', 'gmail'):
+            use_sendgrid = False
+        else:
+            # auto: Gmail SMTP が使えそうなら SendGrid より優先（dogfood 向け）
+            if (
+                'gmail' in smtp_server_env.lower()
+                and sender_password
+                and '@' in sender_email
+            ):
+                use_sendgrid = False
+            elif sendgrid_key:
+                use_sendgrid = True
+
+        self.sendgrid_api_key = sendgrid_key if use_sendgrid else ''
+
+        if use_sendgrid:
+            # SendGrid 時はプレースホルダ SMTP_SERVER を無視（smtp.example.com 等）
+            if 'sendgrid' in smtp_server_env.lower():
+                self.smtp_server = smtp_server_env
+            else:
+                self.smtp_server = 'smtp.sendgrid.net'
+            self.smtp_user = 'apikey'
+            self.smtp_password = sendgrid_key
+            if not self.from_email and '@' in sender_email:
+                self.from_email = sender_email
+        else:
+            self.smtp_server = smtp_server_env
+            self.smtp_user = sender_email
+            self.smtp_password = sender_password
+            if not self.from_email:
+                self.from_email = sender_email if '@' in sender_email else ''
+
+        # 旧コード互換（一部が sender_email / sender_password を参照しうる）
+        self.sender_email = self.from_email or self.smtp_user
+        self.sender_password = self.smtp_password
+        self.email_provider = 'sendgrid' if use_sendgrid else 'smtp'
+
+    def is_configured(self) -> bool:
+        """送信手段と From が揃っているか。"""
+        if not (self.from_email and '@' in self.from_email):
+            return False
+        if self.sendgrid_api_key:
+            return True
+        return bool(self.smtp_server and self.smtp_user and self.smtp_password)
+
+    def send_multipart(self, to_email, subject, html_content, text_content):
+        """任意の multipart メールを送信（公開 API）。"""
+        return self._send_email(to_email, subject, html_content, text_content)
         
     def send_trends_summary(self, to_email, trends_data, frequency='daily'):
         """トレンドサマリーをメール送信"""
@@ -156,17 +220,91 @@ class EmailService:
             'monthly': '毎月'
         }
         return frequency_map.get(frequency, frequency)
+
+    def _send_via_sendgrid_api(self, to_email, subject, html_content, text_content) -> bool:
+        """SendGrid Web API v3 で送信（requests 優先・urllib フォールバック）。"""
+        payload = {
+            "personalizations": [{"to": [{"email": to_email}]}],
+            "from": {"email": self.from_email},
+            "subject": subject,
+            "content": [
+                {"type": "text/plain", "value": text_content or " "},
+                {"type": "text/html", "value": html_content or "<p></p>"},
+            ],
+        }
+        headers = {
+            "Authorization": f"Bearer {self.sendgrid_api_key}",
+            "Content-Type": "application/json",
+        }
+        try:
+            import requests
+
+            resp = requests.post(
+                "https://api.sendgrid.com/v3/mail/send",
+                headers=headers,
+                json=payload,
+                timeout=30,
+            )
+            if 200 <= resp.status_code < 300:
+                logger.info(
+                    "メール送信完了 (SendGrid API): to=%s subject=%s",
+                    to_email,
+                    subject,
+                )
+                return True
+            logger.error(
+                "SendGrid API エラー: %s %s",
+                resp.status_code,
+                (resp.text or "")[:800],
+            )
+            return False
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.error("SendGrid API (requests) 失敗: %s", e, exc_info=True)
+            return False
+
+        req = urllib.request.Request(
+            "https://api.sendgrid.com/v3/mail/send",
+            data=json.dumps(payload).encode("utf-8"),
+            headers=headers,
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                if 200 <= resp.status < 300:
+                    logger.info(
+                        "メール送信完了 (SendGrid API): to=%s subject=%s",
+                        to_email,
+                        subject,
+                    )
+                    return True
+                body = resp.read()[:500]
+                logger.error("SendGrid API 予期しない応答: %s %s", resp.status, body)
+                return False
+        except urllib.error.HTTPError as e:
+            body = e.read()[:800].decode("utf-8", errors="replace")
+            logger.error("SendGrid API エラー: %s %s", e.code, body)
+            return False
     
     def _send_email(self, to_email, subject, html_content, text_content):
         """メール送信"""
         try:
-            if not self.sender_email or not self.sender_password:
-                logger.debug("メール未設定のため送信をスキップします（SENDER_EMAIL / SENDER_PASSWORD）")
+            if not self.is_configured():
+                logger.debug(
+                    "メール未設定のため送信をスキップします"
+                    "（SENDGRID_API_KEY + From、または SENDER_EMAIL / SENDER_PASSWORD）"
+                )
                 return False
+
+            if self.sendgrid_api_key:
+                return self._send_via_sendgrid_api(
+                    to_email, subject, html_content, text_content
+                )
 
             msg = MIMEMultipart('alternative')
             msg['Subject'] = subject
-            msg['From'] = self.sender_email  # 環境変数から読み込んだ送信者アドレス
+            msg['From'] = self.from_email
             msg['To'] = to_email
             
             # テキストとHTMLを追加
@@ -178,15 +316,18 @@ class EmailService:
 
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
                 server.starttls()
-                server.login(self.sender_email, self.sender_password)
+                server.login(self.smtp_user, self.smtp_password)
                 server.send_message(msg)
 
-            logger.debug("メール送信完了: %s", to_email)
+            logger.info("メール送信完了: to=%s subject=%s", to_email, subject)
             return True
             
         except smtplib.SMTPAuthenticationError as e:
             logger.error(f"   ❌ SMTP認証エラー: {e}")
-            logger.error(f"      Gmailアプリパスワードが正しくない可能性があります", exc_info=True)
+            logger.error(
+                "      SendGrid API Key / From 認証、または Gmail アプリパスワードを確認してください",
+                exc_info=True,
+            )
             return False
         except smtplib.SMTPException as e:
             logger.error(f"   ❌ SMTPエラー: {e}", exc_info=True)

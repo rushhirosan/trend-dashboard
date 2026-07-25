@@ -42,3 +42,71 @@ def test_weekly_markdown_to_email_html_is_inline_only():
     assert "<img" not in html
     assert "06-24 (2位)" in html
     assert "<table>" in html
+    assert "<strong>" in html  # **日別ベスト順位**
+
+
+def test_weekly_markdown_to_email_html_has_anchor_links():
+    md = """---
+status: draft
+---
+
+1. [PAYDAY 3](https://www.google.com/search?q=PAYDAY+3)（Twitch）
+"""
+    html = weekly_markdown_to_email_html(md)
+    assert '<a href="https://www.google.com/search?q=PAYDAY+3">PAYDAY 3</a>' in html
+    assert "PAYDAY 3 (https://" not in html
+
+
+def test_weekly_flow_inserts_breaks_after_japanese_periods():
+    md = """---
+status: draft
+---
+
+## 今週の流れ（短文）
+
+今週はAが注目を集めました。また、Bが話題となりました。検索ではCが急上昇し、1位を記録。エンタメではDが注目を集めました。
+"""
+    html = weekly_markdown_to_email_html(md)
+    assert "集めました。<br>" in html
+    assert "なりました。<br>" in html
+    # 「記録。」のあとも改行（句点）
+    assert "記録。<br>" in html
+    text = weekly_markdown_to_email_text(md)
+    assert "集めました。\nまた、" in text
+
+
+def test_list_item_period_not_broken():
+    md = "1. タイトルです\n"
+    html = weekly_markdown_to_email_html(md)
+    assert "1.<br>" not in html
+    assert "1. タイトルです" in html
+
+
+def test_email_html_skips_duplicate_leading_h1():
+    md = """---
+status: draft
+---
+
+# 日次サマリー — 2026-07-22（JST）
+
+## 昨日の一行結論
+
+本文です。
+"""
+    html = weekly_markdown_to_email_html(md, title="日次サマリー — 2026-07-22 (JP)")
+    assert html.count("<h1>") == 1
+    assert "日次サマリー — 2026-07-22 (JP)" in html
+    assert "（JST）" not in html
+    assert "昨日の一行結論" in html
+
+
+def test_email_strips_category_trend_blurbs():
+    md = """### テック・開発
+**昨日の傾向**: WordPressが話題です。
+
+1. [A](https://ex.com)
+"""
+    html = weekly_markdown_to_email_html(md)
+    assert "昨日の傾向" not in html
+    assert "WordPressが話題" not in html
+    assert "テック・開発" in html

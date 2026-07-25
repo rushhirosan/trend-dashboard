@@ -9,7 +9,7 @@
 
 | ファイル | 内容 |
 |----------|------|
-| `YYYY-MM-DD.md` | OpenAI で生成した Markdown（成功時のみ上書き。**`generator: openai`** がフロントマターにあるのが AI 生成の目印）。構成は **一行結論・見どころ（AI、不整合時は機械補完）→ 急上昇3つ（機械+補足）→ 複数ソース重なり（機械・厳密一致）→ カテゴリ別トップ3（機械+区分1文）**（観測日＝ファイル名、読者は通常翌朝に受け取る）。`.generation.json` の `one_liner_source` / `spotlights_filled` で補完の有無を確認できる |
+| `YYYY-MM-DD.md` | OpenAI で生成した Markdown（成功時のみ上書き。**`generator: openai`** がフロントマターにあるのが AI 生成の目印）。構成は **一行結論・見どころ（AI、不整合時は機械補完）→ 急上昇3つ（機械+補足）→ 複数ソース重なり（機械・厳密一致）→ カテゴリ別トップ3（機械）**（観測日＝ファイル名、読者は通常翌朝に受け取る）。`.generation.json` の `one_liner_source` / `spotlights_filled` で補完の有無を確認できる |
 | `YYYY-MM-DD.generation.json` | その回の **成否ログ**（成功なら `ok: true` と行数・モデル、失敗なら `ok: false` と `error` / `phase`） |
 
 スナップショットは `--region` に応じて日本／米国ソースに絞ります。フロントマターに `region: jp|us` を書き込みます。

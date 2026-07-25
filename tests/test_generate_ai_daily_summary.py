@@ -1181,7 +1181,7 @@ def test_render_cross_source_includes_intro(gads):
     assert "複数ソースで同名が観測された。" in md
 
 
-def test_render_category_top3_includes_intro(gads):
+def test_render_category_top3_omits_trend_blurbs(gads):
     blocks = [
         {
             "category": "ニュース",
@@ -1194,8 +1194,10 @@ def test_render_category_top3_includes_intro(gads):
         }
     ]
     md = gads.render_category_top3_markdown(blocks, {"ニュース": "気象関連が中心。"})
-    assert "**昨日の傾向**" in md
-    assert "気象関連が中心。" in md
+    assert "**昨日の傾向**" not in md
+    assert "気象関連が中心。" not in md
+    assert "### ニュース" in md
+    assert "Head A" in md
 
 
 def test_assemble_daily_markdown_structure(gads):
@@ -1339,7 +1341,8 @@ def test_us_render_uses_english_labels_not_japanese(gads):
     )
     assert "- **News**: (no data)" in top3_md
     assert "### Search & Video" in top3_md
-    assert "Yesterday's trend" in top3_md
+    assert "Yesterday's trend" not in top3_md
+    assert "Search interest clustered on politics." not in top3_md
     assert "データなし" not in top3_md
     assert "昨日の傾向" not in top3_md
     assert "ニュース" not in top3_md

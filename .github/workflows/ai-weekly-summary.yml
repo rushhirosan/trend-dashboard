@@ -70,3 +70,20 @@ jobs:
             exit 0
           fi
           python scripts/publish_summaries_to_site.py
+
+      # 自分宛 dogfood（draft 可）。Gmail SMTP 推奨。Secrets 未設定ならスキップ。
+      - name: Dogfood email (weekly JP+US)
+        if: always()
+        env:
+          EMAIL_PROVIDER: smtp
+          SMTP_SERVER: smtp.gmail.com
+          SMTP_PORT: "587"
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
+          SUMMARY_DOGFOOD_TO: ${{ secrets.SUMMARY_DOGFOOD_TO }}
+        run: |
+          if [ -z "$SENDER_EMAIL" ] || [ -z "$SENDER_PASSWORD" ]; then
+            echo "::notice::dogfood email skipped (set secrets SENDER_EMAIL + SENDER_PASSWORD; optional SUMMARY_DOGFOOD_TO)"
+            exit 0
+          fi
+          python scripts/send_summary_dogfood_email.py --kind weekly --regions jp,us

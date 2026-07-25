@@ -1,20 +1,58 @@
 # メール送信設定ガイド
 
-## SendGrid（推奨）
+## Gmail SMTP（dogfood / 自分宛おすすめ・無料）
 
-### 1. アカウント作成
-1. https://sendgrid.com/ にアクセス
-2. 無料アカウントを作成
-3. メール認証を完了
+自分に日次・週次サマリーを送る用途ならこれが最短。
 
-### 2. API Key作成
-1. Dashboard → Settings → API Keys
-2. "Create API Key" をクリック
-3. 名前を入力（例: "trends_dashboard"）
-4. 権限: "Full Access" または "Mail Send"
-5. API Keyをコピー
+### 1. アプリパスワードを発行
 
-### 3. 環境変数設定
+1. Google アカウントで [2段階認証](https://myaccount.google.com/security) をオン
+2. [アプリパスワード](https://myaccount.google.com/apppasswords) を作成（メール / その他）
+3. 表示された 16 文字をコピー（スペースなしで `.env` に入れる）
+
+### 2. `.env` 設定
+
+```bash
+EMAIL_PROVIDER=smtp
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SENDER_EMAIL=you@gmail.com
+SENDER_PASSWORD=xxxxxxxxxxxxxxxx
+SUMMARY_DOGFOOD_TO=you@gmail.com
+```
+
+### 3. 送信テスト
+
+```bash
+python scripts/send_summary_dogfood_email.py --kind daily --id 2026-07-22 --regions jp,us --dry-run
+python scripts/send_summary_dogfood_email.py --kind daily --id 2026-07-22 --regions jp,us
+```
+
+### GitHub Actions
+
+Repository secrets:
+
+- `SENDER_EMAIL`
+- `SENDER_PASSWORD`（アプリパスワード）
+- `SUMMARY_DOGFOOD_TO`（省略可。未設定なら From と同じ扱い）
+
+`ai-daily-summary` / `ai-weekly-summary` が生成直後に dogfood 送信する。
+
+---
+
+## SendGrid（任意・本番向け）
+
+Trial 切れだと `Maximum credits exceeded` になる。有料枠があるときだけ。
+
+```bash
+EMAIL_PROVIDER=sendgrid
+SENDGRID_API_KEY=SG.xxxxx
+SENDGRID_FROM_EMAIL=your-verified-sender@example.com
+SUMMARY_DOGFOOD_TO=your-verified-sender@example.com
+```
+
+または SMTP:
+
 ```bash
 export SMTP_SERVER=smtp.sendgrid.net
 export SMTP_PORT=587
@@ -22,11 +60,7 @@ export SENDER_EMAIL=apikey
 export SENDER_PASSWORD=your_sendgrid_api_key_here
 ```
 
-### 4. 送信者情報設定
-1. Settings → Sender Authentication
-2. "Single Sender Verification" を設定
-3. 送信者メールアドレスを登録
-4. 確認メールを送信
+---
 
 ## Mailgun
 
@@ -59,5 +93,5 @@ export SENDER_PASSWORD=your_mailtrap_password
 
 ## 使用方法
 1. 環境変数を設定
-2. サーバーを再起動
-3. サブスクリプション登録をテスト
+2. サーバーを再起動（またはスクリプトを再実行）
+3. dogfood / サブスクリプション登録をテスト

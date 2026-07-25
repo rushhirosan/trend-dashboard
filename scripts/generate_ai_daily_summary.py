@@ -1694,27 +1694,21 @@ def render_category_top3_markdown(
     blocks: List[Dict[str, Any]],
     category_intros: Optional[Dict[str, str]] = None,
 ) -> str:
-    """カテゴリ別トップ3の Markdown 本文（機械生成・リンク付き + 区分1文）。"""
-    intros = category_intros or {}
+    """カテゴリ別トップ3の Markdown 本文（機械生成・リンク付き）。
+
+    category_intros は後方互換のため受け取るが、統一性のため出力しない。
+    """
+    del category_intros  # unused — do not render per-category blurbs
     lines: List[str] = [_TOP3_HEADING, ""]
     empty_label = "(no data)" if _ACTIVE_REGION == "us" else "（データなし）"
-    trend_label = "Yesterday's trend" if _ACTIVE_REGION == "us" else "昨日の傾向"
     for block in blocks:
         cat = block.get("category") or ""
         cat_disp = category_display_name(str(cat))
         items = block.get("items") or []
-        intro = ""
-        if isinstance(intros, dict):
-            intro = (
-                (intros.get(cat) or intros.get(cat_disp) or "").strip()
-            )
         if block.get("quiet") or not items:
             lines.append(f"- **{cat_disp}**: {empty_label}")
             continue
         lines.append(f"### {cat_disp}")
-        if intro:
-            lines.append(f"**{trend_label}**: {intro}")
-            lines.append("")
         for i, it in enumerate(items, 1):
             lines.append(f"{i}. {it.get('link_line') or it.get('label')}")
         lines.append("")
@@ -2440,8 +2434,6 @@ SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ�
 - `rising_notes` (array): `{ "match_label", "note" }` — rising_highlights の label に対応する1文補足。
   順位の事実の繰り返し・「急上昇中」「注目を集め」等の定型は禁止。rising_highlights が空なら []。
 - `cross_intro` (string|null): cross_source_highlights が1件以上あるときのみ導入1〜2文。0件なら null。
-- `category_intros` (object): キーは区分名、値は1文。quiet_editorial_categories 以外を優先。
-  静かな区分は省略可。抽象語のみ（「定番アプリ」「SNS投稿」等）は禁止。
 
 禁止:
 - 入力 editorial_candidates / rising_highlights / cross_source_highlights に無いラベル・事実の捏造
@@ -2472,8 +2464,6 @@ insert Japanese category labels or phrases like 補足 / 圏外 / 時位.
 - `rising_notes` (array): `{ "match_label", "note" }` — one short **English** note per rising label.
   Ban restating rank facts or stock phrases. Empty array if no rising_highlights.
 - `cross_intro` (string|null): 1–2 English sentences only when cross_source_highlights is non-empty; else null.
-- `category_intros` (object): English category name → one English sentence. Prefer non-quiet categories.
-  Ban abstract-only copy without concrete labels.
 
 Forbidden:
 - Inventing labels/facts not in editorial_candidates / rising / cross

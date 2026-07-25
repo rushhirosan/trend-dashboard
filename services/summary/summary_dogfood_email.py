@@ -62,7 +62,7 @@ def dogfood_enabled() -> bool:
 
 
 def build_subject(kind: str, region: str, doc_id: str) -> str:
-    return f"[dogfood][{region.upper()}][{kind}] {doc_id}"
+    return f"[Trends-dashboard][{region.upper()}][{kind}] {doc_id}"
 
 
 def send_summary_dogfood(

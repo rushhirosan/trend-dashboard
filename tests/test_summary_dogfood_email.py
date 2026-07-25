@@ -26,7 +26,10 @@ def test_default_weekly_doc_id_is_previous_iso_week():
 
 
 def test_build_subject():
-    assert build_subject("daily", "jp", "2026-07-22") == "[dogfood][JP][daily] 2026-07-22"
+    assert (
+        build_subject("daily", "jp", "2026-07-22")
+        == "[Trends-dashboard][JP][daily] 2026-07-22"
+    )
 
 
 def test_summary_markdown_path_jp_us(tmp_path: Path):

@@ -25,11 +25,22 @@ _CATEGORY_TREND_LINE_RE = re.compile(
     r"^\*\*(?:昨日の傾向|Yesterday's trend)\*\*:.*\n?",
     re.MULTILINE,
 )
+# 既存原稿のメタ行（タイトルと重複・またはプレースホルダ）
+_HEADER_META_LINE_RE = re.compile(
+    r"^- \*\*(?:対象（観測日）|Observation day|生成・送信完了|Generated)\*\*:.*\n?",
+    re.MULTILINE,
+)
 
 
 def strip_category_trend_blurbs(markdown: str) -> str:
     """既存原稿の「昨日の傾向」行を除去（カテゴリ間で有無がバラつくため）。"""
     text = _CATEGORY_TREND_LINE_RE.sub("", markdown)
+    return re.sub(r"\n{3,}", "\n\n", text)
+
+
+def strip_redundant_header_meta(markdown: str) -> str:
+    """観測日・生成時刻のメタ箇条書きを除去（メール見出しと重複するため）。"""
+    text = _HEADER_META_LINE_RE.sub("", markdown)
     return re.sub(r"\n{3,}", "\n\n", text)
 
 
@@ -40,6 +51,7 @@ def strip_legacy_charts(markdown: str) -> str:
     text = _SVG_BLOCK_RE.sub("", text)
     text = _IMAGE_LINE_RE.sub("", text)
     text = strip_category_trend_blurbs(text)
+    text = strip_redundant_header_meta(text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip() + "\n"
 

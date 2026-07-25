@@ -1299,9 +1299,14 @@ def test_configure_daily_region_us_paths_and_headings(gads):
     assert "Biggest movers" in gads._RISING_HEADING
     hdr = gads.render_header_markdown(date(2026, 7, 13))
     assert "Daily summary" in hdr
+    assert "Observation day" not in hdr
+    assert "Generated" not in hdr
     gads.configure_daily_region("jp")
     assert gads.daily_output_dir() == gads.DAILY_DIR
     assert "一行結論" in gads._ONE_LINER_HEADING
+    jp_hdr = gads.render_header_markdown(date(2026, 7, 13))
+    assert "対象（観測日）" not in jp_hdr
+    assert "生成・送信完了" not in jp_hdr
 
 
 def test_us_render_uses_english_labels_not_japanese(gads):

@@ -1728,23 +1728,11 @@ def _format_business_day_ja(business_day: date) -> str:
 
 
 def render_header_markdown(business_day: date) -> str:
+    """日次の見出しのみ（観測日はタイトルに含む。メタ行は付けない）。"""
     bd = business_day.isoformat()
     if _ACTIVE_REGION == "us":
-        return "\n".join(
-            [
-                f"# Daily summary — {bd} (JST)",
-                f"- **Observation day**: {bd}",
-                "- **Generated**: automatic (time not filled)",
-            ]
-        )
-    ja = _format_business_day_ja(business_day)
-    return "\n".join(
-        [
-            f"# 日次サマリー — {bd}（JST）",
-            f"- **対象（観測日）**: {ja}",
-            "- **生成・送信完了**: 自動生成（時刻未入力）",
-        ]
-    )
+        return f"# Daily summary — {bd} (JST)"
+    return f"# 日次サマリー — {bd}（JST）"
 
 
 def render_editorial_markdown(

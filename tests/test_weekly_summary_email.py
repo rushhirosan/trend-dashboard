@@ -110,3 +110,18 @@ def test_email_strips_category_trend_blurbs():
     assert "昨日の傾向" not in html
     assert "WordPressが話題" not in html
     assert "テック・開発" in html
+
+
+def test_email_strips_redundant_header_meta():
+    md = """# 日次サマリー — 2026-07-24（JST）
+- **対象（観測日）**: 2026年7月24日
+- **生成・送信完了**: 自動生成（時刻未入力）
+
+## 昨日の一行結論
+
+本文。
+"""
+    html = weekly_markdown_to_email_html(md, title="日次サマリー — 2026-07-24 (JP)")
+    assert "対象（観測日）" not in html
+    assert "生成・送信完了" not in html
+    assert "昨日の一行結論" in html

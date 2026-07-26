@@ -235,7 +235,19 @@ def write_and_verify_snapshot(
 
 
 def format_snapshot_status_for_discord(status: Optional[Dict[str, Any]]) -> str:
-    if not status or not status.get("scheduler_slot_key"):
+    if not status:
+        return "（対象スロットなし）"
+    # 全ソース成功前にスナップショットを書かなかった場合（slot はあるが verified ではない）
+    if status.get("skipped"):
+        slot_key = status.get("scheduler_slot_key") or ""
+        failed_count = status.get("failed_count")
+        reason = status.get("skip_reason") or "refresh_incomplete"
+        if slot_key and failed_count is not None:
+            return f"取得一部失敗のためスキップ ({slot_key}, failed={failed_count})"
+        if slot_key:
+            return f"取得未完了のためスキップ ({slot_key}, {reason})"
+        return f"取得未完了のためスキップ ({reason})"
+    if not status.get("scheduler_slot_key"):
         return "（対象スロットなし）"
     base_ok = status.get("verified_ok")
     cap_warn = status.get("captured_at_warning")
@@ -255,3 +267,42 @@ def format_snapshot_status_for_discord(status: Optional[Dict[str, Any]]) -> str:
         f"NG · {status.get('business_day')} · slot {status.get('slot')} · "
         f"DB {row_count}行 · write={'OK' if write_ok else '失敗'}"
     )
+
+
+def snapshot_skip_status_for_refresh(
+    scheduler_slot_key: Optional[str],
+    refresh_result: dict,
+) -> Dict[str, Any]:
+    """refresh 未完了でスナップショットを書かないときの Discord / ログ用 status。"""
+    results = refresh_result.get("results") or {}
+    failed_count = sum(1 for r in results.values() if not r.get("success"))
+    reasons: List[str] = []
+    if refresh_result.get("job_timed_out"):
+        reasons.append("timeout")
+    if refresh_result.get("jp_phase_failed"):
+        reasons.append("jp_phase_failed")
+    if refresh_result.get("us_phase_failed"):
+        reasons.append("us_phase_failed")
+    if refresh_result.get("us_phase_skipped"):
+        reasons.append("us_skipped")
+    if failed_count:
+        reasons.append(f"failed={failed_count}")
+    skip_reason = ",".join(reasons) or "refresh_incomplete"
+    status: Dict[str, Any] = {
+        "skipped": True,
+        "skip_reason": skip_reason,
+        "failed_count": failed_count,
+        "write_ok": False,
+        "verified_ok": False,
+        "row_count": 0,
+        "scheduler_slot_key": scheduler_slot_key or "",
+        "business_day": "",
+        "slot": "",
+    }
+    if scheduler_slot_key:
+        parsed = parse_slot_key(scheduler_slot_key)
+        if parsed:
+            business_day, slot_code = parsed
+            status["business_day"] = business_day.isoformat()
+            status["slot"] = slot_code
+    return status

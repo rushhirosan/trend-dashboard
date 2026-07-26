@@ -101,6 +101,46 @@ def test_format_snapshot_status_for_discord():
     assert "失敗" in ng
 
 
+def test_format_snapshot_status_skipped_partial_failure():
+    msg = format_snapshot_status_for_discord(
+        {
+            "skipped": True,
+            "scheduler_slot_key": "7pm_2026-07-26",
+            "failed_count": 1,
+            "skip_reason": "failed=1",
+            "verified_ok": False,
+            "write_ok": False,
+        }
+    )
+    assert "取得一部失敗のためスキップ" in msg
+    assert "7pm_2026-07-26" in msg
+    assert "failed=1" in msg
+
+
+def test_snapshot_skip_status_for_refresh():
+    from services.snapshot_slot_health import snapshot_skip_status_for_refresh
+
+    status = snapshot_skip_status_for_refresh(
+        "7pm_2026-07-26",
+        {
+            "success": False,
+            "results": {
+                "google_JP": {"success": True},
+                "globenewswire_market_reaction_US": {"success": False},
+            },
+        },
+    )
+    assert status["skipped"] is True
+    assert status["failed_count"] == 1
+    assert status["scheduler_slot_key"] == "7pm_2026-07-26"
+    assert status["slot"] == "19"
+    assert status["business_day"] == "2026-07-26"
+    assert status["verified_ok"] is False
+    formatted = format_snapshot_status_for_discord(status)
+    assert "取得一部失敗のためスキップ" in formatted
+    assert "7pm_2026-07-26" in formatted
+
+
 def test_slot_key_for_and_iter():
     bd = date(2026, 6, 20)
     assert slot_key_for(bd, "07") == "7am_2026-06-20"

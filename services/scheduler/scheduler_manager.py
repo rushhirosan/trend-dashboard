@@ -1707,13 +1707,20 @@ class TrendsScheduler:
                         exc_info=True,
                     )
             else:
+                from services.snapshot_slot_health import snapshot_skip_status_for_refresh
+
+                snapshot_status = snapshot_skip_status_for_refresh(
+                    snapshot_slot_key, result
+                )
                 logger.warning(
                     "⏭️ refresh 未完了のためスナップショット保存をスキップ "
-                    "(success=%s jp_failed=%s us_failed=%s timed_out=%s)",
+                    "(success=%s jp_failed=%s us_failed=%s timed_out=%s slot=%s failed=%s)",
                     result.get("success"),
                     result.get("jp_phase_failed"),
                     result.get("us_phase_failed"),
                     result.get("job_timed_out"),
+                    snapshot_slot_key,
+                    snapshot_status.get("failed_count"),
                 )
             
             # 結果をログ出力
@@ -2313,11 +2320,13 @@ class TrendsScheduler:
         snapshot_bad = bool(
             snapshot_status
             and snapshot_status.get("scheduler_slot_key")
+            and not snapshot_status.get("skipped")
             and (
                 not snapshot_status.get("verified_ok")
                 or not snapshot_status.get("captured_at_ok", True)
             )
         )
+        snapshot_skipped = bool(snapshot_status and snapshot_status.get("skipped"))
         gaps = list(prior_slot_gaps or [])
         gaps_bad = bool(gaps)
         region_stats = region_stats or {}
@@ -2329,7 +2338,10 @@ class TrendsScheduler:
             us_line = "skipped"
 
         snapshot_required = bool(snapshot_status and snapshot_status.get("scheduler_slot_key"))
-        snapshot_ok = not snapshot_required or bool(snapshot_status.get("verified_ok"))
+        snapshot_ok = (
+            not snapshot_required
+            or bool(snapshot_status.get("verified_ok"))
+        ) and not snapshot_skipped
         sources_all_ok = failed_count == 0 and total_count > 0
         fully_ok = (
             sources_all_ok
@@ -2355,7 +2367,7 @@ class TrendsScheduler:
             alert_type = "critical"
         elif jp_phase_failed or us_phase_skipped or failed_count > 0:
             alert_type = "warning"
-        elif has_anomaly or snapshot_bad or gaps_bad:
+        elif has_anomaly or snapshot_bad or gaps_bad or snapshot_skipped:
             alert_type = "warning"
         elif failed_count == 0:
             alert_type = "success"
@@ -2396,6 +2408,15 @@ class TrendsScheduler:
                     f"トレンド取得が完了しませんでした（JP: {jp_line}, US: {us_line}）。\n"
                     f"トリガー: {trigger_label}"
                 )
+        elif failed_count > 0:
+            title = "⚠️ トレンド取得完了（一部失敗）"
+            message = f"トレンド取得が完了しましたが、{failed_count}件の失敗があります。\nトリガー: {trigger_label}"
+        elif snapshot_skipped:
+            title = "⚠️ トレンド取得完了（スナップショット未保存）"
+            message = (
+                f"取得が未完了のためスナップショットを保存しませんでした。\n"
+                f"トリガー: {trigger_label}"
+            )
         elif failed_count == 0:
             title = "✅ トレンド取得正常終了"
             message = f"全てのトレンド取得が正常に完了しました。\nトリガー: {trigger_label}"

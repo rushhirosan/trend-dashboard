@@ -5,19 +5,47 @@ yfinance で株価・出来高を取得し、abs(24h%change) + volume_spike で�
 反応ランキング Top N を返す。
 """
 
+import math
 import re
-import requests
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 
 import feedparser
-import yfinance as yf
 import pandas as pd
+import requests
+import yfinance as yf
 
 from database_config import TrendsCache
-from utils.logger_config import get_logger
 from services.trends.base_trends_manager import BaseTrendsManager
+from utils.logger_config import get_logger
 
 logger = get_logger(__name__)
+
+
+def _safe_float(val, default: float = 0.0) -> float:
+    """yfinance / DB 由来の NaN・Decimal・文字列を安全な float に落とす。"""
+    try:
+        if val is None:
+            return default
+        if isinstance(val, Decimal):
+            if not val.is_finite():
+                return default
+            return float(val)
+        if isinstance(val, bool):
+            return default
+        if isinstance(val, (int, float)):
+            f = float(val)
+            return f if math.isfinite(f) else default
+        if isinstance(val, str):
+            cleaned = val.strip().replace("%", "").replace(",", "")
+            if cleaned == "":
+                return default
+            f = float(cleaned)
+            return f if math.isfinite(f) else default
+        f = float(val)
+        return f if math.isfinite(f) else default
+    except (InvalidOperation, ValueError, TypeError, OverflowError):
+        return default
 
 # GlobeNewswire 公式ATOM（Public Companies）
 DEFAULT_RSS_URL = (
@@ -164,20 +192,26 @@ class GlobeNewswireMarketReactionTrendsManager(BaseTrendsManager):
         result = {t: {'change_percent': 0, 'volume_spike': 0} for t in tickers}
 
         def _calc_from_hist(hist: pd.DataFrame) -> tuple[float, float]:
-            """hist DataFrame から change_pct と vol_spike を計算"""
+            """hist DataFrame から change_pct と vol_spike を計算（NaN は 0）。"""
             if hist is None or hist.empty or len(hist) < 2:
                 return 0.0, 0.0
             close = hist['Close'] if 'Close' in hist.columns else None
             vol = hist['Volume'] if 'Volume' in hist.columns else pd.Series([0] * len(hist))
             if close is None or close.empty:
                 return 0.0, 0.0
-            prev_close = float(close.iloc[-2])
-            curr_close = float(close.iloc[-1])
-            change_pct = (curr_close / prev_close - 1) * 100 if prev_close > 0 else 0
-            curr_vol = float(vol.iloc[-1]) if len(vol) > 0 else 0
-            avg_vol = float(vol.iloc[:-1].mean()) if len(vol) > 1 and vol.iloc[:-1].sum() > 0 else curr_vol
-            vol_spike = min(50, max(0, (curr_vol / avg_vol - 1) * 100)) if avg_vol and avg_vol > 0 else 0
-            return change_pct, vol_spike
+            prev_close = _safe_float(close.iloc[-2])
+            curr_close = _safe_float(close.iloc[-1])
+            change_pct = (curr_close / prev_close - 1) * 100 if prev_close > 0 else 0.0
+            curr_vol = _safe_float(vol.iloc[-1]) if len(vol) > 0 else 0.0
+            if len(vol) > 1:
+                avg_vol = _safe_float(vol.iloc[:-1].mean(), curr_vol)
+            else:
+                avg_vol = curr_vol
+            if avg_vol > 0:
+                vol_spike = min(50.0, max(0.0, (curr_vol / avg_vol - 1) * 100))
+            else:
+                vol_spike = 0.0
+            return _safe_float(change_pct), _safe_float(vol_spike)
 
         try:
             # yf.download で一括取得（1リクエスト）
@@ -292,12 +326,13 @@ class GlobeNewswireMarketReactionTrendsManager(BaseTrendsManager):
             market_data = self._fetch_market_data_batch(unique_tickers)
 
             # スコア算出とマージ（各ティッカーで最新1件のみ使用）
+            # NaN / Decimal は float 化して 0 に落とす（ソート・round で InvalidOperation を防ぐ）
             scored_items = []
             for ticker, item_list in ticker_to_items.items():
                 item = item_list[0]
                 md = market_data.get(ticker, {'change_percent': 0, 'volume_spike': 0})
-                change_pct = md.get('change_percent', 0) or 0
-                vol_spike = md.get('volume_spike', 0) or 0
+                change_pct = _safe_float(md.get('change_percent', 0))
+                vol_spike = _safe_float(md.get('volume_spike', 0))
                 score = abs(change_pct) + vol_spike
 
                 item['ticker'] = ticker
@@ -306,7 +341,7 @@ class GlobeNewswireMarketReactionTrendsManager(BaseTrendsManager):
                 item['reaction_score'] = round(score, 2)
                 scored_items.append(item)
 
-            scored_items.sort(key=lambda x: x.get('reaction_score', 0), reverse=True)
+            scored_items.sort(key=lambda x: _safe_float(x.get('reaction_score', 0)), reverse=True)
             top = scored_items[:limit]
             for i, item in enumerate(top, 1):
                 item['rank'] = i

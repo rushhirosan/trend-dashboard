@@ -5,13 +5,41 @@
 
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Any, Callable
+import math
 import os
+from decimal import Decimal, InvalidOperation
 from database_config import TrendsCache
 from utils.logger_config import get_logger
 from utils.rate_limiter import get_rate_limiter
 from utils.dummy_data_generator import generate_dummy_trends_data
 
 logger = get_logger(__name__)
+
+
+def _safe_numeric_sort_value(value: Any, default: float = 0.0) -> float:
+    """ソート用に数値を安全な float にする（NaN / Decimal / 文字列対応）。"""
+    try:
+        if value is None:
+            return default
+        if isinstance(value, Decimal):
+            if not value.is_finite():
+                return default
+            return float(value)
+        if isinstance(value, bool):
+            return default
+        if isinstance(value, (int, float)):
+            f = float(value)
+            return f if math.isfinite(f) else default
+        if isinstance(value, str):
+            cleaned = value.strip().replace("%", "").replace(",", "")
+            if cleaned == "":
+                return default
+            f = float(cleaned)
+            return f if math.isfinite(f) else default
+    except (InvalidOperation, ValueError, TypeError, OverflowError):
+        return default
+    return default
+
 
 # AlertServiceを遅延インポート（オプション）
 _alert_service = None
@@ -224,19 +252,19 @@ class BaseTrendsManager(ABC):
             # 数値キーのリスト（数値としてソートする必要があるキー）
             numeric_keys = ['stars', 'stars_count', 'forks', 'forks_count', 'average_user_rating',
                           'user_rating_count', 'votes_count', 'reactions_count', 'sales_count',
-                          'review_count', 'price', 'change_percent', 'bookmark_count', 'score',
+                          'review_count', 'price', 'change_percent', 'volume_spike', 'reaction_score',
+                          'bookmark_count', 'score',
                           'viewer_count', 'view_count', 'like_count', 'reply_count', 'repost_count']
 
-            # 数値キーの場合は数値として比較、それ以外は文字列として比較
+            # 数値キーは Decimal/NaN を 0 に落として比較（キャッシュ再読込時の InvalidOperation 防止）
             def get_sort_value(x):
                 value = x.get(sort_key)
-                # Noneの場合は、数値キーの場合は0、それ以外は空文字列として扱う
+                if sort_key in numeric_keys:
+                    return _safe_numeric_sort_value(value)
                 if value is None:
-                    return 0 if sort_key in numeric_keys else ''
-                # 数値の場合は数値として返す
+                    return ''
                 if isinstance(value, (int, float)):
                     return value
-                # 文字列の場合はそのまま返す
                 return value
 
             data.sort(key=get_sort_value, reverse=reverse)

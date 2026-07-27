@@ -35,12 +35,13 @@
 .trend-table tbody tr.row-clickable {
     cursor: pointer;
 }
-/* 行内のリンクはタップを親のtrに透過（行全体で1つのタップ領域にする） */
-.trend-table tbody tr.row-clickable a[href] {
+/* 行内の通常リンクはタップを親のtrに透過（行全体で1つのタップ領域にする） */
+.trend-table tbody tr.row-clickable a[href]:not(.row-action-link) {
     pointer-events: none;
 }
-/* 二次アクション（Amazonで見る等）だけは独自URLへ遷移させる */
-.trend-table tbody tr.row-clickable a.row-action-link[href] {
+/* 二次アクション（Amazonで見る等）は独自URLへ。href判定も保険 */
+.trend-table tbody tr.row-clickable a.row-action-link[href],
+.trend-table tbody tr.row-clickable a[href*="amazon."] {
     pointer-events: auto;
 }
 

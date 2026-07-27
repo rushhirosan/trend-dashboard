@@ -1,6 +1,6 @@
 // 共通: テーブル行クリックで別タブでURLを開く（ニュースタブと同様の動作を全タブに適用）
 // モバイル: tabindex=-1 で1回タップで開く（フォーカス経由の2回タップを回避）、touch-action: manipulation でタップ遅延を解消
-// .row-action-link（例: 映画の「Amazonで見る」）は行の主リンクとは別URLのため、行ハンドラ対象外
+// .row-action-link / Amazon URL は行の主リンクとは別のため、行ハンドラ対象外（座標判定込み）
 function makeTableRowClickable(row, linkUrl, ariaLabel) {
     if (!row || !linkUrl || linkUrl === '#' || (typeof linkUrl === 'string' && linkUrl.trim() === '')) return;
 
@@ -11,12 +11,35 @@ function makeTableRowClickable(row, linkUrl, ariaLabel) {
     row.style.cursor = 'pointer';
     row.style.touchAction = 'manipulation';
 
-    const isRowActionLink = function (target) {
-        return !!(target && target.closest && target.closest('a.row-action-link[href]'));
+    // pointer-events:none だと e.target / elementsFromPoint がリンクを拾えないため、矩形ヒットも使う
+    const findRowActionLink = function (e) {
+        const isActionAnchor = function (a) {
+            if (!a || !row.contains(a)) return false;
+            if (a.classList && a.classList.contains('row-action-link')) return true;
+            const href = a.getAttribute('href') || '';
+            return /amazon\.(co\.jp|com)\//i.test(href);
+        };
+        if (e && e.target && e.target.closest) {
+            const direct = e.target.closest('a[href]');
+            if (isActionAnchor(direct)) return direct;
+        }
+        const x = (e && typeof e.clientX === 'number') ? e.clientX
+            : (e && e.changedTouches && e.changedTouches[0] && e.changedTouches[0].clientX);
+        const y = (e && typeof e.clientY === 'number') ? e.clientY
+            : (e && e.changedTouches && e.changedTouches[0] && e.changedTouches[0].clientY);
+        if (typeof x !== 'number' || typeof y !== 'number') return null;
+        const candidates = row.querySelectorAll('a.row-action-link[href], a[href*="amazon."]');
+        for (let i = 0; i < candidates.length; i++) {
+            const a = candidates[i];
+            if (!isActionAnchor(a)) continue;
+            const r = a.getBoundingClientRect();
+            if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return a;
+        }
+        return null;
     };
 
-    const openInNewTab = function () {
-        window.open(linkUrl, '_blank', 'noopener,noreferrer');
+    const openInNewTab = function (url) {
+        window.open(url || linkUrl, '_blank', 'noopener,noreferrer');
     };
 
     var touchHandled = false;
@@ -26,8 +49,15 @@ function makeTableRowClickable(row, linkUrl, ariaLabel) {
         if (t) { touchStartX = t.clientX; touchStartY = t.clientY; }
     }, { passive: true });
     row.addEventListener('touchend', function (e) {
-        // 二次アクションリンクはネイティブ遷移に任せる（行の主リンクを開かない）
-        if (isRowActionLink(e.target)) return;
+        var action = findRowActionLink(e);
+        if (action) {
+            touchHandled = true;
+            e.preventDefault();
+            e.stopPropagation();
+            openInNewTab(action.href);
+            setTimeout(function () { touchHandled = false; }, 400);
+            return;
+        }
         var t = e.changedTouches && e.changedTouches[0];
         if (!t) return;
         var dx = Math.abs(t.clientX - touchStartX);
@@ -40,7 +70,13 @@ function makeTableRowClickable(row, linkUrl, ariaLabel) {
     }, { passive: false });
 
     row.addEventListener('click', function (e) {
-        if (isRowActionLink(e.target)) return;
+        var action = findRowActionLink(e);
+        if (action) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!touchHandled) openInNewTab(action.href);
+            return;
+        }
         if (touchHandled) { e.preventDefault(); e.stopPropagation(); return; }
         e.preventDefault();
         e.stopPropagation();
@@ -48,7 +84,7 @@ function makeTableRowClickable(row, linkUrl, ariaLabel) {
     }, true);
 
     row.addEventListener('keydown', function (e) {
-        if (isRowActionLink(e.target)) return;
+        if (findRowActionLink(e)) return;
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             openInNewTab();

@@ -72,13 +72,14 @@ COPY service-account-key.json /app/service-account-key.json
 ENV GOOGLE_APPLICATION_CREDENTIALS="/app/service-account-key.json"
 ```
 
-### 4. メール送信設定（サブスクリプション機能用）
+### 4. メール送信設定（サブスクリプション・dogfood 共通）
+
+検証・本番とも **Resend**（ドメイン認証済み From）。
 
 ```bash
-SENDER_EMAIL="your-email@gmail.com"
-SENDER_PASSWORD="your-email-password"
-SMTP_SERVER="smtp.gmail.com"
-SMTP_PORT="587"
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=re_xxxxx
+RESEND_FROM_EMAIL=noreply@trends-dashboard.com
 ```
 
 ## 📝 本番環境への設定方法
@@ -105,13 +106,11 @@ fly secrets set \
   SPOTIFY_CLIENT_ID="your-spotify-client-id" \
   SPOTIFY_CLIENT_SECRET="your-spotify-client-secret" \
   GITHUB_ACCESS_TOKEN="your-github-access-token" \
-  SENDER_EMAIL="your-email@gmail.com" \
-  SENDER_PASSWORD="your-email-password" \
-  SMTP_SERVER="smtp.gmail.com" \
-  SMTP_PORT="587" \
+  EMAIL_PROVIDER=resend \
+  RESEND_API_KEY="re_xxxxx" \
+  RESEND_FROM_EMAIL="noreply@trends-dashboard.com" \
   -a trends-dashboard
 ```
-
 2. **Google Cloud認証情報の設定**
 
 ```bash

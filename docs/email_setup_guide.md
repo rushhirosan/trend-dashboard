@@ -1,16 +1,60 @@
 # メール送信設定ガイド
 
-## Gmail SMTP（dogfood / 自分宛おすすめ・無料）
+検証（ローカル / dogfood / GHA）と本番は **同じ Resend** を使う。無料枠はおおよそ月 3,000 通・1日 100 通まで。
 
-自分に日次・週次サマリーを送る用途ならこれが最短。
+## Resend（推奨・検証と本番で共通）
 
-### 1. アプリパスワードを発行
+### 1. ドメイン認証
 
-1. Google アカウントで [2段階認証](https://myaccount.google.com/security) をオン
-2. [アプリパスワード](https://myaccount.google.com/apppasswords) を作成（メール / その他）
-3. 表示された 16 文字をコピー（スペースなしで `.env` に入れる）
+Resend → Domains で `trends-dashboard.com` を追加し、DNS（DKIM / SPF）を verified にする。
 
-### 2. `.env` 設定
+### 2. API キー
+
+Resend → API Keys で作成（送信だけなら **Sending access** で可）。表示された `re_...` は一度しか見られない。
+
+### 3. ローカル `.env`
+
+```bash
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=re_xxxxx
+RESEND_FROM_EMAIL=noreply@trends-dashboard.com
+SUMMARY_DOGFOOD_TO=you@gmail.com
+```
+
+### 4. Fly 本番（同じ変数）
+
+```bash
+fly secrets set \
+  EMAIL_PROVIDER=resend \
+  RESEND_API_KEY=re_xxxxx \
+  RESEND_FROM_EMAIL=noreply@trends-dashboard.com \
+  -a trends-dashboard
+```
+
+### 5. GitHub Actions（dogfood）
+
+Repository secrets:
+
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`（例: `noreply@trends-dashboard.com`）
+- `SUMMARY_DOGFOOD_TO`（自分宛）
+
+`ai-daily-summary` / `ai-weekly-summary` が生成直後に dogfood 送信する。
+
+### 6. 送信テスト
+
+```bash
+python scripts/send_summary_dogfood_email.py --kind daily --id 2026-07-22 --regions jp,us --dry-run
+python scripts/send_summary_dogfood_email.py --kind daily --id 2026-07-22 --regions jp,us
+```
+
+`EMAIL_PROVIDER=auto` のとき、`RESEND_API_KEY` があれば Resend を優先する。SMTP モードでは `RESEND_FROM_EMAIL` は無視される。
+
+---
+
+## Gmail SMTP（任意フォールバック）
+
+Resend が使えないときの代替。通常運用では不要。
 
 ```bash
 EMAIL_PROVIDER=smtp
@@ -21,44 +65,7 @@ SENDER_PASSWORD=xxxxxxxxxxxxxxxx
 SUMMARY_DOGFOOD_TO=you@gmail.com
 ```
 
-### 3. 送信テスト
-
-```bash
-python scripts/send_summary_dogfood_email.py --kind daily --id 2026-07-22 --regions jp,us --dry-run
-python scripts/send_summary_dogfood_email.py --kind daily --id 2026-07-22 --regions jp,us
-```
-
-### GitHub Actions
-
-Repository secrets:
-
-- `SENDER_EMAIL`
-- `SENDER_PASSWORD`（アプリパスワード）
-- `SUMMARY_DOGFOOD_TO`（省略可。未設定なら From と同じ扱い）
-
-`ai-daily-summary` / `ai-weekly-summary` が生成直後に dogfood 送信する。
-
----
-
-## SendGrid（任意・本番向け）
-
-Trial 切れだと `Maximum credits exceeded` になる。有料枠があるときだけ。
-
-```bash
-EMAIL_PROVIDER=sendgrid
-SENDGRID_API_KEY=SG.xxxxx
-SENDGRID_FROM_EMAIL=your-verified-sender@example.com
-SUMMARY_DOGFOOD_TO=your-verified-sender@example.com
-```
-
-または SMTP:
-
-```bash
-export SMTP_SERVER=smtp.sendgrid.net
-export SMTP_PORT=587
-export SENDER_EMAIL=apikey
-export SENDER_PASSWORD=your_sendgrid_api_key_here
-```
+アプリパスワード: Google アカウントで [2段階認証](https://myaccount.google.com/security) → [アプリパスワード](https://myaccount.google.com/apppasswords)。
 
 ---
 

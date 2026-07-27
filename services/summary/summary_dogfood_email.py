@@ -47,7 +47,12 @@ def resolve_dogfood_to() -> str:
     to_addr = (os.getenv("SUMMARY_DOGFOOD_TO") or "").strip()
     if to_addr:
         return to_addr
-    sender = (os.getenv("SENDGRID_FROM_EMAIL") or os.getenv("SENDER_EMAIL") or "").strip()
+    sender = (
+        os.getenv("RESEND_FROM_EMAIL")
+        or os.getenv("MAIL_FROM")
+        or os.getenv("SENDER_EMAIL")
+        or ""
+    ).strip()
     if "@" in sender:
         return sender
     return ""

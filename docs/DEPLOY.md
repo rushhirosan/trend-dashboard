@@ -89,10 +89,9 @@ fly secrets set \
   EBAY_CAMPAIGN_ID="your-ebay-campaign-id" \
   TWITCH_CLIENT_ID="your-twitch-client-id" \
   TWITCH_CLIENT_SECRET="your-twitch-client-secret" \
-  SENDER_EMAIL="your-email@gmail.com" \
-  SENDER_PASSWORD="your-email-password" \
-  SMTP_SERVER="smtp.gmail.com" \
-  SMTP_PORT="587" \
+  EMAIL_PROVIDER=resend \
+  RESEND_API_KEY="re_xxxxx" \
+  RESEND_FROM_EMAIL="noreply@trends-dashboard.com" \
   -a trends-dashboard
 ```
 

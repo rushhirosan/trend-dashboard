@@ -16,66 +16,66 @@ logger = get_logger(__name__)
 class EmailService:
     def __init__(self):
         # 環境変数からメール設定を読み込む（機密情報は .env で管理）
-        # EMAIL_PROVIDER=smtp|gmail → Gmail 等の SMTP
-        # EMAIL_PROVIDER=sendgrid → SendGrid Web API
-        # EMAIL_PROVIDER=auto（既定）→ Gmail SMTP が揃っていれば SMTP、なければ SendGrid、それ以外は SMTP
+        # EMAIL_PROVIDER=smtp|gmail → Gmail 等の SMTP（任意フォールバック）
+        # EMAIL_PROVIDER=resend → Resend Web API（検証・本番の推奨）
+        # EMAIL_PROVIDER=auto（既定）→ RESEND_API_KEY があれば Resend、なければ Gmail SMTP
         provider = (os.getenv('EMAIL_PROVIDER') or 'auto').strip().lower()
-        sendgrid_key = (os.getenv('SENDGRID_API_KEY') or '').strip()
+        resend_key = (os.getenv('RESEND_API_KEY') or '').strip()
         smtp_server_env = (os.getenv('SMTP_SERVER') or '').strip()
         sender_email = (os.getenv('SENDER_EMAIL') or '').strip()
         sender_password = (os.getenv('SENDER_PASSWORD') or '').strip()
-        self.from_email = (
-            os.getenv('SENDGRID_FROM_EMAIL')
-            or os.getenv('MAIL_FROM')
-            or ''
-        ).strip()
+        mail_from = (os.getenv('MAIL_FROM') or '').strip()
+        resend_from = (os.getenv('RESEND_FROM_EMAIL') or '').strip()
         self.smtp_port = int((os.getenv('SMTP_PORT') or '587').strip())
 
-        use_sendgrid = False
-        if provider in ('sendgrid', 'sg'):
-            use_sendgrid = bool(sendgrid_key)
+        use_resend = False
+        if provider in ('resend',):
+            use_resend = bool(resend_key)
         elif provider in ('smtp', 'gmail'):
-            use_sendgrid = False
+            use_resend = False
         else:
-            # auto: Gmail SMTP が使えそうなら SendGrid より優先（dogfood 向け）
-            if (
+            # auto: Resend を優先（検証と本番を同じ経路にする）
+            if resend_key:
+                use_resend = True
+            elif (
                 'gmail' in smtp_server_env.lower()
                 and sender_password
                 and '@' in sender_email
             ):
-                use_sendgrid = False
-            elif sendgrid_key:
-                use_sendgrid = True
+                use_resend = False
 
-        self.sendgrid_api_key = sendgrid_key if use_sendgrid else ''
+        self.resend_api_key = resend_key if use_resend else ''
 
-        if use_sendgrid:
-            # SendGrid 時はプレースホルダ SMTP_SERVER を無視（smtp.example.com 等）
-            if 'sendgrid' in smtp_server_env.lower():
-                self.smtp_server = smtp_server_env
-            else:
-                self.smtp_server = 'smtp.sendgrid.net'
-            self.smtp_user = 'apikey'
-            self.smtp_password = sendgrid_key
+        if use_resend:
+            # Resend は Web API のみ使う。プレースホルダ SMTP_SERVER は無視する
+            self.smtp_server = ''
+            self.smtp_user = ''
+            self.smtp_password = ''
+            # From は検証済みドメインのみ（SMTP 用 SENDER_EMAIL を誤って使わない）
+            self.from_email = resend_from or mail_from or ''
             if not self.from_email and '@' in sender_email:
                 self.from_email = sender_email
         else:
             self.smtp_server = smtp_server_env
             self.smtp_user = sender_email
             self.smtp_password = sender_password
-            if not self.from_email:
-                self.from_email = sender_email if '@' in sender_email else ''
+            # SMTP / dogfood: RESEND_FROM_EMAIL は無視（Gmail From と衝突させない）
+            self.from_email = (
+                sender_email
+                if '@' in sender_email
+                else (mail_from if '@' in mail_from else '')
+            )
 
         # 旧コード互換（一部が sender_email / sender_password を参照しうる）
         self.sender_email = self.from_email or self.smtp_user
         self.sender_password = self.smtp_password
-        self.email_provider = 'sendgrid' if use_sendgrid else 'smtp'
+        self.email_provider = 'resend' if use_resend else 'smtp'
 
     def is_configured(self) -> bool:
         """送信手段と From が揃っているか。"""
         if not (self.from_email and '@' in self.from_email):
             return False
-        if self.sendgrid_api_key:
+        if self.resend_api_key:
             return True
         return bool(self.smtp_server and self.smtp_user and self.smtp_password)
 
@@ -221,39 +221,37 @@ class EmailService:
         }
         return frequency_map.get(frequency, frequency)
 
-    def _send_via_sendgrid_api(self, to_email, subject, html_content, text_content) -> bool:
-        """SendGrid Web API v3 で送信（requests 優先・urllib フォールバック）。"""
+    def _send_via_resend_api(self, to_email, subject, html_content, text_content) -> bool:
+        """Resend Web API で送信（requests 優先・urllib フォールバック）。"""
         payload = {
-            "personalizations": [{"to": [{"email": to_email}]}],
-            "from": {"email": self.from_email},
+            "from": self.from_email,
+            "to": [to_email],
             "subject": subject,
-            "content": [
-                {"type": "text/plain", "value": text_content or " "},
-                {"type": "text/html", "value": html_content or "<p></p>"},
-            ],
+            "html": html_content or "<p></p>",
+            "text": text_content or " ",
         }
         headers = {
-            "Authorization": f"Bearer {self.sendgrid_api_key}",
+            "Authorization": f"Bearer {self.resend_api_key}",
             "Content-Type": "application/json",
         }
         try:
             import requests
 
             resp = requests.post(
-                "https://api.sendgrid.com/v3/mail/send",
+                "https://api.resend.com/emails",
                 headers=headers,
                 json=payload,
                 timeout=30,
             )
             if 200 <= resp.status_code < 300:
                 logger.info(
-                    "メール送信完了 (SendGrid API): to=%s subject=%s",
+                    "メール送信完了 (Resend API): to=%s subject=%s",
                     to_email,
                     subject,
                 )
                 return True
             logger.error(
-                "SendGrid API エラー: %s %s",
+                "Resend API エラー: %s %s",
                 resp.status_code,
                 (resp.text or "")[:800],
             )
@@ -261,11 +259,11 @@ class EmailService:
         except ImportError:
             pass
         except Exception as e:
-            logger.error("SendGrid API (requests) 失敗: %s", e, exc_info=True)
+            logger.error("Resend API (requests) 失敗: %s", e, exc_info=True)
             return False
 
         req = urllib.request.Request(
-            "https://api.sendgrid.com/v3/mail/send",
+            "https://api.resend.com/emails",
             data=json.dumps(payload).encode("utf-8"),
             headers=headers,
             method="POST",
@@ -274,31 +272,31 @@ class EmailService:
             with urllib.request.urlopen(req, timeout=30) as resp:
                 if 200 <= resp.status < 300:
                     logger.info(
-                        "メール送信完了 (SendGrid API): to=%s subject=%s",
+                        "メール送信完了 (Resend API): to=%s subject=%s",
                         to_email,
                         subject,
                     )
                     return True
                 body = resp.read()[:500]
-                logger.error("SendGrid API 予期しない応答: %s %s", resp.status, body)
+                logger.error("Resend API 予期しない応答: %s %s", resp.status, body)
                 return False
         except urllib.error.HTTPError as e:
             body = e.read()[:800].decode("utf-8", errors="replace")
-            logger.error("SendGrid API エラー: %s %s", e.code, body)
+            logger.error("Resend API エラー: %s %s", e.code, body)
             return False
-    
+
     def _send_email(self, to_email, subject, html_content, text_content):
         """メール送信"""
         try:
             if not self.is_configured():
                 logger.debug(
                     "メール未設定のため送信をスキップします"
-                    "（SENDGRID_API_KEY + From、または SENDER_EMAIL / SENDER_PASSWORD）"
+                    "（RESEND_API_KEY + From、または SENDER_EMAIL / SENDER_PASSWORD）"
                 )
                 return False
 
-            if self.sendgrid_api_key:
-                return self._send_via_sendgrid_api(
+            if self.resend_api_key:
+                return self._send_via_resend_api(
                     to_email, subject, html_content, text_content
                 )
 
@@ -306,11 +304,11 @@ class EmailService:
             msg['Subject'] = subject
             msg['From'] = self.from_email
             msg['To'] = to_email
-            
+
             # テキストとHTMLを追加
             text_part = MIMEText(text_content, 'plain', 'utf-8')
             html_part = MIMEText(html_content, 'html', 'utf-8')
-            
+
             msg.attach(text_part)
             msg.attach(html_part)
 
@@ -321,11 +319,11 @@ class EmailService:
 
             logger.info("メール送信完了: to=%s subject=%s", to_email, subject)
             return True
-            
+
         except smtplib.SMTPAuthenticationError as e:
             logger.error(f"   ❌ SMTP認証エラー: {e}")
             logger.error(
-                "      SendGrid API Key / From 認証、または Gmail アプリパスワードを確認してください",
+                "      Gmail アプリパスワード、または SMTP 認証情報を確認してください",
                 exc_info=True,
             )
             return False

@@ -80,19 +80,17 @@ jobs:
           fi
           python scripts/publish_summaries_to_site.py
 
-      # 自分宛 dogfood（draft 可）。Gmail SMTP 推奨。Secrets 未設定ならスキップ。
+      # 自分宛 dogfood（draft 可）。Resend（検証=本番と同じ経路）。Secrets 未設定ならスキップ。
       - name: Dogfood email (daily JP+US)
         if: always()
         env:
-          EMAIL_PROVIDER: smtp
-          SMTP_SERVER: smtp.gmail.com
-          SMTP_PORT: "587"
-          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
-          SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
+          EMAIL_PROVIDER: resend
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
           SUMMARY_DOGFOOD_TO: ${{ secrets.SUMMARY_DOGFOOD_TO }}
         run: |
-          if [ -z "$SENDER_EMAIL" ] || [ -z "$SENDER_PASSWORD" ]; then
-            echo "::notice::dogfood email skipped (set secrets SENDER_EMAIL + SENDER_PASSWORD; optional SUMMARY_DOGFOOD_TO)"
+          if [ -z "$RESEND_API_KEY" ] || [ -z "$RESEND_FROM_EMAIL" ]; then
+            echo "::notice::dogfood email skipped (set secrets RESEND_API_KEY + RESEND_FROM_EMAIL; optional SUMMARY_DOGFOOD_TO)"
             exit 0
           fi
           python scripts/send_summary_dogfood_email.py --kind daily --regions jp,us

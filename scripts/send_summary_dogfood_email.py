@@ -12,11 +12,11 @@
   python scripts/send_summary_dogfood_email.py --kind weekly
 
 環境変数:
-  EMAIL_PROVIDER=smtp（推奨）+ SMTP_SERVER=smtp.gmail.com
-  SENDER_EMAIL / SENDER_PASSWORD（Gmail アプリパスワード）
-  SUMMARY_DOGFOOD_TO（宛先。未設定なら SENDER_EMAIL）
+  EMAIL_PROVIDER=resend（推奨・検証と本番で共通）
+  RESEND_API_KEY / RESEND_FROM_EMAIL
+  SUMMARY_DOGFOOD_TO（宛先。未設定なら From）
   SUMMARY_DOGFOOD_ENABLED=false で無効化
-  （任意）EMAIL_PROVIDER=sendgrid + SENDGRID_API_KEY + SENDGRID_FROM_EMAIL
+  （任意フォールバック）EMAIL_PROVIDER=smtp + Gmail SMTP
 """
 
 from __future__ import annotations

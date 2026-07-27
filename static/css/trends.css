@@ -39,6 +39,10 @@
 .trend-table tbody tr.row-clickable a[href] {
     pointer-events: none;
 }
+/* 二次アクション（Amazonで見る等）だけは独自URLへ遷移させる */
+.trend-table tbody tr.row-clickable a.row-action-link[href] {
+    pointer-events: auto;
+}
 
 .trend-table tbody tr[data-clickable="true"]:hover,
 .trend-table tbody tr.row-clickable:hover {

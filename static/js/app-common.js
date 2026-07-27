@@ -1,5 +1,6 @@
 // 共通: テーブル行クリックで別タブでURLを開く（ニュースタブと同様の動作を全タブに適用）
 // モバイル: tabindex=-1 で1回タップで開く（フォーカス経由の2回タップを回避）、touch-action: manipulation でタップ遅延を解消
+// .row-action-link（例: 映画の「Amazonで見る」）は行の主リンクとは別URLのため、行ハンドラ対象外
 function makeTableRowClickable(row, linkUrl, ariaLabel) {
     if (!row || !linkUrl || linkUrl === '#' || (typeof linkUrl === 'string' && linkUrl.trim() === '')) return;
 
@@ -9,6 +10,10 @@ function makeTableRowClickable(row, linkUrl, ariaLabel) {
     if (ariaLabel) row.setAttribute('aria-label', ariaLabel);
     row.style.cursor = 'pointer';
     row.style.touchAction = 'manipulation';
+
+    const isRowActionLink = function (target) {
+        return !!(target && target.closest && target.closest('a.row-action-link[href]'));
+    };
 
     const openInNewTab = function () {
         window.open(linkUrl, '_blank', 'noopener,noreferrer');
@@ -21,6 +26,8 @@ function makeTableRowClickable(row, linkUrl, ariaLabel) {
         if (t) { touchStartX = t.clientX; touchStartY = t.clientY; }
     }, { passive: true });
     row.addEventListener('touchend', function (e) {
+        // 二次アクションリンクはネイティブ遷移に任せる（行の主リンクを開かない）
+        if (isRowActionLink(e.target)) return;
         var t = e.changedTouches && e.changedTouches[0];
         if (!t) return;
         var dx = Math.abs(t.clientX - touchStartX);
@@ -33,6 +40,7 @@ function makeTableRowClickable(row, linkUrl, ariaLabel) {
     }, { passive: false });
 
     row.addEventListener('click', function (e) {
+        if (isRowActionLink(e.target)) return;
         if (touchHandled) { e.preventDefault(); e.stopPropagation(); return; }
         e.preventDefault();
         e.stopPropagation();
@@ -40,6 +48,7 @@ function makeTableRowClickable(row, linkUrl, ariaLabel) {
     }, true);
 
     row.addEventListener('keydown', function (e) {
+        if (isRowActionLink(e.target)) return;
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             openInNewTab();
@@ -993,7 +1002,8 @@ function syncToAllPane(mainTableBodyId, allTableBodyId, limit = 5) {
             td.appendChild(wrapper);
         });
         // クローンはイベントリスナーを引き継がないため、行クリックで別タブ表示を再適用
-        const firstLink = cloned.querySelector('a[href]');
+        // 主リンクは .row-action-link（Amazon等の二次アクション）を除外して選ぶ
+        const firstLink = cloned.querySelector('a[href]:not(.row-action-link)') || cloned.querySelector('a[href]');
         if (firstLink && firstLink.href && typeof makeTableRowClickable === 'function') {
             const href = firstLink.href;
             if (href !== '#' && href.indexOf('example.com') === -1) {

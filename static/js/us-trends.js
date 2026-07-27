@@ -395,9 +395,9 @@ function displayMovieResultsUS(data) {
                 tmdbLink = '#';
             }
             
-            // Amazonリンクが存在する場合は「Amazonで見る」ボタンを追加
+            // Amazonリンクが存在する場合は「View on Amazon」ボタンを追加（row-action-link: 行クリックの主リンク対象外）
             const amazonButton = item.amazon_link 
-                ? `<br><a href="${item.amazon_link}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-warning mt-1" style="font-size: 0.75rem;">
+                ? `<br><a href="${item.amazon_link}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-warning mt-1 row-action-link" style="font-size: 0.75rem;">
                     <i class="fas fa-shopping-cart"></i> View on Amazon
                    </a>`
                 : '';

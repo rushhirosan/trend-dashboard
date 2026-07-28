@@ -748,6 +748,62 @@ def test_build_cross_source_excludes_same_article_hatena_zenn(gads):
     assert gads.build_cross_source_highlights(rows, count=3) == []
 
 
+def test_build_cross_source_excludes_same_article_after_bracket_clean(gads):
+    """表示は【】除去後でも、生タイトル＋同一 URL なら同一記事として除外する。"""
+    article_url = "https://zenn.dev/mixi/articles/fd62f8ddc178f6"
+    rows = [
+        {
+            "slot": "13",
+            "series_key": "hatena_jp",
+            "items": [
+                {
+                    "t": "【2026年版】MIXI 新卒向け技術研修を公開しました。",
+                    "r": 4,
+                    "u": article_url,
+                }
+            ],
+            "captured_at": "2026-07-28T13:00:00+09:00",
+        },
+        {
+            "slot": "13",
+            "series_key": "zenn_jp",
+            "items": [
+                {
+                    "t": "【2026年版】MIXI 新卒向け技術研修を公開しました。",
+                    "r": 3,
+                    "u": article_url,
+                }
+            ],
+            "captured_at": "2026-07-28T13:00:00+09:00",
+        },
+    ]
+    assert gads.build_cross_source_highlights(rows, count=3) == []
+
+
+def test_url_for_label_matches_cleaned_bracket_prefix(gads):
+    rows = [
+        {
+            "slot": "13",
+            "series_key": "zenn_jp",
+            "items": [
+                {
+                    "t": "【2026年版】MIXI 新卒向け技術研修を公開しました。",
+                    "r": 3,
+                    "u": "https://zenn.dev/mixi/articles/fd62f8ddc178f6",
+                }
+            ],
+            "captured_at": "2026-07-28T13:00:00+09:00",
+        },
+    ]
+    series_by_slot = gads.rows_to_series_by_slot(rows)
+    url = gads._url_for_label_in_series(
+        series_by_slot,
+        "zenn_jp",
+        "MIXI 新卒向け技術研修を公開しました。",
+    )
+    assert url == "https://zenn.dev/mixi/articles/fd62f8ddc178f6"
+
+
 def test_build_cross_source_keeps_different_urls_same_title(gads):
     rows = [
         {
@@ -772,6 +828,45 @@ def test_build_cross_source_keeps_different_urls_same_title(gads):
     cross = gads.build_cross_source_highlights(rows, count=3)
     assert len(cross) == 1
     assert cross[0]["label"] == "台風接近"
+    links = {sl["display"]: sl["url"] for sl in cross[0]["source_links"]}
+    assert "NHK" in links
+    assert links["NHK"] == "https://www3.nhk.or.jp/news/html/20260529/k100.html"
+    assert "Google Trends" in links
+    assert "google.com/search" in links["Google Trends"]
+
+
+def test_build_cross_source_includes_per_source_links(gads):
+    rows = [
+        {
+            "slot": "13",
+            "series_key": "hatena_jp",
+            "items": [
+                {
+                    "t": "MIXI 新卒向け技術研修を公開しました。",
+                    "r": 4,
+                    "u": "https://example.com/hatena-mixi",
+                }
+            ],
+            "captured_at": "2026-07-28T13:00:00+09:00",
+        },
+        {
+            "slot": "13",
+            "series_key": "zenn_jp",
+            "items": [
+                {
+                    "t": "MIXI 新卒向け技術研修を公開しました。",
+                    "r": 4,
+                    "u": "https://zenn.dev/mixi/articles/training",
+                }
+            ],
+            "captured_at": "2026-07-28T13:00:00+09:00",
+        },
+    ]
+    cross = gads.build_cross_source_highlights(rows, count=3)
+    assert len(cross) == 1
+    by_name = {sl["display"]: sl["url"] for sl in cross[0]["source_links"]}
+    assert by_name["はてな"] == "https://example.com/hatena-mixi"
+    assert by_name["Zenn"] == "https://zenn.dev/mixi/articles/training"
 
 
 def test_normalize_article_url_ignores_google_search(gads):
@@ -876,19 +971,44 @@ def test_render_cross_source_highlights_markdown_lists_items(gads):
         {
             "label": "豊臣秀長",
             "sources_display": "Wikipedia (JA), Google Trends (JP)",
+            "source_links": [
+                {
+                    "display": "Wikipedia (JA)",
+                    "url": "https://ja.wikipedia.org/wiki/%E8%B1%8A%E8%87%A3%E7%A7%80%E9%95%B7",
+                },
+                {
+                    "display": "Google Trends (JP)",
+                    "url": "https://www.google.com/search?q=%E8%B1%8A%E8%87%A3%E7%A7%80%E9%95%B7",
+                },
+            ],
             "rank_evidence": "7時8位 → 13時圏外 → 19時2位",
             "ranks": {"07": 8, "19": 2},
         },
     ]
     md = gads.render_cross_source_highlights_markdown(highlights, date(2026, 5, 20))
     assert "### 1. 豊臣秀長" in md
-    assert "Wikipedia (JA), Google Trends (JP)" in md
+    assert "[Wikipedia (JA)](https://ja.wikipedia.org/wiki/" in md
+    assert "[Google Trends (JP)](https://www.google.com/search?" in md
     assert "| 時 | 07 | 13 | 19 |" in md
     assert "| 順位 |" in md
     assert "**順位の動き**" in md
     assert "```mermaid" not in md
     assert "**根拠**" not in md
     assert gads._CROSS_NONE_LINE not in md
+
+
+def test_render_cross_source_falls_back_to_plain_sources_display(gads):
+    md = gads.render_cross_source_highlights_markdown(
+        [
+            {
+                "label": "豊臣秀長",
+                "sources_display": "Wikipedia (JA), Google Trends (JP)",
+                "rank_evidence": "19時1位",
+            }
+        ],
+        date(2026, 5, 20),
+    )
+    assert "- **登場ソース**: Wikipedia (JA), Google Trends (JP)" in md
 
 
 def test_format_daily_rank_table_us_has_slot_corner(gads):

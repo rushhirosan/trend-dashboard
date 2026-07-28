@@ -777,6 +777,42 @@ def _format_sources_display(series_keys: List[str]) -> str:
     return ", ".join(_format_series_key_display(k) for k in _dedupe_series_keys_by_provider(series_keys))
 
 
+def _build_cross_source_links(
+    series_by_slot: Dict[str, Dict[str, List[Dict[str, Any]]]],
+    series_keys: List[str],
+    label: str,
+) -> List[Dict[str, str]]:
+    """重なり検出に使った系列ごとに、表示名と記事 URL（無ければ検索）を返す。"""
+    out: List[Dict[str, str]] = []
+    for sk in _dedupe_series_keys_by_provider(series_keys):
+        url = _url_for_label_in_series(series_by_slot, sk, label) or _fallback_search_url(
+            label
+        )
+        out.append(
+            {
+                "series_key": sk,
+                "display": _format_series_key_display(sk),
+                "url": url,
+            }
+        )
+    return out
+
+
+def _format_sources_display_linked(source_links: List[Dict[str, Any]]) -> str:
+    """登場ソース行用: [はてな](url), [Zenn](url)。"""
+    parts: List[str] = []
+    for sl in source_links or []:
+        name = str(sl.get("display") or "").strip()
+        if not name:
+            continue
+        url = str(sl.get("url") or "").strip()
+        if url.startswith(("http://", "https://")):
+            parts.append(f"[{name}]({url})")
+        else:
+            parts.append(name)
+    return ", ".join(parts)
+
+
 def _url_from_thin_item(item: Dict[str, Any]) -> Optional[str]:
     u = item.get("u")
     if u is None:
@@ -813,18 +849,30 @@ def _normalize_article_url(url: str) -> Optional[str]:
     return f"{host}{path}".lower()
 
 
+def _title_matches_label(title: str, label: str) -> bool:
+    """生タイトルと表示ラベルの一致（【版】除去後も同一なら一致）。"""
+    t = str(title or "").strip()
+    lab = str(label or "").strip()
+    if not t or not lab:
+        return False
+    if _normalize_label_key(t) == _normalize_label_key(lab):
+        return True
+    return _normalize_label_key(_clean_rising_display(t)) == _normalize_label_key(
+        _clean_rising_display(lab)
+    )
+
+
 def _url_for_label_in_series(
     series_by_slot: Dict[str, Dict[str, List[Dict[str, Any]]]],
     series_key: str,
     label: str,
 ) -> Optional[str]:
     """系列内でラベルに対応する記事 URL（19→13→07→01 の順）。"""
-    nk = _normalize_label_key(label)
     for slot in ("19", "13", "07", "01"):
         for it in (series_by_slot.get(slot) or {}).get(series_key) or []:
             if not isinstance(it, dict):
                 continue
-            if _normalize_label_key(str(it.get("t") or "")) == nk:
+            if _title_matches_label(str(it.get("t") or ""), label):
                 u = _url_from_thin_item(it)
                 if u:
                     return u
@@ -1047,14 +1095,13 @@ def _url_for_rising_item(
     label: str,
     ranks: dict[str, int],
 ) -> Optional[str]:
-    nk = _normalize_label_key(label)
     for slot in ("19", "13", "07"):
         if slot not in ranks:
             continue
         for it in (series_by_slot.get(slot) or {}).get(series_key) or []:
             if not isinstance(it, dict):
                 continue
-            if _normalize_label_key(str(it.get("t") or "")) == nk:
+            if _title_matches_label(str(it.get("t") or ""), label):
                 u = _url_from_thin_item(it)
                 if u:
                     return u
@@ -1202,6 +1249,7 @@ def build_cross_source_highlights(
         if _cross_source_is_same_article(series_by_slot, series_keys, label):
             continue
         deduped_keys = _dedupe_series_keys_by_provider(series_keys)
+        source_links = _build_cross_source_links(series_by_slot, series_keys, label)
         jp_pref = max(s.get("series_pref", 0) for s in series_list)
         best_daytime_rank = min(
             (s.get("best_daytime_rank") or 999 for s in series_list),
@@ -1213,6 +1261,7 @@ def build_cross_source_highlights(
                 "label": entry["label"],
                 "series_keys": deduped_keys,
                 "sources_display": _format_sources_display(series_keys),
+                "source_links": source_links,
                 "providers": sorted({_series_provider(k) for k in series_keys}),
                 "categories": categories,
                 "source_count": len(deduped_keys),
@@ -1581,7 +1630,15 @@ def build_label_link_index(
         label = str(h.get("label") or "")
         keys = h.get("series_keys") or []
         sk = str(keys[0]) if keys else ""
-        url = _url_for_label_in_series(series_by_slot, sk, label) if sk else None
+        source_links = h.get("source_links") or []
+        url = None
+        for sl in source_links:
+            u = str(sl.get("url") or "").strip()
+            if u.startswith(("http://", "https://")) and "google.com/search" not in u:
+                url = u
+                break
+        if not url and sk:
+            url = _url_for_label_in_series(series_by_slot, sk, label)
         line = _format_digest_link_line(label, sk or "?", DAYTIME_SLOTS_ARROW, url) if label else None
         register(label, line, series_key=sk)
 
@@ -1678,7 +1735,9 @@ def render_cross_source_highlights_markdown(
         lines.append(f"### {i}. {label}")
         lines.append("")
         lines.append(overlap_line)
-        sources = h.get("sources_display")
+        source_links = h.get("source_links") or []
+        linked = _format_sources_display_linked(source_links)
+        sources = linked or str(h.get("sources_display") or "").strip()
         if sources:
             lines.append(f"- **{sources_label}**: {sources}")
         ranks = _ranks_dict_from_item(h)

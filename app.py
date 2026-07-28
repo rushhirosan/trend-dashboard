@@ -503,6 +503,42 @@ def create_app():
             try:
                 from flask import Response
                 base = AppConfig.PUBLIC_BASE_URL
+                allow_draft = app.config.get('AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT', False)
+
+                recent_lines = []
+                try:
+                    from services.summary.summary_pages import (
+                        list_published_daily,
+                        list_published_weekly,
+                    )
+                    jp_daily = list_published_daily(region='jp', allow_draft=allow_draft)[:5]
+                    us_daily = list_published_daily(region='us', allow_draft=allow_draft)[:3]
+                    jp_weekly = list_published_weekly(region='jp', allow_draft=allow_draft)[:3]
+                    us_weekly = list_published_weekly(region='us', allow_draft=allow_draft)[:2]
+
+                    if jp_daily or us_daily or jp_weekly or us_weekly:
+                        recent_lines.append('## 直近の公開サマリー（実 URL）')
+                        for date_str, _ in jp_daily:
+                            recent_lines.append(
+                                f'- 日次 JP {date_str}: {base}/summaries/daily/{date_str}'
+                            )
+                        for date_str, _ in us_daily:
+                            recent_lines.append(
+                                f'- Daily US {date_str}: {base}/us/summaries/daily/{date_str}'
+                            )
+                        for week_id, _ in jp_weekly:
+                            recent_lines.append(
+                                f'- 週次 JP {week_id}: {base}/summaries/weekly/{week_id}'
+                            )
+                        for week_id, _ in us_weekly:
+                            recent_lines.append(
+                                f'- Weekly US {week_id}: {base}/us/summaries/weekly/{week_id}'
+                            )
+                        recent_lines.append('')
+                except Exception as sum_err:
+                    logger.debug(f"llms.txt 直近サマリーURL生成スキップ: {sum_err}")
+
+                recent_block = '\n'.join(recent_lines)
                 llms_content = f"""# Trends Dashboard（トレンドダッシュボード）
 
 > 日本・米国の20以上の公開ソースを横断比較する無料トレンドダッシュボード。
@@ -512,15 +548,18 @@ def create_app():
 - 日本トレンド: {base}/
 - USトレンド: {base}/us
 - データ鮮度・更新状況: {base}/data-status
-- このサイトについて: {base}/about
+- このサイトについて（FAQ・使い方）: {base}/about
+
+## 兄弟サイト
+- World Front Page: https://g7-dashboard.vercel.app/ （世界のニュース表紙をざっと見る。本サイトは多ソースの日次トレンド横断）
 
 ## トレンドサマリー（過去分・無料プレビュー）
 - 一覧（日本語）: {base}/summaries （直近分のみ。日次は約10日・週次は約30日で公開終了）
-- 日次（日本語）: {base}/summaries/daily/YYYY-MM-DD （例: 観測日ごとの一行結論と急上昇トピック）
-- 週次（日本語）: {base}/summaries/weekly/YYYY-Www （例: 週の流れと注目トピック）
+- 日次（日本語）: {base}/summaries/daily/YYYY-MM-DD （観測日ごとの一行結論と急上昇トピック）
+- 週次（日本語）: {base}/summaries/weekly/YYYY-Www （週の流れと注目トピック）
 - Summaries (English/US): {base}/us/summaries , {base}/us/summaries/daily/YYYY-MM-DD , {base}/us/summaries/weekly/YYYY-Www
 
-## 更新頻度
+{recent_block}## 更新頻度
 毎日 1・7・13・19時 JST に更新処理を開始（完了まで通常10〜15分程度）。
 
 ## 引用時のお願い
@@ -546,6 +585,7 @@ Disallow: /api/
 Disallow: /health
 Disallow: /subscription
 Sitemap: {AppConfig.PUBLIC_BASE_URL}/sitemap.xml
+# AI / citation hints: {AppConfig.PUBLIC_BASE_URL}/llms.txt
 """
                 return Response(robots_content, mimetype='text/plain')
             except Exception as e:

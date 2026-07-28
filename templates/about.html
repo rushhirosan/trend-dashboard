@@ -37,6 +37,7 @@
     
     {% include 'partials/vendor_assets.html' %}
     <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
+    <link rel="alternate" type="text/plain" href="{{ public_base_url }}/llms.txt" title="llms.txt">
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -45,6 +46,54 @@
       "description": "日本と米国の最新トレンド情報を表示するシンプルなトレンドダッシュボード。NHK、CNN、Google Trends、YouTube、Wikipedia、はてなブックマーク、Qiita、Zenn、Note、Hacker News、OpenAlex、Bluesky、株価・仮想通貨、Spotify、Podcast、楽天、eBay、Twitchなどの公開データを集約。1日4回更新（1・7・13・19時 JST）。",
       "url": "{{ public_base_url }}/about",
       "isPartOf": { "@id": "{{ public_base_url }}/#website" }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "トレンドダッシュボードとは何ですか？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "日本と米国でいま話題のトレンドを、検索・ニュース・テック・マーケットなど20以上の公開ソースから1画面に集約する無料のWebダッシュボードです。投資助言や各サービスの正規データの代替ではありません。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "データはどのくらいの頻度で更新されますか？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "毎日1時・7時・13時・19時（JST）に更新処理を開始します。完了まで通常10〜15分程度です。ソースごとの鮮度はデータ更新状況ページで確認できます。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "日本ページとUSページの違いは？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "日本ページ（/）は国内向けソース中心、USページ（/us）は米国向けソース中心です。共通ソースもありますが、取得パラメータやカテゴリ構成が異なります。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "World Front Page（G7 Dashboard）との違いは？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "World Front Pageは世界のニュース表紙をざっと見る兄弟サイトです。トレンドダッシュボードは検索・SNS・マーケットなど多ソースの日次トレンドを横断比較する用途です。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "利用料はかかりますか？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "ダッシュボード本体の閲覧は無料です。"
+          }
+        }
+      ]
     }
     </script>
     
@@ -235,6 +284,25 @@
                             </p>
                         </section>
 
+                        <!-- よくある質問（SEO/GEO向け・about のみ） -->
+                        <section class="mb-5" id="faq">
+                            <h3 class="h5 mb-3">
+                                <i class="fas fa-comments text-primary me-2"></i>
+                                よくある質問
+                            </h3>
+                            <dl class="mb-0">
+                                <dt class="fw-bold mb-1">無料ですか？</dt>
+                                <dd class="mb-3">ダッシュボード本体の閲覧は無料です。</dd>
+                                <dt class="fw-bold mb-1">更新頻度は？</dt>
+                                <dd class="mb-3">毎日1・7・13・19時（JST）に更新処理を開始します（完了まで通常10〜15分程度）。詳細は<a href="{{ url_for('data_status') }}">データ鮮度情報</a>へ。</dd>
+                                <dt class="fw-bold mb-1">World Front Page との違いは？</dt>
+                                <dd class="mb-0">
+                                    <a href="https://g7-dashboard.vercel.app/" target="_blank" rel="noopener noreferrer">World Front Page</a>
+                                    は世界のニュース表紙をざっと見る兄弟サイト。本サイトは検索・SNS・マーケットなど<strong>多ソースの日次トレンドを横断比較</strong>する用途です。
+                                </dd>
+                            </dl>
+                        </section>
+
                         <!-- 4. 運営者について -->
                         <section class="mb-0">
                             <h3 class="h5 mb-3">
@@ -249,7 +317,7 @@
                                 関連サイト:
                                 <a href="https://g7-dashboard.vercel.app/" target="_blank" rel="noopener noreferrer">World Front Page</a>
                                 <i class="fas fa-external-link-alt ms-1" style="font-size: 0.75rem;"></i>
-                                — 世界のニュース表紙をざっと見る兄弟サイトです。
+                                — 世界のニュース表紙をざっと見る兄弟サイト（本サイトは多ソースの日次トレンド横断）。
                             </p>
                             {% if BUY_ME_A_COFFEE_USERNAME %}
                             <div class="buy-me-a-coffee-container mb-3">
@@ -424,6 +492,25 @@
                             </p>
                         </section>
 
+                        <!-- FAQ (about only; not on dashboard) -->
+                        <section class="mb-5" id="faq-en">
+                            <h3 class="h5 mb-3">
+                                <i class="fas fa-comments text-primary me-2"></i>
+                                FAQ
+                            </h3>
+                            <dl class="mb-0">
+                                <dt class="fw-bold mb-1">Is it free?</dt>
+                                <dd class="mb-3">Yes. Viewing the dashboard itself is free.</dd>
+                                <dt class="fw-bold mb-1">How often does data refresh?</dt>
+                                <dd class="mb-3">Update jobs start at 1, 7, 13, and 19 JST (typically 10–15 minutes to finish). See <a href="{{ url_for('data_status') }}">Data Status</a>.</dd>
+                                <dt class="fw-bold mb-1">How is this different from World Front Page?</dt>
+                                <dd class="mb-0">
+                                    <a href="https://g7-dashboard.vercel.app/" target="_blank" rel="noopener noreferrer">World Front Page</a>
+                                    scans world news front pages. This site cross-compares <strong>multi-source daily trends</strong> (search, social, markets, and more).
+                                </dd>
+                            </dl>
+                        </section>
+
                         <!-- 4. About the creator -->
                         <section class="mb-0">
                             <h3 class="h5 mb-3">
@@ -438,7 +525,7 @@
                                 Related site:
                                 <a href="https://g7-dashboard.vercel.app/" target="_blank" rel="noopener noreferrer">World Front Page</a>
                                 <i class="fas fa-external-link-alt ms-1" style="font-size: 0.75rem;"></i>
-                                — a sibling project for scanning world news front pages.
+                                — sibling project for world news front pages (this site is multi-source daily trend comparison).
                             </p>
                             {% if BUY_ME_A_COFFEE_USERNAME %}
                             <div class="buy-me-a-coffee-container mb-3">

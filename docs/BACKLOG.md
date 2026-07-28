@@ -10,7 +10,7 @@
 - 週次の数値 → [週次メモ](#週次メモ)
 - 日次サマリー品質・SLA の詳細手順 → [`summary_pattern_a_phase1.md`](summary_pattern_a_phase1.md)
 
-**最終更新:** 2026-07-25
+**最終更新:** 2026-07-29
 
 ---
 
@@ -197,12 +197,12 @@
 
 #### フェーズ3 — サイト内プレビュー + 配信自動化
 
-- [ ] `/llms.txt`
+- [x] `/llms.txt`
 - [ ] `/summaries/daily/YYYY-MM-DD`（approved のみ・プレビュー範囲）
 - [ ] トップサマリーカード → 昨日分プレビューへのリンク（ヘッダー nav は増やさない）
 - [ ] `/summaries/weekly/YYYY-Www`（approved のみ・プレビュー範囲）
 - [ ] `/summaries` 一覧（任意・後追い可）
-- [ ] sitemap に公開中のサマリー URL を反映
+- [x] sitemap に公開中のサマリー URL を反映
 - [ ] 10:30 JST 自動配信 + 失敗アラート
 - [ ] 週次バンドル同梱（メール全文）
 - [ ] 欠損時短縮テンプレ + 件名 `[一部欠損]`
@@ -305,6 +305,9 @@
 **SEO**
 
 - [x] Core Web Vitals / 内部リンク / Search Console 基本設定
+- [x] トップ head のみ強化（title/OG・`llms.txt` link）。**ダッシュボード body / UI は変更しない**
+- [x] `/about` FAQ + FAQPage スキーマ・G7 役割分担文言
+- [x] `/llms.txt` に直近サマリー実 URL を動的掲載
 - [ ] Search Console 定期レビュー（カバレッジ・パフォーマンス）
 
 **PageSpeed / フロントエンド（詳細は [`PERFORMANCE.md`](PERFORMANCE.md)）**
@@ -347,6 +350,7 @@
 | 2026-06-22 | `todo.md` + `monetization.md` を本 BACKLOG に統合。1536MB 安定・retention purge デプロイ済。 |
 | 2026-06-26 | PageSpeed 改善の進捗管理を `docs/PERFORMANCE.md` に分離。BACKLOG からリンク。 |
 | 2026-07-12 | 案1（Web プレビュー + メール全文）・GEO 公開方針・障害時 SLA を BACKLOG に追記。 |
+| 2026-07-29 | SEO/GEO: トップ UI 非接触で head・llms.txt・about FAQ のみ強化。 |
 | | |
 
 ### 決定ログ

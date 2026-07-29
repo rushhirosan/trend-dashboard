@@ -55,11 +55,13 @@ def test_robots_txt_mentions_llms(app_client):
 
 
 def test_jp_index_head_title_without_body_copy_change(app_client):
-    """title は具体化。既存の body SEO 説明は引き続き非表示（d-none）。"""
+    """タブ用 title は短く、og/twitter は長め。body SEO 説明は引き続き非表示（d-none）。"""
     res = app_client.get("/")
     assert res.status_code == 200
     html = res.get_data(as_text=True)
-    assert "<title>日本のトレンドを20ソース横断比較 | トレンドダッシュボード</title>" in html
+    assert "<title>トレンドダッシュボード</title>" in html
+    assert 'property="og:title" content="日本のトレンドを20ソース横断比較 | トレンドダッシュボード"' in html
+    assert 'name="twitter:title" content="日本のトレンドを20ソース横断比較 | トレンドダッシュボード"' in html
     assert 'href="/llms.txt"' in html or 'href="' in html and "/llms.txt" in html
     assert 'id="about-trends-dashboard"' in html
     assert "d-none" in html

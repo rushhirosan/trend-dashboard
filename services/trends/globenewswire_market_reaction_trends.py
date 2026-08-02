@@ -60,6 +60,10 @@ TICKER_PATTERN = re.compile(
 )
 
 TOP_N = 15
+# GlobeNewswire は間欠的に遅いことがあるため、15秒ではタイムアウトしやすい
+RSS_TIMEOUT_SECONDS = 30
+# 初回失敗後に 1 回だけリトライ（合計 2 試行）
+RSS_MAX_ATTEMPTS = 2
 
 
 class GlobeNewswireMarketReactionTrendsManager(BaseTrendsManager):
@@ -127,58 +131,118 @@ class GlobeNewswireMarketReactionTrendsManager(BaseTrendsManager):
                 return ticker
         return None
 
-    def _parse_feed(self) -> list[dict]:
-        """RSS を取得してエントリ一覧を返す"""
-        try:
-            self.rate_limiter.wait_if_needed()
-            resp = self.session.get(self.rss_url, timeout=15)
-            if resp.status_code != 200:
-                logger.warning(f"GlobeNewswire RSS status: {resp.status_code}")
-                return []
-            parsed = feedparser.parse(resp.content)
-            items = []
-            for e in parsed.entries:
-                link = e.get('link') or (e.get('links') or [{}])[0].get('href') or ''
-                title = (e.get('title') or '').strip()
-                if not link or not title:
-                    continue
-                published = None
-                for key in ('published', 'updated', 'created'):
-                    val = e.get(key)
-                    if val:
-                        try:
-                            if hasattr(val, 'timestamp'):
-                                published = datetime.utcfromtimestamp(val.timestamp()).isoformat() + 'Z'
-                            else:
-                                published = val
-                            break
-                        except Exception:
+    def _entries_from_parsed(self, parsed) -> list[dict]:
+        """feedparser 結果からエントリ一覧を組み立てる"""
+        items = []
+        for e in parsed.entries:
+            link = e.get('link') or (e.get('links') or [{}])[0].get('href') or ''
+            title = (e.get('title') or '').strip()
+            if not link or not title:
+                continue
+            published = None
+            for key in ('published', 'updated', 'created'):
+                val = e.get(key)
+                if val:
+                    try:
+                        if hasattr(val, 'timestamp'):
+                            published = datetime.utcfromtimestamp(val.timestamp()).isoformat() + 'Z'
+                        else:
                             published = val
-                            break
-                description = (e.get('summary') or e.get('description') or '')
-                if hasattr(description, 'strip'):
-                    description = description.strip()[:500] if description else ''
-                tags = []
-                for t in (getattr(e, 'tags', None) or []):
-                    if isinstance(t, dict):
-                        tags.append({'term': t.get('term'), 'scheme': t.get('scheme'), 'label': t.get('label')})
-                    else:
-                        tags.append({
-                            'term': getattr(t, 'term', None),
-                            'scheme': getattr(t, 'scheme', None),
-                            'label': getattr(t, 'label', None),
-                        })
-                items.append({
-                    'title': title,
-                    'url': link,
-                    'published_date': published or '',
-                    'description': description or '',
-                    'tags': tags,
-                })
-            return items
-        except Exception as e:
-            logger.warning(f"GlobeNewswire RSS取得エラー: {e}")
-            return []
+                        break
+                    except Exception:
+                        published = val
+                        break
+            description = (e.get('summary') or e.get('description') or '')
+            if hasattr(description, 'strip'):
+                description = description.strip()[:500] if description else ''
+            tags = []
+            for t in (getattr(e, 'tags', None) or []):
+                if isinstance(t, dict):
+                    tags.append({'term': t.get('term'), 'scheme': t.get('scheme'), 'label': t.get('label')})
+                else:
+                    tags.append({
+                        'term': getattr(t, 'term', None),
+                        'scheme': getattr(t, 'scheme', None),
+                        'label': getattr(t, 'label', None),
+                    })
+            items.append({
+                'title': title,
+                'url': link,
+                'published_date': published or '',
+                'description': description or '',
+                'tags': tags,
+            })
+        return items
+
+    def _parse_feed(self) -> tuple[list[dict], str | None]:
+        """
+        RSS を取得してエントリ一覧を返す。
+        返り値: (items, empty_reason)。items があるときは empty_reason は None。
+        """
+        last_reason: str | None = None
+        for attempt in range(1, RSS_MAX_ATTEMPTS + 1):
+            try:
+                self.rate_limiter.wait_if_needed()
+                resp = self.session.get(self.rss_url, timeout=RSS_TIMEOUT_SECONDS)
+                if resp.status_code != 200:
+                    last_reason = (
+                        f"RSS取得失敗（HTTP {resp.status_code}）。"
+                        "一時的な不調の可能性があります。"
+                    )
+                    logger.warning(
+                        "GlobeNewswire RSS status: %s (attempt %s/%s)",
+                        resp.status_code,
+                        attempt,
+                        RSS_MAX_ATTEMPTS,
+                    )
+                    if attempt < RSS_MAX_ATTEMPTS:
+                        continue
+                    return [], last_reason
+
+                parsed = feedparser.parse(resp.content)
+                items = self._entries_from_parsed(parsed)
+                if not items:
+                    return [], "RSSフィードは取得できましたがエントリが0件でした。"
+                if attempt > 1:
+                    logger.info(
+                        "GlobeNewswire RSS: リトライ成功（attempt %s/%s, %s件）",
+                        attempt,
+                        RSS_MAX_ATTEMPTS,
+                        len(items),
+                    )
+                return items, None
+
+            except requests.exceptions.Timeout:
+                last_reason = (
+                    f"RSS取得がタイムアウトしました"
+                    f"（{RSS_TIMEOUT_SECONDS}秒×{RSS_MAX_ATTEMPTS}回）。"
+                    "一時的な遅延の可能性があります。"
+                )
+                logger.warning(
+                    "GlobeNewswire RSS タイムアウト (attempt %s/%s)",
+                    attempt,
+                    RSS_MAX_ATTEMPTS,
+                )
+                if attempt < RSS_MAX_ATTEMPTS:
+                    continue
+                return [], last_reason
+            except requests.exceptions.RequestException as e:
+                last_reason = f"RSS取得リクエストエラー: {e}"
+                logger.warning(
+                    "GlobeNewswire RSS リクエストエラー (attempt %s/%s): %s",
+                    attempt,
+                    RSS_MAX_ATTEMPTS,
+                    e,
+                )
+                if attempt < RSS_MAX_ATTEMPTS:
+                    continue
+                return [], last_reason
+            except Exception as e:
+                last_reason = f"RSS解析エラー: {e}"
+                logger.warning(f"GlobeNewswire RSS取得エラー: {e}")
+                return [], last_reason
+
+        return [], last_reason or "RSS取得に失敗しました。"
 
     def _fetch_market_data_batch(self, tickers: list[str]) -> dict[str, dict]:
         """
@@ -289,15 +353,18 @@ class GlobeNewswireMarketReactionTrendsManager(BaseTrendsManager):
         """
         try:
             logger.info("GlobeNewswire × Market Reaction: 取得開始")
-            items = self._parse_feed()
+            items, rss_empty_reason = self._parse_feed()
             if not items:
-                logger.warning("GlobeNewswire × Market Reaction: RSS 0件")
+                reason = rss_empty_reason or "RSS 0件（原因不明）"
+                logger.warning("GlobeNewswire × Market Reaction: %s", reason)
                 return {
                     'success': True,
                     'data': [],
                     'status': 'api_fetched',
                     'source': 'globenewswire_market_reaction',
                     'total_count': 0,
+                    'empty_reason': reason,
+                    'message': reason,
                 }
 
             # ティッカー抽出（重複除去）
@@ -311,13 +378,19 @@ class GlobeNewswireMarketReactionTrendsManager(BaseTrendsManager):
 
             unique_tickers = list(ticker_to_items.keys())
             if not unique_tickers:
-                logger.warning("GlobeNewswire × Market Reaction: ティッカー抽出 0件")
+                reason = (
+                    f"RSSエントリは{len(items)}件ありましたが、"
+                    "ティッカー（NASDAQ/NYSE/AMEX/TSX/OTC）を抽出できませんでした。"
+                )
+                logger.warning("GlobeNewswire × Market Reaction: %s", reason)
                 return {
                     'success': True,
                     'data': [],
                     'status': 'api_fetched',
                     'source': 'globenewswire_market_reaction',
                     'total_count': 0,
+                    'empty_reason': reason,
+                    'message': reason,
                 }
 
             logger.info(f"GlobeNewswire × Market Reaction: {len(unique_tickers)} ティッカー抽出")

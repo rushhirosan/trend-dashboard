@@ -482,16 +482,31 @@ class BaseTrendsManager(ABC):
 
                             # 詳細情報を準備
                             is_zero_data = len(trends_data) == 0
+                            empty_reason = None
+                            if is_zero_data and isinstance(api_result, dict):
+                                empty_reason = (
+                                    api_result.get("empty_reason")
+                                    or api_result.get("message")
+                                    or api_result.get("error")
+                                )
+                            zero_detail = (
+                                f"{empty_reason} "
+                                "データが0件のためキャッシュ保存をスキップしました（既存キャッシュを保護する仕様）"
+                                if empty_reason
+                                else "データが0件のためキャッシュ保存をスキップしました（既存キャッシュを保護する仕様）"
+                            )
                             error_details = {
                                 "サービス名": self.service_name,
                                 "キャッシュキー": cache_key,
                                 "データ件数": str(len(trends_data)),
                                 "エラーメッセージ": (
-                                    "データが0件のためキャッシュ保存をスキップしました（既存キャッシュを保護する仕様）"
+                                    zero_detail[:1000]
                                     if is_zero_data
                                     else cache_save_error[:1000]
                                 ),
                             }
+                            if empty_reason:
+                                error_details["0件の原因"] = str(empty_reason)[:500]
 
                             # エラーの種類とスタックトレース（例外発生時のみ）
                             if error_exception:
@@ -508,11 +523,17 @@ class BaseTrendsManager(ABC):
                             error_details.update(source_data_info)
 
                             if is_zero_data:
-                                # 0件取得: warning（RSS不調・一時的な問題の可能性）
+                                # 0件取得: warning（原因はソース側 empty_reason / message を優先）
+                                reason_text = empty_reason or (
+                                    "RSS不調または一時的な問題の可能性があります。"
+                                )
                                 alert_service.send_alert(
                                     "warning",
                                     f"データ0件: {self.service_name}",
-                                    f"{self.service_name}のデータ取得は成功しましたが、取得件数が0件でした。RSS不調または一時的な問題の可能性があります。",
+                                    (
+                                        f"{self.service_name}のデータ取得は成功しましたが、"
+                                        f"取得件数が0件でした。{reason_text}"
+                                    ),
                                     error_details,
                                 )
                             else:

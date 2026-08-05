@@ -113,7 +113,7 @@ status: draft
 
 # 日次サマリー — 2026-07-22（JST）
 
-## 昨日の一行結論
+## 昨日の注目
 
 本文です。
 """
@@ -121,7 +121,7 @@ status: draft
     assert html.count("<h1>") == 1
     assert "日次サマリー — 2026-07-22 (JP)" in html
     assert "（JST）" not in html
-    assert "昨日の一行結論" in html
+    assert "昨日の注目" in html
 
 
 def test_email_strips_category_trend_blurbs():
@@ -141,11 +141,11 @@ def test_email_strips_redundant_header_meta():
 - **対象（観測日）**: 2026年7月24日
 - **生成・送信完了**: 自動生成（時刻未入力）
 
-## 昨日の一行結論
+## 昨日の注目
 
 本文。
 """
     html = weekly_markdown_to_email_html(md, title="日次サマリー — 2026-07-24 (JP)")
     assert "対象（観測日）" not in html
     assert "生成・送信完了" not in html
-    assert "昨日の一行結論" in html
+    assert "昨日の注目" in html

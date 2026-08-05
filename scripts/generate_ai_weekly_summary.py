@@ -86,6 +86,15 @@ WEEKLY_SCORE_CROSS = 25
 _WEEKLY_RISING_HEADING = "## 📈 今週いちばん動いた話題"
 _WEEKLY_CATEGORY_HEADING = "## 📊 カテゴリ別 — 今週の top3"
 _WEEKLY_CROSS_HEADING = "## 複数ソースで週を通じて重なった話題"
+_WEEKLY_HOT_HEADING = "## 🔥 週のホットトピック"
+_WEEKLY_NEXT_HEADING = "## 来週に残る論点"
+_WEEKLY_HOT_HEADING_US = "## 🔥 Hot topics this week"
+_WEEKLY_NEXT_HEADING_US = "## What to watch next week"
+# 週次「動いた」として載せる最低 jump_sum（横ばい・悪化のみは除外）
+WEEKLY_RISING_MIN_JUMP = 5.0
+WEEKLY_HOT_MAX = 5
+WEEKLY_NEXT_MIN = 2
+WEEKLY_NEXT_MAX = 3
 
 # 週次カテゴリ top3: 同一トピック/ソースの重複を抑える
 _WEEKLY_SERIES_DIVERSITY_CATEGORIES = frozenset(
@@ -607,15 +616,22 @@ def aggregate_weekly_cross_source(
     return out
 
 
+def weekly_rising_is_significant(item: Dict[str, Any]) -> bool:
+    """週内で実質的に順位が改善した話題か（横ばい・悪化のみは除外）。"""
+    return float(item.get("jump_sum") or 0) >= WEEKLY_RISING_MIN_JUMP
+
+
 def pick_regional_weekly_rising(
     pools: Dict[str, List[Dict[str, Any]]],
 ) -> Dict[str, List[Dict[str, Any]]]:
-    """地域別 rising top1。日本で選んだラベルと同一の話題は米国でスキップし次点を採用。"""
+    """地域別 rising top1。有意な jump のみ。日本で選んだラベルと同一の話題は米国でスキップ。"""
     used_nks: set[str] = set()
     out: Dict[str, List[Dict[str, Any]]] = {}
     for region in WEEKLY_REGIONS:
         picked: Optional[Dict[str, Any]] = None
         for item in pools.get(region) or []:
+            if not weekly_rising_is_significant(item):
+                continue
             nk = sr.normalize_label_key(str(item.get("label") or ""))
             if region != "jp" and nk in used_nks:
                 continue
@@ -1363,14 +1379,78 @@ def parse_editorial_json(raw: str) -> Dict[str, Any]:
         if not flow_jp:
             raise ValueError("editorial JSON missing flow_jp / flow")
 
+    hot_raw = data.get("hot_topics") or []
+    hot_topics: List[Dict[str, str]] = []
+    if isinstance(hot_raw, list):
+        for h in hot_raw[:WEEKLY_HOT_MAX]:
+            if not isinstance(h, dict):
+                continue
+            title = str(h.get("title") or h.get("label") or "").strip()
+            why = str(h.get("why") or h.get("reason") or "").strip()
+            if title and why:
+                hot_topics.append({"title": title, "why": why})
+
+    next_raw = data.get("next_week") or data.get("next_week_points") or []
+    next_week: List[str] = []
+    if isinstance(next_raw, list):
+        for p in next_raw:
+            s = str(p or "").strip()
+            if s:
+                next_week.append(s)
+        next_week = next_week[:WEEKLY_NEXT_MAX]
+
     return {
         "flow_jp": flow_jp,
         "flow_us": flow_us,
+        "hot_topics": hot_topics,
+        "next_week": next_week,
         "category_themes": {
             "jp": _parse_category_themes_region(data, "category_themes_jp"),
             "us": _parse_category_themes_region(data, "category_themes_us"),
         },
     }
+
+
+def render_weekly_hot_topics_markdown(editorial: Dict[str, Any]) -> str:
+    topics = editorial.get("hot_topics") or []
+    if _ACTIVE_REGION == "us":
+        heading = _WEEKLY_HOT_HEADING_US
+        empty = "(No hot topics selected this week.)"
+        why_label = "Why hot"
+    else:
+        heading = _WEEKLY_HOT_HEADING
+        empty = "（今週のホットトピックはありません）"
+        why_label = "なぜホットか"
+    lines: List[str] = [heading, ""]
+    if not topics:
+        lines.append(empty)
+        return "\n".join(lines).rstrip() + "\n"
+    for i, t in enumerate(topics, 1):
+        title = str(t.get("title") or "").strip()
+        why = str(t.get("why") or "").strip()
+        lines.append(f"### {i}. {title}")
+        lines.append("")
+        lines.append(f"- **{why_label}**: {why}")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def render_weekly_next_week_markdown(editorial: Dict[str, Any]) -> str:
+    points = editorial.get("next_week") or []
+    if _ACTIVE_REGION == "us":
+        heading = _WEEKLY_NEXT_HEADING_US
+        empty = "(No carry-over points.)"
+    else:
+        heading = _WEEKLY_NEXT_HEADING
+        empty = "（来週に残る論点はありません）"
+    lines: List[str] = [heading, ""]
+    if not points:
+        lines.append(empty)
+        return "\n".join(lines).rstrip() + "\n"
+    for p in points:
+        lines.append(f"- {p}")
+    lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def assemble_weekly_markdown(
@@ -1410,6 +1490,10 @@ def assemble_weekly_markdown(
     lines.extend(
         [
             render_weekly_rising_markdown(weekly_rising).rstrip(),
+            "",
+            render_weekly_hot_topics_markdown(editorial).rstrip(),
+            "",
+            render_weekly_next_week_markdown(editorial).rstrip(),
             "",
             render_weekly_category_markdown(weekly_category, editorial).rstrip(),
             "",
@@ -1515,15 +1599,20 @@ daily_summaries があれば補助。新しい URL・ラベル・事実を捏造
 
 この原稿は **日本ページ向け**（日本ソースのみ）。アメリカソースは扱わない。
 
-weekly_rising は「週内で最もジャンプした1件」の参考程度。
+weekly_rising は「週内で最もジャンプした1件」の参考程度（横ばい・悪化のみの話題は除外済み）。
 Twitch 等の定番ゲーム配信だけで flow を書かない（カテゴリ pool を優先）。
 
 カテゴリ別 top3 の一覧は **機械生成**（候補 label をそのままリンク表示）する。
 flow では pool の **具体ラベル・固有名詞** をそのまま引用すること。
 「エンタメの話題」「トレンドの検索」「新技術の導入」のような抽象表現は禁止。
 
-**出力は JSON オブジェクトのみ**（Markdown 不可）。キーは次のみ:
-- `flow_jp` (string): 3〜5文・日本語。複数カテゴリに触れる週次ストーリー。pool の label を具体名で引用。
+**出力は JSON オブジェクトのみ**（Markdown 不可）。キー:
+- `flow_jp` (string): 5〜8文・日本語。**週としての1本のストーリー**（カテゴリ1位の列挙にしない）。
+  続いた話題・一過性の話題の対比があるとよい。pool の label を具体名で引用。
+- `hot_topics` (array): 最大5件。各要素 `{ "title", "why" }`。
+  title は pool / rising の具体ラベル。why は2〜4文で「なぜその週ホットか」。
+  定番株・一過性の季節ネタ・事故の単日首位だけは避ける。厳選すること。
+- `next_week` (array of string): 2〜3件。来週も残りうる論点（各1〜2文）。未来の断定予測は禁止。
 
 禁止: 入力に無いラベル・URL・未来予測・Markdown 見出し・抽象カテゴリ名だけの記述。"""
 
@@ -1535,7 +1624,7 @@ daily_summaries are optional assist context. Do not invent URLs, labels, or fact
 
 This brief is **U.S. page only** (U.S. sources). Do not summarize Japan-only sources.
 
-weekly_rising is only a hint (the single biggest jump of the week).
+weekly_rising is only a hint (the single biggest jump of the week; flat/worsening-only are excluded).
 Do not write the flow around evergreen Twitch titles alone; prefer the category pool.
 
 Category top3 lists are machine-generated (labels shown as links).
@@ -1543,7 +1632,12 @@ In flow, quote concrete labels/proper nouns from the pool.
 Ban vague phrases like "entertainment topics" or "tech adoption" without labels.
 
 **Output JSON only** (no Markdown). Keys:
-- `flow_us` (string): 3–5 sentences in **English**. Multi-category weekly story; quote pool labels by name.
+- `flow_us` (string): 5–8 sentences in **English**. One weekly narrative arc (not a list of daily #1s).
+  Contrast what persisted vs one-off spikes. Quote pool labels by name.
+- `hot_topics` (array): up to 5 items `{ "title", "why" }`.
+  title = concrete pool/rising label; why = 2–4 sentences on why it was hot.
+  Skip evergreen tickers and one-day accident spikes. Be selective.
+- `next_week` (array of string): 2–3 carry-over points (1–2 sentences each). No hard forecasts.
 
 Forbidden: labels/URLs not in input, forecasts, Markdown headings, abstract category-only prose."""
 

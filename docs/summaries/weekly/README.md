@@ -9,9 +9,11 @@
 
 ## 構成（1枚向け・単一地域）
 
-1. **今週の流れ / Week in review** — OpenAI（`flow_jp` または `flow_us`）。正本は `weekly_category_digest`
-2. **今週いちばん動いた話題 / Biggest movers** — 週内 jump 最大の1件
-3. **カテゴリ別 — 今週の top3 / Category top3** — 日次カテゴリ top3 の週次集約
+1. **今週の流れ / Week in review** — OpenAI（週としての1本線。日次の列挙にしない）
+2. **今週いちばん動いた話題 / Biggest movers** — 週内で実質ジャンプしたものだけ（横ばい除外）
+3. **週のホットトピック / Hot topics** — 厳選・上限5（OpenAI）
+4. **来週に残る論点 / What to watch next week** — 2〜3点（OpenAI）
+5. **カテゴリ別 — 今週の top3 / Category top3** — 日次カテゴリ top3 の週次集約（機械）
 
 > 以前は1ファイルに日本・アメリカを対称配置していましたが、**日本語ページ／USページで原稿を分けました**。
 

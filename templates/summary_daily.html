@@ -105,7 +105,7 @@
                 {% if page.one_liner %}
                 <section class="card shadow-sm mb-4">
                     <div class="card-body p-4">
-                        <h2 class="h6 text-uppercase text-muted mb-2">{% if is_us %}Yesterday's takeaway{% else %}昨日の一行結論{% endif %}</h2>
+                        <h2 class="h6 text-uppercase text-muted mb-2">{% if is_us %}Yesterday's highlight{% else %}昨日の注目{% endif %}</h2>
                         {% if page.one_liner_sentences %}
                         <ul class="mb-0 ps-3">
                             {% for sentence in page.one_liner_sentences %}

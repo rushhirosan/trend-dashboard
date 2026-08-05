@@ -140,7 +140,7 @@ python scripts/generate_ai_daily_summary.py --write --force --business-day 2026-
 python scripts/generate_ai_daily_summary.py --from-api --write --force
 ```
 
-生成ファイルはフロントマターに `generator: openai` を付ける。本文は **一行結論・見どころ（AI JSON）→ 急上昇3つ（機械+AI補足）→ 複数ソース重なり（機械・厳密一致）→ カテゴリ別トップ3（機械）**。成否は **`daily/README.md`** のとおり **`*.generation.json`** で確認。**レビュー後に `approved` にするまで配信に使わない。**
+生成ファイルはフロントマターに `generator: openai` を付ける。本文は **昨日の注目（1トピック）→ 急上昇3つ（機械+AI補足）→ 複数ソース重なり（該当時のみ）→ カテゴリ別トップ3（機械・アフィ短縮・マーケット圧縮）→ フッターに対象ソース注記**。成否は **`daily/README.md`** のとおり **`*.generation.json`** で確認。**レビュー後に `approved` にするまで配信に使わない。**
 
 ---
 

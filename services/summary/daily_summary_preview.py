@@ -9,12 +9,13 @@ from pathlib import Path
 from typing import Optional
 
 JST = timezone(timedelta(hours=9))
-# 現行は「昨日の一行結論」。過去に生成済みの原稿は「今日の一行結論」なので両対応する。
-# US 英語原稿は "## Bottom line" / "## Yesterday's takeaway" など英語見出しを使う。
+# 現行は「昨日の注目」。過去原稿の「昨日/今日の一行結論」「Yesterday's takeaway」も拾う。
 _ONE_LINER_HEADINGS = (
+    "## 昨日の注目",
     "## 昨日の一行結論",
     "## 今日の一行結論",
     "## Bottom line",
+    "## Yesterday's highlight",
     "## Yesterday's takeaway",
     "## Takeaway",
 )
@@ -138,7 +139,7 @@ def teaser_for_display(one_liner: str, teaser: str = "") -> str:
 
 
 def extract_one_liner(markdown_body: str) -> str:
-    """``## 昨日の一行結論``（旧: ``## 今日の一行結論``）直後の本文（次の見出しまで）。"""
+    """``## 昨日の注目``（旧: 一行結論 / takeaway）直後の本文（次の見出しまで）。"""
     idx = -1
     heading = ""
     for h in _ONE_LINER_HEADINGS:

@@ -58,6 +58,13 @@ snapshot_slots_included: ["07", "13", "19", "01"]
 SAMPLE_APPROVED = SAMPLE.replace("status: draft", "status: approved", 1)
 
 
+def test_extract_one_liner_new_heading():
+    sample = SAMPLE.replace("## 昨日の一行結論", "## 昨日の注目", 1)
+    assert extract_one_liner(sample) == (
+        "かつお節の話が一日を通して上位に。順位の動きが大きかったのは「AXIS CAMERAS」。"
+    )
+
+
 def test_extract_one_liner():
     assert extract_one_liner(SAMPLE) == (
         "かつお節の話が一日を通して上位に。順位の動きが大きかったのは「AXIS CAMERAS」。"

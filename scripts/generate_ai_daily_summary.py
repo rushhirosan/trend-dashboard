@@ -74,7 +74,7 @@ def configure_daily_region(region: str) -> None:
         _CROSS_HEADING_PREFIX = "## Topics that overlapped across sources"
         _CROSS_NONE_LINE = "(No clear multi-source overlaps on this observation day.)"
         _TOP3_HEADING = "## 📊 Category top3"
-        _ONE_LINER_HEADING = "## Yesterday's takeaway"
+        _ONE_LINER_HEADING = "## Yesterday's highlight"
         _NOTABLE_HEADING = "## 💡 What stood out yesterday"
     else:
         _RISING_HEADING = "## 📈 昨日いちばん動いた3つ"
@@ -83,7 +83,7 @@ def configure_daily_region(region: str) -> None:
             "該当なし（独立した取得元を2つ以上またいだ同一トピックはありませんでした）"
         )
         _TOP3_HEADING = "## 📊 カテゴリ別トップ3"
-        _ONE_LINER_HEADING = "## 昨日の一行結論"
+        _ONE_LINER_HEADING = "## 昨日の注目"
         _NOTABLE_HEADING = "## 💡 昨日特異だったこと"
 
 
@@ -130,13 +130,21 @@ _CROSS_NONE_LINE = (
 _TOP3_HEADING = "## 📊 カテゴリ別トップ3"
 _TOP1_HEADING = "## 📊 カテゴリ別トップ1"
 _NOTABLE_HEADING = "## 💡 昨日特異だったこと"
-_ONE_LINER_HEADING = "## 昨日の一行結論"
+_ONE_LINER_HEADING = "## 昨日の注目"
 _SPOTLIGHTS_HEADING = "## 昨日の見どころ（3〜5）"
 EDITORIAL_CANDIDATE_MAX = 12
 SPOTLIGHT_MAX = 5
 SPOTLIGHT_MIN = 2
-_MECHANICAL_ONE_LINER_MAX = 420
+# 「昨日の注目」は1トピックのリード文。長すぎる連結は不可。
+_MECHANICAL_ONE_LINER_MAX = 220
+_DIGEST_TITLE_MAX = 48
 _TEASER_MAX_CHARS = 90
+_AFFILIATE_SERIES_PREFIXES = ("rakuten_",)
+_AFFILIATE_TITLE_RE = re.compile(
+    r"クーポン|％OFF|%OFF|送料無料|衝撃\d|【P半】|お中元|ギフト",
+    re.I,
+)
+_MARKET_CATEGORY_KEYS = frozenset({"マーケット", "Market"})
 _GENERIC_ONE_LINER = re.compile(
     r"(注目を集めて|人気です|が話題|盛り上がり|関心が高ま)",
     re.I,
@@ -902,6 +910,39 @@ def _fallback_search_url(label: str) -> str:
     return f"https://www.google.com/search?q={quote_plus(_clean_rising_display(label))}"
 
 
+def _is_affiliate_series(series_key: str) -> bool:
+    sk = (series_key or "").strip().lower()
+    return any(sk.startswith(p) for p in _AFFILIATE_SERIES_PREFIXES)
+
+
+def _shorten_digest_title(label: str, series_key: str = "", max_len: int = _DIGEST_TITLE_MAX) -> str:
+    """アフィ長文・極端に長いタイトルを表示用に短縮する。"""
+    s = _clean_rising_display(label)
+    if not s:
+        return s
+    needs_short = (
+        _is_affiliate_series(series_key)
+        or bool(_AFFILIATE_TITLE_RE.search(s))
+        or len(s) > max_len * 2
+    )
+    if not needs_short and len(s) <= max_len:
+        return s
+    cut = s[:max_len].rstrip()
+    for sep in ("！", "!", "。", " ", "　", "・", "｜", "|", "【"):
+        idx = cut.rfind(sep)
+        if idx >= max(12, max_len // 3):
+            cut = cut[:idx].rstrip()
+            break
+    if len(cut) < len(s):
+        return cut + "…"
+    return cut
+
+
+def _ranks_are_flat(ranks: dict[str, int]) -> bool:
+    vals = [int(ranks[s]) for s in DAYTIME_SLOTS if s in ranks]
+    return len(vals) >= 1 and len(set(vals)) == 1
+
+
 def _format_digest_link_line(
     label: str,
     series_key: str,
@@ -910,7 +951,7 @@ def _format_digest_link_line(
 ) -> str:
     """カテゴリ digest 用: リンク付き1行。"""
     href = url if url else _fallback_search_url(label)
-    title = _clean_rising_display(label).replace("[", "\\[")
+    title = _shorten_digest_title(label, series_key).replace("[", "\\[")
     source = _format_series_key_display(series_key)
     return f"[{title}]({href})（{source} · {rank_display}）"
 
@@ -1357,6 +1398,16 @@ def build_category_top3(
                     "rank_display": cand["rank_display"],
                     "url": cand.get("url"),
                     "link_line": link_line,
+                    "stale": bool(cand.get("stale")),
+                    "flat": _ranks_are_flat(
+                        {
+                            slot: int(r)
+                            for slot, r in _parse_rank_evidence(
+                                str(cand.get("rank_display") or "")
+                            ).items()
+                            if r is not None
+                        }
+                    ),
                 }
             )
             if len(picked) >= count:
@@ -1713,12 +1764,14 @@ def render_cross_source_highlights_markdown(
     business_day: date,
     cross_intro: Optional[str] = None,
 ) -> str:
-    """複数ソース重なり（機械生成・スナップショット事実 + 任意の AI 導入）。"""
+    """複数ソース重なり（機械生成・スナップショット事実 + 任意の AI 導入）。
+
+    0件の日はセクション自体を出さない（「該当なし」行は付けない）。
+    """
+    if not highlights:
+        return ""
     heading = f"{_CROSS_HEADING_PREFIX} — {business_day.isoformat()}"
     lines: List[str] = [heading, ""]
-    if not highlights:
-        lines.append(_CROSS_NONE_LINE)
-        return "\n".join(lines).rstrip() + "\n"
     intro = (cross_intro or "").strip()
     if intro:
         lines.append(intro)
@@ -1807,6 +1860,7 @@ def render_category_top3_markdown(
     """カテゴリ別トップ3の Markdown 本文（機械生成・リンク付き）。
 
     category_intros は後方互換のため受け取るが、統一性のため出力しない。
+    マーケットの定番（終日同順位）は圧縮1行にする。
     """
     del category_intros  # unused — do not render per-category blurbs
     lines: List[str] = [_TOP3_HEADING, ""]
@@ -1819,10 +1873,51 @@ def render_category_top3_markdown(
             lines.append(f"- **{cat_disp}**: {empty_label}")
             continue
         lines.append(f"### {cat_disp}")
-        for i, it in enumerate(items, 1):
-            lines.append(f"{i}. {it.get('link_line') or it.get('label')}")
+        if str(cat) in _MARKET_CATEGORY_KEYS or cat_disp in _MARKET_CATEGORY_KEYS:
+            lines.extend(_render_market_category_items(items))
+        else:
+            for i, it in enumerate(items, 1):
+                lines.append(f"{i}. {it.get('link_line') or it.get('label')}")
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _render_market_category_items(items: List[Dict[str, Any]]) -> List[str]:
+    """マーケット: 終日同順位の定番は圧縮、動いたものだけ番号付き。"""
+    movers: List[Dict[str, Any]] = []
+    flat: List[Dict[str, Any]] = []
+    for it in items:
+        if it.get("flat"):
+            flat.append(it)
+        else:
+            movers.append(it)
+    out: List[str] = []
+    for i, it in enumerate(movers, 1):
+        out.append(f"{i}. {it.get('link_line') or it.get('label')}")
+    if flat:
+        parts: List[str] = []
+        for it in flat:
+            lab = _shorten_digest_title(
+                str(it.get("label") or ""),
+                str(it.get("series_key") or ""),
+                max_len=24,
+            )
+            rd = str(it.get("rank_display") or "").strip()
+            # 終日同順位なら「終日N位」に圧縮
+            m = re.search(r"(\d+)時(\d+)位", rd) or re.search(r"#(\d+)@", rd)
+            if m and _ACTIVE_REGION != "us":
+                rank_n = m.group(2) if m.lastindex and m.lastindex >= 2 else m.group(1)
+                parts.append(f"{lab}（終日{rank_n}位）")
+            elif m and _ACTIVE_REGION == "us":
+                parts.append(f"{lab} (held #{m.group(1)})")
+            else:
+                parts.append(lab)
+        label = "Steady leaders" if _ACTIVE_REGION == "us" else "定番（変化なし）"
+        out.append(f"- **{label}**: {' · '.join(parts)}")
+    if not out:
+        for i, it in enumerate(items, 1):
+            out.append(f"{i}. {it.get('link_line') or it.get('label')}")
+    return out
 
 
 def _category_has_items(cat_block: Dict[str, Any]) -> bool:
@@ -1845,7 +1940,7 @@ def render_editorial_markdown(
     editorial: Dict[str, Any],
     label_index: Dict[str, Dict[str, Any]],
 ) -> str:
-    """一行結論のみ（急上昇は別セクション）。"""
+    """昨日の注目（1トピックのリード）のみ。急上昇は別セクション。"""
     _ = label_index
     lines: List[str] = []
     one_liner = str(editorial.get("one_liner") or "").strip()
@@ -1874,18 +1969,18 @@ def build_llm_payload(
             "Category names are English (News, Search & Video, Tech, Market, "
             "Entertainment, Gov Data). "
             "rank_evidence uses out@H / #N@H for 07→13→19 daytime moves. "
-            "one_liner must include 2+ rising_highlights labels verbatim; "
-            "also include a News category_leader when not already in rising. "
-            "Do not output URLs or Japanese UI words."
+            "one_liner (= Yesterday's highlight) must cover ONE lead topic only "
+            "(prefer a News category_leader, else first rising). "
+            "Do not list multiple movers in one_liner. Do not output URLs or Japanese UI words."
         )
     else:
         reader_context = (
             "観測日（business_day）のトレンドを編集する。読者は通常翌朝に受け取る。"
             "「昨日」= business_day。未来予測は禁止。"
             "候補の rank_evidence は 07→13→19 の一日推移（圏外含む）。"
-            "one_liner は rising_highlights の label を2件以上そのまま含め、"
-            "ニュースの category_leader があればそれも含める（未達なら機械文に差し替えられる）。"
-            "URL は出力しない。"
+            "one_liner（= 昨日の注目）は **トピックを1つだけ**。"
+            "優先: ニュースの category_leader。無ければ rising_highlights 先頭。"
+            "複数トピックの列挙は禁止。URL は出力しない。"
         )
     return {
         "business_day": business_day.isoformat(),
@@ -1940,36 +2035,65 @@ def _label_mentioned_in_text(label: str, text: str) -> bool:
     return len(probe) >= 10 and probe in tn
 
 
+def _preferred_highlight_candidate(
+    editorial_candidates: List[Dict[str, Any]],
+    rising_items: List[Dict[str, Any]],
+    cross_items: List[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """昨日の注目用: ニュース首位 → クロス → 急上昇先頭。"""
+    for c in editorial_candidates:
+        if c.get("reason") == "category_leader" and c.get("category") == news_category_key():
+            return {
+                "label": c.get("label"),
+                "rank_evidence": c.get("rank_evidence"),
+                "kind": "news",
+            }
+    if cross_items:
+        h = cross_items[0]
+        return {
+            "label": h.get("label"),
+            "rank_evidence": h.get("rank_evidence"),
+            "kind": "cross",
+        }
+    if rising_items:
+        r = rising_items[0]
+        return {
+            "label": r.get("label"),
+            "rank_evidence": r.get("rank_evidence"),
+            "kind": "rising",
+        }
+    return None
+
+
 def one_liner_is_acceptable(
     one_liner: str,
     editorial_candidates: List[Dict[str, Any]],
     rising_items: List[Dict[str, Any]],
+    cross_items: Optional[List[Dict[str, Any]]] = None,
 ) -> bool:
-    """LLM 一行が機械ファクトと整合しているか（自動配信用）。"""
+    """LLM の「昨日の注目」が1トピックとして機械ファクトと整合しているか。"""
     s = (one_liner or "").strip()
     if len(s) < 12 or len(s) > _MECHANICAL_ONE_LINER_MAX:
         return False
     if _warn_vague_one_liner(s) or _GENERIC_ONE_LINER.search(s):
         return False
+    preferred = _preferred_highlight_candidate(
+        editorial_candidates, rising_items, cross_items or []
+    )
+    if preferred and preferred.get("label"):
+        if not _label_mentioned_in_text(str(preferred["label"]), s):
+            return False
+    # 急上昇を2件以上並べた連結は拒否（注目は1本）
     if rising_items:
-        need = min(len(rising_items), 2)
         hits = sum(
             1
             for r in rising_items
             if _label_mentioned_in_text(str(r.get("label") or ""), s)
         )
-        if hits < need:
+        if hits >= 2:
             return False
-    rising_nks = {_normalize_label_key(str(r.get("label") or "")) for r in rising_items}
-    for c in editorial_candidates:
-        if c.get("reason") != "category_leader" or c.get("category") != news_category_key():
-            continue
-        lab = str(c.get("label") or "")
-        if _normalize_label_key(lab) in rising_nks:
-            continue
-        if not _label_mentioned_in_text(lab, s):
-            return False
-        break
+    if _text_misstates_rank_movement(s, rising_items):
+        return False
     return True
 
 
@@ -1983,14 +2107,21 @@ def build_teaser_from_one_liner(one_liner: str, max_chars: int = _TEASER_MAX_CHA
 def teaser_is_acceptable(
     teaser: str,
     rising_items: List[Dict[str, Any]],
+    *,
+    one_liner: str = "",
 ) -> bool:
     s = (teaser or "").strip()
     if len(s) < 12 or len(s) > _TEASER_MAX_CHARS:
         return False
     if _warn_vague_one_liner(s) or _GENERIC_ONE_LINER.search(s):
         return False
-    labels = [str(r.get("label") or "").strip() for r in rising_items if r.get("label")]
-    if labels and not any(lab in s for lab in labels[:3]):
+    # 注目本文か急上昇ラベルのいずれかと一致すれば可
+    pool_labels = [str(r.get("label") or "").strip() for r in rising_items if r.get("label")]
+    if one_liner:
+        # one_liner に含まれる固有ラベルを優先チェック（引用「…」）
+        for m in re.finditer(r"「([^」]{2,80})」", one_liner):
+            pool_labels.insert(0, m.group(1))
+    if pool_labels and not any(lab and lab in s for lab in pool_labels[:5]):
         return False
     if _text_misstates_rank_movement(s, rising_items):
         return False
@@ -2002,82 +2133,53 @@ def build_mechanical_one_liner(
     rising_items: List[Dict[str, Any]],
     cross_items: List[Dict[str, Any]],
 ) -> str:
-    """データだけから組み立てる一行結論（LLM 不整合時のフォールバック）。"""
-    if _ACTIVE_REGION == "us":
-        sentences: List[str] = []
-        if cross_items:
-            lab = _clip_editorial_label(str(cross_items[0].get("label") or ""))
-            ev = str(cross_items[0].get("rank_evidence") or "").strip()
-            if lab:
-                sentences.append(
-                    f"「{lab}」 overlapped across sources{f' ({ev})' if ev else ''}."
-                )
-        labels = [
-            f"「{_clip_editorial_label(str(r.get('label') or ''))}」"
-            for r in rising_items[:3]
-            if str(r.get("label") or "").strip()
-        ]
-        if labels:
-            if len(labels) == 1:
-                sentences.append(f"The biggest mover was {labels[0]}.")
-            else:
-                sentences.append(
-                    f"Biggest movers: {', '.join(labels[:-1])}, and {labels[-1]}."
-                )
-        if not sentences:
+    """データだけから「昨日の注目」1本を組み立てる（LLM 不整合時のフォールバック）。"""
+    pick = _preferred_highlight_candidate(
+        editorial_candidates, rising_items, cross_items
+    )
+    if not pick or not str(pick.get("label") or "").strip():
+        if _ACTIVE_REGION == "us":
             return (
                 f"Across {DAYTIME_SLOTS_ARROW}, rank jumps were limited. "
                 "Category leaders are listed below."
             )
-        out = " ".join(sentences)
-        if len(out) > _MECHANICAL_ONE_LINER_MAX:
-            out = out[: _MECHANICAL_ONE_LINER_MAX - 1].rstrip() + "…"
-        return out
-
-    sentences = []
-
-    if cross_items:
-        lab = _clip_editorial_label(str(cross_items[0].get("label") or ""))
-        ev = str(cross_items[0].get("rank_evidence") or "").strip()
-        if lab:
-            tail = f"（{ev}）" if ev else ""
-            sentences.append(f"複数の取得元で「{lab}」が重なった{tail}。")
-
-    news_leaders = [
-        c
-        for c in editorial_candidates
-        if c.get("reason") == "category_leader" and c.get("category") == news_category_key()
-    ]
-    if news_leaders:
-        c = news_leaders[0]
-        lab = _clip_editorial_label(str(c.get("label") or ""))
-        ev = str(c.get("rank_evidence") or "").strip()
-        if lab:
-            if ev:
-                sentences.append(f"ニュースでは「{lab}」が一日を通して上位（{ev}）。")
-            else:
-                sentences.append(f"ニュースでは「{lab}」が一日を通して上位。")
-
-    labels = [
-        f"「{_clip_editorial_label(str(r.get('label') or ''))}」"
-        for r in rising_items[:3]
-        if str(r.get("label") or "").strip()
-    ]
-    if labels:
-        if len(labels) == 1:
-            sentences.append(f"順位の動きが大きかったのは{labels[0]}。")
-        else:
-            sentences.append(
-                f"順位の動きが大きかったのは{'、'.join(labels[:-1])}と{labels[-1]}。"
-            )
-
-    if not sentences:
         return (
             f"{DAYTIME_SLOTS_ARROW} では、目立った順位の急上昇は限定的でした。"
             "カテゴリ別の上位は下記のとおりです。"
         )
 
-    out = "".join(sentences)
+    lab = _clip_editorial_label(str(pick.get("label") or ""))
+    ev = str(pick.get("rank_evidence") or "").strip()
+    kind = pick.get("kind")
+
+    if _ACTIVE_REGION == "us":
+        if kind == "cross":
+            out = f"「{lab}」 overlapped across sources{f' ({ev})' if ev else ''}."
+        elif kind == "news":
+            out = (
+                f"News lead: 「{lab}」"
+                + (f" ({ev})." if ev else ".")
+            )
+        else:
+            out = (
+                f"Biggest highlight: 「{lab}」"
+                + (f" ({ev})." if ev else ".")
+            )
+    else:
+        if kind == "cross":
+            tail = f"（{ev}）" if ev else ""
+            out = f"複数の取得元で「{lab}」が重なった{tail}。"
+        elif kind == "news":
+            if ev:
+                out = f"ニュースでは「{lab}」が一日を通して上位（{ev}）。"
+            else:
+                out = f"ニュースでは「{lab}」が一日を通して上位。"
+        else:
+            if ev:
+                out = f"「{lab}」が大きく動いた（{ev}）。"
+            else:
+                out = f"「{lab}」が大きく動いた。"
+
     if len(out) > _MECHANICAL_ONE_LINER_MAX:
         out = out[: _MECHANICAL_ONE_LINER_MAX - 1].rstrip() + "…"
     return out
@@ -2333,7 +2435,9 @@ def finalize_editorial(
         editorial_candidates, rising_items, cross_items
     )
     one = str(editorial.get("one_liner") or "").strip()
-    if one_liner_is_acceptable(one, editorial_candidates, rising_items):
+    if one_liner_is_acceptable(
+        one, editorial_candidates, rising_items, cross_items=cross_items
+    ):
         trace["one_liner_source"] = "llm"
     else:
         editorial["one_liner"] = mech_one
@@ -2342,7 +2446,9 @@ def finalize_editorial(
             trace["one_liner_replaced"] = True
 
     teaser = str(editorial.get("teaser") or "").strip()
-    if teaser_is_acceptable(teaser, rising_items):
+    if teaser_is_acceptable(
+        teaser, rising_items, one_liner=str(editorial.get("one_liner") or "")
+    ):
         trace["teaser_source"] = "llm"
     else:
         teaser = build_teaser_from_one_liner(str(editorial.get("one_liner") or ""))
@@ -2461,10 +2567,9 @@ def assemble_daily_markdown(
     cross_items: List[Dict[str, Any]],
     top3_blocks: List[Dict[str, Any]],
 ) -> str:
-    """ヘッダ + 編集 + 機械根拠セクションを合成。"""
+    """ヘッダ + 編集 + 機械根拠 + フッター注記を合成。"""
     parts = [
         render_header_markdown(business_day),
-        digest_scope_note_markdown(),
         render_editorial_markdown(editorial, label_index),
         render_rising_highlights_markdown(rising_items, editorial.get("rising_notes")),
         render_cross_source_highlights_markdown(
@@ -2473,6 +2578,7 @@ def assemble_daily_markdown(
             editorial.get("cross_intro") if cross_items else None,
         ),
         render_category_top3_markdown(top3_blocks, editorial.get("category_intros")),
+        digest_scope_note_markdown(),
     ]
     return "\n\n".join(p.strip() for p in parts if p and p.strip()) + "\n"
 
@@ -2521,11 +2627,13 @@ SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ�
 **出力は JSON オブジェクトのみ**（Markdown 不可）。次のキーを含める:
 
 - `teaser` (string): **サイト無料プレビュー用**。1文・**最大90字**。主題は1つに絞る。
-  rising_highlights の **先頭 label を1件**そのまま含める。順位の動きは括弧で短く（例: 7時圏外→19時1位）。
-  2件目以降のトピックは書かない（それらは one_liner / 有料全文向け）。
-- `one_liner` (string): 最大3文。必ず rising_highlights の label を **2件以上**そのまま含める。
-  reason=category_leader かつ category=ニュース の候補が rising に無い場合は、その label も含める。
-  「注目を集めて」「人気です」等の抽象表現は禁止。全カテゴリを無理に埋めない。
+  one_liner と同じ1トピックの label をそのまま含める。順位の動きは括弧で短く（例: 7時圏外→19時1位）。
+  2件目以降のトピックは書かない。
+- `one_liner` (string): **昨日の注目**。最大2文・**トピックは1つだけ**。
+  優先: reason=category_leader かつ category=ニュース の label。無ければ rising_highlights 先頭。
+  その label をそのまま含め、必要なら rank_evidence を括弧で添える。
+  複数トピックの列挙・「順位の動きが大きかったのはAとBとC」は禁止。
+  「注目を集めて」「人気です」等の抽象表現は禁止。
 - `rising_notes` (array): `{ "match_label", "note" }` — rising_highlights の label に対応する1文補足。
   順位の事実の繰り返し・「急上昇中」「注目を集め」等の定型は禁止。rising_highlights が空なら []。
 - `cross_intro` (string|null): cross_source_highlights が1件以上あるときのみ導入1〜2文。0件なら null。
@@ -2551,11 +2659,12 @@ insert Japanese category labels or phrases like 補足 / 圏外 / 時位.
 **Output JSON only** (no Markdown). Include:
 
 - `teaser` (string): free preview on the site. One sentence, **max 90 chars**. One topic only.
-  Include the **first rising_highlights label** verbatim. Optionally short rank move in parentheses
+  Use the same single topic as one_liner. Optionally short rank move in parentheses
   (e.g. out@7 → #1@19). Do not mention 2nd+ topics here.
-- `one_liner` (string): up to 3 sentences in **English**. Include **2+ rising_highlights labels** verbatim.
-  If a News category_leader exists and is not already in rising, include that label too.
-  Ban vague fillers ("trending", "gaining attention"). Do not force every category in.
+- `one_liner` (string): **Yesterday's highlight**. Up to 2 sentences in **English**. **One topic only**.
+  Prefer a News category_leader label; else the first rising_highlights label.
+  Include that label verbatim; optional rank_evidence in parentheses.
+  Do not list multiple movers. Ban vague fillers ("trending", "gaining attention").
 - `rising_notes` (array): `{ "match_label", "note" }` — one short **English** note per rising label.
   Ban restating rank facts or stock phrases. Empty array if no rising_highlights.
 - `cross_intro` (string|null): 1–2 English sentences only when cross_source_highlights is non-empty; else null.

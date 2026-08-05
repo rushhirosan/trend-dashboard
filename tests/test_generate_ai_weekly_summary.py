@@ -1,6 +1,7 @@
 """Tests for scripts/generate_ai_weekly_summary.py (week boundaries and loaders)."""
 
 import importlib.util
+import json
 from datetime import date, datetime
 from pathlib import Path
 
@@ -482,8 +483,8 @@ def test_pick_regional_weekly_rising_picks_top_for_active_region(gaws):
     gaws.configure_weekly_region("jp")
     pools = {
         "jp": [
-            {"label": "Counter-Strike", "weekly_score": 100},
-            {"label": "League of Legends", "weekly_score": 90},
+            {"label": "Counter-Strike", "weekly_score": 100, "jump_sum": 12.0},
+            {"label": "League of Legends", "weekly_score": 90, "jump_sum": 8.0},
         ],
     }
     out = gaws.pick_regional_weekly_rising(pools)
@@ -606,6 +607,10 @@ def test_assemble_weekly_markdown_jp_only(gaws):
     editorial = {
         "flow_jp": "今週は日本のテスト話題が動いた。",
         "flow_us": "",
+        "hot_topics": [
+            {"title": "Hot JP", "why": "週を通じて議論が続いた。"},
+        ],
+        "next_week": ["関税関連が続くか。", "テックのAI記事が残るか。"],
         "category_themes": {"jp": {}, "us": {}},
     }
     rising = {
@@ -648,7 +653,39 @@ def test_assemble_weekly_markdown_jp_only(gaws):
     assert "Rising JP" in md
     assert "[Cat JP](https://example.com/cat)" in md
     assert "今週は日本のテスト話題が動いた。" in md
+    assert "週のホットトピック" in md
+    assert "Hot JP" in md
+    assert "来週に残る論点" in md
+    assert "関税関連が続くか。" in md
     assert "複数ソースで週を通じて重なった話題" not in md
+
+
+def test_weekly_rising_filters_flat_jump(gaws):
+    pools = {
+        "jp": [
+            {"label": "Flat", "jump_sum": 1.0},
+            {"label": "Real Move", "jump_sum": 12.0},
+        ],
+    }
+    out = gaws.pick_regional_weekly_rising(pools)
+    assert len(out["jp"]) == 1
+    assert out["jp"][0]["label"] == "Real Move"
+
+
+def test_parse_editorial_json_hot_and_next(gaws):
+    raw = json.dumps(
+        {
+            "flow_jp": "流れ。",
+            "hot_topics": [{"title": "A", "why": "理由"}],
+            "next_week": ["論点1", "論点2"],
+        },
+        ensure_ascii=False,
+    )
+    gaws.configure_weekly_region("jp")
+    data = gaws.parse_editorial_json(raw)
+    assert data["flow_jp"] == "流れ。"
+    assert data["hot_topics"][0]["title"] == "A"
+    assert data["next_week"] == ["論点1", "論点2"]
 
 
 def test_assemble_weekly_markdown_us_english(gaws):
@@ -658,6 +695,8 @@ def test_assemble_weekly_markdown_us_english(gaws):
     editorial = {
         "flow_jp": "",
         "flow_us": "U.S. tech topics moved this week.",
+        "hot_topics": [{"title": "Hot US", "why": "Cross-source all week."}],
+        "next_week": ["Watch Fed news."],
         "category_themes": {"jp": {}, "us": {}},
     }
     rising = {
@@ -682,10 +721,14 @@ def test_assemble_weekly_markdown_us_english(gaws):
     assert "Week in review" in md
     assert "U.S. tech topics moved this week." in md
     assert "Biggest movers this week" in md
-    gaws.configure_weekly_region("jp")  # restore for other tests
+    assert "Hot topics this week" in md
+    assert "Hot US" in md
+    assert "What to watch next week" in md
+    assert "Watch Fed news." in md
     assert "来週に残る論点" not in md
     assert "ソース一覧" not in md
     assert "週のホットトピック" not in md
+    gaws.configure_weekly_region("jp")  # restore for other tests
 
 
 def test_openai_api_key_accepts_open_api_key_env(monkeypatch, gaws):

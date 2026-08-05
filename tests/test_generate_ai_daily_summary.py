@@ -961,9 +961,8 @@ def test_format_daily_slot_rank_trend_skips_flat_ranks(gads):
 
 def test_render_cross_source_highlights_markdown_empty(gads):
     md = gads.render_cross_source_highlights_markdown([], date(2026, 5, 27))
-    assert "## 複数ソースで重なった話題 — 2026-05-27" in md
-    assert gads._CROSS_NONE_LINE in md
-    assert "### 1." not in md
+    assert md == ""
+    assert "該当なし" not in md
 
 
 def test_render_cross_source_highlights_markdown_lists_items(gads):
@@ -1227,7 +1226,7 @@ def test_build_editorial_candidates_excludes_stale(gads):
     assert "build-your-own-x" not in labels
 
 
-def test_one_liner_is_acceptable_requires_rising_labels(gads):
+def test_one_liner_is_acceptable_requires_single_topic(gads):
     rising = [
         {"label": "Ariana Grande MV", "category": "検索・動画"},
         {"label": "Splatoon 3", "category": "検索・動画"},
@@ -1238,18 +1237,21 @@ def test_one_liner_is_acceptable_requires_rising_labels(gads):
             "label": "老舗ホテルのカピピン",
             "category": "ニュース",
             "reason": "category_leader",
+            "rank_evidence": "7時圏外 → 13時1位 → 19時1位",
         }
     ]
-    weak = (
-        "「老舗ホテルのカピピン」が注目を集めており、"
-        "特に検索・動画カテゴリでは「Victor Wembanyama」が人気です。"
+    multi = (
+        "順位の動きが大きかったのは「Ariana Grande MV」、「Splatoon 3」と"
+        "「Victor Wembanyama」。"
     )
+    assert not gads.one_liner_is_acceptable(multi, news, rising)
+    weak = "動きは限定的でした。"
     assert not gads.one_liner_is_acceptable(weak, news, rising)
+    good = "ニュースでは「老舗ホテルのカピピン」が一日を通して上位（7時圏外 → 13時1位 → 19時1位）。"
+    assert gads.one_liner_is_acceptable(good, news, rising)
     mech = gads.build_mechanical_one_liner(news, rising, [])
-    assert "Ariana Grande MV" in mech or "Ariana" in mech
-    assert "Splatoon 3" in mech
-    assert "Victor Wembanyama" in mech
     assert "カピピン" in mech
+    assert "Ariana" not in mech or mech.count("「") <= 1
     assert gads.one_liner_is_acceptable(mech, news, rising)
 
 
@@ -1401,10 +1403,64 @@ def test_assemble_daily_markdown_structure(gads):
     assert "# 日次サマリー — 2026-05-31" in md
     assert "対象外" in md
     assert "Medium" in md
+    # 注記はフッター（注目より後）
+    assert md.rfind("対象外") > md.find(gads._ONE_LINER_HEADING)
     assert gads._ONE_LINER_HEADING in md
+    assert "昨日の注目" in gads._ONE_LINER_HEADING
     assert gads._RISING_HEADING in md
-    assert "複数ソースで重なった話題" in md
+    # 空のクロスソースは出さない
+    assert "複数ソースで重なった話題" not in md
     assert gads._TOP3_HEADING in md
+
+
+def test_assemble_omits_empty_cross_includes_when_present(gads):
+    bd = date(2026, 5, 31)
+    editorial = {"one_liner": "注目。", "rising_notes": [], "category_intros": {}}
+    cross = [{"label": "豊臣秀長", "sources_display": "Wiki", "rank_evidence": "19時1位"}]
+    md = gads.assemble_daily_markdown(bd, editorial, {}, [], cross, [])
+    assert "複数ソースで重なった話題" in md
+    assert "豊臣秀長" in md
+    assert "該当なし" not in md
+
+
+def test_shorten_affiliate_title(gads):
+    long_title = (
+        "今夜23:59まで★衝撃60％OFFクーポンで24,980円⇒送料無料9,992円！"
+        "お中元 ギフト 希少な 国産 うなぎ 蒲焼き 超特大サイズ"
+    )
+    short = gads._shorten_digest_title(long_title, "rakuten_jp")
+    assert len(short) <= gads._DIGEST_TITLE_MAX + 1  # may include …
+    assert "…" in short or len(short) < len(long_title)
+    line = gads._format_digest_link_line(long_title, "rakuten_jp", "19時4位")
+    assert "クーポンで24,980円⇒送料無料9,992円！お中元" not in line or "…" in line
+
+
+def test_market_category_compresses_flat(gads):
+    blocks = [
+        {
+            "category": "マーケット",
+            "items": [
+                {
+                    "label": "Bitcoin",
+                    "series_key": "crypto_global",
+                    "rank_display": "7時1位 → 13時1位 → 19時1位",
+                    "link_line": "[Bitcoin](https://example.com)（暗号資産 · 7時1位 → 13時1位 → 19時1位）",
+                    "flat": True,
+                },
+                {
+                    "label": "ソフトバンクグループ",
+                    "series_key": "stock_jp",
+                    "rank_display": "7時2位 → 13時2位 → 19時2位",
+                    "link_line": "[ソフトバンクグループ](https://example.com)（株価 · 7時2位 → 13時2位 → 19時2位）",
+                    "flat": True,
+                },
+            ],
+        }
+    ]
+    md = gads.render_category_top3_markdown(blocks)
+    assert "定番（変化なし）" in md
+    assert "Bitcoin" in md
+    assert "1. [Bitcoin]" not in md
 
 
 def test_build_llm_payload_no_legacy_category_list(gads):
@@ -1491,7 +1547,7 @@ def test_configure_daily_region_us_paths_and_headings(gads):
     gads.configure_daily_region("us")
     assert gads._ACTIVE_REGION == "us"
     assert gads.daily_output_dir().name == "us"
-    assert "takeaway" in gads._ONE_LINER_HEADING.lower()
+    assert "highlight" in gads._ONE_LINER_HEADING.lower()
     assert "Biggest movers" in gads._RISING_HEADING
     hdr = gads.render_header_markdown(date(2026, 7, 13))
     assert "Daily summary" in hdr
@@ -1499,7 +1555,7 @@ def test_configure_daily_region_us_paths_and_headings(gads):
     assert "Generated" not in hdr
     gads.configure_daily_region("jp")
     assert gads.daily_output_dir() == gads.DAILY_DIR
-    assert "一行結論" in gads._ONE_LINER_HEADING
+    assert "昨日の注目" in gads._ONE_LINER_HEADING
     jp_hdr = gads.render_header_markdown(date(2026, 7, 13))
     assert "対象（観測日）" not in jp_hdr
     assert "生成・送信完了" not in jp_hdr

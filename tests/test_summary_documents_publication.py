@@ -21,7 +21,7 @@ snapshot_slots_included: ["07", "13", "19", "01"]
 
 # 日次サマリー — {business_day}
 
-## 昨日の一行結論
+## 昨日の注目
 
 {one_liner}
 

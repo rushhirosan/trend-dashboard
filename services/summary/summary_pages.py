@@ -102,7 +102,7 @@ def _read_doc(kind: str, region: str, doc_id: str) -> Optional[str]:
 
 # 見出しの言語差を吸収するためのキーワード（JP/EN 両対応）。
 # US 原稿は英語見出しで生成する想定だが、パーサはどちらでも拾えるようにする。
-_ONE_LINER_KEYS = ("一行結論", "takeaway", "bottom line")
+_ONE_LINER_KEYS = ("昨日の注目", "一行結論", "highlight", "takeaway", "bottom line")
 _RISING_KEYS = ("いちばん動いた", "biggest movers", "movers")
 _FLOW_KEYS = ("今週の流れ", "week in review", "this week")
 _JP_SUB_KEYS = ("日本", "Japan", "JP")

@@ -80,7 +80,7 @@ def test_render_weekly_category_markdown_shows_concrete_link(gaws):
     category = {
         "jp": [
             {
-                "category": "エンタメ",
+                "category": "エンタメ・ショッピング",
                 "items": [
                     {
                         "label": "最終絶叫計画 令和！",

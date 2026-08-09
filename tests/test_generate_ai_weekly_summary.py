@@ -285,7 +285,7 @@ def test_render_weekly_rising_markdown_compact_no_table(gaws):
                 "jump_sum": 15.0,
                 "best_rank": 6,
                 "weekly_score": 145.0,
-                "category": "エンタメ",
+                "category": "エンタメ・ショッピング",
                 "link_line": "[ライラック](https://example.com)",
                 "rank_evidence_by_day": {
                     "2026-06-08": "7時10位 → 13時8位 → 19時8位",

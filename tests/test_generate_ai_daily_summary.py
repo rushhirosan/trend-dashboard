@@ -99,11 +99,11 @@ def test_use_http_snapshots_gha_fly_private_fallback(monkeypatch, gads, gha, db,
         ("appstore_jp", "テック・開発"),
         ("stock_jp", "マーケット"),
         ("crypto_jp", "マーケット"),
-        ("rakuten_jp", "エンタメ"),
-        ("twitch_jp", "エンタメ"),
-        ("bluesky_jp", "エンタメ"),
-        ("ebay_us", "エンタメ"),
-        ("book_jp_fiction", "エンタメ"),
+        ("rakuten_jp", "エンタメ・ショッピング"),
+        ("twitch_jp", "エンタメ・ショッピング"),
+        ("bluesky_jp", "エンタメ・ショッピング"),
+        ("ebay_us", "エンタメ・ショッピング"),
+        ("book_jp_fiction", "エンタメ・ショッピング"),
         ("globenewswire_market_us", "ニュース"),
         ("estat_jp", "行政"),
         ("kkj_jp", "行政"),
@@ -216,7 +216,7 @@ def test_build_rising_and_category_top3_exclude_twitch(gads):
     assert all(it.get("series_key") != "twitch_jp" for it in rising)
     assert any(it.get("label") == "具体的な曲名ヒット" for it in rising)
     top3 = gads.build_category_top3(rows, count=3)
-    ent = next(b for b in top3 if b["category"] == "エンタメ")
+    ent = next(b for b in top3 if b["category"] == "エンタメ・ショッピング")
     labels = [it["label"] for it in ent.get("items") or []]
     assert "League of Legends" not in labels
     assert "具体的な曲名ヒット" in labels
@@ -1158,6 +1158,33 @@ def test_build_llm_payload_includes_editorial_fields(gads):
     assert "cross_source_highlights" in payload
     assert "spotlight_max" not in payload
     assert "急上昇" not in payload["reader_context"] or "editorial_candidates" in payload["reader_context"]
+    assert payload["weekend"] is False
+
+
+def test_build_llm_payload_strips_market_quiet_on_weekend(gads):
+    top3 = [
+        {
+            "category": "ニュース",
+            "items": [{"label": "headline", "series_key": "nhk_jp"}],
+        },
+        {"category": "マーケット", "items": [], "quiet": True},
+        {
+            "category": "テック・開発",
+            "items": [],
+            "quiet": True,
+        },
+    ]
+    payload = gads.build_llm_payload(
+        [],
+        date(2026, 8, 9),
+        rising_items=[],
+        cross_items=[],
+        top3_blocks=top3,
+    )
+    assert payload["weekend"] is True
+    assert "マーケット" not in payload["quiet_editorial_categories"]
+    assert "テック・開発" in payload["quiet_editorial_categories"]
+    assert "マーケット" not in payload["quiet_category_examples"]
 
 
 def test_build_llm_payload_marks_quiet_tech_when_all_stale(gads):
@@ -1412,11 +1439,51 @@ def test_build_mechanical_editor_notes_cross_and_quiet(gads):
     assert any("ラベル一致はなし" in n for n in empty_cross)
 
 
+def test_build_mechanical_editor_notes_skips_market_quiet_on_weekend(gads):
+    from datetime import date
+
+    rising = [
+        {"label": "A", "category": "ニュース"},
+        {"label": "B", "category": "テック・開発"},
+    ]
+    sunday = date(2026, 8, 9)
+    notes = gads.build_mechanical_editor_notes(
+        rising, [], ["マーケット", "テック・開発"], business_day=sunday
+    )
+    assert not any("マーケット" in n for n in notes)
+    assert any("テック・開発" in n for n in notes)
+
+    friday = date(2026, 8, 7)
+    weekday_notes = gads.build_mechanical_editor_notes(
+        rising, [], ["マーケット"], business_day=friday
+    )
+    assert any("マーケット" in n for n in weekday_notes)
+
+
+def test_quiet_categories_for_editor_notes_weekend(gads):
+    from datetime import date
+
+    quiet = ["マーケット", "テック・開発"]
+    assert gads.quiet_categories_for_editor_notes(quiet, date(2026, 8, 9)) == [
+        "テック・開発"
+    ]
+    assert gads.quiet_categories_for_editor_notes(quiet, date(2026, 8, 7)) == quiet
+
+
 def test_filter_editor_notes_drops_vague_and_forecast(gads):
     assert gads.filter_editor_notes(
         ["全体的に盛り上がり。", "明日は伸びるでしょう。", "テックは一過性、ニュースは持続。"]
     ) == ["テックは一過性、ニュースは持続。"]
 
+
+def test_filter_editor_notes_drops_weak_market_filler(gads):
+    assert gads.filter_editor_notes(
+        [
+            "注目の富士フイルムホールディングスは、安定した人気を維持しています。",
+            "他のトピックは一過性の可能性が高いです。",
+            "急上昇はニュースと検索に分散。",
+        ]
+    ) == ["急上昇はニュースと検索に分散。"]
 
 def test_finalize_editorial_fills_mechanical_editor_notes(gads):
     rising = [

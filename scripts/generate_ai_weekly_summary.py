@@ -98,7 +98,7 @@ WEEKLY_NEXT_MAX = 3
 
 # 週次カテゴリ top3: 同一トピック/ソースの重複を抑える
 _WEEKLY_SERIES_DIVERSITY_CATEGORIES = frozenset(
-    {"マーケット", "テック・開発", "検索・動画", "エンタメ"}
+    {"マーケット", "テック・開発", "検索・動画", "エンタメ・ショッピング"}
 )
 # 週次 digest の検索・動画: YouTube / Google Trends / Wikipedia のみ（日次カテゴリ分類とは別）
 _WEEKLY_SEARCH_VIDEO_ALLOWED_PREFIXES = (

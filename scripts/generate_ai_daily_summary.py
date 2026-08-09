@@ -99,7 +99,7 @@ CATEGORY_LABELS_EN: dict[str, str] = {
     "検索・動画": "Search & Video",
     "テック・開発": "Tech",
     "マーケット": "Market",
-    "エンタメ": "Entertainment",
+    "エンタメ・ショッピング": "Entertainment & Shopping",
     "行政": "Gov Data",
 }
 
@@ -163,6 +163,14 @@ _GENERIC_EDITOR_NOTE = re.compile(
     r"trending|gaining attention|overall)",
     re.I,
 )
+# 定番株を「注目」扱い／「他は一過性」だけの空文（土日マーケット由来で出やすい）
+_WEAK_EDITOR_NOTE = re.compile(
+    r"(注目の.{0,48}(は、?安定|を維持)|安定した人気を維持|"
+    r"他のトピックは一過性|他は一過性|"
+    r"stable popularity|held steady in (popularity|attention)|"
+    r"other topics? (are |look |seem )?(transient|fleeting|one-?off))",
+    re.I,
+)
 _FORECAST_EDITOR_NOTE = re.compile(
     r"(でしょう|見込み|なるはず|だろう|will (likely|probably)|expected to)",
     re.I,
@@ -198,7 +206,7 @@ CATEGORY_DIGEST_ORDER: tuple[str, ...] = (
     "検索・動画",
     "テック・開発",
     "マーケット",
-    "エンタメ",
+    "エンタメ・ショッピング",
 )
 
 # カテゴリ top3 / 急上昇 / クロスソースから除外する系列（人気や話題の代表にならない）
@@ -327,7 +335,7 @@ SUMMARY_CATEGORY_ORDER: tuple[str, ...] = (
     "検索・動画",
     "テック・開発",
     "マーケット",
-    "エンタメ",
+    "エンタメ・ショッピング",
     "行政",
 )
 SUMMARY_CATEGORY_HINTS: dict[str, str] = {
@@ -335,7 +343,7 @@ SUMMARY_CATEGORY_HINTS: dict[str, str] = {
     "検索・動画": "Google トレンド・YouTube・Wikipedia 等",
     "テック・開発": "Zenn・Qiita・GitHub・はてな・App Store・セキュリティ注意・HN 等",
     "マーケット": "株・暗号 等",
-    "エンタメ": "音楽・映画・Podcast・書籍・楽天・Twitch・Bluesky 等",
+    "エンタメ・ショッピング": "音楽・映画・Podcast・書籍・楽天・Twitch・Bluesky 等",
     "行政": "e-Stat・官公需・米 BLS・政府支出等",
 }
 
@@ -489,7 +497,7 @@ def categorize_series_key(series_key: str) -> str:
             "ebay_",
         )
     ):
-        return "エンタメ"
+        return "エンタメ・ショッピング"
     if any(
         sk.startswith(p)
         for p in (
@@ -1461,6 +1469,27 @@ def detect_quiet_editorial_categories(top3_blocks: List[Dict[str, Any]]) -> List
     return quiet
 
 
+def is_weekend_business_day(business_day: date) -> bool:
+    """観測日が土日か（JST の暦日。市場が動かない日の読み方メモ向け）。"""
+    return business_day.weekday() >= 5
+
+
+def _is_market_category_name(cat: str) -> bool:
+    c = (cat or "").strip()
+    return c in _MARKET_CATEGORY_KEYS or category_display_name(c) in _MARKET_CATEGORY_KEYS
+
+
+def quiet_categories_for_editor_notes(
+    quiet: List[str],
+    business_day: Optional[date] = None,
+) -> List[str]:
+    """読み方メモ用の quiet リスト。土日はマーケット静けさを材料から外す。"""
+    out = [str(c).strip() for c in (quiet or []) if str(c).strip()]
+    if business_day is not None and is_weekend_business_day(business_day):
+        out = [c for c in out if not _is_market_category_name(c)]
+    return out
+
+
 def quiet_category_examples(top3_blocks: List[Dict[str, Any]]) -> Dict[str, List[str]]:
     """静かな区分向け: 定番ラベル例（一行結論で具体名を1つ出す用）。"""
     out: Dict[str, List[str]] = {}
@@ -1994,13 +2023,23 @@ def build_llm_payload(
     editorial_candidates = build_editorial_candidates(
         rising_items, cross_items, top3_blocks, rows
     )
-    quiet_editorial = detect_quiet_editorial_categories(top3_blocks)
+    quiet_editorial = quiet_categories_for_editor_notes(
+        detect_quiet_editorial_categories(top3_blocks),
+        business_day,
+    )
+    quiet_examples = quiet_category_examples(top3_blocks)
+    if is_weekend_business_day(business_day):
+        quiet_examples = {
+            k: v
+            for k, v in quiet_examples.items()
+            if not _is_market_category_name(k)
+        }
     if _ACTIVE_REGION == "us":
         reader_context = (
             "Edit trends for business_day. Readers usually get this the next morning. "
             '"Yesterday" = business_day. No forecasts. Write English only. '
             "Category names are English (News, Search & Video, Tech, Market, "
-            "Entertainment, Gov Data). "
+            "Entertainment & Shopping, Gov Data). "
             "rank_evidence uses out@H / #N@H for 07→13→19 daytime moves. "
             "one_liner (= Yesterday's highlight) must cover ONE lead topic only "
             "(prefer a News category_leader, else first rising). "
@@ -2017,10 +2056,11 @@ def build_llm_payload(
         )
     return {
         "business_day": business_day.isoformat(),
+        "weekend": is_weekend_business_day(business_day),
         "reader_context": reader_context,
         "editorial_candidates": editorial_candidates,
         "quiet_editorial_categories": quiet_editorial,
-        "quiet_category_examples": quiet_category_examples(top3_blocks),
+        "quiet_category_examples": quiet_examples,
         "rising_highlights": [
             {
                 "label": r.get("label"),
@@ -2374,6 +2414,7 @@ def build_mechanical_editor_notes(
     rising_items: List[Dict[str, Any]],
     cross_items: List[Dict[str, Any]],
     quiet_editorial_categories: Optional[List[str]] = None,
+    business_day: Optional[date] = None,
 ) -> List[str]:
     """入力ファクトだけから読み方メモを組み立てる（LLM 欠落時のフォールバック）。"""
     notes: List[str] = []
@@ -2408,11 +2449,14 @@ def build_mechanical_editor_notes(
         else:
             notes.append(f"急上昇は「{'」「'.join(cats)}」に分散。")
 
-    quiet = [
-        category_display_name(str(c))
-        for c in (quiet_editorial_categories or [])
-        if str(c).strip()
-    ][:2]
+    quiet = quiet_categories_for_editor_notes(
+        [
+            category_display_name(str(c))
+            for c in (quiet_editorial_categories or [])
+            if str(c).strip()
+        ],
+        business_day,
+    )[:2]
     if quiet:
         if _ACTIVE_REGION == "us":
             notes.append(
@@ -2435,7 +2479,11 @@ def filter_editor_notes(raw_notes: Any) -> List[str]:
         note = str(item or "").strip()
         if len(note) < 8 or len(note) > _EDITOR_NOTE_MAX_CHARS:
             continue
-        if _GENERIC_EDITOR_NOTE.search(note) or _FORECAST_EDITOR_NOTE.search(note):
+        if (
+            _GENERIC_EDITOR_NOTE.search(note)
+            or _WEAK_EDITOR_NOTE.search(note)
+            or _FORECAST_EDITOR_NOTE.search(note)
+        ):
             continue
         if _warn_vague_one_liner(note):
             continue
@@ -2538,6 +2586,7 @@ def finalize_editorial(
     cross_items: List[Dict[str, Any]],
     label_index: Dict[str, Dict[str, Any]],
     quiet_editorial_categories: Optional[List[str]] = None,
+    business_day: Optional[date] = None,
 ) -> tuple[Dict[str, Any], Dict[str, Any]]:
     """LLM 編集 JSON を検証し、不足分は機械生成で補完（人手なし自動配信向け）。"""
     trace: Dict[str, Any] = {}
@@ -2580,6 +2629,7 @@ def finalize_editorial(
             rising_items,
             cross_items,
             quiet_editorial_categories,
+            business_day=business_day,
         )
         trace["editor_notes_source"] = "mechanical"
     trace["spotlights_renderable"] = 0
@@ -2771,6 +2821,9 @@ SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ�
 - `editor_notes` (array of string): **メール全文用の読み方**。0〜3件・各1文・最大120字。
   対比・横断・除外理由・一過性 vs 持続のみ。カテゴリ top3 の列挙はしない。
   cross_source_highlights が空なら「横断なし」を1件入れてよい。quiet_editorial_categories があれば触れてよい。
+  **禁止:** 定番株・終日同順位を「注目」と呼ぶこと。「他のトピックは一過性」だけの空文。
+  weekend=true（土日）のときはマーケット静けさ・定番銘柄に触れない（休場由来のノイズ）。
+  対比するなら rising_highlights / ニュース側の具体ラベルを使う。
 - `cross_intro` (string|null): cross_source_highlights が1件以上あるときのみ導入1〜2文。
   「どの系統が重なったか」を書く。0件なら null。
 
@@ -2789,7 +2842,7 @@ business_day in the JSON is the **observation day**. Readers usually get this th
 "Yesterday" = business_day.
 
 **Write all string values in English.** Category names in the input are already English
-(News, Search & Video, Tech, Market, Entertainment, Gov Data) — reuse them as-is; never
+(News, Search & Video, Tech, Market, Entertainment & Shopping, Gov Data) — reuse them as-is; never
 insert Japanese category labels or phrases like 補足 / 圏外 / 時位.
 
 **Output JSON only** (no Markdown). Include:
@@ -2809,6 +2862,9 @@ insert Japanese category labels or phrases like 補足 / 圏外 / 時位.
   each, max 120 chars. Contrast, cross-source, exclusions, one-off vs sustained only.
   Do not list category top3. If cross_source_highlights is empty, you may note "no overlap".
   You may mention quiet_editorial_categories when present.
+  **Ban:** calling steady market names "notable"/"注目"; filler like "other topics are transient"
+  with no concrete label. When weekend=true, do not mention Market quiet/evergreens (markets closed).
+  Prefer contrasts using rising_highlights or News labels.
 - `cross_intro` (string|null): 1–2 English sentences only when cross_source_highlights is
   non-empty (which source lanes overlapped); else null.
 
@@ -2936,6 +2992,7 @@ def run_generate(
         quiet_editorial_categories=list(
             payload.get("quiet_editorial_categories") or []
         ),
+        business_day=business_day,
     )
     vague_warn = _warn_vague_one_liner(str(editorial.get("one_liner") or ""))
 

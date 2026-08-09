@@ -1373,6 +1373,7 @@ def test_parse_editorial_json(gads):
                 }
             ],
             "rising_notes": [{"match_label": "Climber", "note": "順位上昇。"}],
+            "editor_notes": ["急上昇は検索とテックに分散。", "本日横断なし。"],
             "cross_intro": None,
             "category_intros": {"ニュース": "気象系。"},
         },
@@ -1383,6 +1384,78 @@ def test_parse_editorial_json(gads):
     assert data["one_liner"].startswith("台風")
     assert len(data["spotlights"]) == 1
     assert data["cross_intro"] is None
+    assert data["editor_notes"] == ["急上昇は検索とテックに分散。", "本日横断なし。"]
+
+
+def test_render_editor_notes_markdown(gads):
+    md = gads.render_editor_notes_markdown(
+        ["本日、別系統ソースでのラベル一致はなし。", "急上昇はニュースとテックに分散。"]
+    )
+    assert gads._EDITOR_NOTES_HEADING in md
+    assert "ラベル一致はなし" in md
+    assert gads.render_editor_notes_markdown([]) == ""
+    assert gads.render_editor_notes_markdown(None) == ""
+
+
+def test_build_mechanical_editor_notes_cross_and_quiet(gads):
+    rising = [
+        {"label": "A", "category": "ニュース"},
+        {"label": "B", "category": "テック・開発"},
+    ]
+    cross = [{"label": "豊臣秀長", "sources_display": "Wikipedia · NHK"}]
+    notes = gads.build_mechanical_editor_notes(rising, cross, ["マーケット"])
+    assert any("豊臣秀長" in n for n in notes)
+    assert any("分散" in n for n in notes)
+    assert any("マーケット" in n for n in notes)
+
+    empty_cross = gads.build_mechanical_editor_notes(rising, [], [])
+    assert any("ラベル一致はなし" in n for n in empty_cross)
+
+
+def test_filter_editor_notes_drops_vague_and_forecast(gads):
+    assert gads.filter_editor_notes(
+        ["全体的に盛り上がり。", "明日は伸びるでしょう。", "テックは一過性、ニュースは持続。"]
+    ) == ["テックは一過性、ニュースは持続。"]
+
+
+def test_finalize_editorial_fills_mechanical_editor_notes(gads):
+    rising = [
+        {
+            "label": "Climber",
+            "category": "検索・動画",
+            "rank_evidence": "7時圏外 → 13時3位 → 19時1位",
+            "ranks": {"13": 3, "19": 1},
+            "link_line": "[Climber](https://example.com)（YouTube · 19時1位）",
+        },
+    ]
+    editorial_candidates = [
+        {
+            "label": "Climber",
+            "category": "検索・動画",
+            "reason": "rising",
+            "rank_evidence": "7時圏外 → 13時3位 → 19時1位",
+        },
+    ]
+    editorial = {
+        "one_liner": (
+            "検索・動画では「Climber」が上位（7時圏外 → 13時3位 → 19時1位）。"
+        ),
+        "teaser": "「Climber」が上昇（7時圏外→19時1位）。",
+        "spotlights": [],
+        "rising_notes": [],
+        "editor_notes": ["盛り上がりました。"],
+    }
+    out, trace = gads.finalize_editorial(
+        editorial,
+        editorial_candidates=editorial_candidates,
+        rising_items=rising,
+        cross_items=[],
+        label_index={},
+        quiet_editorial_categories=["マーケット"],
+    )
+    assert trace["editor_notes_source"] == "mechanical"
+    assert out["editor_notes"]
+    assert any("ラベル一致はなし" in n for n in out["editor_notes"])
 
 
 def test_render_editorial_markdown_one_liner_only(gads):
@@ -1455,7 +1528,13 @@ def test_render_category_top3_omits_trend_blurbs(gads):
 
 def test_assemble_daily_markdown_structure(gads):
     bd = date(2026, 5, 31)
-    editorial = {"one_liner": "一行。", "spotlights": [], "rising_notes": [], "category_intros": {}}
+    editorial = {
+        "one_liner": "一行。",
+        "spotlights": [],
+        "rising_notes": [],
+        "editor_notes": ["本日、別系統ソースでのラベル一致はなし。"],
+        "category_intros": {},
+    }
     md = gads.assemble_daily_markdown(bd, editorial, {}, [], [], [])
     assert "# 日次サマリー — 2026-05-31" in md
     assert "対象外" in md
@@ -1465,18 +1544,28 @@ def test_assemble_daily_markdown_structure(gads):
     assert gads._ONE_LINER_HEADING in md
     assert "昨日の注目" in gads._ONE_LINER_HEADING
     assert gads._RISING_HEADING in md
+    assert gads._EDITOR_NOTES_HEADING in md
+    assert md.index(gads._RISING_HEADING) < md.index(gads._EDITOR_NOTES_HEADING)
     # 空のクロスソースは出さない
     assert "複数ソースで重なった話題" not in md
     assert gads._TOP3_HEADING in md
+    assert md.index(gads._EDITOR_NOTES_HEADING) < md.index(gads._TOP3_HEADING)
 
 
 def test_assemble_omits_empty_cross_includes_when_present(gads):
     bd = date(2026, 5, 31)
-    editorial = {"one_liner": "注目。", "rising_notes": [], "category_intros": {}}
+    editorial = {
+        "one_liner": "注目。",
+        "rising_notes": [],
+        "editor_notes": ["横断あり。"],
+        "category_intros": {},
+    }
     cross = [{"label": "豊臣秀長", "sources_display": "Wiki", "rank_evidence": "19時1位"}]
     md = gads.assemble_daily_markdown(bd, editorial, {}, [], cross, [])
     assert "複数ソースで重なった話題" in md
     assert "豊臣秀長" in md
+    assert gads._EDITOR_NOTES_HEADING in md
+    assert md.index(gads._EDITOR_NOTES_HEADING) < md.index("複数ソースで重なった話題")
     assert "該当なし" not in md
 
 

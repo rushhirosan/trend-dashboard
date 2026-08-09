@@ -3,6 +3,7 @@
 from services.summary.summary_pages import (
     _collect_topic_links,
     _linkify,
+    _parse_daily_rising,
     _split_sentences,
 )
 
@@ -89,3 +90,14 @@ def test_linkify_prefers_longest_match():
     assert '<a href="https://www.asahi.com/articles/x.html"' in html
     # 長いラベル全体が1つのリンクになる
     assert html.count("<a ") == 1
+
+
+def test_parse_daily_rising_accepts_note_en_and_ja():
+    ja = _parse_daily_rising(
+        "1. [Foo](https://example.com)（Wiki）\n\n   - **補足**: 検索側の急上昇。\n"
+    )
+    assert ja[0]["note"] == "検索側の急上昇。"
+    en = _parse_daily_rising(
+        "1. [Foo](https://example.com)（Wiki）\n\n   - **Note**: Search lane spike.\n"
+    )
+    assert en[0]["note"] == "Search lane spike."

@@ -2,7 +2,7 @@
 
 方針（案1: ティーザー公開）:
 - Web はプレビュー範囲のみ表示（日次=一行結論＋動いた3つ、週次=流れ＋動いた話題各1）
-- 全文（カテゴリ別・順位推移・週内推移）はメール配信の領分なので、ここでは
+- 全文（読み方メモ・カテゴリ別・順位推移・週内推移）はメール配信の領分なので、ここでは
   「ロックされたセクション見出し」だけを返し、本文は出さない。
 
 原稿の読み込みは DB（summary_documents・GHA が毎朝 upsert）を優先し、
@@ -300,7 +300,7 @@ def _parse_daily_rising(content: str) -> list[dict]:
                     "note": "",
                 }
             continue
-        note = re.match(r"^-\s*\*\*補足\*\*[:：]\s*(.*)$", s)
+        note = re.match(r"^-\s*\*\*(?:補足|Note)\*\*[:：]\s*(.*)$", s)
         if note and cur is not None:
             cur["note"] = note.group(1).strip()
     if cur:

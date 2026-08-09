@@ -64,7 +64,7 @@ _ACTIVE_REGION = "jp"
 def configure_daily_region(region: str) -> None:
     """生成対象地域を切り替え（jp → daily/、us → daily/us/）。見出し・プロンプトも切り替える。"""
     global _ACTIVE_REGION, _RISING_HEADING, _CROSS_HEADING_PREFIX, _CROSS_NONE_LINE
-    global _TOP3_HEADING, _ONE_LINER_HEADING, _NOTABLE_HEADING
+    global _TOP3_HEADING, _ONE_LINER_HEADING, _NOTABLE_HEADING, _EDITOR_NOTES_HEADING
     r = (region or "jp").strip().lower()
     if r not in ("jp", "us"):
         r = "jp"
@@ -76,6 +76,7 @@ def configure_daily_region(region: str) -> None:
         _TOP3_HEADING = "## 📊 Category top3"
         _ONE_LINER_HEADING = "## Yesterday's highlight"
         _NOTABLE_HEADING = "## 💡 What stood out yesterday"
+        _EDITOR_NOTES_HEADING = "## How to read (editor notes)"
     else:
         _RISING_HEADING = "## 📈 昨日いちばん動いた3つ"
         _CROSS_HEADING_PREFIX = "## 複数ソースで重なった話題"
@@ -85,6 +86,7 @@ def configure_daily_region(region: str) -> None:
         _TOP3_HEADING = "## 📊 カテゴリ別トップ3"
         _ONE_LINER_HEADING = "## 昨日の注目"
         _NOTABLE_HEADING = "## 💡 昨日特異だったこと"
+        _EDITOR_NOTES_HEADING = "## 読み方（編集メモ）"
 
 
 def daily_output_dir() -> Path:
@@ -131,10 +133,13 @@ _TOP3_HEADING = "## 📊 カテゴリ別トップ3"
 _TOP1_HEADING = "## 📊 カテゴリ別トップ1"
 _NOTABLE_HEADING = "## 💡 昨日特異だったこと"
 _ONE_LINER_HEADING = "## 昨日の注目"
+_EDITOR_NOTES_HEADING = "## 読み方（編集メモ）"
 _SPOTLIGHTS_HEADING = "## 昨日の見どころ（3〜5）"
 EDITORIAL_CANDIDATE_MAX = 12
 SPOTLIGHT_MAX = 5
 SPOTLIGHT_MIN = 2
+EDITOR_NOTES_MAX = 3
+_EDITOR_NOTE_MAX_CHARS = 120
 # 「昨日の注目」は1トピックのリード文。長すぎる連結は不可。
 _MECHANICAL_ONE_LINER_MAX = 220
 _DIGEST_TITLE_MAX = 48
@@ -151,6 +156,15 @@ _GENERIC_ONE_LINER = re.compile(
 )
 _GENERIC_RISING_NOTE = re.compile(
     r"(若い世代|話題です|盛り上がり|関心が高ま|人気です|特に.*の間で|急上昇中|注目を集め)",
+    re.I,
+)
+_GENERIC_EDITOR_NOTE = re.compile(
+    r"(若い世代|盛り上がり|関心が高ま|人気です|注目を集め|いつも通り|全体的に|"
+    r"trending|gaining attention|overall)",
+    re.I,
+)
+_FORECAST_EDITOR_NOTE = re.compile(
+    r"(でしょう|見込み|なるはず|だろう|will (likely|probably)|expected to)",
     re.I,
 )
 _LATE_SLOT_IMPROVE_RE = re.compile(
@@ -1762,6 +1776,22 @@ def render_rising_highlights_markdown(
     return "\n".join(lines).rstrip() + "\n"
 
 
+def render_editor_notes_markdown(notes: Optional[List[str]]) -> str:
+    """メール全文向けの短い読み方メモ（0件ならセクションごと省略）。"""
+    cleaned = [
+        str(n).strip()
+        for n in (notes or [])
+        if isinstance(n, str) and str(n).strip()
+    ][:EDITOR_NOTES_MAX]
+    if not cleaned:
+        return ""
+    lines: List[str] = [_EDITOR_NOTES_HEADING, ""]
+    for note in cleaned:
+        lines.append(f"- {note}")
+    lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def render_cross_source_highlights_markdown(
     highlights: List[Dict[str, Any]],
     business_day: date,
@@ -2340,6 +2370,82 @@ def build_mechanical_rising_note(item: Dict[str, Any]) -> str:
     return note.rstrip("。") + "。"
 
 
+def build_mechanical_editor_notes(
+    rising_items: List[Dict[str, Any]],
+    cross_items: List[Dict[str, Any]],
+    quiet_editorial_categories: Optional[List[str]] = None,
+) -> List[str]:
+    """入力ファクトだけから読み方メモを組み立てる（LLM 欠落時のフォールバック）。"""
+    notes: List[str] = []
+    if cross_items:
+        h = cross_items[0]
+        label = _clip_editorial_label(str(h.get("label") or ""))
+        sources = str(h.get("sources_display") or "").strip()
+        if _ACTIVE_REGION == "us":
+            if label and sources:
+                notes.append(f'Cross-source: "{label}" appeared on {sources}.')
+            elif label:
+                notes.append(f'Cross-source overlap on "{label}".')
+        else:
+            if label and sources:
+                notes.append(f"横断:「{label}」が {sources} で重なった。")
+            elif label:
+                notes.append(f"横断:「{label}」が複数ソースで重なった。")
+    else:
+        if _ACTIVE_REGION == "us":
+            notes.append("No multi-source label overlaps today.")
+        else:
+            notes.append("本日、別系統ソースでのラベル一致はなし。")
+
+    cats: List[str] = []
+    for item in rising_items:
+        cat = category_display_name(str(item.get("category") or ""))
+        if cat and cat not in cats:
+            cats.append(cat)
+    if len(cats) >= 2:
+        if _ACTIVE_REGION == "us":
+            notes.append(f"Biggest movers spanned {', '.join(cats)}.")
+        else:
+            notes.append(f"急上昇は「{'」「'.join(cats)}」に分散。")
+
+    quiet = [
+        category_display_name(str(c))
+        for c in (quiet_editorial_categories or [])
+        if str(c).strip()
+    ][:2]
+    if quiet:
+        if _ACTIVE_REGION == "us":
+            notes.append(
+                f"{', '.join(quiet)} looked quiet (evergreen / little movement)."
+            )
+        else:
+            notes.append(
+                f"{'・'.join(quiet)} は目立った動きなし（定番据え置き寄り）。"
+            )
+
+    return notes[:EDITOR_NOTES_MAX]
+
+
+def filter_editor_notes(raw_notes: Any) -> List[str]:
+    """LLM の editor_notes を検証・整形。不合格は落とす。"""
+    if not isinstance(raw_notes, list):
+        return []
+    out: List[str] = []
+    for item in raw_notes:
+        note = str(item or "").strip()
+        if len(note) < 8 or len(note) > _EDITOR_NOTE_MAX_CHARS:
+            continue
+        if _GENERIC_EDITOR_NOTE.search(note) or _FORECAST_EDITOR_NOTE.search(note):
+            continue
+        if _warn_vague_one_liner(note):
+            continue
+        if note not in out:
+            out.append(note)
+        if len(out) >= EDITOR_NOTES_MAX:
+            break
+    return out
+
+
 def _rising_note_misstates_movement(note: str, ranks: dict[str, int]) -> bool:
     """「19時1位に上昇」等、実際より遅いスロットだけを強調する文言を検出。"""
     text = note or ""
@@ -2431,6 +2537,7 @@ def finalize_editorial(
     rising_items: List[Dict[str, Any]],
     cross_items: List[Dict[str, Any]],
     label_index: Dict[str, Dict[str, Any]],
+    quiet_editorial_categories: Optional[List[str]] = None,
 ) -> tuple[Dict[str, Any], Dict[str, Any]]:
     """LLM 編集 JSON を検証し、不足分は機械生成で補完（人手なし自動配信向け）。"""
     trace: Dict[str, Any] = {}
@@ -2464,7 +2571,19 @@ def finalize_editorial(
     editorial["rising_notes"] = filter_rising_notes(
         editorial.get("rising_notes") or [], rising_items
     )
+    llm_notes = filter_editor_notes(editorial.get("editor_notes") or [])
+    if llm_notes:
+        editorial["editor_notes"] = llm_notes
+        trace["editor_notes_source"] = "llm"
+    else:
+        editorial["editor_notes"] = build_mechanical_editor_notes(
+            rising_items,
+            cross_items,
+            quiet_editorial_categories,
+        )
+        trace["editor_notes_source"] = "mechanical"
     trace["spotlights_renderable"] = 0
+    trace["editor_notes_count"] = len(editorial.get("editor_notes") or [])
     return editorial, trace
 
 
@@ -2525,6 +2644,7 @@ def parse_editorial_json(raw: str) -> Dict[str, Any]:
         "one_liner": str(data.get("one_liner") or "").strip(),
         "spotlights": [],
         "rising_notes": [],
+        "editor_notes": [],
         "cross_intro": data.get("cross_intro"),
         "category_intros": {},
     }
@@ -2544,6 +2664,12 @@ def parse_editorial_json(raw: str) -> Dict[str, Any]:
                     "note": str(n.get("note")).strip(),
                 }
             )
+
+    for note in data.get("editor_notes") or []:
+        text = str(note or "").strip()
+        if text:
+            out["editor_notes"].append(text)
+    out["editor_notes"] = out["editor_notes"][:EDITOR_NOTES_MAX]
 
     ci = data.get("category_intros")
     if isinstance(ci, dict):
@@ -2575,6 +2701,7 @@ def assemble_daily_markdown(
         render_header_markdown(business_day),
         render_editorial_markdown(editorial, label_index),
         render_rising_highlights_markdown(rising_items, editorial.get("rising_notes")),
+        render_editor_notes_markdown(editorial.get("editor_notes")),
         render_cross_source_highlights_markdown(
             cross_items,
             business_day,
@@ -2638,8 +2765,14 @@ SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ�
   複数トピックの列挙・「順位の動きが大きかったのはAとBとC」は禁止。
   「注目を集めて」「人気です」等の抽象表現は禁止。
 - `rising_notes` (array): `{ "match_label", "note" }` — rising_highlights の label に対応する1文補足。
-  順位の事実の繰り返し・「急上昇中」「注目を集め」等の定型は禁止。rising_highlights が空なら []。
-- `cross_intro` (string|null): cross_source_highlights が1件以上あるときのみ導入1〜2文。0件なら null。
+  **順位の言い換えは禁止**（rank_evidence の再掲も禁止）。代わりに次のいずれか:
+  ソース系統（報道 / 検索 / テック等）・注目トピックとの関係・一過性っぽさ
+  （観測スロットが狭い等、入力にある根拠のみ）。rising_highlights が空なら []。
+- `editor_notes` (array of string): **メール全文用の読み方**。0〜3件・各1文・最大120字。
+  対比・横断・除外理由・一過性 vs 持続のみ。カテゴリ top3 の列挙はしない。
+  cross_source_highlights が空なら「横断なし」を1件入れてよい。quiet_editorial_categories があれば触れてよい。
+- `cross_intro` (string|null): cross_source_highlights が1件以上あるときのみ導入1〜2文。
+  「どの系統が重なったか」を書く。0件なら null。
 
 禁止:
 - 入力 editorial_candidates / rising_highlights / cross_source_highlights に無いラベル・事実の捏造
@@ -2669,8 +2802,15 @@ insert Japanese category labels or phrases like 補足 / 圏外 / 時位.
   Include that label verbatim; optional rank_evidence in parentheses.
   Do not list multiple movers. Ban vague fillers ("trending", "gaining attention").
 - `rising_notes` (array): `{ "match_label", "note" }` — one short **English** note per rising label.
-  Ban restating rank facts or stock phrases. Empty array if no rising_highlights.
-- `cross_intro` (string|null): 1–2 English sentences only when cross_source_highlights is non-empty; else null.
+  **Do not restate rank_evidence.** Prefer source lane (news/search/tech), relation to the
+  lead topic, or one-off vs sustained (only if slots in the input support it).
+  Empty array if no rising_highlights.
+- `editor_notes` (array of string): **email-only "how to read"** notes. 0–3 items, one sentence
+  each, max 120 chars. Contrast, cross-source, exclusions, one-off vs sustained only.
+  Do not list category top3. If cross_source_highlights is empty, you may note "no overlap".
+  You may mention quiet_editorial_categories when present.
+- `cross_intro` (string|null): 1–2 English sentences only when cross_source_highlights is
+  non-empty (which source lanes overlapped); else null.
 
 Forbidden:
 - Inventing labels/facts not in editorial_candidates / rising / cross
@@ -2793,6 +2933,9 @@ def run_generate(
         rising_items=rising_items,
         cross_items=cross_items,
         label_index=label_index,
+        quiet_editorial_categories=list(
+            payload.get("quiet_editorial_categories") or []
+        ),
     )
     vague_warn = _warn_vague_one_liner(str(editorial.get("one_liner") or ""))
 

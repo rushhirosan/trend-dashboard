@@ -188,12 +188,14 @@ CATEGORY_DIGEST_ORDER: tuple[str, ...] = (
 )
 
 # カテゴリ top3 / 急上昇 / クロスソースから除外する系列（人気や話題の代表にならない）
+# twitch_: 同時視聴ランキングであり日次の「話題」シグナルとしてノイズが多い（UI には残す）
 DIGEST_EXCLUDED_SERIES_PREFIXES: tuple[str, ...] = (
     "medium_",
     "openalex_",
     "globenewswire",
     "ebay_",
     "bluesky_",
+    "twitch_",
     "estat_",
     "kkj_",
     "bls_",
@@ -521,15 +523,16 @@ def digest_scope_note_markdown() -> str:
     if _ACTIVE_REGION == "us":
         return (
             "> **In scope:** Sources that reflect public attention "
-            "(including World News, DEV.to, App Store, Twitch). "
+            "(including World News, DEV.to, App Store). "
             "**Out of scope:** Medium (tag RSS by recency, not popularity), "
-            "OpenAlex, GlobeNewswire (IR filings), eBay, Bluesky, and government datasets."
+            "OpenAlex, GlobeNewswire (IR filings), eBay, Bluesky, Twitch "
+            "(concurrent viewers), and government datasets."
         )
     return (
         "> **対象ソース:** 検索・報道・テック・エンタメなど話題が見えるソース"
-        "（World News、DEV.to、App Store、Twitch、はてな、note、PR TIMES を含む）。"
+        "（World News、DEV.to、App Store、はてな、note、PR TIMES を含む）。"
         "**対象外:** Medium（タグRSS・新着順）、OpenAlex、GlobeNewswire（企業IR）、"
-        "eBay、Bluesky、行政データ。"
+        "eBay、Bluesky、Twitch（同時視聴）、行政データ。"
     )
 
 

@@ -125,7 +125,8 @@ def test_categorize_series_key(gads, series_key, expected):
         ("worldnews_us", True),
         ("devto_us", True),
         ("appstore_jp", True),
-        ("twitch_us", True),
+        ("twitch_us", False),
+        ("twitch_jp", False),
         ("hatena_jp", True),
         ("note_jp", True),
         ("prtimes_jp", True),
@@ -171,12 +172,68 @@ def test_build_category_top3_excludes_medium(gads):
     assert "Real HN Story" in labels
 
 
+def test_build_rising_and_category_top3_exclude_twitch(gads):
+    rows = [
+        {
+            "slot": "07",
+            "series_key": "twitch_jp",
+            "items": [{"t": "League of Legends", "r": 10}],
+            "captured_at": "2026-08-08T07:00:00+09:00",
+        },
+        {
+            "slot": "13",
+            "series_key": "twitch_jp",
+            "items": [{"t": "League of Legends", "r": 5}],
+            "captured_at": "2026-08-08T13:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "twitch_jp",
+            "items": [{"t": "League of Legends", "r": 1}],
+            "captured_at": "2026-08-08T19:00:00+09:00",
+        },
+        {
+            "slot": "07",
+            "series_key": "music_trends_jp",
+            "items": [{"t": "具体的な曲名ヒット", "r": 8}],
+            "captured_at": "2026-08-08T07:00:00+09:00",
+        },
+        {
+            "slot": "13",
+            "series_key": "music_trends_jp",
+            "items": [{"t": "具体的な曲名ヒット", "r": 3}],
+            "captured_at": "2026-08-08T13:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "music_trends_jp",
+            "items": [{"t": "具体的な曲名ヒット", "r": 1}],
+            "captured_at": "2026-08-08T19:00:00+09:00",
+        },
+    ]
+    gads.configure_daily_region("jp")
+    rising = gads.build_rising_highlights(rows, count=3)
+    assert all(it.get("series_key") != "twitch_jp" for it in rising)
+    assert any(it.get("label") == "具体的な曲名ヒット" for it in rising)
+    top3 = gads.build_category_top3(rows, count=3)
+    ent = next(b for b in top3 if b["category"] == "エンタメ")
+    labels = [it["label"] for it in ent.get("items") or []]
+    assert "League of Legends" not in labels
+    assert "具体的な曲名ヒット" in labels
+
+
 def test_digest_scope_note_mentions_medium_exclusion(gads):
     gads.configure_daily_region("jp")
-    assert "Medium" in gads.digest_scope_note_markdown()
-    assert "対象外" in gads.digest_scope_note_markdown()
+    note_jp = gads.digest_scope_note_markdown()
+    assert "Medium" in note_jp
+    assert "対象外" in note_jp
+    assert "Twitch" in note_jp
+    assert "Twitch、はてな" not in note_jp
     gads.configure_daily_region("us")
-    assert "Out of scope" in gads.digest_scope_note_markdown()
+    note_us = gads.digest_scope_note_markdown()
+    assert "Out of scope" in note_us
+    assert "Twitch" in note_us
+    assert "App Store, Twitch" not in note_us
 
 
 def test_compact_rows_by_category_groups_series(gads):
@@ -653,7 +710,7 @@ def test_build_cross_source_excludes_generic_sports_label(gads):
     assert gads.build_cross_source_highlights(rows, count=3) == []
 
 
-def test_build_cross_source_dedupes_twitch_provider_keys(gads):
+def test_build_cross_source_dedupes_same_provider_region_keys(gads):
     rows = [
         {
             "slot": "19",
@@ -663,22 +720,22 @@ def test_build_cross_source_dedupes_twitch_provider_keys(gads):
         },
         {
             "slot": "19",
-            "series_key": "twitch_jp",
+            "series_key": "google_trends_jp",
             "items": [{"t": "具体的な技術記事タイトル", "r": 4}],
             "captured_at": "2026-05-25T19:00:00+09:00",
         },
         {
             "slot": "19",
-            "series_key": "twitch_us",
+            "series_key": "google_trends_us",
             "items": [{"t": "具体的な技術記事タイトル", "r": 5}],
             "captured_at": "2026-05-25T19:00:00+09:00",
         },
     ]
     cross = gads.build_cross_source_highlights(rows, count=3)
     assert len(cross) == 1
-    assert cross[0]["series_keys"] == ["hatena_jp", "twitch_jp"]
-    assert "Twitch" in cross[0]["sources_display"]
-    assert "twitch_us" not in cross[0]["series_keys"]
+    assert cross[0]["series_keys"] == ["google_trends_jp", "hatena_jp"]
+    assert "Google Trends" in cross[0]["sources_display"]
+    assert "google_trends_us" not in cross[0]["series_keys"]
 
 
 @pytest.mark.parametrize(

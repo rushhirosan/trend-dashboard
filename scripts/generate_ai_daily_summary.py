@@ -163,12 +163,17 @@ _GENERIC_EDITOR_NOTE = re.compile(
     r"trending|gaining attention|overall)",
     re.I,
 )
-# 定番株を「注目」扱い／「他は一過性」だけの空文（土日マーケット由来で出やすい）
+# 定番株を「注目」扱い／「他は一過性」だけの空文／否定・分散だけの空読み（要る日だけ出す）
 _WEAK_EDITOR_NOTE = re.compile(
     r"(注目の.{0,48}(は、?安定|を維持)|安定した人気を維持|"
     r"他のトピックは一過性|他は一過性|"
+    r"ラベル一致はなし|横断なし|別系統ソースでのラベル一致|"
+    r"急上昇は.+に分散|"
     r"stable popularity|held steady in (popularity|attention)|"
-    r"other topics? (are |look |seem )?(transient|fleeting|one-?off))",
+    r"other topics? (are |look |seem )?(transient|fleeting|one-?off)|"
+    r"No multi-source label overlaps|"
+    r"no (multi-?source )?(label )?overlaps?|"
+    r"Biggest movers spanned|movers spanned)",
     re.I,
 )
 _FORECAST_EDITOR_NOTE = re.compile(
@@ -2416,7 +2421,12 @@ def build_mechanical_editor_notes(
     quiet_editorial_categories: Optional[List[str]] = None,
     business_day: Optional[date] = None,
 ) -> List[str]:
-    """入力ファクトだけから読み方メモを組み立てる（LLM 欠落時のフォールバック）。"""
+    """入力ファクトだけから読み方メモを組み立てる（LLM 欠落時のフォールバック）。
+
+    横断あり・静かな区分など、読者の判断を速める事実がある日だけ返す。
+    「横断なし」「急上昇のカテゴリ分散」だけの日は空（セクションごと省略）。
+    """
+    _ = rising_items  # 呼び出し互換のため残す（分散メモは出さない）
     notes: List[str] = []
     if cross_items:
         h = cross_items[0]
@@ -2432,22 +2442,6 @@ def build_mechanical_editor_notes(
                 notes.append(f"横断:「{label}」が {sources} で重なった。")
             elif label:
                 notes.append(f"横断:「{label}」が複数ソースで重なった。")
-    else:
-        if _ACTIVE_REGION == "us":
-            notes.append("No multi-source label overlaps today.")
-        else:
-            notes.append("本日、別系統ソースでのラベル一致はなし。")
-
-    cats: List[str] = []
-    for item in rising_items:
-        cat = category_display_name(str(item.get("category") or ""))
-        if cat and cat not in cats:
-            cats.append(cat)
-    if len(cats) >= 2:
-        if _ACTIVE_REGION == "us":
-            notes.append(f"Biggest movers spanned {', '.join(cats)}.")
-        else:
-            notes.append(f"急上昇は「{'」「'.join(cats)}」に分散。")
 
     quiet = quiet_categories_for_editor_notes(
         [
@@ -2819,8 +2813,9 @@ SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ�
   ソース系統（報道 / 検索 / テック等）・注目トピックとの関係・一過性っぽさ
   （観測スロットが狭い等、入力にある根拠のみ）。rising_highlights が空なら []。
 - `editor_notes` (array of string): **メール全文用の読み方**。0〜3件・各1文・最大120字。
-  対比・横断・除外理由・一過性 vs 持続のみ。カテゴリ top3 の列挙はしない。
-  cross_source_highlights が空なら「横断なし」を1件入れてよい。quiet_editorial_categories があれば触れてよい。
+  対比・横断（該当時）・除外理由・一過性 vs 持続のみ。カテゴリ top3 の列挙はしない。
+  **材料がなければ []**（「横断なし」「急上昇がカテゴリに分散」だけの空読みは禁止）。
+  quiet_editorial_categories があれば触れてよい。cross がある日だけ横断に触れる。
   **禁止:** 定番株・終日同順位を「注目」と呼ぶこと。「他のトピックは一過性」だけの空文。
   weekend=true（土日）のときはマーケット静けさ・定番銘柄に触れない（休場由来のノイズ）。
   対比するなら rising_highlights / ニュース側の具体ラベルを使う。
@@ -2859,9 +2854,9 @@ insert Japanese category labels or phrases like 補足 / 圏外 / 時位.
   lead topic, or one-off vs sustained (only if slots in the input support it).
   Empty array if no rising_highlights.
 - `editor_notes` (array of string): **email-only "how to read"** notes. 0–3 items, one sentence
-  each, max 120 chars. Contrast, cross-source, exclusions, one-off vs sustained only.
-  Do not list category top3. If cross_source_highlights is empty, you may note "no overlap".
-  You may mention quiet_editorial_categories when present.
+  each, max 120 chars. Contrast, cross-source (when present), exclusions, one-off vs sustained only.
+  Do not list category top3. **Use [] when nothing useful** — ban "no overlap" and
+  "movers spanned categories" filler. You may mention quiet_editorial_categories when present.
   **Ban:** calling steady market names "notable"/"注目"; filler like "other topics are transient"
   with no concrete label. When weekend=true, do not mention Market quiet/evergreens (markets closed).
   Prefer contrasts using rising_highlights or News labels.

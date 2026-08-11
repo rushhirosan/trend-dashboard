@@ -1416,10 +1416,10 @@ def test_parse_editorial_json(gads):
 
 def test_render_editor_notes_markdown(gads):
     md = gads.render_editor_notes_markdown(
-        ["本日、別系統ソースでのラベル一致はなし。", "急上昇はニュースとテックに分散。"]
+        ["横断:「豊臣秀長」が Wikipedia · NHK で重なった。", "マーケットは目立った動きなし（定番据え置き寄り）。"]
     )
     assert gads._EDITOR_NOTES_HEADING in md
-    assert "ラベル一致はなし" in md
+    assert "豊臣秀長" in md
     assert gads.render_editor_notes_markdown([]) == ""
     assert gads.render_editor_notes_markdown(None) == ""
 
@@ -1432,11 +1432,28 @@ def test_build_mechanical_editor_notes_cross_and_quiet(gads):
     cross = [{"label": "豊臣秀長", "sources_display": "Wikipedia · NHK"}]
     notes = gads.build_mechanical_editor_notes(rising, cross, ["マーケット"])
     assert any("豊臣秀長" in n for n in notes)
-    assert any("分散" in n for n in notes)
+    assert not any("分散" in n for n in notes)
     assert any("マーケット" in n for n in notes)
 
     empty_cross = gads.build_mechanical_editor_notes(rising, [], [])
-    assert any("ラベル一致はなし" in n for n in empty_cross)
+    assert empty_cross == []
+    assert not any("ラベル一致はなし" in n for n in empty_cross)
+
+
+def test_build_mechanical_editor_notes_us_omits_empty_filler(gads):
+    gads.configure_daily_region("us")
+    rising = [
+        {"label": "A", "category": "News"},
+        {"label": "B", "category": "Tech"},
+    ]
+    assert gads.build_mechanical_editor_notes(rising, [], []) == []
+
+    cross = [{"label": "Widget", "sources_display": "HN · Reddit"}]
+    notes = gads.build_mechanical_editor_notes(rising, cross, ["Market"])
+    assert any("Widget" in n for n in notes)
+    assert any("Market" in n for n in notes)
+    assert not any("No multi-source" in n for n in notes)
+    assert not any("spanned" in n.lower() for n in notes)
 
 
 def test_build_mechanical_editor_notes_skips_market_quiet_on_weekend(gads):
@@ -1482,8 +1499,21 @@ def test_filter_editor_notes_drops_weak_market_filler(gads):
             "注目の富士フイルムホールディングスは、安定した人気を維持しています。",
             "他のトピックは一過性の可能性が高いです。",
             "急上昇はニュースと検索に分散。",
+            "本日、別系統ソースでのラベル一致はなし。",
+            "テックは一過性、ニュースは持続。",
         ]
-    ) == ["急上昇はニュースと検索に分散。"]
+    ) == ["テックは一過性、ニュースは持続。"]
+
+
+def test_filter_editor_notes_drops_us_empty_filler(gads):
+    assert gads.filter_editor_notes(
+        [
+            "No multi-source label overlaps today.",
+            "Biggest movers spanned News, Tech.",
+            "News sustained; Search looked one-off.",
+        ]
+    ) == ["News sustained; Search looked one-off."]
+
 
 def test_finalize_editorial_fills_mechanical_editor_notes(gads):
     rising = [
@@ -1522,8 +1552,26 @@ def test_finalize_editorial_fills_mechanical_editor_notes(gads):
     )
     assert trace["editor_notes_source"] == "mechanical"
     assert out["editor_notes"]
-    assert any("ラベル一致はなし" in n for n in out["editor_notes"])
+    assert any("マーケット" in n for n in out["editor_notes"])
+    assert not any("ラベル一致はなし" in n for n in out["editor_notes"])
 
+    empty_out, empty_trace = gads.finalize_editorial(
+        {
+            "one_liner": editorial["one_liner"],
+            "teaser": editorial["teaser"],
+            "spotlights": [],
+            "rising_notes": [],
+            "editor_notes": ["盛り上がりました。"],
+        },
+        editorial_candidates=editorial_candidates,
+        rising_items=rising,
+        cross_items=[],
+        label_index={},
+        quiet_editorial_categories=[],
+    )
+    assert empty_trace["editor_notes_source"] == "mechanical"
+    assert empty_out["editor_notes"] == []
+    assert empty_trace["editor_notes_count"] == 0
 
 def test_render_editorial_markdown_one_liner_only(gads):
     editorial = {
@@ -1599,7 +1647,7 @@ def test_assemble_daily_markdown_structure(gads):
         "one_liner": "一行。",
         "spotlights": [],
         "rising_notes": [],
-        "editor_notes": ["本日、別系統ソースでのラベル一致はなし。"],
+        "editor_notes": ["マーケットは目立った動きなし（定番据え置き寄り）。"],
         "category_intros": {},
     }
     md = gads.assemble_daily_markdown(bd, editorial, {}, [], [], [])

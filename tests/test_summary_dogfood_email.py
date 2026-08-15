@@ -62,7 +62,9 @@ def test_load_summary_email_bodies_daily(tmp_path: Path):
     assert path.name == "2026-07-22.md"
     assert "status: draft" not in text
     assert "bold" in text
-    assert "https://ex.com" in text
+    # テキストパートはラベルのみ（長い URL を晒さない）。リンクは HTML 側。
+    assert "https://ex.com" not in text
+    assert " and a\n" in text or text.rstrip().endswith("and a")
     assert "<h1>" in html
     assert '<a href="https://ex.com">a</a>' in html
     assert "<strong>bold</strong>" in html

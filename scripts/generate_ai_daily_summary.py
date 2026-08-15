@@ -797,7 +797,7 @@ def _build_cross_source_links(
     out: List[Dict[str, str]] = []
     for sk in _dedupe_series_keys_by_provider(series_keys):
         url = _url_for_label_in_series(series_by_slot, sk, label) or _fallback_search_url(
-            label
+            label, sk
         )
         out.append(
             {
@@ -909,8 +909,16 @@ def _cross_source_is_same_article(
     return len(set(normalized)) == 1
 
 
-def _fallback_search_url(label: str) -> str:
-    return f"https://www.google.com/search?q={quote_plus(_clean_rising_display(label))}"
+_FALLBACK_SEARCH_Q_MAX = 48
+
+
+def _fallback_search_url(label: str, series_key: str = "") -> str:
+    """記事 URL が無いときの Google 検索。長タイトルは q を短縮してメール肥大化を防ぐ。"""
+    query = _shorten_digest_title(label, series_key, max_len=_FALLBACK_SEARCH_Q_MAX)
+    query = query.rstrip("…").rstrip(".").strip()
+    if not query:
+        query = _clean_rising_display(label)[:_FALLBACK_SEARCH_Q_MAX]
+    return f"https://www.google.com/search?q={quote_plus(query)}"
 
 
 def _is_affiliate_series(series_key: str) -> bool:
@@ -946,6 +954,11 @@ def _ranks_are_flat(ranks: dict[str, int]) -> bool:
     return len(vals) >= 1 and len(set(vals)) == 1
 
 
+def _sanitize_md_link_label(title: str) -> str:
+    """半角 [] は Markdown リンクを壊すので全角に置換する。"""
+    return title.replace("[", "［").replace("]", "］")
+
+
 def _format_digest_link_line(
     label: str,
     series_key: str,
@@ -953,8 +966,8 @@ def _format_digest_link_line(
     url: Optional[str] = None,
 ) -> str:
     """カテゴリ digest 用: リンク付き1行。"""
-    href = url if url else _fallback_search_url(label)
-    title = _shorten_digest_title(label, series_key).replace("[", "\\[")
+    href = url if url else _fallback_search_url(label, series_key)
+    title = _sanitize_md_link_label(_shorten_digest_title(label, series_key))
     source = _format_series_key_display(series_key)
     return f"[{title}]({href})（{source} · {rank_display}）"
 

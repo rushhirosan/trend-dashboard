@@ -31,3 +31,14 @@ def test_article_url_for_rising_fallback_search(sr):
     bundle = {"19": {"google_trends_jp": [{"t": "Some Topic", "r": 1}]}}
     url = sr.article_url_for_rising(bundle, "google_trends_jp", "Some Topic")
     assert url.startswith("https://www.google.com/search?q=")
+
+
+def test_fallback_search_url_truncates_long_label(sr):
+    from urllib.parse import unquote_plus, urlparse, parse_qs
+
+    long_title = "あ" * 120
+    url = sr.fallback_search_url(long_title)
+    assert url.startswith("https://www.google.com/search?q=")
+    q = parse_qs(urlparse(url).query)["q"][0]
+    assert len(q) <= sr._FALLBACK_SEARCH_Q_MAX
+    assert len(unquote_plus(url)) < len(long_title) + 80

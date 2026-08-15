@@ -9,6 +9,7 @@ import html
 import re
 from pathlib import Path
 from typing import Optional, Tuple
+from urllib.parse import parse_qs, quote_plus, urlencode, urlparse, urlunparse
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SUMMARIES_ROOT = _REPO_ROOT / "docs" / "summaries"
@@ -17,8 +18,73 @@ _FRONTMATTER_RE = re.compile(r"^---\s*\n.*?\n---\s*\n", re.DOTALL)
 _IMAGE_LINE_RE = re.compile(r"^!\[[^\]]*\]\([^)]+\)\s*\n?", re.MULTILINE)
 _MERMAID_BLOCK_RE = re.compile(r"```mermaid[\s\S]*?```\s*\n?", re.MULTILINE)
 _SVG_BLOCK_RE = re.compile(r"<svg[\s\S]*?</svg>\s*\n?", re.MULTILINE)
-_LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 _BOLD_RE = re.compile(r"\*\*([^*]+)\*\*")
+# ](http…) を錨にし、ラベル内の ] や \[ エスケープにも耐える
+_MD_LINK_HREF_RE = re.compile(r"\]\((https?://[^)\s]+|mailto:[^)\s]+)\)")
+
+# 既存原稿の Google 検索フォールバックがタイトル全文を載せている場合の肥大化防止
+_EMAIL_SEARCH_Q_MAX = 48
+
+
+def _find_md_link_open(text: str, close_idx: int) -> int:
+    """`](url)` の `]` 位置から、対応する開き `[` を探す（`\\[` は無視）。"""
+    i = close_idx - 1
+    while i >= 0:
+        if text[i] == "[":
+            if i > 0 and text[i - 1] == "\\":
+                i -= 2
+                continue
+            return i
+        i -= 1
+    return -1
+
+
+def iter_markdown_links(text: str):
+    """Yield (start, end, label, url)。ラベル内に `]` があっても可。"""
+    for m in _MD_LINK_HREF_RE.finditer(text):
+        close_idx = m.start()
+        open_idx = _find_md_link_open(text, close_idx)
+        if open_idx < 0:
+            continue
+        label = text[open_idx + 1 : close_idx]
+        label = label.replace("\\[", "[").replace("\\]", "]")
+        yield open_idx, m.end(), label, m.group(1)
+
+
+def shorten_email_href(url: str, *, max_q: int = _EMAIL_SEARCH_Q_MAX) -> str:
+    """過長な google.com/search?q=… の q だけ短縮する（他 URL はそのまま）。"""
+    s = (url or "").strip()
+    if not s.startswith(("http://", "https://")):
+        return s
+    try:
+        p = urlparse(s)
+    except ValueError:
+        return s
+    host = (p.hostname or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    if host != "google.com" or (p.path or "").rstrip("/") != "/search":
+        return s
+    qs = parse_qs(p.query, keep_blank_values=True)
+    q_vals = qs.get("q") or []
+    if not q_vals:
+        return s
+    q = q_vals[0]
+    if len(q) <= max_q:
+        return s
+    cut = q[:max_q].rstrip()
+    for sep in ("！", "!", "。", " ", "　", "・", "｜", "|", "【"):
+        idx = cut.rfind(sep)
+        if idx >= max(12, max_q // 3):
+            cut = cut[:idx].rstrip()
+            break
+    qs["q"] = [cut]
+    flat: list[tuple[str, str]] = []
+    for key, vals in qs.items():
+        for v in vals:
+            flat.append((key, v))
+    new_query = urlencode(flat, quote_via=quote_plus)
+    return urlunparse((p.scheme, p.netloc, p.path, p.params, new_query, p.fragment))
 
 
 _CATEGORY_TREND_LINE_RE = re.compile(
@@ -63,7 +129,19 @@ def strip_front_matter(markdown: str) -> str:
 def markdown_to_email_text(markdown: str) -> str:
     """配信用プレーンテキスト（添付なし）。"""
     body = strip_legacy_charts(strip_front_matter(markdown))
-    body = _LINK_RE.sub(r"\1 (\2)", body)
+
+    def _expand_link_region(s: str) -> str:
+        parts: list[str] = []
+        pos = 0
+        for start, end, label, href in iter_markdown_links(s):
+            parts.append(s[pos:start])
+            # HTML パートが本リンク。テキストはラベルのみ（長い URL を晒さない）
+            parts.append(label)
+            pos = end
+        parts.append(s[pos:])
+        return "".join(parts)
+
+    body = _expand_link_region(body)
     body = _BOLD_RE.sub(r"\1", body)
     # 長い段落（今週の流れなど）は句点・ピリオド後で改行
     lines: list[str] = []
@@ -107,9 +185,9 @@ def markdown_to_email_text(markdown: str) -> str:
     return "\n".join(lines).strip() + "\n"
 
 
-_INLINE_MD_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*")
 # 英文ピリオド: 数字直後（1. や 7.5）は除外。空白＋続きがあるときだけ
 _EN_SENTENCE_END_RE = re.compile(r"(?<!\d)\.(?=\s+\S)")
+_INLINE_BOLD_RE = re.compile(r"\*\*([^*]+)\*\*")
 
 
 def _insert_sentence_breaks_text(text: str) -> str:
@@ -121,7 +199,6 @@ def _insert_sentence_breaks_text(text: str) -> str:
 
 def _insert_sentence_breaks_html(fragment: str) -> str:
     """句点・文末ピリオドの後に <br> を入れる（HTML 断片。タグ外のみ）。"""
-    # <a>...</a> 等を保護してから句点処理
     slots: list[str] = []
 
     def _park(m: re.Match[str]) -> str:
@@ -141,23 +218,44 @@ def _insert_sentence_breaks_html(fragment: str) -> str:
 
 def _inline_markdown_to_html(text: str) -> str:
     """インラインのリンク・太字を HTML にし、それ以外はエスケープ。"""
+    # 先にリンクをプレースホルダ化し、ラベル内の ** や ] でも壊れないようにする
+    slots: list[str] = []
+    pieces: list[str] = []
+    pos = 0
+    for start, end, label, url in iter_markdown_links(text):
+        pieces.append(text[pos:start])
+        href = shorten_email_href(url.strip())
+        if href.startswith(("http://", "https://", "mailto:")):
+            slots.append(
+                f'<a href="{html.escape(href, quote=True)}">{html.escape(label)}</a>'
+            )
+        else:
+            slots.append(html.escape(f"{label} ({href})"))
+        pieces.append(f"\x00L{len(slots) - 1}\x00")
+        pos = end
+    pieces.append(text[pos:])
+    interim = "".join(pieces)
+
     parts: list[str] = []
     pos = 0
-    for m in _INLINE_MD_RE.finditer(text):
-        parts.append(html.escape(text[pos : m.start()]))
-        if m.group(1) is not None:
-            label, url = m.group(1), (m.group(2) or "").strip()
-            if url.startswith(("http://", "https://", "mailto:")):
-                parts.append(
-                    f'<a href="{html.escape(url, quote=True)}">{html.escape(label)}</a>'
-                )
-            else:
-                parts.append(html.escape(f"{label} ({url})"))
-        else:
-            parts.append(f"<strong>{html.escape(m.group(3))}</strong>")
+    for m in _INLINE_BOLD_RE.finditer(interim):
+        chunk = interim[pos : m.start()]
+        parts.append(_escape_keeping_link_slots(chunk, slots))
+        parts.append(f"<strong>{html.escape(m.group(1))}</strong>")
         pos = m.end()
-    parts.append(html.escape(text[pos:]))
+    parts.append(_escape_keeping_link_slots(interim[pos:], slots))
     return "".join(parts)
+
+
+def _escape_keeping_link_slots(text: str, slots: list[str]) -> str:
+    out: list[str] = []
+    pos = 0
+    for m in re.finditer(r"\x00L(\d+)\x00", text):
+        out.append(html.escape(text[pos : m.start()]))
+        out.append(slots[int(m.group(1))])
+        pos = m.end()
+    out.append(html.escape(text[pos:]))
+    return "".join(out)
 
 
 _TABLE_STYLE = "border-collapse:collapse;margin:0.75em 0;"

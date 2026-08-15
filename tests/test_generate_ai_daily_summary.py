@@ -1587,6 +1587,36 @@ def test_shorten_affiliate_title(gads):
     assert "クーポンで24,980円⇒送料無料9,992円！お中元" not in line or "…" in line
 
 
+def test_fallback_search_url_truncates_long_youtube_title(gads):
+    from urllib.parse import unquote_plus
+
+    long_title = (
+        "モンストニュース[8/13]TVアニメ『ブルーロック』 コラボ開催決定！"
+        "超究極「士道龍聖」も登場！その他、獣神化・改など、モンストの最新情報をお届けします！"
+        "【モンスト公式】"
+    )
+    url = gads._fallback_search_url(long_title, "youtube_trends")
+    assert url.startswith("https://www.google.com/search?q=")
+    assert len(url) < 400
+    decoded = unquote_plus(url)
+    assert "モンスト" in decoded
+    assert "士道龍聖" not in decoded
+
+
+def test_format_digest_link_line_uses_youtube_url_when_present(gads):
+    line = gads._format_digest_link_line(
+        "モンストニュース[8/13]とても長いタイトルですよ追加テキスト",
+        "youtube_trends",
+        "19時3位",
+        "https://www.youtube.com/watch?v=abc123",
+    )
+    assert "https://www.youtube.com/watch?v=abc123" in line
+    assert "google.com/search" not in line
+    # 半角 [] は全角になり、MD リンクが壊れない
+    assert "［8/13］" in line
+    assert "\\[" not in line
+
+
 def test_market_category_compresses_flat(gads):
     blocks = [
         {

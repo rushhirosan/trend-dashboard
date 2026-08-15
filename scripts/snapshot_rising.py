@@ -472,8 +472,21 @@ def url_for_label_in_series(
     return None
 
 
+_FALLBACK_SEARCH_Q_MAX = 48
+
+
 def fallback_search_url(label: str) -> str:
-    return f"https://www.google.com/search?q={quote_plus(clean_rising_display(label))}"
+    """記事 URL が無いときの Google 検索。長タイトルは q を短縮する。"""
+    query = clean_rising_display(label)
+    if len(query) > _FALLBACK_SEARCH_Q_MAX:
+        cut = query[:_FALLBACK_SEARCH_Q_MAX].rstrip()
+        for sep in ("！", "!", "。", " ", "　", "・", "｜", "|", "【"):
+            idx = cut.rfind(sep)
+            if idx >= max(12, _FALLBACK_SEARCH_Q_MAX // 3):
+                cut = cut[:idx].rstrip()
+                break
+        query = cut
+    return f"https://www.google.com/search?q={quote_plus(query)}"
 
 
 def article_url_for_rising(

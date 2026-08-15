@@ -112,7 +112,17 @@ def _label_from_item(item: Any, idx: int) -> Optional[Dict[str, Any]]:
     except (TypeError, ValueError):
         rank = idx + 1
     out: Dict[str, Any] = {"t": text, "r": rank}
-    for uk in ("url", "link", "html_url", "news_url"):
+    # YouTube は video_id のみ、Google Trends は google_search_url、映画/書籍は item_url 等。
+    for uk in (
+        "url",
+        "link",
+        "html_url",
+        "news_url",
+        "google_search_url",
+        "item_url",
+        "affiliate_url",
+        "amazon_link",
+    ):
         raw_u = item.get(uk)
         if raw_u is None:
             continue
@@ -120,6 +130,10 @@ def _label_from_item(item: Any, idx: int) -> Optional[Dict[str, Any]]:
         if u.startswith("http://") or u.startswith("https://"):
             out["u"] = u[:2000]
             break
+    if "u" not in out:
+        vid = item.get("video_id")
+        if vid is not None and str(vid).strip():
+            out["u"] = f"https://www.youtube.com/watch?v={str(vid).strip()}"[:2000]
     return out
 
 

@@ -81,6 +81,56 @@ status: draft
     assert "PAYDAY 3 (https://" not in html
 
 
+def test_email_shortens_overlong_google_search_href():
+    from urllib.parse import quote_plus, unquote_plus
+
+    from services.summary.summary_markdown_email import (
+        markdown_to_email_html,
+        markdown_to_email_text,
+        shorten_email_href,
+    )
+
+    long_q = (
+        "モンストニュース[8/13]TVアニメ『ブルーロック』 コラボ開催決定！"
+        "超究極「士道龍聖」も登場！その他、獣神化・改など、モンストの最新情報をお届けします！"
+        "【モンスト公式】"
+    )
+    long_url = f"https://www.google.com/search?q={quote_plus(long_q)}"
+    short = shorten_email_href(long_url)
+    assert len(short) < len(long_url)
+    assert "士道龍聖" not in unquote_plus(short)
+    assert "モンストニュース" in unquote_plus(short)
+
+    # 既存原稿の壊れた \[ エスケープ＋ラベル内 ] でも <a> になること
+    broken_md = (
+        f"1. [モンストニュース\\[8/13]TVアニメ『ブルーロック』…]({long_url})"
+        "（YouTube · 19時3位）\n"
+    )
+    html = markdown_to_email_html(broken_md)
+    text = markdown_to_email_text(broken_md)
+    assert "<a href=" in html
+    assert "モンストニュース[8/13]" in html or "モンストニュース\\[8/13]" not in html
+    assert long_url not in html
+    assert long_url not in text
+    assert "google.com/search?q=" in html
+    # テキストパートはラベルのみ（長い URL を晒さない）
+    assert "https://" not in text
+    assert "モンストニュース" in text
+
+
+def test_email_hyperlink_with_brackets_in_title():
+    """タイトルに半角 [] があってもハイパーリンクになる。"""
+    from services.summary.summary_markdown_email import markdown_to_email_html
+
+    md = (
+        "1. [モンストニュース［8/13］コラボ](https://www.youtube.com/watch?v=abc)"
+        "（YouTube · 19時3位）\n"
+    )
+    html = markdown_to_email_html(md)
+    assert '<a href="https://www.youtube.com/watch?v=abc">' in html
+    assert "モンストニュース［8/13］コラボ</a>" in html
+
+
 def test_weekly_flow_inserts_breaks_after_japanese_periods():
     md = """---
 status: draft

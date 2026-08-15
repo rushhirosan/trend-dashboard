@@ -115,23 +115,51 @@ def _title_has(title: str, *keywords: str) -> bool:
 
 # インライン Markdown（リンク・太字）だけを HTML 化する。原稿は AI 生成＋レビュー済みの
 # 管理下コンテンツだが、念のため escape してからリンク/太字のみ復元する。
-_LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
 _BOLD_RE = re.compile(r"\*\*([^*]+)\*\*")
 
 
 def render_inline(text: str) -> Markup:
-    """リンクと太字のみを安全に HTML 化する。"""
-    escaped = str(escape(text or ""))
+    """リンクと太字のみを安全に HTML 化する（ラベル内の ] にも耐える）。"""
+    from services.summary.summary_markdown_email import iter_markdown_links
 
-    def _link(m: "re.Match[str]") -> str:
-        label, url = m.group(1), m.group(2)
-        if not url.startswith(("http://", "https://")):
-            return label
-        return f'<a href="{url}" target="_blank" rel="noopener nofollow">{label}</a>'
+    raw = text or ""
+    slots: list[Markup] = []
+    pieces: list[str] = []
+    pos = 0
+    for start, end, label, url in iter_markdown_links(raw):
+        pieces.append(raw[pos:start])
+        if url.startswith(("http://", "https://")):
+            slots.append(
+                Markup(
+                    f'<a href="{escape(url)}" target="_blank" rel="noopener nofollow">'
+                    f"{escape(label)}</a>"
+                )
+            )
+        else:
+            slots.append(Markup(str(escape(label))))
+        pieces.append(f"\x00L{len(slots) - 1}\x00")
+        pos = end
+    pieces.append(raw[pos:])
+    interim = "".join(pieces)
 
-    escaped = _LINK_RE.sub(_link, escaped)
-    escaped = _BOLD_RE.sub(r"<strong>\1</strong>", escaped)
-    return Markup(escaped)
+    def _escape_with_slots(chunk: str) -> Markup:
+        out: list[Markup | str] = []
+        p = 0
+        for m in re.finditer(r"\x00L(\d+)\x00", chunk):
+            out.append(escape(chunk[p : m.start()]))
+            out.append(slots[int(m.group(1))])
+            p = m.end()
+        out.append(escape(chunk[p:]))
+        return Markup("").join(out)
+
+    parts: list[Markup | str] = []
+    pos = 0
+    for m in _BOLD_RE.finditer(interim):
+        parts.append(_escape_with_slots(interim[pos : m.start()]))
+        parts.append(Markup(f"<strong>{escape(m.group(1))}</strong>"))
+        pos = m.end()
+    parts.append(_escape_with_slots(interim[pos:]))
+    return Markup("").join(parts)
 
 
 def _split_frontmatter(text: str) -> tuple[str, str]:
@@ -212,17 +240,17 @@ def _split_sentences(text: str) -> list[str]:
     return [part.strip() for part in re.split(r"(?<=。)", s) if part.strip()]
 
 
-# 本文中の markdown リンク行 [ラベル](http...) からトピック名とURLを拾うための正規表現。
-_MD_LINK_RE = re.compile(r"\[([^\]]+)\]\((https?://[^)\s]+)\)")
-
-
 def _collect_topic_links(body: str) -> list[tuple[str, str]]:
     """本文全体の [ラベル](url) を集め、一行結論のリンク化に使う (ラベル, url) 一覧を返す。
 
     同じラベルは最初の URL を採用。長いラベルを優先マッチさせたいので長さ降順で返す。
     """
+    from services.summary.summary_markdown_email import iter_markdown_links
+
     seen: dict[str, str] = {}
-    for label, url in _MD_LINK_RE.findall(body):
+    for _s, _e, label, url in iter_markdown_links(body or ""):
+        if not url.startswith(("http://", "https://")):
+            continue
         label = label.strip()
         # 1文字ラベルは誤マッチしやすいので除外
         if len(label) >= 2 and label not in seen:

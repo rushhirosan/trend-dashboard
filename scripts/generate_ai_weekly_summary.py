@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 直前に終了した ISO 週（月〜日）の trend_daily_snapshots を集計し、
-OpenAI で週次サマリー（今週の流れ・急上昇各1件・カテゴリ別 top3）を1ファイルに生成する。
+OpenAI で週次サマリー（先週の流れ・急上昇各1件・カテゴリ別 top3）を1ファイルに生成する。
 
 既定入力は **スナップショット**（DB 直読 or ``--from-api``）。日次 Markdown は
 補助コンテキストとして読む（欠損可）。``--daily-only`` で旧挙動（日次 md のみ）。
@@ -83,12 +83,12 @@ WEEKLY_SCORE_SLOT = 5
 WEEKLY_SCORE_JUMP = 1.0
 WEEKLY_SCORE_CROSS = 25
 
-_WEEKLY_RISING_HEADING = "## 📈 今週いちばん動いた話題"
-_WEEKLY_CATEGORY_HEADING = "## 📊 カテゴリ別 — 今週の top3"
+_WEEKLY_RISING_HEADING = "## 📈 先週いちばん動いた話題"
+_WEEKLY_CATEGORY_HEADING = "## 📊 カテゴリ別 — 先週の top3"
 _WEEKLY_CROSS_HEADING = "## 複数ソースで週を通じて重なった話題"
 _WEEKLY_HOT_HEADING = "## 🔥 週のホットトピック"
 _WEEKLY_NEXT_HEADING = "## 来週に残る論点"
-_WEEKLY_HOT_HEADING_US = "## 🔥 Hot topics this week"
+_WEEKLY_HOT_HEADING_US = "## 🔥 Hot topics last week"
 _WEEKLY_NEXT_HEADING_US = "## What to watch next week"
 # 週次「動いた」として載せる最低 jump_sum（横ばい・悪化のみは除外）
 WEEKLY_RISING_MIN_JUMP = 5.0
@@ -1137,12 +1137,12 @@ def render_weekly_category_markdown(
     editorial: Dict[str, Any],
 ) -> str:
     empty_msg = (
-        "(No notable category topics this week.)"
+        "(No notable category topics last week.)"
         if _ACTIVE_REGION == "us"
-        else "（今週、カテゴリ別の注目話題は見つかりませんでした）"
+        else "（先週、カテゴリ別の注目話題は見つかりませんでした）"
     )
     heading = (
-        "## 📊 Category top3 this week"
+        "## 📊 Category top3 last week"
         if _ACTIVE_REGION == "us"
         else _WEEKLY_CATEGORY_HEADING
     )
@@ -1268,18 +1268,125 @@ def _compact_weekly_link_line(item: Dict[str, Any]) -> str:
     return re.sub(r"（[^）]*）\s*$", "", link)
 
 
+_MD_LINK_TITLE_RE = re.compile(r"^\[([^\]]+)\]\([^)]+\)\s*")
+
+
+def _strip_md_link_title(title: str) -> str:
+    """見出しが既に Markdown リンクならラベルだけ取り出す。"""
+    s = (title or "").strip()
+    m = _MD_LINK_TITLE_RE.match(s)
+    if m:
+        rest = s[m.end() :].strip()
+        # 末尾の（ソース）はマッチ用に落とす
+        rest = re.sub(r"^（[^）]*）\s*", "", rest)
+        return m.group(1).strip() or s
+    return s
+
+
+def _iter_weekly_link_source_items(
+    weekly_rising: Dict[str, List[Dict[str, Any]]],
+    weekly_category: Dict[str, List[Dict[str, Any]]],
+) -> List[Dict[str, Any]]:
+    """ホットトピック照合用: rising + カテゴリ pool/items を集める。"""
+    items: List[Dict[str, Any]] = []
+    for region in WEEKLY_REGIONS:
+        for it in weekly_rising.get(region) or []:
+            if isinstance(it, dict):
+                items.append(it)
+        for block in weekly_category.get(region) or []:
+            if not isinstance(block, dict):
+                continue
+            for key in ("pool", "items"):
+                for it in block.get(key) or []:
+                    if isinstance(it, dict):
+                        items.append(it)
+    return items
+
+
+def build_hot_topic_link_index(
+    weekly_rising: Dict[str, List[Dict[str, Any]]],
+    weekly_category: Dict[str, List[Dict[str, Any]]],
+) -> Dict[str, Dict[str, Any]]:
+    """label（大小無視）→ 機械側アイテム。URL / link_line 付きを優先。"""
+    index: Dict[str, Dict[str, Any]] = {}
+    for it in _iter_weekly_link_source_items(weekly_rising, weekly_category):
+        label = str(it.get("label") or "").strip()
+        if not label:
+            continue
+        key = label.casefold()
+        has_link = bool(str(it.get("link_line") or "").strip() or str(it.get("url") or "").strip())
+        prev = index.get(key)
+        if prev is None:
+            index[key] = it
+            continue
+        prev_has = bool(
+            str(prev.get("link_line") or "").strip() or str(prev.get("url") or "").strip()
+        )
+        if has_link and not prev_has:
+            index[key] = it
+    return index
+
+
+def _hot_topic_heading_line(title: str, matched: Optional[Dict[str, Any]]) -> str:
+    """ホット見出し: 機械リンクがあれば [title](url)（ソース）、なければプレーン。"""
+    plain = _strip_md_link_title(title)
+    if not matched:
+        return plain
+    link = _compact_weekly_link_line(matched)
+    if not link or link == str(matched.get("label") or ""):
+        url = str(matched.get("url") or "").strip()
+        if url.startswith(("http://", "https://")):
+            return f"[{plain}]({url})"
+        return plain
+    # compact のラベル部分を AI の title 表記に寄せる（表記ゆれ許容）
+    m = re.match(r"^\[([^\]]+)\]\(([^)]+)\)(.*)$", link)
+    if m:
+        return f"[{plain}]({m.group(2)}){m.group(3)}"
+    return link
+
+
+def enrich_hot_topics_with_links(
+    editorial: Dict[str, Any],
+    weekly_rising: Dict[str, List[Dict[str, Any]]],
+    weekly_category: Dict[str, List[Dict[str, Any]]],
+) -> Dict[str, Any]:
+    """hot_topics に機械由来の link_line を付与（LLM に URL を出させない）。"""
+    index = build_hot_topic_link_index(weekly_rising, weekly_category)
+    enriched: List[Dict[str, Any]] = []
+    for t in editorial.get("hot_topics") or []:
+        if not isinstance(t, dict):
+            continue
+        title = str(t.get("title") or "").strip()
+        why = str(t.get("why") or "").strip()
+        if not title or not why:
+            continue
+        plain = _strip_md_link_title(title)
+        matched = index.get(plain.casefold())
+        row: Dict[str, Any] = {"title": plain, "why": why}
+        if matched:
+            row["link_line"] = _hot_topic_heading_line(plain, matched)
+            if matched.get("url"):
+                row["url"] = matched.get("url")
+        else:
+            row["link_line"] = plain
+        enriched.append(row)
+    out = dict(editorial)
+    out["hot_topics"] = enriched
+    return out
+
+
 def render_weekly_rising_markdown(
     weekly_rising: Dict[str, List[Dict[str, Any]]],
 ) -> str:
     heading = (
-        "## 📈 Biggest movers this week"
+        "## 📈 Biggest movers last week"
         if _ACTIVE_REGION == "us"
         else _WEEKLY_RISING_HEADING
     )
     empty_msg = (
-        "(No big rank movers this week.)"
+        "(No big rank movers last week.)"
         if _ACTIVE_REGION == "us"
-        else "（今週、順位が大きく動いた話題は見つかりませんでした）"
+        else "（先週、順位が大きく動いた話題は見つかりませんでした）"
     )
     lines: List[str] = [heading, ""]
     any_items = False
@@ -1415,22 +1522,20 @@ def render_weekly_hot_topics_markdown(editorial: Dict[str, Any]) -> str:
     topics = editorial.get("hot_topics") or []
     if _ACTIVE_REGION == "us":
         heading = _WEEKLY_HOT_HEADING_US
-        empty = "(No hot topics selected this week.)"
-        why_label = "Why hot"
+        empty = "(No hot topics selected last week.)"
     else:
         heading = _WEEKLY_HOT_HEADING
-        empty = "（今週のホットトピックはありません）"
-        why_label = "なぜホットか"
+        empty = "（先週のホットトピックはありません）"
     lines: List[str] = [heading, ""]
     if not topics:
         lines.append(empty)
         return "\n".join(lines).rstrip() + "\n"
     for i, t in enumerate(topics, 1):
-        title = str(t.get("title") or "").strip()
         why = str(t.get("why") or "").strip()
-        lines.append(f"### {i}. {title}")
+        heading_line = str(t.get("link_line") or t.get("title") or "").strip()
+        lines.append(f"### {i}. {heading_line}")
         lines.append("")
-        lines.append(f"- **{why_label}**: {why}")
+        lines.append(why)
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
@@ -1462,13 +1567,14 @@ def assemble_weekly_markdown(
     weekly_category: Dict[str, List[Dict[str, Any]]],
     meta: Dict[str, Any],
 ) -> str:
+    editorial = enrich_hot_topics_with_links(editorial, weekly_rising, weekly_category)
     if _ACTIVE_REGION == "us":
         title = f"# Weekly summary — {iso_week} (observation week JST {mon.isoformat()}–{sun.isoformat()})"
         meta_lines = [
             f"- **Week**: {mon.isoformat()} – {sun.isoformat()} (JST)",
             "- **Generated**: automatic (time not filled)",
             "",
-            "## Week in review",
+            "## Last week in review",
             "",
             (editorial.get("flow_us") or editorial.get("flow_jp") or "(Could not generate the U.S. weekly brief.)").strip(),
             "",
@@ -1479,7 +1585,7 @@ def assemble_weekly_markdown(
             f"- **対象週**: {mon.isoformat()} 〜 {sun.isoformat()}",
             "- **生成・送信完了**: 自動生成（時刻未入力）",
             "",
-            "## 今週の流れ（短文）",
+            "## 先週の流れ（短文）",
             "",
             # 日本語ページは日本ソースのみ。地域サブ見出しは付けず単一フローにする。
             (editorial.get("flow_jp") or "（日本向けの週次要約を生成できませんでした）").strip(),
@@ -1607,10 +1713,11 @@ flow では pool の **具体ラベル・固有名詞** をそのまま引用す
 「エンタメの話題」「トレンドの検索」「新技術の導入」のような抽象表現は禁止。
 
 **出力は JSON オブジェクトのみ**（Markdown 不可）。キー:
-- `flow_jp` (string): 5〜8文・日本語。**週としての1本のストーリー**（カテゴリ1位の列挙にしない）。
-  続いた話題・一過性の話題の対比があるとよい。pool の label を具体名で引用。
+- `flow_jp` (string): 5〜8文・日本語。**先週としての1本のストーリー**（カテゴリ1位の列挙にしない）。
+  読者向けには「先週」と書く（「今週」は使わない）。続いた話題・一過性の話題の対比があるとよい。pool の label を具体名で引用。
 - `hot_topics` (array): 最大5件。各要素 `{ "title", "why" }`。
-  title は pool / rising の具体ラベル。why は2〜4文で「なぜその週ホットか」。
+  title は pool / rising の具体ラベル（URL・Markdown リンクは付けない。リンクは後段で機械付与）。
+  why は2〜4文で「なぜその週ホットか」（ラベル文言は不要・本文のみ）。
   定番株・一過性の季節ネタ・事故の単日首位だけは避ける。厳選すること。
 - `next_week` (array of string): 2〜3件。来週も残りうる論点（各1〜2文）。未来の断定予測は禁止。
 
@@ -1632,10 +1739,11 @@ In flow, quote concrete labels/proper nouns from the pool.
 Ban vague phrases like "entertainment topics" or "tech adoption" without labels.
 
 **Output JSON only** (no Markdown). Keys:
-- `flow_us` (string): 5–8 sentences in **English**. One weekly narrative arc (not a list of daily #1s).
-  Contrast what persisted vs one-off spikes. Quote pool labels by name.
+- `flow_us` (string): 5–8 sentences in **English**. One narrative arc for **last week** (not a list of daily #1s).
+  Use "last week" (not "this week"). Contrast what persisted vs one-off spikes. Quote pool labels by name.
 - `hot_topics` (array): up to 5 items `{ "title", "why" }`.
-  title = concrete pool/rising label; why = 2–4 sentences on why it was hot.
+  title = concrete pool/rising label (no URL/Markdown link; links are attached mechanically later).
+  why = 2–4 sentences on why it was hot (body only; no "Why hot:" label).
   Skip evergreen tickers and one-day accident spikes. Be selective.
 - `next_week` (array of string): 2–3 carry-over points (1–2 sentences each). No hard forecasts.
 
@@ -1653,8 +1761,8 @@ LEGACY_SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集
 - 見出し構造:
   - `# 週次サマリー — ISO_WEEK（対象週 JST WEEK_MON〜WEEK_SUN）`
   - `- **対象週**:` と `- **生成・送信完了**:` の2行（生成時刻は「自動生成（時刻未入力）」でよい）
-  - `## 今週の流れ（短文）`
-- 「今週の流れ」は日次の繰り返しにせず、週としての要約にする。
+  - `## 先週の流れ（短文）`
+- 「先週の流れ」は日次の繰り返しにせず、週としての要約にする。
 - 日次ファイルが欠けている日がある場合は `## データ前提` を短く置く。
 - 憶測・未確認の断定は避ける。"""
 

@@ -104,7 +104,7 @@ def _read_doc(kind: str, region: str, doc_id: str) -> Optional[str]:
 # US 原稿は英語見出しで生成する想定だが、パーサはどちらでも拾えるようにする。
 _ONE_LINER_KEYS = ("昨日の注目", "一行結論", "highlight", "takeaway", "bottom line")
 _RISING_KEYS = ("いちばん動いた", "biggest movers", "movers")
-_FLOW_KEYS = ("今週の流れ", "week in review", "this week")
+_FLOW_KEYS = ("先週の流れ", "今週の流れ", "last week in review", "week in review")
 _JP_SUB_KEYS = ("日本", "Japan", "JP")
 _US_SUB_KEYS = ("アメリカ", "US", "United States")
 
@@ -222,7 +222,7 @@ def _find_section(sections: list[tuple[str, str]], *keywords: str) -> str:
 def _clean_title(title: str) -> str:
     """見出しから日付サフィックス（``— 2026-07-11`` 等）だけを除く。
 
-    週次の ``カテゴリ別 — 今週の top3`` のような説明サフィックスは残す。
+    週次の ``カテゴリ別 — 先週の top3`` のような説明サフィックスは残す。
     """
     return re.sub(r"\s*—\s*\d{4}[-/].*$", "", title).strip()
 
@@ -443,7 +443,7 @@ def load_weekly_page(
             "us": render_inline(_join_paragraph(_find_section(flow_subs, *_US_SUB_KEYS))),
         }
     else:
-        # 単一地域ファイル: 「今週の流れ」直下に本文（### なし）
+        # 単一地域ファイル: 「先週の流れ」直下に本文（### なし）
         content = render_inline(_join_paragraph(flow_section))
         flow = {
             "jp": content if region == "jp" else Markup(""),

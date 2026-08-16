@@ -143,7 +143,7 @@ def markdown_to_email_text(markdown: str) -> str:
 
     body = _expand_link_region(body)
     body = _BOLD_RE.sub(r"\1", body)
-    # 長い段落（今週の流れなど）は句点・ピリオド後で改行
+    # 長い段落（先週の流れなど）は句点・ピリオド後で改行
     lines: list[str] = []
     table_buf: list[list[str]] = []
 

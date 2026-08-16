@@ -136,7 +136,7 @@ def test_weekly_flow_inserts_breaks_after_japanese_periods():
 status: draft
 ---
 
-## 今週の流れ（短文）
+## 先週の流れ（短文）
 
 今週はAが注目を集めました。また、Bが話題となりました。検索ではCが急上昇し、1位を記録。エンタメではDが注目を集めました。
 """

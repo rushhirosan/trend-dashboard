@@ -12,10 +12,10 @@
     <!-- SEO Meta Tags -->
     {% if is_us %}
     <title>Weekly trend brief {{ page.iso_week }} | Trends Dashboard</title>
-    <meta name="description" content="Weekly U.S. trend brief for {{ page.week_range }} (free preview). Notable topics and the week in review.">
+    <meta name="description" content="Weekly U.S. trend brief for {{ page.week_range }} (free preview). Notable topics and last week in review.">
     {% else %}
     <title>週次トレンドまとめ {{ page.iso_week }} | トレンドダッシュボード</title>
-    <meta name="description" content="{{ page.week_range }} の週次トレンドまとめ（無料プレビュー）。日本・米国の注目トピックと今週の流れ。">
+    <meta name="description" content="{{ page.week_range }} の週次トレンドまとめ（無料プレビュー）。日本・米国の注目トピックと先週の流れ。">
     {% endif %}
     <meta name="author" content="Trends Dashboard">
     <meta name="robots" content="index, follow">
@@ -103,7 +103,7 @@
 
                 <section class="card shadow-sm mb-4">
                     <div class="card-body p-4">
-                        <h2 class="h5 mb-3">{% if is_us %}The week in review{% else %}今週の流れ{% endif %}</h2>
+                        <h2 class="h5 mb-3">{% if is_us %}Last week in review{% else %}先週の流れ{% endif %}</h2>
                         {% if page.flow.jp and page.flow.us %}
                         <h3 class="h6 mb-2">🇯🇵 {% if is_us %}Japan{% else %}日本{% endif %}</h3>
                         <p class="mb-3">{{ page.flow.jp }}</p>
@@ -120,7 +120,7 @@
                 {% if page.rising.jp or page.rising.us %}
                 <section class="card shadow-sm mb-4">
                     <div class="card-body p-4">
-                        <h2 class="h5 mb-3"><i class="fas fa-arrow-trend-up text-primary me-2"></i>{% if is_us %}Biggest movers this week{% else %}今週いちばん動いた話題{% endif %}</h2>
+                        <h2 class="h5 mb-3"><i class="fas fa-arrow-trend-up text-primary me-2"></i>{% if is_us %}Biggest movers last week{% else %}先週いちばん動いた話題{% endif %}</h2>
                         {% if page.rising.jp and page.rising.us %}
                         <div class="mb-3">
                             <h3 class="h6 mb-1">🇯🇵 {% if is_us %}Japan{% else %}日本{% endif %}</h3>

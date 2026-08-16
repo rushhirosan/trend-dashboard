@@ -560,7 +560,7 @@ def test_render_weekly_category_markdown_fallback_mechanical(gaws):
     }
     editorial = {"category_themes": {"jp": {}, "us": {}}}
     md = gaws.render_weekly_category_markdown(category, editorial)
-    assert "カテゴリ別 — 今週の top3" in md
+    assert "カテゴリ別 — 先週の top3" in md
     assert "[Topic A](https://example.com/a)" in md
     assert "07-01 1位" in md
     assert " — " not in md.split("#### ニュース")[1].split("###")[0]
@@ -608,7 +608,7 @@ def test_assemble_weekly_markdown_jp_only(gaws):
         "flow_jp": "今週は日本のテスト話題が動いた。",
         "flow_us": "",
         "hot_topics": [
-            {"title": "Hot JP", "why": "週を通じて議論が続いた。"},
+            {"title": "Cat JP", "why": "週を通じて議論が続いた。"},
         ],
         "next_week": ["関税関連が続くか。", "テックのAI記事が残るか。"],
         "category_themes": {"jp": {}, "us": {}},
@@ -648,16 +648,100 @@ def test_assemble_weekly_markdown_jp_only(gaws):
     )
     assert "🇯🇵 日本" not in md
     assert "🇺🇸" not in md
-    assert "今週いちばん動いた話題" in md
-    assert "カテゴリ別 — 今週の top3" in md
+    assert "先週の流れ" in md
+    assert "先週いちばん動いた話題" in md
+    assert "カテゴリ別 — 先週の top3" in md
     assert "Rising JP" in md
     assert "[Cat JP](https://example.com/cat)" in md
     assert "今週は日本のテスト話題が動いた。" in md
     assert "週のホットトピック" in md
-    assert "Hot JP" in md
+    assert "[Cat JP](https://example.com/cat)" in md
+    assert "なぜホットか" not in md
+    assert "週を通じて議論が続いた。" in md
     assert "来週に残る論点" in md
     assert "関税関連が続くか。" in md
     assert "複数ソースで週を通じて重なった話題" not in md
+
+
+def test_enrich_hot_topics_with_links_from_rising_and_category(gaws):
+    editorial = {
+        "hot_topics": [
+            {"title": "Rising JP", "why": "jump"},
+            {"title": "News A", "why": "hot"},
+            {"title": "Unknown", "why": "no link"},
+        ]
+    }
+    rising = {
+        "jp": [
+            {
+                "label": "Rising JP",
+                "link_line": "[Rising JP](https://example.com/rise)（App Store · 6位）",
+                "url": "https://example.com/rise",
+            }
+        ]
+    }
+    category = {
+        "jp": [
+            {
+                "category": "ニュース",
+                "pool": [
+                    {
+                        "label": "News A",
+                        "link_line": "[News A](https://example.com/news)（NHK · 1位）",
+                        "url": "https://example.com/news",
+                    }
+                ],
+                "items": [],
+            }
+        ]
+    }
+    out = gaws.enrich_hot_topics_with_links(editorial, rising, category)
+    topics = out["hot_topics"]
+    assert topics[0]["link_line"] == "[Rising JP](https://example.com/rise)（App Store）"
+    assert topics[1]["link_line"] == "[News A](https://example.com/news)（NHK）"
+    assert topics[2]["link_line"] == "Unknown"
+
+
+def test_assemble_weekly_markdown_us_hot_topic_links(gaws):
+    gaws.configure_weekly_region("us")
+    mon = date(2026, 6, 8)
+    sun = date(2026, 6, 14)
+    editorial = {
+        "flow_jp": "",
+        "flow_us": "Last week U.S. topics moved.",
+        "hot_topics": [{"title": "Hot US", "why": "Cross-source all week."}],
+        "next_week": ["Watch Fed news."],
+        "category_themes": {"jp": {}, "us": {}},
+    }
+    rising = {"us": []}
+    category = {
+        "us": [
+            {
+                "category": "ニュース",
+                "items": [
+                    {
+                        "label": "Hot US",
+                        "link_line": "[Hot US](https://example.com/us-hot)（World News (US)）",
+                        "url": "https://example.com/us-hot",
+                    }
+                ],
+                "pool": [
+                    {
+                        "label": "Hot US",
+                        "link_line": "[Hot US](https://example.com/us-hot)（World News (US)）",
+                        "url": "https://example.com/us-hot",
+                    }
+                ],
+            }
+        ]
+    }
+    meta = {"missing_snapshot_dates": [], "partial_snapshot_dates": [], "missing_dates": []}
+    md = gaws.assemble_weekly_markdown(
+        "2026-W24", mon, sun, editorial, rising, category, meta
+    )
+    assert "[Hot US](https://example.com/us-hot)" in md
+    assert "Why hot" not in md
+    gaws.configure_weekly_region("jp")
 
 
 def test_weekly_rising_filters_flat_jump(gaws):
@@ -718,11 +802,12 @@ def test_assemble_weekly_markdown_us_english(gaws):
         "2026-W24", mon, sun, editorial, rising, category, meta
     )
     assert "Weekly summary" in md
-    assert "Week in review" in md
+    assert "Last week in review" in md
     assert "U.S. tech topics moved this week." in md
-    assert "Biggest movers this week" in md
-    assert "Hot topics this week" in md
+    assert "Biggest movers last week" in md
+    assert "Hot topics last week" in md
     assert "Hot US" in md
+    assert "Why hot" not in md
     assert "What to watch next week" in md
     assert "Watch Fed news." in md
     assert "来週に残る論点" not in md

@@ -3788,6 +3788,22 @@ body.data-status-active #data-status .card-body {
 .page-header-compact {
     margin-bottom: 0.5rem;
 }
+/* 要約カードとタブが bg-light で溶けないよう、薄い色面と左アクセントだけ分ける */
+.ai-summary-fake-door-root.dashboard-summary-panel > .card.border-secondary {
+    background-color: #f5f8fd;
+    border-color: #c5d6ef;
+    border-left-width: 3px;
+    border-left-color: #0d6efd;
+}
+.ai-summary-fake-door-root.dashboard-summary-panel > .card > .card-header.bg-light {
+    background-color: #e8f0fb !important;
+    border-bottom-color: #d0def3;
+}
+#header-admin-unified.dashboard-summary-panel {
+    background-color: #f4f6f1;
+    border-color: #cfd6c6;
+    border-left: 3px solid #6d7f5c;
+}
 .trend-tabs-compact {
     margin-bottom: 0.5rem;
 }
@@ -3895,7 +3911,8 @@ body.data-status-active #data-status .card-body {
     position: sticky;
     top: var(--header-height, 3.25rem);
     z-index: 999;
-    background-color: #f8f9fa;
+    background-color: #e9eef3;
+    border-top: 1px solid #d5dde6;
     border-bottom: 1px solid rgba(0, 0, 0, 0.1);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
@@ -3921,7 +3938,7 @@ body.data-status-active #data-status .card-body {
 .trend-category-tabs .nav-link.active,
 ul.trend-category-tabs li.nav-item button.nav-link.active {
     color: #0d6efd !important;
-    background-color: #e9ecef !important;
+    background-color: #fff !important;
     border-color: rgba(0, 0, 0, 0.1);
     border-bottom: 2px solid #0d6efd !important;
     margin-bottom: -2px;

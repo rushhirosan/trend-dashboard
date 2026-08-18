@@ -104,19 +104,25 @@ body#trends-us #trends #pane-govdata #us-gov-body .card-body > .table-responsive
 
 /* === USヘッダー: Gov Data 最新表示 === */
 /* === USヘッダー: 日本ページと同じレイアウト === */
-body#trends-us .header-row { margin-bottom: 0 !important; }
 body#trends-us .dashboard-summary-grid {
     display: grid;
     grid-template-columns: 1fr;
     align-items: start;
 }
 @media (min-width: 992px) {
-    body#trends-us .dashboard-summary-grid--3 {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
     body#trends-us .dashboard-summary-grid--2 {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+}
+body#trends-us .page-header-oneliner {
+    line-height: 1.25;
+}
+body#trends-us .ai-summary-fake-door-root.dashboard-summary-panel .h6 {
+    font-size: 0.85rem;
+    line-height: 1.2;
+}
+body#trends-us .ai-summary-fake-door-root.dashboard-summary-panel .small {
+    line-height: 1.25;
 }
 body#trends-us .dashboard-summary-panel#header-admin-unified {
     display: flex;
@@ -125,8 +131,8 @@ body#trends-us .dashboard-summary-panel#header-admin-unified {
 body#trends-us #header-admin-unified .header-admin-cols { padding-top: 0.1rem; padding-right: 3rem; }
 body#trends-us #header-admin-unified .header-admin-section-title {
     font-size: 0.7rem;
-    line-height: 1.25;
-    margin-bottom: 0.2rem;
+    line-height: 1.2;
+    margin-bottom: 0.1rem;
     font-weight: 700;
     color: #6c757d !important;
 }
@@ -135,14 +141,14 @@ body#trends-us #header-admin-unified .header-admin-section-title--bottom { margi
 body#trends-us #header-estat-compact-body,
 body#trends-us #header-kkj-compact-body {
     font-size: 0.7rem;
-    line-height: 1.25;
-    padding: 0.1rem 0;
+    line-height: 1.2;
+    padding: 0;
     color: #212529 !important;
-    min-height: 2.2rem;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 0.1rem;
+    gap: 0;
 }
 body#trends-us #header-kkj-compact-body .text-muted,
 body#trends-us #header-estat-compact-body .text-muted { color: #6c757d !important; }

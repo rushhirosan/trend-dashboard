@@ -1,4 +1,4 @@
-{# 3カラム要約: 中央 AI の見た目の高さに左右を固定。body 末尾で実行（レイアウト確定後）。 #}
+{# 2カラム要約: サマリーカードと行政データを同じ高さに揃える。body 末尾で実行（レイアウト確定後）。 #}
 <script>
 (function () {
   var mq = window.matchMedia('(min-width: 992px)');
@@ -21,15 +21,14 @@
   }
 
   function clearForcedAll() {
-    ['dashboard-summary-intro', 'header-admin-unified'].forEach(function (id) {
-      var el = document.getElementById(id);
-      if (!el) return;
-      el.style.removeProperty('height');
-      el.style.removeProperty('max-height');
-      el.style.removeProperty('overflow-y');
-      el.style.removeProperty('min-height');
-      el.style.removeProperty('box-sizing');
-    });
+    var right = document.getElementById('header-admin-unified');
+    if (right) {
+      right.style.removeProperty('height');
+      right.style.removeProperty('max-height');
+      right.style.removeProperty('overflow-y');
+      right.style.removeProperty('min-height');
+      right.style.removeProperty('box-sizing');
+    }
     var center = refMeasureEl(refRoot());
     if (center) {
       center.style.removeProperty('min-height');
@@ -39,34 +38,29 @@
 
   function natural(el) {
     // サブピクセルの高さを切り上げる。round で切り捨てると内容が数px溢れ、
-    // 左右パネルの overflow-y:auto が発動して不要な縦スクロールバーが出るため。
+    // 行政パネルの overflow-y:auto が発動して不要な縦スクロールバーが出るため。
     return el ? Math.ceil(el.getBoundingClientRect().height) : 0;
   }
 
   function sync() {
     try {
-      if (!mq.matches || !document.querySelector('.dashboard-summary-grid--3')) {
+      if (!mq.matches || !document.querySelector('.dashboard-summary-grid--2')) {
         clearForcedAll();
         return;
       }
       var center = refMeasureEl(refRoot());
-      var left = document.getElementById('dashboard-summary-intro');
       var right = document.getElementById('header-admin-unified');
-      if (!center || !left || !right) return;
-      // いったん強制を解除して自然高を測り、3枚の最大に合わせる。
-      // 基準を中央 Fake door 単体にすると、中央が短いとき左右が切り詰められてスクロールが出るため最大採用。
+      if (!center || !right) return;
+      // いったん強制を解除して自然高を測り、2枚の最大に合わせる。
       clearForcedAll();
-      var h = Math.max(natural(center), natural(left), natural(right));
+      var h = Math.max(natural(center), natural(right));
       if (h < 1) return;
-      // 左右パネル: 高さを固定（万一の溢れに備え overflow-y:auto は安全弁）
-      [left, right].forEach(function (el) {
-        el.style.setProperty('box-sizing', 'border-box', 'important');
-        el.style.setProperty('min-height', '0', 'important');
-        el.style.setProperty('height', h + 'px', 'important');
-        el.style.setProperty('max-height', h + 'px', 'important');
-        el.style.setProperty('overflow-y', 'auto', 'important');
-      });
-      // 中央（Fake door / CTA）は下端を揃えるため最小高だけ与える（クランプせず＝スクロールさせない）
+      right.style.setProperty('box-sizing', 'border-box', 'important');
+      right.style.setProperty('min-height', '0', 'important');
+      right.style.setProperty('height', h + 'px', 'important');
+      right.style.setProperty('max-height', h + 'px', 'important');
+      right.style.setProperty('overflow-y', 'auto', 'important');
+      // サマリーカードは下端を揃えるため最小高だけ与える（クランプせず＝CTAはスクロールさせない）
       center.style.setProperty('box-sizing', 'border-box', 'important');
       center.style.setProperty('min-height', h + 'px', 'important');
     } catch (e) {}

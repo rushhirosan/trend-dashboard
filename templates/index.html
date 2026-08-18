@@ -49,7 +49,7 @@
     {% include 'partials/jp_web_font.html' %}
     <!-- Performance Optimization: Preload critical CSS -->
     <link rel="preload" href="{{ url_for('static', filename='css/common.css') }}" as="style">
-    <link rel="preload" href="{{ url_for('static', filename='css/main.css') }}" as="style">
+    <link rel="preload" href="{{ url_for('static', filename='css/main.css') }}?v=20260819-header-tint" as="style">
     
     <!-- Structured Data (JSON-LD) -->
     <!-- Organization Schema（運営者・信頼性） -->
@@ -121,7 +121,7 @@
     <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
     {% set async_css_href = url_for('static', filename='css/trends.css') + '?v=20260728-amazon-row-action' %}
     {% include 'partials/async_stylesheet.html' %}
-    <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/main.css') }}?v=20260819-header-tint" rel="stylesheet">
 </head>
 <body id="trends-jp" class="bg-light">
     <!-- 前回USページを開いていた場合、外部からのルート(/)訪問時のみ /us へリダイレクト（サイト内の「日本トレンド」クリックではリダイレクトしない） -->
@@ -145,83 +145,18 @@
 
     <noscript>
         <div class="alert alert-info mx-3 mt-3 mb-4" role="alert">
-            <h2 class="h5 mb-3">トレンドダッシュボードについて</h2>
-            <p class="mb-3">トレンドダッシュボードは、日本の最新トレンド情報を一括で確認できる無料のWebアプリケーションです。JavaScriptを有効にすることで、リアルタイムのトレンドデータを表示できます。</p>
-            <h3 class="h6 fw-bold mb-2">提供しているトレンド情報</h3>
-            <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                    <h4 class="h6 fw-bold mb-2">検索・動画</h4>
-                    <ul class="small mb-0">
-                        <li>Google Trends - 日本で検索されている人気キーワード</li>
-                        <li>YouTube - 日本で人気の動画とチャンネル</li>
-                        <li>Wikipedia - 日本語版Wikipediaの人気記事</li>
-                    </ul>
-                </div>
-                <div class="col-md-6">
-                    <h4 class="h6 fw-bold mb-2">テック・開発</h4>
-                    <ul class="small mb-0">
-                        <li>Zenn - 技術記事プラットフォームの人気記事</li>
-                        <li>Note - 創作・ビジネス記事の人気コンテンツ</li>
-                        <li>Qiita - プログラマー向け技術記事</li>
-                        <li>GitHub - 人気のオープンソースプロジェクト</li>
-                        <li>はてなブックマーク - テクノロジー・社会・エンタメなどの話題</li>
-                    </ul>
-                </div>
-                <div class="col-md-6">
-                    <h4 class="h6 fw-bold mb-2">ニュース</h4>
-                    <ul class="small mb-0">
-                        <li>NHK - 日本の公共放送のニュース</li>
-                        <li>World News - 海外の主要ニュース</li>
-                        <li>PR TIMES - 企業のプレスリリース</li>
-                    </ul>
-                </div>
-                <div class="col-md-6">
-                    <h4 class="h6 fw-bold mb-2">マーケット・エンタメ</h4>
-                    <ul class="small mb-0">
-                        <li>株価 - 日本の株式市場の動向</li>
-                        <li>仮想通貨 - ビットコインなどの暗号資産の価格動向</li>
-                        <li>Spotify - 音楽ストリーミングの人気楽曲</li>
-                        <li>楽天 - ショッピングサイトの人気商品</li>
-                        <li>Twitch - ゲーム配信プラットフォームの人気コンテンツ</li>
-                        <li>Podcast - 人気のポッドキャスト番組</li>
-                    </ul>
-                </div>
-            </div>
-            <p class="mb-0"><strong>データ更新頻度：</strong>すべてのトレンドデータは毎日1時、7時、13時、19時（JST）に自動更新されます。最新のデータを確認するには、JavaScriptを有効にしてページを再読み込みしてください。</p>
+            <p class="mb-0">トレンドデータを表示するには JavaScript を有効にしてください。サイトの説明は <a href="/about">このサイトについて</a> を参照してください。更新は毎日 1・7・13・19時（JST）です。</p>
         </div>
     </noscript>
     <main class="container-fluid main-content-compact">
         <div id="mainContent">
-            <header class="page-header-compact mb-3">
-                <h1 class="h3 fw-bold mb-2">日本の最新トレンド情報</h1>
-                <div class="row align-items-start g-2 header-row d-none">
-                    <div class="col-12 col-lg-6 header-desc-col">
-                        <div class="header-description-modern">
-                            <span class="header-desc-short">Google Trends、YouTube、Spotify、はてな、楽天、Zenn、Note、Qiita、OpenAlex、Bluesky など複数ソースを一括表示。株価・仮想通貨も。</span>
-                            <span class="header-desc-meta">
-                                <span class="header-desc-badge" aria-hidden="true"><i class="fas fa-sync-alt me-1"></i>毎日 1・7・13・19時(JST)更新</span>
-                                <button type="button" class="header-desc-info-btn" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Google Trends、YouTube、Spotify、はてなブックマーク、楽天、Twitch、Podcast、Zenn、Note、Qiita、OpenAlex、Blueskyなどの人気トレンドを一括表示。株価や仮想通貨のトレンドも確認できます。データは毎日1時、7時、13時、19時（JST）に更新処理を開始します（完了まで通常10〜15分程度（状況により延びる場合があります））。主な機能：複数ソースの一括表示・カテゴリ別タブ・日米切り替え。対応：Google Trends、YouTube、Spotify、はてな、楽天、Twitch、Podcast、Zenn、Note、Qiita、OpenAlex、Bluesky、NHK、Wikipedia、株価・仮想通貨。" aria-label="詳細説明を表示">
-                                    <i class="fas fa-info-circle"></i>
-                                </button>
-                            </span>
-                        </div>
-                    </div>
-                </div>
+            <header class="page-header-compact mb-1">
+                <p class="page-header-oneliner small text-muted mb-3 d-flex flex-wrap align-items-baseline justify-content-between gap-2">
+                    <span>対象ソースが1日4回更新（1・7・13・19時 JST）されます。</span>
+                    <a href="/about">このサイトについて</a>
+                </p>
                 {% set dashboard_show_ai = (ENABLE_AI_SUMMARY_FAKE_DOOR and AI_SUMMARY_FAKE_DOOR) or (SHOW_LOCAL_AI_SUMMARY_MOCK and AI_SUMMARY_MOCK) %}
-                <div class="dashboard-summary-grid gap-2 mb-0 {% if dashboard_show_ai %}dashboard-summary-grid--3{% else %}dashboard-summary-grid--2{% endif %}" aria-label="ダッシュボード要約">
-                        <section id="dashboard-summary-intro" class="rounded border bg-light p-2 min-w-0 dashboard-summary-panel" aria-label="このページの説明">
-                            <h2 class="h6 fw-bold mb-2">このページで分かること</h2>
-                            <p class="small mb-2">
-                                トレンドダッシュボードは、日本国内の関心を素早く把握するための無料ダッシュボードです。Google Trends、YouTube、NHK、Wikipedia、はてなブックマーク、Zenn、Note、Qiita、OpenAlex、Bluesky、株価・仮想通貨などの公開データを横断して比較できます。
-                                更新は毎日1・7・13・19時（JST）に開始し、完了まで通常10〜15分程度（状況により延びる場合があります）。タブでカテゴリごとに確認できます。
-                            </p>
-                            <p class="small mb-0">
-                                関連:
-                                <a href="/us" class="me-2">米国トレンド（US）</a>
-                                <a href="/data-status" class="me-2">データ鮮度・更新状況</a>
-                                <a href="/about">サイト概要・データソース</a>
-                            </p>
-                        </section>
+                <div class="dashboard-summary-grid gap-2 mb-0 {% if dashboard_show_ai %}dashboard-summary-grid--2{% endif %}" aria-label="ダッシュボード要約">
                     {% if dashboard_show_ai %}
                         {% if ENABLE_AI_SUMMARY_FAKE_DOOR and AI_SUMMARY_FAKE_DOOR %}
                         {% set fake_door_locale = 'ja' %}
@@ -275,7 +210,7 @@
                         </section>
                         {% endif %}
                     {% endif %}
-                        <div id="header-admin-unified" class="rounded border bg-light p-2 position-relative min-w-0 dashboard-summary-panel">
+                        <div id="header-admin-unified" class="rounded border py-1 px-2 position-relative min-w-0 dashboard-summary-panel">
                             <span class="position-absolute top-0 end-0 mt-1 me-1" style="font-size: 0.7rem;">
                                 <a href="#" class="btn btn-sm btn-outline-primary py-0 px-1 estat-goto-tab ms-1" data-target-tab="tab-admin" aria-label="行政データタブへ">もっと見る</a>
                             </span>
@@ -283,13 +218,13 @@
                                 <i class="fas fa-chart-line me-1"></i>景気・行政データ
                                 <span id="header-estat-latest-period" class="text-muted ms-1"></span>
                             </div>
-                            <div id="header-estat-cache-meta" class="mb-1" aria-live="polite"></div>
-                            <div id="header-estat-compact-body" class="header-admin-latest mb-2" aria-live="polite">
+                            <div id="header-estat-cache-meta" class="mb-0" aria-live="polite"></div>
+                            <div id="header-estat-compact-body" class="header-admin-latest mb-1" aria-live="polite">
                                 <span class="text-muted">取得中…</span>
                             </div>
 
                             <div class="header-admin-section-title header-admin-section-title--bottom">🇯🇵 政府調達シグナル（今月）</div>
-                            <div id="header-kkj-cache-meta" class="mb-1" aria-live="polite"></div>
+                            <div id="header-kkj-cache-meta" class="mb-0" aria-live="polite"></div>
                             <div id="header-kkj-compact-body" class="header-kkj-body">
                                 <span class="text-muted">取得中…</span>
                             </div>
@@ -2660,47 +2595,31 @@
 
                 </div><!-- /.tab-content -->
             </section>
-
-            <!-- SEO: 詳細説明セクション（非表示・メタタグ・構造化データで十分） -->
-            <section id="about-trends-dashboard" class="mt-5 mb-4 d-none" aria-label="トレンドダッシュボードについて">
-                <div class="card">
-                    <div class="card-header bg-dark text-white">
-                        <h2 class="h5 mb-0"><i class="fas fa-info-circle" aria-hidden="true"></i> トレンドダッシュボードについて</h2>
-                    </div>
-                    <div class="card-body">
-                        <p class="mb-3">トレンドダッシュボードは、日本の最新トレンド情報を一括で確認できる無料のWebアプリです。複数のサービスで話題になっているキーワードやコンテンツを1つの画面で把握できます。</p>
-                        <h3 class="h6 fw-bold mt-4 mb-2">主な機能</h3>
-                        <ul class="mb-3">
-                            <li>Google Trends・YouTube・Spotify・はてなブックマーク・楽天・Twitch・Podcast・OpenAlex・Blueskyなど、複数ソースのトレンドを同時表示</li>
-                            <li>Zenn・Note・Qiita・Wikipedia人気記事などの技術・創作系プラットフォームのトレンド表示</li>
-                            <li>株価・仮想通貨（暗号資産）の市場動向の確認</li>
-                            <li>NHK・World Newsなどニュース系トレンドの表示</li>
-                        </ul>
-                        <h3 class="h6 fw-bold mt-4 mb-2">データの更新</h3>
-                        <p class="mb-0">データは毎日1時、7時、13時、19時（JST）に更新処理を開始します（完了まで通常10〜15分程度（状況により延びる場合があります））。最新の状態は<a href="{{ url_for('data_status') }}">データ更新状況</a>ページで確認できます。</p>
-                    </div>
-                </div>
-            </section>
         </div>
     </main>
 
 
     <style>
-        /* ヘッダー行：余白を詰める */
-        .header-row { margin-bottom: 0 !important; }
-        /* ダッシュボード要約: 上揃え（3カラム時は dashboard_summary_height_sync が3枚の最大高に合わせる） */
+        /* ダッシュボード要約: 2カラム（サマリー + 行政データ）。高さは dashboard_summary_height_sync が揃える */
         .dashboard-summary-grid {
             display: grid;
             grid-template-columns: 1fr;
             align-items: start;
         }
         @media (min-width: 992px) {
-            .dashboard-summary-grid--3 {
-                grid-template-columns: repeat(3, minmax(0, 1fr));
-            }
             .dashboard-summary-grid--2 {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
+        }
+        .page-header-oneliner {
+            line-height: 1.25;
+        }
+        .ai-summary-fake-door-root.dashboard-summary-panel .h6 {
+            font-size: 0.85rem;
+            line-height: 1.2;
+        }
+        .ai-summary-fake-door-root.dashboard-summary-panel .small {
+            line-height: 1.25;
         }
         .dashboard-summary-panel#header-admin-unified {
             display: flex;
@@ -2709,21 +2628,21 @@
         /* 統合ボックス：もっと見るを右上に配置したためコンテンツに余白 */
         #header-admin-unified .header-admin-cols { padding-top: 0.1rem; padding-right: 3rem; }
         /* 左右のセクション見出し・本文の行間を揃える */
-        #header-admin-unified .header-admin-section-title { font-size: 0.7rem; line-height: 1.25; margin-bottom: 0.2rem; font-weight: 700; color: #6c757d !important; }
+        #header-admin-unified .header-admin-section-title { font-size: 0.7rem; line-height: 1.2; margin-bottom: 0.1rem; font-weight: 700; color: #6c757d !important; }
         /* 政府調達セクションはカード下端に寄せる（余った高さは2セクションの間に入る） */
         #header-admin-unified .header-admin-section-title--bottom { margin-top: auto; }
         .estat-compact-box { min-height: auto; }
         #header-estat-compact-body,
         #header-kkj-compact-body {
             font-size: 0.7rem;
-            line-height: 1.25;
-            padding: 0.1rem 0;
+            line-height: 1.2;
+            padding: 0;
             color: #212529 !important;
-            min-height: 2.2rem;
+            min-height: 0;
             display: flex;
             flex-direction: column;
             justify-content: center;
-            gap: 0.1rem;
+            gap: 0;
         }
         #header-kkj-compact-body .text-muted,
         #header-estat-compact-body .text-muted { color: #6c757d !important; }

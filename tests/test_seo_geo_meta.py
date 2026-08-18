@@ -55,7 +55,7 @@ def test_robots_txt_mentions_llms(app_client):
 
 
 def test_jp_index_head_title_without_body_copy_change(app_client):
-    """SERP向け title/description は具体的に。body SEO 説明は引き続き非表示（d-none）。"""
+    """SERP向け title/description は具体的に。トップの長い説明パネルは出さない。"""
     res = app_client.get("/")
     assert res.status_code == 200
     html = res.get_data(as_text=True)
@@ -63,8 +63,9 @@ def test_jp_index_head_title_without_body_copy_change(app_client):
     assert 'property="og:title" content="日本のトレンドを20ソース横断比較 | トレンドダッシュボード"' in html
     assert 'name="twitter:title" content="日本のトレンドを20ソース横断比較 | トレンドダッシュボード"' in html
     assert 'href="/llms.txt"' in html or 'href="' in html and "/llms.txt" in html
-    assert 'id="about-trends-dashboard"' in html
-    assert "d-none" in html
+    assert 'id="about-trends-dashboard"' not in html
+    assert "このページで分かること" not in html
+    assert "このサイトについて" in html
     # FAQ セクションは about のみ（トップに出さない）
     assert 'id="faq"' not in html
 
@@ -77,6 +78,7 @@ def test_us_index_head_title_for_gsc_queries(app_client):
     assert "<title>Real-time U.S. Trends Dashboard | Compare 20+ Sources</title>" in html
     assert "current U.S. trends" in html
     assert 'property="og:title" content="Compare U.S. trends across 20+ sources | Trends Dashboard"' in html
+    assert "What this page covers" not in html
     assert 'id="faq"' not in html
 
 

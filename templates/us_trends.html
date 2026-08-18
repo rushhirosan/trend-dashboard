@@ -47,7 +47,7 @@
     {% include 'partials/us_web_font.html' %}
     <!-- Performance Optimization: Preload critical CSS -->
     <link rel="preload" href="{{ url_for('static', filename='css/common.css') }}" as="style">
-    <link rel="preload" href="{{ url_for('static', filename='css/main.css') }}" as="style">
+    <link rel="preload" href="{{ url_for('static', filename='css/main.css') }}?v=20260819-header-tint" as="style">
     
     <!-- Structured Data (JSON-LD) -->
     <script type="application/ld+json">
@@ -115,9 +115,9 @@
     <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
     {% set async_css_href = url_for('static', filename='css/trends.css') + '?v=20260728-amazon-row-action' %}
     {% include 'partials/async_stylesheet.html' %}
-    <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/main.css') }}?v=20260819-header-tint" rel="stylesheet">
     <!-- data-status.css, subscription.css は /data-status, /subscription 専用。USトレンドには不要（日本ページと同じレイアウトにするため） -->
-    {% set async_css_href = url_for('static', filename='css/us-trends.css') + '?v=20260719-header-admin-bottom-align' %}
+    {% set async_css_href = url_for('static', filename='css/us-trends.css') + '?v=20260819-header-compact' %}
     {% include 'partials/async_stylesheet.html' %}
 </head>
 <body id="trends-us" class="bg-light" data-trend-meta-tz="America/New_York">
@@ -132,83 +132,18 @@
 
     <noscript>
         <div class="alert alert-info mx-3 mt-3 mb-4" role="alert">
-            <h2 class="h5 mb-3">About Trends Dashboard</h2>
-            <p class="mb-3">Trends Dashboard is a free web app that surfaces U.S. trend signals from many public sources in one place. Enable JavaScript to load live trend data.</p>
-            <h3 class="h6 fw-bold mb-2">Trend sources on this page</h3>
-            <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                    <h4 class="h6 fw-bold mb-2">Search &amp; video</h4>
-                    <ul class="small mb-0">
-                        <li>Google Trends — popular U.S. search keywords</li>
-                        <li>YouTube — trending videos and channels</li>
-                        <li>Wikipedia — popular English Wikipedia articles</li>
-                    </ul>
-                </div>
-                <div class="col-md-6">
-                    <h4 class="h6 fw-bold mb-2">Tech &amp; development</h4>
-                    <ul class="small mb-0">
-                        <li>Hacker News — developer community headlines</li>
-                        <li>GitHub — trending open-source projects</li>
-                        <li>Product Hunt — new product launches</li>
-                        <li>Dev.to &amp; Medium — popular tech articles</li>
-                        <li>OpenAlex — academic research trends</li>
-                    </ul>
-                </div>
-                <div class="col-md-6">
-                    <h4 class="h6 fw-bold mb-2">News</h4>
-                    <ul class="small mb-0">
-                        <li>CNN — U.S. and world news</li>
-                        <li>World News — major headlines</li>
-                        <li>GlobeNewswire — corporate press releases</li>
-                    </ul>
-                </div>
-                <div class="col-md-6">
-                    <h4 class="h6 fw-bold mb-2">Markets &amp; entertainment</h4>
-                    <ul class="small mb-0">
-                        <li>Stocks — U.S. market movers (S&amp;P 500, NASDAQ)</li>
-                        <li>Cryptocurrency — major coin price trends</li>
-                        <li>Spotify &amp; Apple Music — popular tracks</li>
-                        <li>Podcasts, movies, and books — trending titles</li>
-                        <li>Twitch, eBay, and Bluesky — platform trends</li>
-                    </ul>
-                </div>
-            </div>
-            <p class="mb-0"><strong>Update schedule:</strong> refresh starts four times daily at 1, 7, 13, and 19 JST (typically 10–15 minutes to complete). Enable JavaScript and reload for the latest data.</p>
+            <p class="mb-0">Enable JavaScript to load trend data. See <a href="/about">About</a> for sources and update schedule (1 / 7 / 13 / 19 JST).</p>
         </div>
     </noscript>
     <main class="container-fluid main-content-compact">
         <div id="mainContent">
-            <header class="page-header-compact mb-3">
-                <h1 class="h3 fw-bold mb-2">US Trends - Latest Trends in America</h1>
-                <div class="row align-items-start g-2 header-row d-none">
-                    <div class="col-12 col-lg-6 header-desc-col">
-                        <div class="header-description-modern">
-                            <span class="header-desc-short">Google Trends, YouTube, Spotify, Hacker News, OpenAlex, Bluesky, Stock, Crypto, Twitch, Podcasts — all in one place.</span>
-                            <span class="header-desc-meta">
-                                <span class="header-desc-badge" aria-hidden="true"><i class="fas fa-sync-alt me-1"></i>4x daily (1/7/13/19 JST)</span>
-                                <button type="button" class="header-desc-info-btn" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Displaying latest trend data from Google Trends, YouTube, Stock markets, Spotify, Hacker News, OpenAlex, Bluesky, Twitch, and Podcasts. Track cryptocurrency and stock market movements. Data update processing starts daily at 1 AM, 7 AM, 1 PM, and 7 PM (JST) (typically takes about 10–15 minutes to complete (may take longer in some cases))." aria-label="Show details">
-                                    <i class="fas fa-info-circle"></i>
-                                </button>
-                            </span>
-                        </div>
-                    </div>
-                </div>
+            <header class="page-header-compact mb-1">
+                <p class="page-header-oneliner small text-muted mb-3 d-flex flex-wrap align-items-baseline justify-content-between gap-2">
+                    <span>Sources are refreshed 4 times daily (1 / 7 / 13 / 19 JST).</span>
+                    <a href="/about">About this site</a>
+                </p>
                 {% set dashboard_show_ai = (ENABLE_AI_SUMMARY_FAKE_DOOR and AI_SUMMARY_FAKE_DOOR) or (SHOW_LOCAL_AI_SUMMARY_MOCK and AI_SUMMARY_MOCK) %}
-                <div class="dashboard-summary-grid gap-2 mb-0 {% if dashboard_show_ai %}dashboard-summary-grid--3{% else %}dashboard-summary-grid--2{% endif %}" aria-label="Dashboard summary">
-                        <section id="dashboard-summary-intro" class="rounded border bg-light p-2 min-w-0 dashboard-summary-panel" aria-label="About this page">
-                            <h2 class="h6 fw-bold mb-2">What this page covers</h2>
-                            <p class="small mb-2">
-                                This dashboard scans U.S. trend signals across search, video, news, technology, markets, and public data.
-                                Sources include Google Trends, YouTube, CNN, world news, Wikipedia, Hacker News, OpenAlex, Bluesky, stock and cryptocurrency feeds, and selected government data.
-                                Refresh starts four times daily (1/7/13/19 JST) and typically takes about 10–15 minutes to complete (may take longer in some cases). Use the tabs to browse by category.
-                            </p>
-                            <p class="small mb-0">
-                                Related:
-                                <a href="/" class="me-2">Japan Trends Dashboard</a>
-                                <a href="/data-status" class="me-2">Data status and freshness</a>
-                                <a href="/about">About this project and sources</a>
-                            </p>
-                        </section>
+                <div class="dashboard-summary-grid gap-2 mb-0 {% if dashboard_show_ai %}dashboard-summary-grid--2{% endif %}" aria-label="Dashboard summary">
                     {% if dashboard_show_ai %}
                         {% if ENABLE_AI_SUMMARY_FAKE_DOOR and AI_SUMMARY_FAKE_DOOR %}
                         {% set fake_door_locale = 'en' %}
@@ -262,7 +197,7 @@
                         </section>
                         {% endif %}
                     {% endif %}
-                        <div id="header-admin-unified" class="rounded border bg-light p-2 position-relative min-w-0 dashboard-summary-panel">
+                        <div id="header-admin-unified" class="rounded border py-1 px-2 position-relative min-w-0 dashboard-summary-panel">
                             <span class="position-absolute top-0 end-0 mt-1 me-1" style="font-size: 0.7rem;">
                                 <a href="#" class="btn btn-sm btn-outline-primary py-0 px-1 estat-goto-tab ms-1" data-target-tab="tab-govdata" aria-label="Go to Gov Data tab">More</a>
                             </span>
@@ -270,13 +205,13 @@
                                 <i class="fas fa-chart-line me-1"></i>US Economy (BLS)
                                 <span id="header-estat-latest-period" class="text-muted ms-1"></span>
                             </div>
-                            <div id="header-estat-cache-meta" class="mb-1" aria-live="polite"></div>
-                            <div id="header-estat-compact-body" class="header-admin-latest mb-2" aria-live="polite">
+                            <div id="header-estat-cache-meta" class="mb-0" aria-live="polite"></div>
+                            <div id="header-estat-compact-body" class="header-admin-latest mb-1" aria-live="polite">
                                 <span class="text-muted">Loading...</span>
                             </div>
 
                             <div class="header-admin-section-title header-admin-section-title--bottom">US Government Spending (USAspending)</div>
-                            <div id="header-kkj-cache-meta" class="mb-1" aria-live="polite"></div>
+                            <div id="header-kkj-cache-meta" class="mb-0" aria-live="polite"></div>
                             <div id="header-kkj-compact-body" class="header-kkj-body">
                                 <span class="text-muted">Loading...</span>
                             </div>

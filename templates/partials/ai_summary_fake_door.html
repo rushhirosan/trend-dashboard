@@ -1,4 +1,4 @@
-{# AIサマリー: 日次プレビュー（無料）+ 日次・週次メール配信 Waitlist モーダル #}
+{# AIサマリー: 日次プレビュー（無料）+ 有料メール Checkout モーダル #}
 {% set embedded = fake_door_embedded | default(false) %}
 {% set loc = fake_door_locale | default('ja') %}
 {% set reg = fake_door_region | default('jp') %}
@@ -6,46 +6,28 @@
 {% if loc == 'en' %}
   {% set title_a = "Past trend summaries" %}
   {% set preview_lead = "Browse past updates captured at 7:00 / 13:00 / 19:00 / 1:00 JST." %}
-  {% set locked = "You can also receive the full daily & weekly summaries by email. Tap ‘Request email delivery’ below." %}
-  {% set cta = "Request email delivery" %}
+  {% set locked = "Subscribe to receive full daily & weekly summaries by email." %}
+  {% set cta = "Subscribe by email" %}
   {% set modal_title = "Summary delivery (daily & weekly)" %}
-  {% set modal_lead = "We plan to email daily briefs around 10:30 JST and weekly briefs around 11:00 JST each Monday (topics, rank moves, category highlights). Paid launch timing TBD." %}
-  {% set modal_note = "Email signup will open once delivery is ready. Signup is not available yet." %}
-  {% set email_label = "Email" %}
-  {% set email_placeholder = "you@example.com" %}
-  {% set btn_submit = "Join waitlist" %}
+  {% set modal_lead = "Yesterday's and last week's trends by email—before you start your day. Target: daily around 7:30 JST (by 8:00); weekly Mondays around 8:00 JST. Times are not guaranteed." %}
   {% set btn_close = "Close" %}
   {% set read_preview = "Read preview" %}
   {% set past_summaries = "Past summaries" %}
-  {% set waitlist_success = "You're on the list. We'll email you when the brief launches." %}
-  {% set waitlist_error = "Signup failed. Please try again." %}
-  {% set waitlist_invalid = "Enter a valid email address." %}
 {% else %}
   {% set title_a = "過去のトレンドサマリー" %}
   {% set preview_lead = "過去の更新データを7時/13時/19時/1時を閲覧することができます。" %}
-  {% set locked = "日次・週次のサマリー全文をメールで受信することもできます。以下の「メール配信を希望する」を押してください。" %}
-  {% set cta = "メール配信を希望する" %}
+  {% set locked = "日次・週次のサマリー全文をメールで受け取れます。" %}
+  {% set cta = "メールで購読する" %}
   {% set modal_title = "サマリー配信（日次・週次）" %}
-  {% set modal_lead = "日次は毎朝10:30 JST頃、週次は毎週月曜11:00 JST頃を目安に、論点・順位の動き・カテゴリ別トップをメールでお届けする予定です（有料・開始時期未定）。" %}
-  {% set modal_note = "配信の準備が整い次第、事前登録を開始します。現時点では登録はお受けしていません。" %}
-  {% set email_label = "メールアドレス" %}
-  {% set email_placeholder = "example@email.com" %}
-  {% set btn_submit = "事前登録する" %}
+  {% set modal_lead = "昨日・先週のトレンドを、出勤前に確認するメールです。目標は日次 7:30 JST頃（上限 8:00）、週次は月曜 8:00 JST頃。時刻は保証ではありません。" %}
   {% set btn_close = "閉じる" %}
   {% set read_preview = "プレビューを読む" %}
   {% set past_summaries = "過去のサマリー" %}
-  {% set waitlist_success = "登録を受け付けました。提供開始時にご連絡します。" %}
-  {% set waitlist_error = "登録に失敗しました。しばらくしてからお試しください。" %}
-  {% set waitlist_invalid = "有効なメールアドレスを入力してください。" %}
 {% endif %}
 <section id="ai-summary-fake-door-root" aria-label="{{ title_a }}"
     class="ai-summary-fake-door-root{% if embedded %} dashboard-summary-panel mb-0 w-100{% else %} mb-3{% endif %}"
     data-fake-door-region="{{ reg }}"
-    data-fake-door-locale="{{ loc }}"
-    data-waitlist-enabled="false"
-    data-waitlist-success="{{ waitlist_success }}"
-    data-waitlist-error="{{ waitlist_error }}"
-    data-waitlist-invalid="{{ waitlist_invalid }}">
+    data-fake-door-locale="{{ loc }}">
   <div class="card border-secondary h-100">
     <div class="card-header bg-light py-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
       <h2 class="h6 mb-0"><i class="fas fa-newspaper me-1 text-primary" aria-hidden="true"></i>{{ title_a }}</h2>
@@ -55,7 +37,6 @@
       <p class="small text-muted mb-0{% if not embedded %} mt-2{% endif %}">
         <i class="fas fa-lock me-1" aria-hidden="true"></i>{{ locked }}
       </p>
-      {# mt-auto でボタン行をカード下端に揃える（h-100 で隣カードと高さが揃うときに中途半端に浮かないように） #}
       <div class="d-flex flex-wrap align-items-center gap-2 mt-auto pt-3">
         {% if fd.has_preview and fd.business_day %}
         <a class="btn btn-primary btn-sm" href="{{ fd.url_prefix }}/summaries/daily/{{ fd.business_day }}">
@@ -81,24 +62,10 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ btn_close }}"></button>
         </div>
         <div class="modal-body">
-          <p class="small mb-2">{{ modal_lead }}</p>
-          <p class="small text-muted mb-3">{{ modal_note }}</p>
-          <div id="ai-summary-waitlist-form-wrap">
-            <form id="ai-summary-waitlist-form" class="ai-summary-waitlist-form" novalidate>
-              <div class="mb-3">
-                <label for="ai-summary-waitlist-email" class="form-label small mb-1">{{ email_label }}</label>
-                <input type="email" class="form-control form-control-sm" id="ai-summary-waitlist-email"
-                    name="email" autocomplete="email" inputmode="email" required disabled
-                    aria-disabled="true" placeholder="{{ email_placeholder }}">
-              </div>
-              <button type="submit" class="btn btn-primary btn-sm" id="ai-summary-waitlist-submit" disabled
-                  aria-disabled="true">
-                {{ btn_submit }}
-              </button>
-            </form>
-          </div>
-          <div id="ai-summary-waitlist-success" class="alert alert-success py-2 px-2 small mb-0 d-none" role="status"></div>
-          <div id="ai-summary-waitlist-error" class="alert alert-danger py-2 px-2 small mb-0 mt-2 d-none" role="alert"></div>
+          <p class="small mb-3">{{ modal_lead }}</p>
+          {% with checkout_form_prefix='ai-summary-fd', checkout_locale=loc, checkout_default_region=reg %}
+          {% include 'partials/ai_summary_checkout_form.html' %}
+          {% endwith %}
         </div>
         <div class="modal-footer border-0 pt-0">
           <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">{{ btn_close }}</button>

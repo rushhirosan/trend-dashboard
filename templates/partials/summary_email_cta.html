@@ -1,16 +1,11 @@
-{# 日次/週次サマリーのロック領域用: メール配信 CTA + 案内モーダル。
-   waitlist は準備中のため fake door（登録フォームは出さず案内のみ）。Bootstrap bundle だけで動作する。
-   region ('jp'/'us') で日英を切り替える。 #}
+{# 日次/週次サマリーのロック領域用: メール配信 Checkout #}
 {% set cta_is_us = (region|default('jp')) == 'us' %}
-{# モーダル開閉時にスクロールバーが出没して横幅が変わると、一部環境で再描画のちらつきになる。
-   常にガター分を確保してリフローを防ぐ（このモーダルを含むサマリー系ページのみに適用）。 #}
 <style>html { scrollbar-gutter: stable; }</style>
 <div class="mt-3 d-flex flex-wrap align-items-center gap-2">
   <button type="button" class="btn btn-primary btn-sm" id="summary-email-cta"
       data-bs-toggle="modal" data-bs-target="#summaryEmailModal">
-    <i class="fas fa-envelope me-1" aria-hidden="true"></i>{% if cta_is_us %}Request email delivery{% else %}メール配信を希望する{% endif %}
+    <i class="fas fa-envelope me-1" aria-hidden="true"></i>{% if cta_is_us %}Subscribe by email{% else %}メールで購読する{% endif %}
   </button>
-  <span class="small text-muted">{% if cta_is_us %}Coming soon{% else %}提供準備中{% endif %}</span>
 </div>
 
 <div class="modal fade" id="summaryEmailModal" tabindex="-1" aria-labelledby="summaryEmailModalLabel" aria-hidden="true">
@@ -22,12 +17,13 @@
       </div>
       <div class="modal-body">
         {% if cta_is_us %}
-        <p class="small mb-2">We plan to email daily briefs around 10:30 JST and weekly briefs around 11:00 JST each Monday (topics, rank moves, category highlights). Paid launch timing TBD.</p>
-        <p class="small text-muted mb-0">Email signup will open once delivery is ready. Signup is not available yet.</p>
+        <p class="small mb-3">Yesterday's and last week's trends before work. Target: daily around 7:30 JST (by 8:00); weekly Mondays around 8:00 JST. Times are not guaranteed.</p>
         {% else %}
-        <p class="small mb-2">日次は毎朝10:30 JST頃、週次は毎週月曜11:00 JST頃を目安に、論点・順位の動き・カテゴリ別トップをメールでお届けする予定です（有料・開始時期未定）。</p>
-        <p class="small text-muted mb-0">配信の準備が整い次第、事前登録を開始します。現時点では登録はお受けしていません。</p>
+        <p class="small mb-3">昨日・先週のトレンドを出勤前に。目標は日次 7:30 JST頃（上限 8:00）、週次は月曜 8:00 JST頃。時刻は保証ではありません。</p>
         {% endif %}
+        {% with checkout_form_prefix='ai-summary-cta', checkout_locale=('en' if cta_is_us else 'ja'), checkout_default_region=('us' if cta_is_us else 'jp') %}
+        {% include 'partials/ai_summary_checkout_form.html' %}
+        {% endwith %}
       </div>
       <div class="modal-footer border-0 pt-0">
         <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">{% if cta_is_us %}Close{% else %}閉じる{% endif %}</button>
@@ -39,8 +35,6 @@
 <script>
 (function () {
   var modal = document.getElementById('summaryEmailModal');
-  // Bootstrap 推奨: モーダルは body 直下に置く。card 内にネストしたままだと Mac Chrome 等で
-  // backdrop / フォーカスの取り合いにより開閉がちらつくため、初期化前に body へ移設する。
   if (modal && modal.parentNode !== document.body) {
     document.body.appendChild(modal);
   }

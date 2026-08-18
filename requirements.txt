@@ -36,3 +36,6 @@ feedparser==6.0.12
 
 # Tests
 pytest>=7.0.0
+
+# Billing
+stripe>=8.0.0

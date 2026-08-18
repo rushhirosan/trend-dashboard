@@ -62,6 +62,15 @@ class AppConfig:
     ENABLE_AI_SUMMARY_FAKE_DOOR = os.getenv(
         'ENABLE_AI_SUMMARY_FAKE_DOOR', 'true'
     ).lower() in ('true', '1', 'yes')
+
+    # 有料 AI サマリー Stripe Checkout（Price 1本 + region_plan metadata）
+    STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '').strip()
+    STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY', '').strip()
+    STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', '').strip()
+    STRIPE_PRICE_ID = os.getenv('STRIPE_PRICE_ID', '').strip()
+    ENABLE_AI_SUMMARY_CHECKOUT = os.getenv(
+        'ENABLE_AI_SUMMARY_CHECKOUT', 'true'
+    ).lower() in ('true', '1', 'yes')
     # 本番は approved のみ表示。ローカル DEBUG では draft も可（明示 false で無効化）
     _allow_draft_env = os.getenv('AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT')
     if _allow_draft_env is not None and _allow_draft_env.strip() != '':
@@ -91,6 +100,9 @@ class AppConfig:
             'BUY_ME_A_COFFEE_USERNAME': cls.BUY_ME_A_COFFEE_USERNAME,
             'ENABLE_AI_SUMMARY_FAKE_DOOR': cls.ENABLE_AI_SUMMARY_FAKE_DOOR,
             'AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT': cls.AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT,
+            'STRIPE_PUBLISHABLE_KEY': cls.STRIPE_PUBLISHABLE_KEY,
+            'STRIPE_PRICE_ID': cls.STRIPE_PRICE_ID,
+            'ENABLE_AI_SUMMARY_CHECKOUT': cls.ENABLE_AI_SUMMARY_CHECKOUT,
         }
 
 

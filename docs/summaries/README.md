@@ -46,13 +46,13 @@
 
 ### 週次のタイムライン（JST）
 
-**W1（先週）の月曜〜日曜**の日次をまとめ、**W2（翌週）の月曜**に週次を生成する（パターンAの配信目標 11:00 より前に原稿をコミット）。
+**W1（先週）の月曜〜日曜**の日次をまとめ、**W2（翌週）の月曜**に週次を生成する（パターンAの配信目標 **8:00** より前に原稿をコミット）。
 
 例: W20 = 月 **5/11** 〜 日 **5/17** をまとめ、**5/18（月）** に `weekly/2026-W20.md` を生成:
 
 1. 日曜観測日 `2026-05-17.md` が **月曜 5/18 06:50** 前後（**AI daily summary**）に揃う。
 2. **月曜 5/18 07:30** 前後に **AI weekly summary** が `weekly/2026-W20.md` を生成・コミット。
-3. 人のレビュー・配信は [`summary_pattern_a_phase1.md`](../summary_pattern_a_phase1.md) のとおり **月曜 11:00 JST**（遅延上限 12:00）を目標。
+3. 配信は [`summary_pattern_a_phase1.md`](../summary_pattern_a_phase1.md) のとおり **月曜 8:00 JST**（遅延上限 8:30）を目標。
 
 詳細: [`weekly/README.md`](weekly/README.md)
 
@@ -178,6 +178,15 @@ python scripts/generate_ai_weekly_summary.py --write --force --weekly-for-date 2
 4. 保持期間超過の行は毎日 03:00 JST の `purge_expired_snapshots` が削除（ファイルと同じカットオフ）
 
 トークン未設定の場合は publish ステップがスキップされ、従来どおり「次の deploy まで反映されない」挙動に戻るだけで生成は壊れない。
+
+### 有料メール（GHA）
+
+同じジョブの dogfood の後に `scripts/send_summary_paid_email.py --from-api` が走る。
+
+- 原稿は GHA ワークスペースの Markdown（今生成したもの）
+- 購読者は本番 `GET /api/billing/ai-summary/subscribers`（`SUMMARY_UPSERT_TOKEN`）。GHA から Fly Postgres には繋がらない
+- エンドポイント未デプロイ / トークン未設定なら **skip**（生成ジョブは落とさない）
+- 送信は dogfood と同じ Resend secrets
 
 ---
 

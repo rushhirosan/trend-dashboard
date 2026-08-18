@@ -1,0 +1,61 @@
+{# 有料サマリー Checkout: 地域3択 + 購読ボタン
+   checkout_form_prefix で ID を分離（fake door / summary CTA 等） #}
+{% set cfp = checkout_form_prefix | default('ai-summary') %}
+{% set checkout_on = ENABLE_AI_SUMMARY_CHECKOUT | default(false) %}
+{% set default_plan = checkout_default_region | default('jp') %}
+{% if checkout_locale == 'en' %}
+  {% set plan_jp_label = "Japan summaries (daily & weekly)" %}
+  {% set plan_us_label = "US summaries (daily & weekly)" %}
+  {% set plan_both_label = "Both (JP + US — 2 emails per day/week)" %}
+  {% set btn_checkout = "Subscribe" %}
+  {% set checkout_note = "Paid monthly subscription. You'll complete payment on Stripe." %}
+  {% set checkout_disclaimer = "Delivery times are targets (daily 7:30 JST, weekly Mondays 8:00 JST; delay caps apply). Gaps, delays, or missing sources can happen. Significant outages: a free month or a refund. Inbox delivery is not guaranteed." %}
+  {% set checkout_closed = "Subscription is not available yet." %}
+  {% set checkout_error = "Could not start checkout. Please try again." %}
+{% else %}
+  {% set plan_jp_label = "日本のサマリー（日次・週次）" %}
+  {% set plan_us_label = "USサマリー（日次・週次）" %}
+  {% set plan_both_label = "両方（JP + US — 日次・週次それぞれ2通）" %}
+  {% set btn_checkout = "購読する" %}
+  {% set checkout_note = "月額サブスクです。決済は Stripe で行います。" %}
+  {% set checkout_disclaimer = "配信は目標時刻です（日次 7:30 JST、週次月曜 8:00 JST。遅延上限あり）。外部データや生成処理の都合で、欠損・遅延・欠配がありえます。重大な欠配は翌月無料または返金で対応します。メール環境による未到達は保証できません。" %}
+  {% set checkout_closed = "現在、購読の受付は準備中です。" %}
+  {% set checkout_error = "決済の開始に失敗しました。しばらくしてからお試しください。" %}
+{% endif %}
+<div class="ai-summary-checkout-root"
+    data-checkout-enabled="{{ 'true' if checkout_on else 'false' }}"
+    data-checkout-default-plan="{{ default_plan }}"
+    data-checkout-error="{{ checkout_error }}"
+    data-checkout-form-prefix="{{ cfp }}">
+  {% if checkout_on %}
+  <fieldset class="mb-3">
+    <legend class="form-label small mb-2">{% if checkout_locale == 'en' %}Email region{% else %}受け取るサマリー{% endif %}</legend>
+    <div class="form-check small">
+      <input class="form-check-input ai-summary-region-plan" type="radio"
+          name="{{ cfp }}-region-plan" id="{{ cfp }}-plan-jp" value="jp"
+          {% if default_plan == 'jp' %}checked{% endif %}>
+      <label class="form-check-label" for="{{ cfp }}-plan-jp">{{ plan_jp_label }}</label>
+    </div>
+    <div class="form-check small">
+      <input class="form-check-input ai-summary-region-plan" type="radio"
+          name="{{ cfp }}-region-plan" id="{{ cfp }}-plan-us" value="us"
+          {% if default_plan == 'us' %}checked{% endif %}>
+      <label class="form-check-label" for="{{ cfp }}-plan-us">{{ plan_us_label }}</label>
+    </div>
+    <div class="form-check small">
+      <input class="form-check-input ai-summary-region-plan" type="radio"
+          name="{{ cfp }}-region-plan" id="{{ cfp }}-plan-both" value="both"
+          {% if default_plan == 'both' %}checked{% endif %}>
+      <label class="form-check-label" for="{{ cfp }}-plan-both">{{ plan_both_label }}</label>
+    </div>
+  </fieldset>
+  <p class="small text-muted mb-1">{{ checkout_note }}</p>
+  <p class="small text-muted mb-2">{{ checkout_disclaimer }}</p>
+  <button type="button" class="btn btn-primary btn-sm ai-summary-checkout-btn" id="{{ cfp }}-checkout-btn">
+    {{ btn_checkout }}
+  </button>
+  {% else %}
+  <p class="small text-muted mb-0">{{ checkout_closed }}</p>
+  {% endif %}
+  <div class="alert alert-danger py-2 px-2 small mb-0 mt-2 d-none ai-summary-checkout-error" role="alert"></div>
+</div>

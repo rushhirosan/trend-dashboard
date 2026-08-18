@@ -149,7 +149,7 @@
                             <li class="mb-1">{% if is_us %}Detailed rank moves per topic (7:00 → 13:00 → 19:00){% else %}各トピックの詳しい順位推移（7時 → 13時 → 19時）{% endif %}</li>
                         </ul>
                         <p class="small text-muted mb-0">
-                            {% if is_us %}Full daily briefs and weekly roundups are planned to be delivered by email at set times (paid, launch TBD).{% else %}日次の全文と週次まとめは、決まった時間にメールでお届けする予定です（有料・開始時期未定）。{% endif %}
+                            {% if is_us %}Full daily briefs (~7:30 JST) and weekly roundups (Mondays ~8:00 JST)—yesterday's trends before you start your day.{% else %}日次全文（毎朝7:30 JST頃）と週次まとめ（月曜8:00 JST頃）—出勤前に昨日・先週のトレンドをチェック。{% endif %}
                         </p>
                         {% include 'partials/summary_email_cta.html' %}
                     </div>
@@ -188,5 +188,6 @@
     </footer>
 
     <script defer src="{{ url_for('static', filename='vendor/bootstrap/5.1.3/bootstrap.bundle.min.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/ai-summary-checkout.js') }}?v=20260818-checkout"></script>
 </body>
 </html>

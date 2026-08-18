@@ -164,7 +164,7 @@
                             <li class="mb-1">{% if is_us %}Within-week rank moves (day-by-day){% else %}週内の順位推移（日別の並び）{% endif %}</li>
                         </ul>
                         <p class="small text-muted mb-0">
-                            {% if is_us %}Full weekly briefs are planned to be delivered by email at a set time each week (paid, launch TBD).{% else %}週次の全文は、毎週決まった時間にメールでお届けする予定です（有料・開始時期未定）。{% endif %}
+                            {% if is_us %}Full weekly briefs by email on Mondays around 8:00 JST—last week's trends before you start your day.{% else %}週次全文は毎週月曜8:00 JST頃—出勤前に先週のトレンドをチェック。{% endif %}
                         </p>
                         {% include 'partials/summary_email_cta.html' %}
                     </div>
@@ -200,5 +200,6 @@
     </footer>
 
     <script defer src="{{ url_for('static', filename='vendor/bootstrap/5.1.3/bootstrap.bundle.min.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/ai-summary-checkout.js') }}?v=20260818-checkout"></script>
 </body>
 </html>

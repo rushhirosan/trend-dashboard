@@ -18,6 +18,7 @@ from routes.trend_routes import trend_bp
 from routes.data_routes import data_bp
 from services.subscription.subscription_routes import subscription_bp
 from routes.waitlist_routes import waitlist_bp
+from routes.billing_routes import billing_bp
 from services.scheduler.scheduler_manager import TrendsScheduler
 from utils.logger_config import get_logger
 
@@ -90,6 +91,12 @@ def create_app():
         logger.info("✅ waitlist_bp Blueprint登録完了")
     except Exception as e:
         logger.error(f"❌ waitlist_bp登録エラー: {e}", exc_info=True)
+
+    try:
+        app.register_blueprint(billing_bp)
+        logger.info("✅ billing_bp Blueprint登録完了")
+    except Exception as e:
+        logger.error(f"❌ billing_bp登録エラー: {e}", exc_info=True)
     
     # データベースを初期化（接続失敗時は警告のみでアプリは起動を続行）
     cache = None
@@ -209,6 +216,7 @@ def create_app():
                     allow_draft=AppConfig.AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT,
                 ),
             }
+        from services.billing.stripe_service import checkout_enabled
         return {
             'public_base_url': AppConfig.PUBLIC_BASE_URL,
             'ENABLE_SUBSCRIPTION_UI': AppConfig.ENABLE_SUBSCRIPTION_UI,
@@ -217,6 +225,7 @@ def create_app():
             'AI_SUMMARY_MOCK': ai_summary_mock,
             'ENABLE_AI_SUMMARY_FAKE_DOOR': AppConfig.ENABLE_AI_SUMMARY_FAKE_DOOR,
             'AI_SUMMARY_FAKE_DOOR': ai_summary_fake_door,
+            'ENABLE_AI_SUMMARY_CHECKOUT': checkout_enabled(),
         }
 
     @app.before_request

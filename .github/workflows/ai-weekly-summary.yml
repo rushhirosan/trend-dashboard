@@ -85,3 +85,23 @@ jobs:
             exit 0
           fi
           python scripts/send_summary_dogfood_email.py --kind weekly --regions jp,us
+
+      # 有料購読者へ（dogfood の後）。購読者は本番 API（SUMMARY_UPSERT_TOKEN）。
+      - name: Paid subscriber email (weekly)
+        if: always()
+        env:
+          EMAIL_PROVIDER: resend
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
+          TREND_DASHBOARD_BASE_URL: https://trends-dashboard.com
+          SUMMARY_UPSERT_TOKEN: ${{ secrets.SUMMARY_UPSERT_TOKEN }}
+        run: |
+          if [ -z "$RESEND_API_KEY" ] || [ -z "$RESEND_FROM_EMAIL" ]; then
+            echo "::notice::paid email skipped (set secrets RESEND_API_KEY + RESEND_FROM_EMAIL)"
+            exit 0
+          fi
+          if [ -z "$SUMMARY_UPSERT_TOKEN" ]; then
+            echo "::notice::paid email skipped (set secret SUMMARY_UPSERT_TOKEN)"
+            exit 0
+          fi
+          python scripts/send_summary_paid_email.py --kind weekly --from-api

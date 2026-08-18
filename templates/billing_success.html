@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>購読完了 — Trends Dashboard</title>
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
+    {% include 'partials/vendor_assets.html' %}
+    <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8 col-lg-6">
+                <div class="card shadow-sm">
+                    <div class="card-body p-4">
+                        <h1 class="h4 mb-3">ご購読ありがとうございます</h1>
+                        <p class="mb-3">決済が完了しました。選択した地域のサマリーを、日次・週次の目標時刻でメールします。</p>
+                        <p class="small text-muted mb-2">目標は日次 7:30 JST（上限 8:00）、週次は月曜 8:00 JST（上限 8:30）です。欠損・遅延・欠配がありえます。重大な欠配は翌月無料または返金で対応します。</p>
+                        <p class="small text-muted mb-4">反映まで数分かかる場合があります。届かない場合は迷惑メールフォルダもご確認ください。受信側の未到達は保証できません。</p>
+                        <a href="/" class="btn btn-primary btn-sm">ダッシュボードへ戻る</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

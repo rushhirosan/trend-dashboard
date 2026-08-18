@@ -129,3 +129,15 @@ def test_jp_noto_preload_fetchpriority():
     jp_font = (TEMPLATES / "partials" / "jp_web_font.html").read_text(encoding="utf-8")
     assert "fetchpriority" in jp_font
     assert "noto-optional" in jp_font or "20260627-noto-optional" in jp_font
+
+
+def test_category_tabs_have_roving_tabindex_and_keyboard_helper():
+    jp = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    us = (TEMPLATES / "us_trends.html").read_text(encoding="utf-8")
+    js = (ROOT / "static" / "js" / "app-common.js").read_text(encoding="utf-8")
+    assert 'id="tab-all"' in jp and 'tabindex="0"' in jp
+    assert 'id="tab-news"' in jp and 'tabindex="-1"' in jp
+    assert 'id="tab-all"' in us and 'tabindex="0"' in us
+    assert "setupTrendCategoryTabKeyboard" in js
+    assert "ArrowRight" in js
+    assert "ArrowLeft" in js

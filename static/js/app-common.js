@@ -1397,3 +1397,69 @@ if (document.readyState === 'loading') {
 } else {
     setupCategoryAccordionObserver(5);
 }
+
+/**
+ * カテゴリタブ: Tab ではアクティブ1つだけ、←→ / Home / End で隣へ。
+ * Bootstrap 5.1 Tab には矢印キー実装がないため自前で足す。
+ */
+function setupTrendCategoryTabKeyboard() {
+    var tablist = document.getElementById('trendCategoryTabs');
+    if (!tablist) return;
+
+    function tabButtons() {
+        return Array.prototype.slice.call(tablist.querySelectorAll('[role="tab"]'));
+    }
+
+    function syncTabindex(active) {
+        tabButtons().forEach(function (tab) {
+            var on = tab === active;
+            tab.setAttribute('tabindex', on ? '0' : '-1');
+        });
+    }
+
+    function activate(tab) {
+        if (!tab) return;
+        if (window.bootstrap && bootstrap.Tab) {
+            bootstrap.Tab.getOrCreateInstance(tab).show();
+        } else {
+            tab.click();
+        }
+        tab.focus();
+    }
+
+    syncTabindex(tablist.querySelector('[role="tab"].active') || tabButtons()[0]);
+
+    tablist.addEventListener('shown.bs.tab', function (e) {
+        if (e.target && e.target.getAttribute('role') === 'tab') {
+            syncTabindex(e.target);
+        }
+    });
+
+    tablist.addEventListener('keydown', function (e) {
+        var current = e.target && e.target.closest('[role="tab"]');
+        if (!current || !tablist.contains(current)) return;
+        var list = tabButtons();
+        var i = list.indexOf(current);
+        if (i < 0) return;
+        var next = null;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+            next = list[(i + 1) % list.length];
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+            next = list[(i - 1 + list.length) % list.length];
+        } else if (e.key === 'Home') {
+            next = list[0];
+        } else if (e.key === 'End') {
+            next = list[list.length - 1];
+        } else {
+            return;
+        }
+        e.preventDefault();
+        activate(next);
+    });
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupTrendCategoryTabKeyboard);
+} else {
+    setupTrendCategoryTabKeyboard();
+}

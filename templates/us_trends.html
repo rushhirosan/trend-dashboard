@@ -47,7 +47,7 @@
     {% include 'partials/us_web_font.html' %}
     <!-- Performance Optimization: Preload critical CSS -->
     <link rel="preload" href="{{ url_for('static', filename='css/common.css') }}" as="style">
-    <link rel="preload" href="{{ url_for('static', filename='css/main.css') }}?v=20260819-header-tint" as="style">
+    <link rel="preload" href="{{ url_for('static', filename='css/main.css') }}?v=20260819-tab-keyboard" as="style">
     
     <!-- Structured Data (JSON-LD) -->
     <script type="application/ld+json">
@@ -115,7 +115,7 @@
     <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
     {% set async_css_href = url_for('static', filename='css/trends.css') + '?v=20260728-amazon-row-action' %}
     {% include 'partials/async_stylesheet.html' %}
-    <link href="{{ url_for('static', filename='css/main.css') }}?v=20260819-header-tint" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/main.css') }}?v=20260819-tab-keyboard" rel="stylesheet">
     <!-- data-status.css, subscription.css は /data-status, /subscription 専用。USトレンドには不要（日本ページと同じレイアウトにするため） -->
     {% set async_css_href = url_for('static', filename='css/us-trends.css') + '?v=20260819-header-compact' %}
     {% include 'partials/async_stylesheet.html' %}
@@ -221,27 +221,27 @@
             <section id="trends" aria-label="Trend information">
                 <!-- Category tabs (horizontal scroll on mobile) -->
                 <div class="trend-tabs-wrapper trend-tabs-compact">
-                    <ul class="nav nav-tabs trend-category-tabs flex-nowrap" id="trendCategoryTabs" role="tablist">
+                    <ul class="nav nav-tabs trend-category-tabs flex-nowrap" id="trendCategoryTabs" role="tablist" aria-orientation="horizontal">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="tab-all" data-bs-toggle="tab" data-bs-target="#pane-all" type="button" role="tab" aria-controls="pane-all" aria-selected="true">All</button>
+                            <button class="nav-link active" id="tab-all" data-bs-toggle="tab" data-bs-target="#pane-all" type="button" role="tab" tabindex="0" aria-controls="pane-all" aria-selected="true">All</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="tab-news" data-bs-toggle="tab" data-bs-target="#pane-news" type="button" role="tab" aria-controls="pane-news" aria-selected="false">News</button>
+                            <button class="nav-link" id="tab-news" data-bs-toggle="tab" data-bs-target="#pane-news" type="button" role="tab" tabindex="-1" aria-controls="pane-news" aria-selected="false">News</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="tab-search" data-bs-toggle="tab" data-bs-target="#pane-search" type="button" role="tab" aria-controls="pane-search" aria-selected="false">Search & Video</button>
+                            <button class="nav-link" id="tab-search" data-bs-toggle="tab" data-bs-target="#pane-search" type="button" role="tab" tabindex="-1" aria-controls="pane-search" aria-selected="false">Search & Video</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="tab-tech" data-bs-toggle="tab" data-bs-target="#pane-tech" type="button" role="tab" aria-controls="pane-tech" aria-selected="false">Tech</button>
+                            <button class="nav-link" id="tab-tech" data-bs-toggle="tab" data-bs-target="#pane-tech" type="button" role="tab" tabindex="-1" aria-controls="pane-tech" aria-selected="false">Tech</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="tab-market" data-bs-toggle="tab" data-bs-target="#pane-market" type="button" role="tab" aria-controls="pane-market" aria-selected="false">Market</button>
+                            <button class="nav-link" id="tab-market" data-bs-toggle="tab" data-bs-target="#pane-market" type="button" role="tab" tabindex="-1" aria-controls="pane-market" aria-selected="false">Market</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="tab-entertainment" data-bs-toggle="tab" data-bs-target="#pane-entertainment" type="button" role="tab" aria-controls="pane-entertainment" aria-selected="false">Entertainment</button>
+                            <button class="nav-link" id="tab-entertainment" data-bs-toggle="tab" data-bs-target="#pane-entertainment" type="button" role="tab" tabindex="-1" aria-controls="pane-entertainment" aria-selected="false">Entertainment</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="tab-govdata" data-bs-toggle="tab" data-bs-target="#pane-govdata" type="button" role="tab" aria-controls="pane-govdata" aria-selected="false">Gov Data</button>
+                            <button class="nav-link" id="tab-govdata" data-bs-toggle="tab" data-bs-target="#pane-govdata" type="button" role="tab" tabindex="-1" aria-controls="pane-govdata" aria-selected="false">Gov Data</button>
                         </li>
                     </ul>
                 </div>
@@ -2665,7 +2665,7 @@
     {% include 'partials/dashboard_summary_height_sync.html' %}
     <!-- Phase1 perf: defer preserves order; runs after parse, before DOMContentLoaded -->
     <script defer src="{{ url_for('static', filename='vendor/bootstrap/5.1.3/bootstrap.bundle.min.js') }}"></script>
-    <script defer src="{{ url_for('static', filename='js/app-common.js') }}?v=20260728-amazon-row-action"></script>
+    <script defer src="{{ url_for('static', filename='js/app-common.js') }}?v=20260819-tab-keyboard"></script>
     <script defer src="{{ url_for('static', filename='js/view-preferences.js') }}?v=20260401-toolbar-mount-opacity"></script>
     <script defer src="{{ url_for('static', filename='js/display-functions.js') }}?v=20260728-amazon-row-action"></script>
     <script defer src="{{ url_for('static', filename='js/us-trends.js') }}?v=20260728-amazon-row-action"></script>

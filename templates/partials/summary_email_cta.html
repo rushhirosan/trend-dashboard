@@ -17,9 +17,9 @@
       </div>
       <div class="modal-body">
         {% if cta_is_us %}
-        <p class="small mb-3">Yesterday's and last week's trends before work. Target: daily around 7:30 JST (by 8:00); weekly Mondays around 8:00 JST. Times are not guaranteed.</p>
+        <p class="small mb-3">Yesterday's and last week's trends, daily and weekly. Target: around 7:30 JST (by 8:00); weekly Mondays around 8:00 JST. Times are not guaranteed.</p>
         {% else %}
-        <p class="small mb-3">昨日・先週のトレンドを出勤前に。目標は日次 7:30 JST頃（上限 8:00）、週次は月曜 8:00 JST頃。時刻は保証ではありません。</p>
+        <p class="small mb-3">昨日・先週のトレンドをまとめた日次・週次配信です。目標は日次 7:30 JST頃（上限 8:00）、週次は月曜 8:00 JST頃。時刻は保証ではありません。</p>
         {% endif %}
         {% with checkout_form_prefix='ai-summary-cta', checkout_locale=('en' if cta_is_us else 'ja'), checkout_default_region=('us' if cta_is_us else 'jp') %}
         {% include 'partials/ai_summary_checkout_form.html' %}

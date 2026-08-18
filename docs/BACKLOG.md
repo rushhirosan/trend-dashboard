@@ -53,12 +53,12 @@ dogfood 配信は回っている。GHA 有料送信ステップは追加済み�
 
 | # | タスク | 状態 | やること |
 |---|--------|------|----------|
-| 1 | **有料配信 GHA 連携** | 実装済（未デプロイ） | dogfood の後に `send_summary_paid_email.py --from-api`。購読者は `GET /api/billing/ai-summary/subscribers`（`SUMMARY_UPSERT_TOKEN`）。**Fly にエンドポイントを載せてから** 本番送信が有効 |
-| 2 | **有料メールのローカル確認** | 未 | `python scripts/send_summary_paid_email.py --kind daily --dry-run` → 実送信で `rushhirosan@gmail.com`（`region_plan=jp`）に届くか確認。件名に `(dogfood)` が付かないこと |
-| 3 | **変更を commit** | 未 | Stripe / billing / UI / tests / docs をまとめてコミット |
-| 4 | **Fly 本番デプロイ** | 未 | `STRIPE_*` / `ENABLE_AI_SUMMARY_CHECKOUT=true` / `PUBLIC_BASE_URL=https://trends-dashboard.com`。購読者 API もこのデプロイに含む |
-| 5 | **本番 Webhook** | 未 | Stripe Dashboard で `https://trends-dashboard.com/api/billing/stripe/webhook` を登録。`checkout.session.completed` / `customer.subscription.deleted` |
-| 6 | **本番で初回課金 → 有料メール受信** | 一部 | ローカルでは Checkout + DB 登録済。**本番 DB に購読者が載り、GHA が有料メールを送る**までが残り |
+| 1 | **有料配信 GHA 連携** | 済 | dogfood の後に `--from-api`。購読者 API は 2026-08-19 デプロイ済 |
+| 2 | **有料メールのローカル確認** | 未 | `--dry-run` → 実送信。件名に `(dogfood)` が付かないこと |
+| 3 | **変更を commit** | 済 | 2026-08-19 `--ship` |
+| 4 | **Fly 本番デプロイ** | コード済 / **secrets 未** | Checkout が「準備中」なのは `STRIPE_SECRET_KEY` + `STRIPE_PRICE_ID` が Fly に無いため。Waitlist 待ちではない。**今すぐ** `fly secrets set` すれば受付開始 |
+| 5 | **本番 Webhook** | 未 | `https://trends-dashboard.com/api/billing/stripe/webhook` |
+| 6 | **本番で初回課金 → 有料メール受信** | 一部 | secrets + Webhook のあと、本番 Checkout で購読者を載せる |
 
 10人・継続率は入り口の条件ではない。動いてから限定で広げる。
 
@@ -149,9 +149,9 @@ JP/US ダッシュボードそれぞれの Fake door では、**その地域を�
 
 **公開タイミングのイメージ**
 
-- 日次: 観測日 D のスナップショットが揃い、**D+1 朝**に生成（06:50 前後）→ メール全文は **7:30 JST 目標**（出勤前に昨日分）
-- 週次: 先週 W1 を **翌週月曜 W2 朝**に生成（07:30 前後）→ メール全文は **月曜 8:00 JST 目標**
-- 表現は「今日のサマリー」ではなく **「昨日のトレンドまとめ」「先週のトレンドまとめ」**（観測日・生成日時を明示）
+- 日次: 観測日 D のスナップショットが揃い、**D+1 朝**に生成（06:50 前後）→ 全文は **7:30 JST 目標**
+- 週次: 先週 W1 を **翌週月曜 W2 朝**に生成（07:30 前後）→ 全文は **月曜 8:00 JST 目標**
+- 表現は「今日のサマリー」ではなく **「昨日のトレンドまとめ」「先週のトレンドまとめ」**（観測日・生成日時を明示）。ユーザー向け文言に「出勤前」「メールです」は使わない
 
 #### 日次: プレビュー vs 全文
 
@@ -310,7 +310,7 @@ dogfood は `draft` のまま自分宛に送っている。公開・有料の ap
 | **B** note/Substack | 媒体決定 → 5本投稿 → CTA + UTM |
 | **C** B2B | 1枚提案 → サンプル配信 → 契約1件 |
 | **D** 寄付 | BMC 本番 username / 特典ルール |
-| **E** タイムボックス | 7:30 / 月8:00 を商品文に明記（出勤前・昨日/先週）— Checkout 免責まで実装済 |
+| **E** タイムボックス | 7:30 / 月8:00 を目標時刻として商品文に明記（昨日/先週）。出勤前とは書かない |
 
 ### マネタイズ案（参照）
 
@@ -480,6 +480,7 @@ dogfood は `draft` のまま自分宛に送っている。公開・有料の ap
 | 2026-08-18 | **2b の残り:** GHA に `send_summary_paid_email.py`、commit/deploy、本番 Webhook。有料メール受信が 2b 完了の判定。 |
 | 2026-08-18 | **配信は目標であり保証しない。** 日次欠配1回は課金を触らない。週次欠配 or 月内の日次複数欠配は Dashboard で翌月無料 or 返金。受信側未到達は対象外。Stripe 期間延長は使わない。 |
 | 2026-08-19 | 有料配信の GHA は **DB 直結しない**。本番アプリの購読者 API + ワークスペースの Markdown + Resend。 |
+| 2026-08-19 | ユーザー向け文言から **「出勤前」「メールです」を外す**。時刻は目標のみ。Checkout 受付開始は Waitlist 待ちではなく **Fly に Stripe secrets を入れたとき**。 |
 
 ### KPI（週次記録用）
 

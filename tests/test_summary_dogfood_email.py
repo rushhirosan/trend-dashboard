@@ -10,9 +10,11 @@ from services.summary.summary_dogfood_email import (
     send_summary_dogfood,
 )
 from services.summary.summary_markdown_email import (
+    append_summary_email_footer,
     load_summary_email_bodies,
     markdown_to_email_text,
     summary_markdown_path,
+    world_front_page_email_url,
 )
 
 
@@ -68,6 +70,46 @@ def test_load_summary_email_bodies_daily(tmp_path: Path):
     assert "<h1>" in html
     assert '<a href="https://ex.com">a</a>' in html
     assert "<strong>bold</strong>" in html
+    assert "World Front Page" in text
+    assert "g7-dashboard.vercel.app" in text
+    assert "utm_medium=summary_email" in text
+    assert "utm_content=daily" in html
+    assert "G7・中国・インド" in html
+
+
+def test_load_summary_email_bodies_us_footer(tmp_path: Path):
+    daily = tmp_path / "daily" / "us"
+    daily.mkdir(parents=True)
+    (daily / "2026-07-22.md").write_text(
+        "---\nstatus: draft\n---\n\n# Hello\n",
+        encoding="utf-8",
+    )
+    _, text, html = load_summary_email_bodies(
+        "daily", "2026-07-22", region="us", summaries_root=tmp_path
+    )
+    assert "Related: Top headlines from G7 countries" in text
+    assert "G7, China & India" in html
+    assert "utm_campaign=us" in html
+
+
+def test_world_front_page_email_url():
+    url = world_front_page_email_url(region="jp", kind="weekly")
+    assert url.startswith("https://g7-dashboard.vercel.app/?")
+    assert "utm_campaign=jp" in url
+    assert "utm_content=weekly" in url
+
+
+def test_append_summary_email_footer():
+    text, html = append_summary_email_footer(
+        "body\n",
+        "<html><body><h1>x</h1></body></html>",
+        region="jp",
+        kind="daily",
+    )
+    assert "World Front Page" in text
+    assert "g7-dashboard.vercel.app" in text
+    assert "World Front Page</a>" in html
+    assert html.index("<hr") < html.index("</body>")
 
 
 def test_send_summary_dogfood_dry_run(monkeypatch):

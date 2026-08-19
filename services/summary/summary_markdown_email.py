@@ -14,6 +14,19 @@ from urllib.parse import parse_qs, quote_plus, urlencode, urlparse, urlunparse
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SUMMARIES_ROOT = _REPO_ROOT / "docs" / "summaries"
 
+WORLD_FRONT_PAGE_BASE = "https://g7-dashboard.vercel.app/"
+
+_FOOTER_COPY = {
+    "jp": {
+        "text": "関連: 世界9カ国のニュース表紙 → World Front Page\n{url}",
+        "html": "関連: {link} — G7・中国・インドの主要メディア表紙見出し",
+    },
+    "us": {
+        "text": "Related: Top headlines from G7 countries → World Front Page\n{url}",
+        "html": "Related: {link} — Top headlines from G7, China & India",
+    },
+}
+
 _FRONTMATTER_RE = re.compile(r"^---\s*\n.*?\n---\s*\n", re.DOTALL)
 _IMAGE_LINE_RE = re.compile(r"^!\[[^\]]*\]\([^)]+\)\s*\n?", re.MULTILINE)
 _MERMAID_BLOCK_RE = re.compile(r"```mermaid[\s\S]*?```\s*\n?", re.MULTILINE)
@@ -335,6 +348,51 @@ def markdown_to_email_html(
     )
 
 
+def world_front_page_email_url(*, region: str, kind: str) -> str:
+    """サマリーメールフッター用の World Front Page URL（効果測定用 UTM 付き）。"""
+    region_n = (region or "jp").strip().lower()
+    kind_n = (kind or "daily").strip().lower()
+    params = urlencode(
+        {
+            "utm_source": "trends_dashboard",
+            "utm_medium": "summary_email",
+            "utm_campaign": region_n,
+            "utm_content": kind_n,
+        }
+    )
+    return f"{WORLD_FRONT_PAGE_BASE}?{params}"
+
+
+def append_summary_email_footer(
+    text: str,
+    html_body: str,
+    *,
+    region: str,
+    kind: str,
+) -> Tuple[str, str]:
+    """配信メール末尾に World Front Page（G7 Dashboard）へのリンクを付ける。"""
+    region_n = (region or "jp").strip().lower()
+    if region_n not in _FOOTER_COPY:
+        region_n = "jp"
+    url = world_front_page_email_url(region=region_n, kind=kind)
+    copy = _FOOTER_COPY[region_n]
+    text_out = text.rstrip() + "\n\n---\n" + copy["text"].format(url=url) + "\n"
+    link = (
+        f'<a href="{html.escape(url, quote=True)}">World Front Page</a>'
+    )
+    footer_html = (
+        '<hr style="border:none;border-top:1px solid #ddd;margin:2em 0 1em;">'
+        f'<p style="font-size:0.9em;color:#666;margin:0;">'
+        f"{copy['html'].format(link=link)}"
+        "</p>"
+    )
+    if "</body>" in html_body:
+        html_out = html_body.replace("</body>", f"{footer_html}\n</body>", 1)
+    else:
+        html_out = html_body.rstrip() + "\n" + footer_html
+    return text_out, html_out
+
+
 def summary_markdown_path(
     kind: str,
     doc_id: str,
@@ -376,4 +434,9 @@ def load_summary_email_bodies(
             title = f"日次サマリー — {doc_id} ({region_u})"
         else:
             title = f"週次サマリー — {doc_id} ({region_u})"
-    return path, markdown_to_email_text(raw), markdown_to_email_html(raw, title=title)
+    text = markdown_to_email_text(raw)
+    html_body = markdown_to_email_html(raw, title=title)
+    text, html_body = append_summary_email_footer(
+        text, html_body, region=region, kind=kind
+    )
+    return path, text, html_body

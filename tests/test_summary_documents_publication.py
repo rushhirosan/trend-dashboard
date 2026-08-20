@@ -69,6 +69,60 @@ def test_load_daily_page_prefers_db(daily_dir, monkeypatch):
     assert "DB版の一行結論です。" in page["one_liner"]
 
 
+def test_load_daily_page_mechanical_preview_lead(daily_dir):
+    day = _recent_day()
+    md = f"""---
+status: draft
+generator: mechanical
+business_day: "{day}"
+preview_lead: "機械生成の Web リードです。"
+snapshot_slots_included: ["07", "13", "19", "01"]
+---
+
+# 日次サマリー — {day}
+
+## 📈 昨日いちばん動いた3つ
+
+1. [Topic A](https://example.com/a)（Source）
+"""
+    (daily_dir / f"{day}.md").write_text(md, encoding="utf-8")
+
+    page = summary_pages.load_daily_page(day, region="jp", allow_draft=True)
+    assert page is not None
+    assert "機械生成の Web リードです。" in page["one_liner"]
+
+
+def test_load_weekly_page_mechanical_preview_lead(tmp_path, monkeypatch):
+    weekly_dir = tmp_path / "weekly"
+    weekly_dir.mkdir()
+    monkeypatch.setattr(summary_pages, "_WEEKLY_DIR", weekly_dir)
+    monkeypatch.setattr(summary_store, "get_document", lambda *a, **k: None)
+    monkeypatch.setattr(summary_store, "list_documents", lambda *a, **k: [])
+
+    d = datetime.now(JST).date() - timedelta(days=3)
+    y, w, _ = d.isocalendar()
+    week_id = f"{y}-W{w:02d}"
+    md = f"""---
+status: draft
+generator: mechanical
+iso_week: "{week_id}"
+week_range_jst: "2026-01-01 〜 2026-01-07"
+preview_lead: "機械生成の週次リードです。"
+---
+
+# 週次サマリー — {week_id}
+
+## 📈 先週いちばん動いた話題
+
+1. [Topic A](https://example.com/a)（Source）
+"""
+    (weekly_dir / f"{week_id}.md").write_text(md, encoding="utf-8")
+
+    page = summary_pages.load_weekly_page(week_id, region="jp", allow_draft=True)
+    assert page is not None
+    assert "機械生成の週次リード" in str(page["flow"]["jp"])
+
+
 def test_load_daily_page_outside_retention_returns_none(daily_dir):
     old_day = _recent_day(days_ago=30)
     (daily_dir / f"{old_day}.md").write_text(_daily_md(old_day, "古い原稿です。"), encoding="utf-8")

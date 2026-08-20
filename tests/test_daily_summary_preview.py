@@ -185,3 +185,32 @@ def test_preview_for_fake_door_fallback():
         assert len(data["teaser"]) <= 90
     else:
         assert "準備中" in data["headline"]
+
+
+SAMPLE_MECHANICAL = """---
+status: draft
+business_day: "2026-06-10"
+generator: mechanical
+teaser: "ニュース首位の短いリード。"
+preview_lead: "ニュース首位の話題が一日を通して上位に。"
+snapshot_slots_included: ["07", "13", "19", "01"]
+---
+
+# 日次サマリー — 2026-06-10（JST）
+
+## 📈 昨日いちばん動いた3つ
+
+1. [Topic](https://example.com)（Source）
+"""
+
+
+def test_load_mechanical_uses_preview_lead_when_no_body_one_liner(tmp_path: Path):
+    daily = tmp_path / "daily"
+    daily.mkdir()
+    (daily / "2026-06-10.md").write_text(SAMPLE_MECHANICAL, encoding="utf-8")
+    preview = load_latest_daily_preview(
+        daily_dir=daily, delivery_day=date(2026, 6, 11), allow_draft=True
+    )
+    assert preview is not None
+    assert "ニュース首位の話題" in preview.one_liner
+    assert preview.display_teaser() == "ニュース首位の短いリード。"

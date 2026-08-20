@@ -140,31 +140,29 @@ python scripts/generate_ai_daily_summary.py --write --force --business-day 2026-
 python scripts/generate_ai_daily_summary.py --from-api --write --force
 ```
 
-生成ファイルはフロントマターに `generator: openai` を付ける。本文は **昨日の注目（1トピック）→ 急上昇3つ（機械+AI補足）→ 複数ソース重なり（該当時のみ）→ カテゴリ別トップ3（機械・アフィ短縮・マーケット圧縮）→ フッターに対象ソース注記**。成否は **`daily/README.md`** のとおり **`*.generation.json`** で確認。**レビュー後に `approved` にするまで配信に使わない。**
+生成ファイルはフロントマターに `generator: mechanical`（既定）を付ける。本文は **急上昇3つ（機械+順位補足）→ 複数ソース重なり（該当時のみ）→ カテゴリ別トップ3（機械・アフィ短縮・マーケット圧縮）→ フッターに対象ソース注記**（「昨日の注目」はメール本文に含めず、Web 用は `teaser` / `preview_lead`）。成否は **`daily/README.md`** のとおり **`*.generation.json`** で確認。**レビュー後に `approved` にするまで配信に使わない。**
 
 ---
 
-## AI 週次サマリー（日次 Markdown ×7 → OpenAI）
+## AI 週次サマリー（スナップショット ×7 → 機械生成）
 
-`scripts/generate_ai_weekly_summary.py` は **対象週の月〜日それぞれ** `docs/summaries/daily/{YYYY-MM-DD}.md` を探して最大7件読むだけで、DB や公開トレンド API・スナップショットには触れない。日次の `YYYY-MM-DD` は **観測日（business_day）**（[`weekly/README.md`](weekly/README.md)）。`gpt-4o-mini`（`OPENAI_SUMMARY_MODEL` で変更可）で `docs/summaries/weekly/YYYY-Www.md`（週次＋週のホットトピックを1ファイル）を生成する。
+`scripts/generate_ai_weekly_summary.py` は **対象週の月〜日** の `trend_daily_snapshots` を集計し、
+`docs/summaries/weekly/YYYY-Www.md` を **機械生成**（既定・OpenAI 不使用）する。詳細は [`weekly/README.md`](weekly/README.md)。
 
-- **既定の対象週**: JST の **直前に終了した ISO 週**（月曜始まり7日分の観測日ファイルを期待）。
-- **`--weekly-for-date YYYY-MM-DD`**: その日を含む ISO 週をまとめる（`scaffold_summary_drafts.py --weekly-for-date` と同じ週の取り方）。
-- **Secrets（GHA）**: `OPENAI_API_KEY` のみ（`DATABASE_URL` は不要）。GitHub Actions: `.github/workflows/ai-weekly-summary.yml`（タイムラインは上記「週次のタイムライン」）。
-- **手元**: `.env` に `OPENAI_API_KEY`。`--dry-run` でキーなしのときは読み込みマニフェストとロールアップ先頭のみ（課金なし）。
+- **既定の対象週**: JST の **直前に終了した ISO 週**。
+- **`--weekly-for-date YYYY-MM-DD`**: その日を含む ISO 週をまとめる。
+- **`--use-llm`**: 従来の OpenAI 編集 JSON（メール本文から編集セクションは除外）。
+- GitHub Actions: `.github/workflows/ai-weekly-summary.yml`（タイムラインは上記「週次のタイムライン」）。
 
 ```bash
-# マニフェストのみ（API 課金なし）
-python scripts/generate_ai_weekly_summary.py --dry-run --weekly-for-date 2026-05-14
-
-# 標準出力へ全文（課金あり）
-python scripts/generate_ai_weekly_summary.py --weekly-for-date 2026-05-14
+# 標準出力へ全文（OpenAI 不要）
+python scripts/generate_ai_weekly_summary.py --from-api --weekly-for-date 2026-05-14
 
 # ファイルへ（既存は --force で上書き）
-python scripts/generate_ai_weekly_summary.py --write --force --weekly-for-date 2026-05-14
+python scripts/generate_ai_weekly_summary.py --from-api --write --force --weekly-for-date 2026-05-14
 ```
 
-生成ファイルはフロントマターに `generator: openai` と欠損日一覧を付ける。**レビュー後に `approved` にするまで配信に使わない。**
+生成ファイルはフロントマターに `generator: mechanical`（既定）を付ける。**レビュー後に `approved` にするまで配信に使わない。**
 
 ---
 

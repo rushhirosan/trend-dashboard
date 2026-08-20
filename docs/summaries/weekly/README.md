@@ -9,11 +9,16 @@
 
 ## 構成（1枚向け・単一地域）
 
-1. **先週の流れ / Last week in review** — OpenAI（週としての1本線。日次の列挙にしない）
-2. **先週いちばん動いた話題 / Biggest movers** — 週内で実質ジャンプしたものだけ（横ばい除外）
-3. **週のホットトピック / Hot topics** — 厳選・上限5（OpenAI。理由はラベルなし本文のみ。見出しリンクは機械付与）
-4. **来週に残る論点 / What to watch next week** — 2〜3点（OpenAI）
-5. **カテゴリ別 — 先週の top3 / Category top3** — 日次カテゴリ top3 の週次集約（機械）
+1. **先週いちばん動いた話題 / Biggest movers** — 週内で実質ジャンプしたものだけ（横ばい除外・機械）
+2. **カテゴリ別 — 先週の top3 / Category top3** — 日次カテゴリ top3 の週次集約（機械）
+
+メール本文に含めない（Web 用は frontmatter の `teaser` / `preview_lead`）:
+
+- ~~先週の流れ / Last week in review~~（旧: OpenAI）
+- ~~週のホットトピック / Hot topics~~（旧: OpenAI）
+- ~~来週に残る論点 / What to watch next week~~（旧: OpenAI）
+
+`--use-llm` 指定時も編集セクションは **メール本文には載せない**（`preview_lead` のみ frontmatter）。
 
 > 以前は1ファイルに日本・アメリカを対称配置していましたが、**日本語ページ／USページで原稿を分けました**。
 

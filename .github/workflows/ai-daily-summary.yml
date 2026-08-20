@@ -32,7 +32,6 @@ jobs:
         continue-on-error: true
         env:
           TREND_DASHBOARD_BASE_URL: https://trends-dashboard.com
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python scripts/generate_ai_daily_summary.py --from-api --write --force --region jp
 
       - name: Generate US daily summary
@@ -40,7 +39,6 @@ jobs:
         continue-on-error: true
         env:
           TREND_DASHBOARD_BASE_URL: https://trends-dashboard.com
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python scripts/generate_ai_daily_summary.py --from-api --write --force --region us
 
       - name: Commit if changed
@@ -53,7 +51,7 @@ jobs:
             echo "No changes to commit."
             exit 0
           fi
-          git commit -m "docs(summaries): ai daily summary (jp+us)"
+          git commit -m "docs(summaries): mechanical daily summary (jp+us)"
           # main が進んでいると rejected になるので、rebase してから push（リトライ付き）
           for i in 1 2 3; do
             git pull --rebase origin main

@@ -1545,10 +1545,8 @@ def test_assemble_daily_markdown_structure(gads):
     assert "# 日次サマリー — 2026-05-31" in md
     assert "対象外" in md
     assert "Medium" in md
-    # 注記はフッター（注目より後）
-    assert md.rfind("対象外") > md.find(gads._ONE_LINER_HEADING)
-    assert gads._ONE_LINER_HEADING in md
-    assert "昨日の注目" in gads._ONE_LINER_HEADING
+    # 既定では「昨日の注目」はメール本文に含めない
+    assert gads._ONE_LINER_HEADING not in md
     assert gads._RISING_HEADING in md
     assert "読み方" not in md
     assert "How to read" not in md
@@ -1556,6 +1554,12 @@ def test_assemble_daily_markdown_structure(gads):
     assert "複数ソースで重なった話題" not in md
     assert gads._TOP3_HEADING in md
     assert md.index(gads._RISING_HEADING) < md.index(gads._TOP3_HEADING)
+
+    md_with_liner = gads.assemble_daily_markdown(
+        bd, editorial, {}, [], [], [], include_one_liner=True
+    )
+    assert gads._ONE_LINER_HEADING in md_with_liner
+    assert "一行。" in md_with_liner
 
 
 def test_assemble_omits_empty_cross_includes_when_present(gads):
@@ -1799,3 +1803,76 @@ def test_exclude_market_default_is_false():
     text = path.read_text(encoding="utf-8")
     assert 'TREND_SNAPSHOT_EXCLUDE_MARKET", "false"' in text
     assert 'TREND_SNAPSHOT_EXCLUDE_MARKET", "true"' not in text
+
+
+def test_build_mechanical_editorial_uses_mechanical_rising_notes(gads):
+    rising = [
+        {
+            "label": "Topic A",
+            "ranks": {"07": 5, "19": 1},
+            "rank_evidence": "7時5位 → 19時1位",
+        }
+    ]
+    editorial = gads.build_mechanical_editorial([], rising, [])
+    assert editorial["cross_intro"] is None
+    assert len(editorial["rising_notes"]) == 1
+    assert editorial["rising_notes"][0]["match_label"] == "Topic A"
+    assert "上昇" in editorial["rising_notes"][0]["note"] or "位" in editorial["rising_notes"][0]["note"]
+
+
+def test_run_generate_mechanical_omits_one_liner_from_body(gads, monkeypatch):
+    rows = [
+        {
+            "business_day": "2026-05-18",
+            "slot": "19",
+            "series_key": "nhk_news",
+            "category": "ニュース",
+            "rank": 1,
+            "label": "Headline A",
+            "url": "https://example.com/a",
+            "region": "jp",
+        }
+    ]
+    monkeypatch.setattr(gads, "build_rising_highlights", lambda *a, **k: [])
+    monkeypatch.setattr(gads, "build_cross_source_highlights", lambda *a, **k: [])
+    monkeypatch.setattr(
+        gads,
+        "build_category_top3",
+        lambda *a, **k: [{"category": "ニュース", "items": [], "quiet": True}],
+    )
+    monkeypatch.setattr(gads, "build_label_link_index", lambda *a, **k: {})
+    monkeypatch.setattr(
+        gads,
+        "build_editorial_candidates",
+        lambda *a, **k: [
+            {
+                "label": "Headline A",
+                "reason": "category_leader",
+                "category": "ニュース",
+                "rank_evidence": "19時1位",
+            }
+        ],
+    )
+    text, meta = gads.run_generate_mechanical(date(2026, 5, 18), rows)
+    assert meta["generator"] == "mechanical"
+    assert meta["one_liner_source"] == "mechanical"
+    assert "generator: mechanical" in text
+    assert "preview_lead:" in text
+    assert gads._ONE_LINER_HEADING not in text.split("---", 2)[-1]
+    assert gads._RISING_HEADING in text
+
+
+def test_merge_front_matter_mechanical(gads):
+    inner = "# 日次サマリー — 2026-05-18\n"
+    full = gads.merge_front_matter(
+        date(2026, 5, 18),
+        "",
+        inner,
+        teaser="短いリード",
+        preview_lead="Web 向けの一行リード全文。",
+        generator="mechanical",
+    )
+    assert "generator: mechanical" in full
+    assert 'teaser: "短いリード"' in full
+    assert 'preview_lead: "Web 向けの一行リード全文。"' in full
+    assert "model:" not in full.split("---")[1]

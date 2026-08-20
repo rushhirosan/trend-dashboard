@@ -15,6 +15,9 @@ logger = get_logger(__name__)
 
 JST = timezone(timedelta(hours=9))
 
+# dogfood 冒頭の固定ラベル（有料メールには付けない）
+DOGFOOD_BANNER = "【自分（開発者）宛専用 / Developer-only】"
+
 
 @dataclass(frozen=True)
 class DogfoodSendResult:
@@ -156,14 +159,14 @@ def send_summary_dogfood(
             kind, region_n, doc_id, cross_source=has_cross
         )
         header = (
-            f"(dogfood) draft 可・自動送信\n"
+            f"{DOGFOOD_BANNER}\n"
             f"kind={kind} region={region_n} id={doc_id}\n"
             f"path={path}\n\n"
         )
         text_out = header + text
         html_out = html_body.replace(
             "<body>",
-            "<body><p><em>dogfood · draft OK · auto-send after generate</em></p>",
+            f"<body><p><em>{DOGFOOD_BANNER}</em></p>",
             1,
         )
 

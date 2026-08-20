@@ -648,19 +648,34 @@ def test_assemble_weekly_markdown_jp_only(gaws):
     )
     assert "🇯🇵 日本" not in md
     assert "🇺🇸" not in md
-    assert "先週の流れ" in md
+    assert "先週の流れ" not in md
     assert "先週いちばん動いた話題" in md
     assert "カテゴリ別 — 先週の top3" in md
     assert "Rising JP" in md
     assert "[Cat JP](https://example.com/cat)" in md
-    assert "今週は日本のテスト話題が動いた。" in md
-    assert "週のホットトピック" in md
-    assert "[Cat JP](https://example.com/cat)" in md
-    assert "なぜホットか" not in md
-    assert "週を通じて議論が続いた。" in md
-    assert "来週に残る論点" in md
-    assert "関税関連が続くか。" in md
+    assert "今週は日本のテスト話題が動いた。" not in md
+    assert "週のホットトピック" not in md
+    assert "来週に残る論点" not in md
     assert "複数ソースで週を通じて重なった話題" not in md
+
+    md_llm = gaws.assemble_weekly_markdown(
+        "2026-W24",
+        mon,
+        sun,
+        editorial,
+        rising,
+        category,
+        meta,
+        include_flow=True,
+        include_hot_topics=True,
+        include_next_week=True,
+    )
+    assert "先週の流れ" in md_llm
+    assert "今週は日本のテスト話題が動いた。" in md_llm
+    assert "週のホットトピック" in md_llm
+    assert "週を通じて議論が続いた。" in md_llm
+    assert "来週に残る論点" in md_llm
+    assert "関税関連が続くか。" in md_llm
 
 
 def test_enrich_hot_topics_with_links_from_rising_and_category(gaws):
@@ -741,6 +756,7 @@ def test_assemble_weekly_markdown_us_hot_topic_links(gaws):
     )
     assert "[Hot US](https://example.com/us-hot)" in md
     assert "Why hot" not in md
+    assert "Hot topics last week" not in md
     gaws.configure_weekly_region("jp")
 
 
@@ -802,16 +818,29 @@ def test_assemble_weekly_markdown_us_english(gaws):
         "2026-W24", mon, sun, editorial, rising, category, meta
     )
     assert "Weekly summary" in md
-    assert "Last week in review" in md
-    assert "U.S. tech topics moved this week." in md
+    assert "Last week in review" not in md
     assert "Biggest movers last week" in md
-    assert "Hot topics last week" in md
-    assert "Hot US" in md
-    assert "Why hot" not in md
-    assert "What to watch next week" in md
-    assert "Watch Fed news." in md
+    assert "Hot topics last week" not in md
+    assert "What to watch next week" not in md
     assert "来週に残る論点" not in md
     assert "ソース一覧" not in md
+
+    md_llm = gaws.assemble_weekly_markdown(
+        "2026-W24",
+        mon,
+        sun,
+        editorial,
+        rising,
+        category,
+        meta,
+        include_flow=True,
+        include_hot_topics=True,
+        include_next_week=True,
+    )
+    assert "Last week in review" in md_llm
+    assert "U.S. tech topics moved this week." in md_llm
+    assert "Hot topics last week" in md_llm
+    assert "What to watch next week" in md_llm
     assert "週のホットトピック" not in md
     gaws.configure_weekly_region("jp")  # restore for other tests
 
@@ -842,3 +871,84 @@ def test_build_mechanical_llm_payload_active_region_only(gaws):
     assert payload["regions"]["jp"]["weekly_rising"][0]["label"] == "JP Topic"
     assert "us" not in payload["regions"]
     assert payload["regions"]["jp"]["weekly_category_pool"][0]["category"] == "ニュース"
+
+
+def test_build_mechanical_weekly_preview_lead_prefers_rising(gaws):
+    gaws.configure_weekly_region("jp")
+    lead = gaws.build_mechanical_weekly_preview_lead(
+        {"jp": [{"label": "Topic A", "day_count": 3, "days": ["a", "b", "c"]}]},
+        {"jp": []},
+    )
+    assert "Topic A" in lead
+    assert "3日" in lead
+
+
+def test_run_generate_mechanical_omits_flow_from_body(gaws, monkeypatch):
+    gaws.configure_weekly_region("jp")
+    week_mon = date(2026, 6, 8)
+    meta_base = {
+        "snapshot_days_found": 7,
+        "missing_snapshot_dates": [],
+        "partial_snapshot_dates": [],
+        "missing_dates": [],
+        "daily_files": [{"found": True}] * 7,
+    }
+    rising = {
+        "jp": [
+            {
+                "label": "Rising JP",
+                "link_line": "[Rising JP](https://example.com/jp)",
+                "rank_evidence_by_day": {},
+            }
+        ]
+    }
+    category = {"jp": [{"category": "ニュース", "items": [], "quiet": True}]}
+    monkeypatch.setattr(
+        gaws,
+        "build_week_snapshot_rollups",
+        lambda *a, **k: (meta_base, rising, {"jp": []}, category),
+    )
+    monkeypatch.setattr(
+        gaws,
+        "build_daily_rollups",
+        lambda *a, **k: ("", {"missing_dates": []}),
+    )
+    text, meta = gaws.run_generate_mechanical(
+        week_mon,
+        gaws.DAILY_DIR,
+        via_http=True,
+        database_url="",
+        base_url="https://example.com",
+        connect_timeout=5,
+        request_timeout=5,
+    )
+    assert meta["generator"] == "mechanical"
+    assert "generator: mechanical" in text
+    assert "preview_lead:" in text
+    assert "先週の流れ" not in text.split("---", 2)[-1]
+    assert "先週いちばん動いた話題" in text
+
+
+def test_merge_front_matter_mechanical_weekly(gaws):
+    meta = {
+        "input_mode": "snapshots",
+        "snapshot_days_found": 7,
+        "missing_snapshot_dates": [],
+        "partial_snapshot_dates": [],
+        "missing_dates": [],
+        "daily_files": [],
+    }
+    full = gaws.merge_front_matter(
+        "2026-W24",
+        date(2026, 6, 8),
+        date(2026, 6, 14),
+        "",
+        "# 週次サマリー\n",
+        meta,
+        teaser="短い週次",
+        preview_lead="先週の機械リード全文。",
+        generator="mechanical",
+    )
+    assert "generator: mechanical" in full
+    assert 'preview_lead: "先週の機械リード全文。"' in full
+    assert "model:" not in full.split("---")[1]

@@ -28,6 +28,8 @@ _STATUS_RE = re.compile(r"^status:\s*(\w+)", re.M)
 _GENERATOR_RE = re.compile(r"^generator:\s*(\S+)", re.M)
 _SLOTS_RE = re.compile(r'snapshot_slots_included:\s*\[(.*?)\]')
 _TEASER_RE = re.compile(r'^teaser:\s*"(.*)"\s*$', re.M)
+_PREVIEW_LEAD_RE = re.compile(r'^preview_lead:\s*"(.*)"\s*$', re.M)
+_DAILY_GENERATORS = frozenset({"openai", "mechanical"})
 
 
 @dataclass(frozen=True)
@@ -106,6 +108,9 @@ def _parse_frontmatter(text: str) -> dict:
     teaser = _TEASER_RE.search(block)
     if teaser:
         out["teaser"] = teaser.group(1).replace('\\"', '"').strip()
+    preview = _PREVIEW_LEAD_RE.search(block)
+    if preview:
+        out["preview_lead"] = preview.group(1).replace('\\"', '"').strip()
     return out
 
 
@@ -176,7 +181,7 @@ def _parse_summary_text(
     source_path: Optional[Path] = None,
 ) -> Optional[DailySummaryPreview]:
     meta = _parse_frontmatter(text)
-    if meta.get("generator") != "openai":
+    if meta.get("generator") not in _DAILY_GENERATORS:
         return None
     body = text
     if text.startswith("---"):
@@ -184,6 +189,8 @@ def _parse_summary_text(
         if end >= 0:
             body = text[end + 4 :]
     one_liner = extract_one_liner(body)
+    if not one_liner:
+        one_liner = str(meta.get("preview_lead") or meta.get("teaser") or "").strip()
     if not one_liner:
         return None
     try:

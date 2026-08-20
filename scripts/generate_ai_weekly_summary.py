@@ -1,14 +1,24 @@
 #!/usr/bin/env python3
 """
 直前に終了した ISO 週（月〜日）の trend_daily_snapshots を集計し、
-OpenAI で週次サマリー（先週の流れ・急上昇各1件・カテゴリ別 top3）を1ファイルに生成する。
+週次サマリー Markdown を生成する（既定: 機械生成・OpenAI 不使用）。
+
+メール本文は **タイトル+URL+順位** の機械セクションのみ
+（先週の流れ・ホットトピック・来週論点は本文に含めない）。
+Web 用リードは frontmatter の ``teaser`` / ``preview_lead`` に置く。
+
+``--use-llm`` で従来の OpenAI 編集 JSON 生成（メール本文から編集セクションは除外）。
+``--daily-only`` はレガシー（日次 md のみ・要 ``--use-llm``）。
 
 既定入力は **スナップショット**（DB 直読 or ``--from-api``）。日次 Markdown は
 補助コンテキストとして読む（欠損可）。``--daily-only`` で旧挙動（日次 md のみ）。
 
-  export OPENAI_API_KEY=sk-...
   python scripts/generate_ai_weekly_summary.py --from-api --dry-run
   python scripts/generate_ai_weekly_summary.py --from-api --write --force
+
+  # LLM 編集 JSON（レガシー・メール本文からは編集セクション除外）
+  export OPENAI_API_KEY=sk-...
+  python scripts/generate_ai_weekly_summary.py --from-api --write --force --use-llm
 
 詳細: ``docs/summaries/weekly/README.md``
 """
@@ -1558,6 +1568,50 @@ def render_weekly_next_week_markdown(editorial: Dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def build_teaser_from_weekly_preview_lead(
+    preview_lead: str, max_chars: int = 90
+) -> str:
+    from services.summary.daily_summary_preview import clamp_teaser, first_sentence
+
+    return clamp_teaser(first_sentence(preview_lead), max_chars=max_chars)
+
+
+def build_mechanical_weekly_preview_lead(
+    weekly_rising: Dict[str, List[Dict[str, Any]]],
+    weekly_category: Dict[str, List[Dict[str, Any]]],
+) -> str:
+    """週次 Web プレビュー用: 急上昇 top1 → ニュース区分 top1 の順で機械リード。"""
+    region = WEEKLY_REGIONS[0]
+    rising = weekly_rising.get(region) or []
+    if rising:
+        it = rising[0]
+        label = str(it.get("label") or "").strip()
+        if label:
+            dc = int(it.get("day_count") or len(it.get("days") or []) or 0)
+            if _ACTIVE_REGION == "us":
+                days_bit = f" across {dc} day(s)" if dc else ""
+                return (
+                    f'Last week, "{label}" showed the largest rank jump on the dashboard{days_bit}.'
+                )
+            days_bit = f"（{dc}日）" if dc else ""
+            return f"先週、順位の動きが最も大きかったのは「{label}」{days_bit}。"
+
+    for block in weekly_category.get(region) or []:
+        if str(block.get("category") or "") != "ニュース":
+            continue
+        items = block.get("items") or []
+        if not items:
+            continue
+        label = str(items[0].get("label") or "").strip()
+        if label:
+            if _ACTIVE_REGION == "us":
+                return f'News category leader last week: "{label}".'
+            return f"先週、ニュース区分で目立ったのは「{label}」。"
+    if _ACTIVE_REGION == "us":
+        return "Last week's category leaders and rank movers are listed below."
+    return "先週のカテゴリ別トップと順位の動きは以下のとおり。"
+
+
 def assemble_weekly_markdown(
     iso_week: str,
     mon: date,
@@ -1566,45 +1620,63 @@ def assemble_weekly_markdown(
     weekly_rising: Dict[str, List[Dict[str, Any]]],
     weekly_category: Dict[str, List[Dict[str, Any]]],
     meta: Dict[str, Any],
+    *,
+    include_flow: bool = False,
+    include_hot_topics: bool = False,
+    include_next_week: bool = False,
 ) -> str:
-    editorial = enrich_hot_topics_with_links(editorial, weekly_rising, weekly_category)
+    if include_hot_topics:
+        editorial = enrich_hot_topics_with_links(editorial, weekly_rising, weekly_category)
     if _ACTIVE_REGION == "us":
         title = f"# Weekly summary — {iso_week} (observation week JST {mon.isoformat()}–{sun.isoformat()})"
         meta_lines = [
             f"- **Week**: {mon.isoformat()} – {sun.isoformat()} (JST)",
             "- **Generated**: automatic (time not filled)",
             "",
-            "## Last week in review",
-            "",
-            (editorial.get("flow_us") or editorial.get("flow_jp") or "(Could not generate the U.S. weekly brief.)").strip(),
-            "",
         ]
+        if include_flow:
+            meta_lines.extend(
+                [
+                    "## Last week in review",
+                    "",
+                    (
+                        editorial.get("flow_us")
+                        or editorial.get("flow_jp")
+                        or "(Could not generate the U.S. weekly brief.)"
+                    ).strip(),
+                    "",
+                ]
+            )
     else:
         title = f"# 週次サマリー — {iso_week}（対象週 JST {mon.isoformat()}〜{sun.isoformat()}）"
         meta_lines = [
             f"- **対象週**: {mon.isoformat()} 〜 {sun.isoformat()}",
             "- **生成・送信完了**: 自動生成（時刻未入力）",
             "",
-            "## 先週の流れ（短文）",
-            "",
-            # 日本語ページは日本ソースのみ。地域サブ見出しは付けず単一フローにする。
-            (editorial.get("flow_jp") or "（日本向けの週次要約を生成できませんでした）").strip(),
-            "",
         ]
+        if include_flow:
+            meta_lines.extend(
+                [
+                    "## 先週の流れ（短文）",
+                    "",
+                    (
+                        editorial.get("flow_jp")
+                        or "（日本向けの週次要約を生成できませんでした）"
+                    ).strip(),
+                    "",
+                ]
+            )
 
     lines: List[str] = [title, *meta_lines]
-    lines.extend(
-        [
-            render_weekly_rising_markdown(weekly_rising).rstrip(),
-            "",
-            render_weekly_hot_topics_markdown(editorial).rstrip(),
-            "",
-            render_weekly_next_week_markdown(editorial).rstrip(),
-            "",
-            render_weekly_category_markdown(weekly_category, editorial).rstrip(),
-            "",
-        ]
+    body_parts: List[str] = [render_weekly_rising_markdown(weekly_rising).rstrip()]
+    if include_hot_topics:
+        body_parts.append(render_weekly_hot_topics_markdown(editorial).rstrip())
+    if include_next_week:
+        body_parts.append(render_weekly_next_week_markdown(editorial).rstrip())
+    body_parts.append(
+        render_weekly_category_markdown(weekly_category, editorial).rstrip()
     )
+    lines.extend(p + "\n" for p in body_parts if p)
     premise = render_data_premise(meta)
     if premise:
         lines.append(premise.rstrip())
@@ -1668,20 +1740,32 @@ def merge_front_matter(
     model: str,
     inner_markdown: str,
     meta: Dict[str, Any],
+    *,
+    teaser: str = "",
+    preview_lead: str = "",
+    generator: str = "mechanical",
 ) -> str:
     gen_at = datetime.now(JST).strftime("%Y-%m-%d %H:%M JST")
     range_s = f"{mon.isoformat()} 〜 {sun.isoformat()}"
     n_found = sum(1 for x in meta.get("daily_files", []) if x.get("found"))
     snap_found = meta.get("snapshot_days_found", 0)
+    teaser_line = ""
+    if teaser:
+        escaped = teaser.replace("\\", "\\\\").replace('"', '\\"')
+        teaser_line = f'teaser: "{escaped}"\n'
+    preview_line = ""
+    if preview_lead:
+        escaped = preview_lead.replace("\\", "\\\\").replace('"', '\\"')
+        preview_line = f'preview_lead: "{escaped}"\n'
+    model_line = f'model: "{model}"\n' if model else ""
     fm = f"""---
 status: draft
 iso_week: "{iso_week}"
 week_range_jst: "{range_s}"
 reviewer: ""
 reviewed_at: ""
-generator: openai
-model: "{model}"
-region: "{_ACTIVE_REGION}"
+generator: {generator}
+{model_line}region: "{_ACTIVE_REGION}"
 input_mode: "{meta.get('input_mode', 'snapshots')}"
 snapshot_days_found: {snap_found}
 snapshot_days_expected: 7
@@ -1691,7 +1775,7 @@ daily_files_found: {n_found}
 daily_files_expected: 7
 missing_daily_dates: {json.dumps(meta.get('missing_dates') or [], ensure_ascii=False)}
 generated_at: "{gen_at}"
----
+{teaser_line}{preview_line}---
 
 """
     body = strip_wrapping_fences(inner_markdown)
@@ -1833,9 +1917,106 @@ def run_generate_snapshots(
         weekly_rising,
         weekly_category,
         meta,
+        include_flow=False,
+        include_hot_topics=False,
+        include_next_week=False,
     )
     meta["model"] = model
-    full = merge_front_matter(stem, week_mon, week_sun, model, inner, meta)
+    meta["generator"] = "openai"
+    flow_text = (
+        str(editorial.get("flow_us") or editorial.get("flow_jp") or "").strip()
+        if _ACTIVE_REGION == "us"
+        else str(editorial.get("flow_jp") or "").strip()
+    )
+    teaser = build_teaser_from_weekly_preview_lead(flow_text) if flow_text else ""
+    full = merge_front_matter(
+        stem,
+        week_mon,
+        week_sun,
+        model,
+        inner,
+        meta,
+        teaser=teaser,
+        preview_lead=flow_text,
+        generator="openai",
+    )
+    return full, meta
+
+
+def run_generate_mechanical(
+    week_mon: date,
+    daily_dir: Path,
+    *,
+    via_http: bool,
+    database_url: str,
+    base_url: str,
+    connect_timeout: int,
+    request_timeout: int,
+) -> Tuple[str, Dict[str, Any]]:
+    """OpenAI 不使用。スナップショットから機械的に週次 Markdown を組み立てる。"""
+    week_sun = week_mon + timedelta(days=6)
+    stem = iso_week_stem(week_mon)
+
+    snap_meta, weekly_rising, weekly_cross, weekly_category = build_week_snapshot_rollups(
+        week_mon,
+        via_http=via_http,
+        database_url=database_url,
+        base_url=base_url,
+        connect_timeout=connect_timeout,
+        request_timeout=request_timeout,
+    )
+    _ = weekly_cross
+    _, daily_meta = build_daily_rollups(week_mon, week_sun, daily_dir)
+    meta: Dict[str, Any] = {**snap_meta, **daily_meta}
+    meta["iso_week"] = stem
+    meta["input_mode"] = "snapshots"
+    meta["generator"] = "mechanical"
+
+    if meta.get("snapshot_days_found", 0) == 0:
+        meta["error"] = "no_snapshot_days"
+        return "", meta
+
+    editorial: Dict[str, Any] = {
+        "flow_jp": "",
+        "flow_us": "",
+        "hot_topics": [],
+        "next_week": [],
+        "category_themes": {"jp": {}, "us": {}},
+    }
+    preview_lead = build_mechanical_weekly_preview_lead(weekly_rising, weekly_category)
+    teaser = build_teaser_from_weekly_preview_lead(preview_lead)
+
+    inner = assemble_weekly_markdown(
+        stem,
+        week_mon,
+        week_sun,
+        editorial,
+        weekly_rising,
+        weekly_category,
+        meta,
+        include_flow=False,
+        include_hot_topics=False,
+        include_next_week=False,
+    )
+    warnings: List[str] = []
+    for region in WEEKLY_REGIONS:
+        if len(weekly_rising.get(region) or []) == 0:
+            warnings.append(f"weekly_rising_{region} empty")
+    if warnings:
+        meta["editorial_warning"] = "; ".join(warnings)
+    meta["preview_lead_source"] = "mechanical"
+    meta["teaser_source"] = "mechanical"
+    full = merge_front_matter(
+        stem,
+        week_mon,
+        week_sun,
+        "",
+        inner,
+        meta,
+        teaser=teaser,
+        preview_lead=preview_lead,
+        generator="mechanical",
+    )
     return full, meta
 
 
@@ -1920,6 +2101,11 @@ def main() -> int:
     )
     p.add_argument("--connect-timeout", type=int, default=20)
     p.add_argument("--request-timeout", type=int, default=120)
+    p.add_argument(
+        "--use-llm",
+        action="store_true",
+        help="Use OpenAI for flow/hot/next_week (default: mechanical only, no API key)",
+    )
     args = p.parse_args()
     configure_weekly_region(args.region)
 
@@ -1947,7 +2133,7 @@ def main() -> int:
             file=sys.stderr,
         )
 
-    if args.dry_run and not api_key:
+    if args.dry_run and args.use_llm and not api_key:
         if args.daily_only:
             _, meta = build_daily_rollups(week_mon, week_sun, daily_dir)
             print(json.dumps(meta, ensure_ascii=False, indent=2))
@@ -1983,11 +2169,13 @@ def main() -> int:
         print("\n(set OPENAI_API_KEY to generate weekly markdown)", file=sys.stderr)
         return 0
 
-    if not api_key:
-        print("❌ OPENAI_API_KEY（または OPEN_API_KEY）が未設定です", file=sys.stderr)
-        return 1
-
     if args.daily_only:
+        if not args.use_llm or not api_key:
+            print(
+                "❌ --daily-only は --use-llm と OPENAI_API_KEY が必要です",
+                file=sys.stderr,
+            )
+            return 1
         text, meta = run_generate_daily_only(week_mon, api_key, model, daily_dir)
         err = meta.get("error")
         if err == "no_daily_files":
@@ -2004,17 +2192,34 @@ def main() -> int:
             )
             return 1
         try:
-            text, meta = run_generate_snapshots(
-                week_mon,
-                api_key,
-                model,
-                daily_dir,
-                via_http=via_http,
-                database_url=database_url,
-                base_url=base_url,
-                connect_timeout=args.connect_timeout,
-                request_timeout=args.request_timeout,
-            )
+            if args.use_llm:
+                if not api_key:
+                    print(
+                        "❌ --use-llm には OPENAI_API_KEY が必要です",
+                        file=sys.stderr,
+                    )
+                    return 1
+                text, meta = run_generate_snapshots(
+                    week_mon,
+                    api_key,
+                    model,
+                    daily_dir,
+                    via_http=via_http,
+                    database_url=database_url,
+                    base_url=base_url,
+                    connect_timeout=args.connect_timeout,
+                    request_timeout=args.request_timeout,
+                )
+            else:
+                text, meta = run_generate_mechanical(
+                    week_mon,
+                    daily_dir,
+                    via_http=via_http,
+                    database_url=database_url,
+                    base_url=base_url,
+                    connect_timeout=args.connect_timeout,
+                    request_timeout=args.request_timeout,
+                )
         except (requests.RequestException, RuntimeError, ValueError, json.JSONDecodeError) as exc:
             print(f"❌ 週次生成失敗: {exc}", file=sys.stderr)
             return 1

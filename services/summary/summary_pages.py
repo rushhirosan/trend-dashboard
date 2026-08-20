@@ -1,7 +1,7 @@
 """サマリー Web ページ用: 日次・週次 Markdown からプレビュー/全文の構造を組み立てる。
 
 方針（案1: ティーザー公開）:
-- Web はプレビュー範囲のみ表示（日次=一行結論＋動いた3つ、週次=流れ＋動いた話題各1）
+- Web はプレビュー範囲のみ表示（日次=preview_lead/teaser＋動いた3つ、週次=流れ＋動いた話題各1）
 - 全文（カテゴリ別・横断・順位推移・週内推移）はメール配信の領分なので、ここでは
   「ロックされたセクション見出し」だけを返し、本文は出さない。
 
@@ -104,6 +104,8 @@ def _read_doc(kind: str, region: str, doc_id: str) -> Optional[str]:
 # US 原稿は英語見出しで生成する想定だが、パーサはどちらでも拾えるようにする。
 _ONE_LINER_KEYS = ("昨日の注目", "一行結論", "highlight", "takeaway", "bottom line")
 _RISING_KEYS = ("いちばん動いた", "biggest movers", "movers")
+_DAILY_GENERATORS = frozenset({"openai", "mechanical"})
+_WEEKLY_GENERATORS = frozenset({"openai", "mechanical"})
 _FLOW_KEYS = ("先週の流れ", "今週の流れ", "last week in review", "week in review")
 _JP_SUB_KEYS = ("日本", "Japan", "JP")
 _US_SUB_KEYS = ("アメリカ", "US", "United States")
@@ -349,7 +351,7 @@ def load_daily_page(
         return None
     fm, body = _split_frontmatter(text)
     meta = _parse_frontmatter(fm)
-    if meta.get("generator") != "openai":
+    if meta.get("generator") not in _DAILY_GENERATORS:
         return None
     status = meta.get("status", "draft")
     if not _publishable(status, allow_draft=allow_draft):
@@ -361,6 +363,8 @@ def load_daily_page(
 
     sections = _split_sections(body, "## ")
     one_liner = _join_paragraph(_find_section(sections, *_ONE_LINER_KEYS))
+    if not one_liner.strip():
+        one_liner = str(meta.get("preview_lead") or meta.get("teaser") or "").strip()
     # 本文中のリンクを対応表にして、一行結論のトピック名にリンクを張る
     topic_links = _collect_topic_links(body)
     one_liner_sentences = [_linkify(s, topic_links) for s in _split_sentences(one_liner)]
@@ -428,7 +432,7 @@ def load_weekly_page(
         return None
     fm, body = _split_frontmatter(text)
     meta = _parse_frontmatter(fm)
-    if meta.get("generator") != "openai":
+    if meta.get("generator") not in _WEEKLY_GENERATORS:
         return None
     status = meta.get("status", "draft")
     if not _publishable(status, allow_draft=allow_draft):
@@ -449,6 +453,14 @@ def load_weekly_page(
             "jp": content if region == "jp" else Markup(""),
             "us": content if region == "us" else Markup(""),
         }
+    if not _join_paragraph(flow_section).strip():
+        preview = str(meta.get("preview_lead") or meta.get("teaser") or "").strip()
+        if preview:
+            content = render_inline(preview)
+            flow = {
+                "jp": content if region == "jp" else Markup(""),
+                "us": content if region == "us" else Markup(""),
+            }
 
     rising_section = _find_section(sections, *_RISING_KEYS)
     rising_subs = _split_sections(rising_section, "### ")
@@ -496,7 +508,7 @@ def weekly_available(
         return False
     fm, _ = _split_frontmatter(text)
     meta = _parse_frontmatter(fm)
-    if meta.get("generator") != "openai":
+    if meta.get("generator") not in _WEEKLY_GENERATORS:
         return False
     return _publishable(meta.get("status", "draft"), allow_draft=allow_draft)
 
@@ -656,7 +668,7 @@ def _list_published(
             continue
         fm, _ = _split_frontmatter(text)
         meta = _parse_frontmatter(fm)
-        if meta.get("generator") != "openai":
+        if meta.get("generator") not in _DAILY_GENERATORS:
             continue
         if not _publishable(meta.get("status", "draft"), allow_draft=allow_draft):
             continue

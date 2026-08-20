@@ -4,6 +4,7 @@ from datetime import date
 from pathlib import Path
 
 from services.summary.summary_dogfood_email import (
+    DOGFOOD_BANNER,
     build_subject,
     default_daily_doc_id,
     default_weekly_doc_id,
@@ -133,3 +134,41 @@ def test_send_summary_dogfood_dry_run(monkeypatch):
     )
     assert len(results) == 2
     assert all(r.ok and not r.skipped for r in results)
+
+
+def test_send_summary_dogfood_banner(monkeypatch):
+    def fake_load(kind, doc_id, region="jp", **kw):
+        return (
+            Path(f"/tmp/{region}/{doc_id}.md"),
+            "body text\n",
+            "<html><body><h1>x</h1></body></html>",
+        )
+
+    monkeypatch.setattr(
+        "services.summary.summary_dogfood_email.load_summary_email_bodies",
+        fake_load,
+    )
+    sent = []
+
+    class FakeEmail:
+        def is_configured(self):
+            return True
+
+        def send_multipart(self, to, subject, html, text):
+            sent.append({"to": to, "subject": subject, "html": html, "text": text})
+            return True
+
+    results = send_summary_dogfood(
+        kind="daily",
+        doc_id="2026-07-22",
+        regions=("jp",),
+        to_email="me@example.com",
+        dry_run=False,
+        email_service=FakeEmail(),
+    )
+    assert len(results) == 1 and results[0].ok
+    assert DOGFOOD_BANNER == "【自分（開発者）宛専用 / Developer-only】"
+    assert sent[0]["text"].startswith(DOGFOOD_BANNER)
+    assert f"<em>{DOGFOOD_BANNER}</em>" in sent[0]["html"]
+    assert "dogfood · draft OK" not in sent[0]["html"]
+    assert "draft 可・自動送信" not in sent[0]["text"]

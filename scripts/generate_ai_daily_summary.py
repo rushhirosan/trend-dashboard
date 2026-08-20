@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """
 前日の business_day × スロット 07/13/19/01 の trend_daily_snapshots を読み、
-OpenAI Chat Completions で日次サマリー Markdown を生成する。
+日次サマリー Markdown を生成する（既定: 機械生成・OpenAI 不使用）。
+
+メール本文は **タイトル+URL+順位** の機械セクションのみ（「昨日の注目」は本文に含めない）。
+Web プレビュー用の短いリードは frontmatter の ``teaser`` / ``preview_lead`` に置く。
+
+``--use-llm`` を付けると従来どおり OpenAI で編集 JSON を生成するが、
+メール本文から「昨日の注目」は引き続き除外する。
 
 スロット 01 は「翌暦日 1 時ジョブ」で前日を閉じるため、JST 朝 7 時の一括取得より前
 （例: 6:50 JST）に走らせると前日分が揃った状態で取り込める。
@@ -2469,6 +2475,41 @@ def filter_rising_notes(
     return out
 
 
+def build_mechanical_rising_notes(
+    rising_items: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """急上昇各件の順位変化を機械文で返す（LLM 補足なし）。"""
+    out: List[Dict[str, Any]] = []
+    for item in rising_items:
+        ml = str(item.get("label") or "").strip()
+        if not ml:
+            continue
+        note = build_mechanical_rising_note(item)
+        if note:
+            out.append({"match_label": ml, "note": note})
+    return out
+
+
+def build_mechanical_editorial(
+    editorial_candidates: List[Dict[str, Any]],
+    rising_items: List[Dict[str, Any]],
+    cross_items: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """スナップショットだけから編集 JSON 相当を組み立てる（LLM 不使用）。"""
+    one_liner = build_mechanical_one_liner(
+        editorial_candidates, rising_items, cross_items
+    )
+    return {
+        "one_liner": one_liner,
+        "teaser": build_teaser_from_one_liner(one_liner),
+        "rising_notes": build_mechanical_rising_notes(rising_items),
+        "cross_intro": None,
+        "category_intros": {},
+        "spotlights": [],
+        "editor_notes": [],
+    }
+
+
 def finalize_editorial(
     editorial: Dict[str, Any],
     *,
@@ -2617,20 +2658,32 @@ def assemble_daily_markdown(
     rising_items: List[Dict[str, Any]],
     cross_items: List[Dict[str, Any]],
     top3_blocks: List[Dict[str, Any]],
+    *,
+    include_one_liner: bool = False,
 ) -> str:
-    """ヘッダ + 編集 + 機械根拠 + フッター注記を合成。"""
-    parts = [
-        render_header_markdown(business_day),
-        render_editorial_markdown(editorial, label_index),
-        render_rising_highlights_markdown(rising_items, editorial.get("rising_notes")),
-        render_cross_source_highlights_markdown(
-            cross_items,
-            business_day,
-            editorial.get("cross_intro") if cross_items else None,
-        ),
-        render_category_top3_markdown(top3_blocks, editorial.get("category_intros")),
-        digest_scope_note_markdown(),
-    ]
+    """ヘッダ + 機械根拠 + フッター注記を合成。
+
+    ``include_one_liner=False``（既定）では「昨日の注目」を本文に含めない（メール配信向け）。
+    """
+    parts = [render_header_markdown(business_day)]
+    if include_one_liner:
+        parts.append(render_editorial_markdown(editorial, label_index))
+    parts.extend(
+        [
+            render_rising_highlights_markdown(
+                rising_items, editorial.get("rising_notes")
+            ),
+            render_cross_source_highlights_markdown(
+                cross_items,
+                business_day,
+                editorial.get("cross_intro") if cross_items else None,
+            ),
+            render_category_top3_markdown(
+                top3_blocks, editorial.get("category_intros")
+            ),
+            digest_scope_note_markdown(),
+        ]
+    )
     return "\n\n".join(p.strip() for p in parts if p and p.strip()) + "\n"
 
 
@@ -2648,24 +2701,30 @@ def merge_front_matter(
     inner_markdown: str,
     *,
     teaser: str = "",
+    preview_lead: str = "",
+    generator: str = "mechanical",
 ) -> str:
     gen_at = datetime.now(JST).strftime("%Y-%m-%d %H:%M JST")
     teaser_line = ""
     if teaser:
         escaped = teaser.replace("\\", "\\\\").replace('"', '\\"')
         teaser_line = f'teaser: "{escaped}"\n'
+    preview_line = ""
+    if preview_lead:
+        escaped = preview_lead.replace("\\", "\\\\").replace('"', '\\"')
+        preview_line = f'preview_lead: "{escaped}"\n'
+    model_line = f'model: "{model}"\n' if model else ""
     fm = f"""---
 status: draft
 summary_date: "{business_day.isoformat()}"
 reviewer: ""
 reviewed_at: ""
-generator: openai
-model: "{model}"
-region: "{_ACTIVE_REGION}"
+generator: {generator}
+{model_line}region: "{_ACTIVE_REGION}"
 business_day: "{business_day.isoformat()}"
 snapshot_slots_included: ["07", "13", "19", "01"]
 generated_at: "{gen_at}"
-{teaser_line}---
+{teaser_line}{preview_line}---
 
 """
     body = strip_wrapping_fences(inner_markdown)
@@ -2859,8 +2918,10 @@ def run_generate(
         rising_items,
         cross_items,
         top3_blocks,
+        include_one_liner=False,
     )
     meta["model"] = model
+    meta["generator"] = "openai"
     meta["rising_highlights_count"] = len(rising_items)
     meta["cross_source_highlights_count"] = len(cross_items)
     meta["editorial_candidates_count"] = len(payload.get("editorial_candidates") or [])
@@ -2874,6 +2935,59 @@ def run_generate(
         model,
         inner,
         teaser=str(editorial.get("teaser") or ""),
+        preview_lead=str(editorial.get("one_liner") or ""),
+        generator="openai",
+    )
+    return full, meta
+
+
+def run_generate_mechanical(
+    business_day: date,
+    rows: List[Dict[str, Any]],
+) -> tuple[str, Dict[str, Any]]:
+    """OpenAI 不使用。スナップショットから機械的に Markdown を組み立てる。"""
+    meta: Dict[str, Any] = {
+        "business_day": business_day.isoformat(),
+        "row_count": len(rows),
+        "generator": "mechanical",
+    }
+    if not rows:
+        meta["error"] = "no_snapshot_rows"
+        return "", meta
+
+    rising_items = build_rising_highlights(rows, count=RISING_HIGHLIGHT_COUNT)
+    cross_items = build_cross_source_highlights(rows, count=CROSS_SOURCE_HIGHLIGHT_COUNT)
+    top3_blocks = build_category_top3(rows, count=CATEGORY_TOP_N)
+    label_index = build_label_link_index(rows, rising_items, cross_items, top3_blocks)
+    editorial_candidates = build_editorial_candidates(
+        rising_items, cross_items, top3_blocks, rows
+    )
+    editorial = build_mechanical_editorial(
+        editorial_candidates, rising_items, cross_items
+    )
+
+    inner = assemble_daily_markdown(
+        business_day,
+        editorial,
+        label_index,
+        rising_items,
+        cross_items,
+        top3_blocks,
+        include_one_liner=False,
+    )
+    meta["rising_highlights_count"] = len(rising_items)
+    meta["cross_source_highlights_count"] = len(cross_items)
+    meta["editorial_candidates_count"] = len(editorial_candidates)
+    meta["one_liner_source"] = "mechanical"
+    meta["teaser_source"] = "mechanical"
+    meta["rising_notes_source"] = "mechanical"
+    full = merge_front_matter(
+        business_day,
+        "",
+        inner,
+        teaser=str(editorial.get("teaser") or ""),
+        preview_lead=str(editorial.get("one_liner") or ""),
+        generator="mechanical",
     )
     return full, meta
 
@@ -2931,6 +3045,11 @@ def main() -> int:
         type=int,
         default=120,
         help="HTTP timeout seconds for --from-api snapshot fetch",
+    )
+    p.add_argument(
+        "--use-llm",
+        action="store_true",
+        help="Use OpenAI for teaser/one_liner/rising_notes (default: mechanical only, no API key)",
     )
     args = p.parse_args()
     configure_daily_region(args.region)
@@ -3013,7 +3132,7 @@ def main() -> int:
         emit_status(False, phase="snapshots", error="no_snapshot_rows", snapshot_row_count=0)
         return 2
 
-    if args.dry_run and not api_key:
+    if args.dry_run and args.use_llm and not api_key:
         rising_items = build_rising_highlights(rows, count=RISING_HIGHLIGHT_COUNT)
         cross_items = build_cross_source_highlights(rows, count=CROSS_SOURCE_HIGHLIGHT_COUNT)
         top3_blocks = build_category_top3(rows, count=CATEGORY_TOP_N)
@@ -3031,20 +3150,27 @@ def main() -> int:
         )
         return 0
 
-    if not api_key:
-        print(
-            "❌ OPENAI_API_KEY が未設定です（--dry-run のみ、キーなしでは JSON ペイロードを出せます）",
-            file=sys.stderr,
-        )
-        emit_status(False, phase="config", error="missing_openai_api_key", snapshot_row_count=len(rows))
-        return 1
-
-    try:
-        text, meta = run_generate(bd, rows, api_key, model)
-    except RuntimeError as e:
-        print(f"❌ OpenAI / 合成失敗: {e}", file=sys.stderr)
-        emit_status(False, phase="openai", error=str(e), snapshot_row_count=len(rows))
-        return 1
+    if args.use_llm:
+        if not api_key:
+            print(
+                "❌ --use-llm には OPENAI_API_KEY が必要です",
+                file=sys.stderr,
+            )
+            emit_status(
+                False,
+                phase="config",
+                error="missing_openai_api_key",
+                snapshot_row_count=len(rows),
+            )
+            return 1
+        try:
+            text, meta = run_generate(bd, rows, api_key, model)
+        except RuntimeError as e:
+            print(f"❌ OpenAI / 合成失敗: {e}", file=sys.stderr)
+            emit_status(False, phase="openai", error=str(e), snapshot_row_count=len(rows))
+            return 1
+    else:
+        text, meta = run_generate_mechanical(bd, rows)
 
     if args.dry_run:
         print(text)
@@ -3066,7 +3192,8 @@ def main() -> int:
     emit_status(
         True,
         markdown=str(out.relative_to(REPO_ROOT)),
-        model=meta.get("model", model),
+        generator=meta.get("generator", "mechanical"),
+        model=meta.get("model", model if args.use_llm else ""),
         snapshot_row_count=len(rows),
     )
     return 0

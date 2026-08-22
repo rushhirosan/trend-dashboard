@@ -23,7 +23,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install "requests>=2.31" "psycopg2-binary>=2.9" "python-dotenv>=0.19" "pytz>=2023.3"
+          pip install "requests>=2.31" "psycopg2-binary>=2.9" "python-dotenv>=0.19" "pytz>=2023.3" "yfinance>=0.2.0"
 
       # Writes daily markdown and companion .generation.json (--write). On failure we still
       # record .generation.json; continue-on-error so Commit can push the status file, then we fail the job.

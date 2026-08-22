@@ -27,8 +27,9 @@ def gads():
 
 
 @pytest.fixture(autouse=True)
-def _reset_daily_region(gads):
+def _reset_daily_region(gads, monkeypatch):
     gads.configure_daily_region("jp")
+    monkeypatch.setenv("MORNING_BRIEF_ENABLED", "false")
     yield
     gads.configure_daily_region("jp")
 
@@ -1530,6 +1531,25 @@ def test_render_category_top3_omits_trend_blurbs(gads):
     assert "気象関連が中心。" not in md
     assert "### ニュース" in md
     assert "Head A" in md
+
+
+def test_assemble_daily_markdown_includes_morning_brief(gads, monkeypatch):
+    monkeypatch.setenv("MORNING_BRIEF_ENABLED", "true")
+    brief = (
+        "## 🗓 今日どう動くか\n\n"
+        "**カレンダー** 金曜 · 次の祝日は 9/21（月）敬老の日\n\n"
+        "---\n"
+    )
+    monkeypatch.setattr(
+        gads,
+        "render_morning_brief_markdown",
+        lambda *a, **k: brief,
+    )
+    bd = date(2026, 8, 21)
+    editorial = {"one_liner": "", "rising_notes": [], "category_intros": {}}
+    md = gads.assemble_daily_markdown(bd, editorial, {}, [], [], [])
+    assert "## 🗓 今日どう動くか" in md
+    assert md.index("今日どう動くか") < md.index(gads._RISING_HEADING)
 
 
 def test_assemble_daily_markdown_structure(gads):

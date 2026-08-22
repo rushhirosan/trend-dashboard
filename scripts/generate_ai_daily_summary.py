@@ -59,6 +59,8 @@ if str(_SCRIPT_DIR) not in sys.path:
 
 import snapshot_rising as sr
 
+from services.summary.morning_brief import render_morning_brief_markdown
+
 JST = ZoneInfo("Asia/Tokyo")
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -2666,6 +2668,9 @@ def assemble_daily_markdown(
     ``include_one_liner=False``（既定）では「昨日の注目」を本文に含めない（メール配信向け）。
     """
     parts = [render_header_markdown(business_day)]
+    brief = render_morning_brief_markdown(business_day, _ACTIVE_REGION)
+    if brief:
+        parts.append(brief.rstrip())
     if include_one_liner:
         parts.append(render_editorial_markdown(editorial, label_index))
     parts.extend(

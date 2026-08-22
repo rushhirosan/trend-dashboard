@@ -511,3 +511,193 @@ def render_morning_brief_markdown(
     if not sections:
         return ""
     return "\n\n".join(sections) + "\n\n---\n"
+
+
+@dataclass(frozen=True)
+class WeeklyBriefLines:
+    calendar: str
+    fx: Optional[str] = None
+    stock: Optional[str] = None
+    history: Optional[str] = None
+    breath_second: Optional[str] = None
+
+
+def delivery_week_for_observation_week(week_sun: date) -> tuple[date, date]:
+    """観測週（月〜日）の翌週 = 配信週（翌月曜〜日曜）。"""
+    delivery_mon = week_sun + timedelta(days=1)
+    return delivery_mon, delivery_mon + timedelta(days=6)
+
+
+def build_week_calendar_line(week_mon: date, week_sun: date, region: str) -> str:
+    """配信週の祝日一覧（なければ祝日なし）。"""
+    region_n = (region or "jp").lower()
+    holidays = _holiday_map_for_day(week_mon, region_n)
+    in_week: List[tuple[date, str]] = []
+    for ds, name in sorted(holidays.items()):
+        try:
+            d = date.fromisoformat(ds)
+        except ValueError:
+            continue
+        if week_mon <= d <= week_sun:
+            in_week.append((d, name))
+    if region_n == "us":
+        span = f"{_format_short_date(week_mon, region_n)}-{_format_short_date(week_sun, region_n)}"
+        if not in_week:
+            return f"**This week** {span} · No public holidays"
+        bits = ", ".join(
+            f"{_format_short_date(d, region_n)} {n}" for d, n in in_week
+        )
+        return f"**This week** {span} · Holidays: {bits}"
+    span = f"{_format_short_date(week_mon, region_n)}〜{_format_short_date(week_sun, region_n)}"
+    if not in_week:
+        return f"**今週** {span} · 祝日なし"
+    bits = "、".join(f"{_format_short_date(d, region_n)}{n}" for d, n in in_week)
+    return f"**今週** {span} · 祝日: {bits}"
+
+
+def _fetch_yahoo_close_on_or_before(ticker: str, day: date) -> Optional[float]:
+    """day 以前の直近終値。"""
+    try:
+        import yfinance as yf
+    except ImportError:
+        logger.warning("morning_brief: yfinance not installed")
+        return None
+    start = day - timedelta(days=10)
+    end = day + timedelta(days=1)
+    try:
+        hist = yf.Ticker(ticker).history(
+            start=start.isoformat(), end=end.isoformat(), auto_adjust=True
+        )
+    except Exception as exc:
+        logger.warning("morning_brief: yfinance range failed for %s: %s", ticker, exc)
+        return None
+    if hist is None or hist.empty:
+        return None
+    closes = hist["Close"].dropna()
+    if closes.empty:
+        return None
+    for ts in reversed(list(closes.index)):
+        try:
+            d = ts.date()
+        except Exception:
+            continue
+        if d <= day:
+            return float(closes.loc[ts])
+    return float(closes.iloc[-1])
+
+
+def _week_return_pct(
+    ticker: str, week_mon: date, week_sun: date
+) -> Optional[tuple[float, float, float]]:
+    """観測週の週次リターン（前週末終値 → 週末終値）。"""
+    start_close = _fetch_yahoo_close_on_or_before(ticker, week_mon - timedelta(days=1))
+    end_close = _fetch_yahoo_close_on_or_before(ticker, week_sun)
+    if start_close is None or end_close is None or start_close == 0:
+        return None
+    pct = (end_close - start_close) / start_close * 100.0
+    return start_close, end_close, pct
+
+
+def build_week_market_lines(
+    week_mon: date, week_sun: date, region: str
+) -> tuple[Optional[str], Optional[str]]:
+    region_n = (region or "jp").lower()
+    fx = _week_return_pct("USDJPY=X", week_mon, week_sun)
+    fx_line: Optional[str] = None
+    if fx:
+        _start, end, pct = fx
+        if region_n == "us":
+            fx_line = f"**FX** USD/JPY {end:.1f} (week {_signed_pct(pct)})"
+        else:
+            fx_line = f"**為替** USD/JPY {end:.1f}（週次 {_signed_pct(pct)}）"
+    index_ticker = "^N225" if region_n == "jp" else "^GSPC"
+    index_label = "日経" if region_n == "jp" else "S&P 500"
+    idx = _week_return_pct(index_ticker, week_mon, week_sun)
+    stock_line: Optional[str] = None
+    if idx:
+        _start, end, pct = idx
+        if region_n == "us":
+            stock_line = (
+                f"**Stocks** {index_label} {end:,.2f} (week {_signed_pct(pct)})"
+            )
+        else:
+            stock_line = (
+                f"**株** {index_label} {end:,.0f}（週次 {_signed_pct(pct)}）"
+            )
+    return fx_line, stock_line
+
+
+def build_week_breath_lines(
+    week_mon: date, week_sun: date, region: str
+) -> tuple[Optional[str], Optional[str]]:
+    """観測週の代表日（水曜）の歴史 + 週固定の格言。"""
+    mid = week_mon + timedelta(days=min(2, (week_sun - week_mon).days))
+    region_n = (region or "jp").lower()
+    history = build_history_line(mid, region_n)
+    second = build_breath_second_line(week_mon, region_n)
+    return history, second
+
+
+def build_weekly_brief_lines(
+    week_mon: date,
+    week_sun: date,
+    region: str,
+    *,
+    include_market: bool = True,
+) -> WeeklyBriefLines:
+    region_n = (region or "jp").lower()
+    delivery_mon, delivery_sun = delivery_week_for_observation_week(week_sun)
+    calendar = build_week_calendar_line(delivery_mon, delivery_sun, region_n)
+    fx_line = stock_line = None
+    if include_market and not _morning_brief_market_disabled():
+        fx_line, stock_line = build_week_market_lines(week_mon, week_sun, region_n)
+    history, second = build_week_breath_lines(week_mon, week_sun, region_n)
+    return WeeklyBriefLines(
+        calendar=calendar,
+        fx=fx_line,
+        stock=stock_line,
+        history=history,
+        breath_second=second,
+    )
+
+
+def render_weekly_brief_markdown(
+    week_mon: date,
+    week_sun: date,
+    region: str,
+    *,
+    lines: Optional[WeeklyBriefLines] = None,
+) -> str:
+    """週次メール冒頭のオープナー（カレンダー・週次マーケット・ひと息）。"""
+    if not morning_brief_enabled():
+        return ""
+    region_n = (region or "jp").lower()
+    data = lines or build_weekly_brief_lines(week_mon, week_sun, region_n)
+    sections: List[str] = []
+    # 中身は配信週の日付レンジ + 祝日のみ（動向コメントではない）
+    glance_heading = (
+        "## 🗓 This week's calendar"
+        if region_n == "us"
+        else "## 🗓 今週のカレンダー"
+    )
+    sections.append(f"{glance_heading}\n\n{data.calendar}")
+    market_lines = [x for x in (data.fx, data.stock) if x]
+    if market_lines:
+        market_heading = (
+            "## 💹 Markets (last week)"
+            if region_n == "us"
+            else "## 💹 マーケット（先週）"
+        )
+        sections.append(market_heading + "\n\n" + "\n".join(market_lines))
+    breath_lines = [x for x in (data.history, data.breath_second) if x]
+    if breath_lines:
+        breath_heading = (
+            "## ☕ A breath (history + quote)"
+            if region_n == "us"
+            else "## ☕ ひと息（歴史 + 格言）"
+        )
+        sections.append(breath_heading + "\n\n" + "\n".join(breath_lines))
+    if not sections:
+        return ""
+    return "\n\n".join(sections) + "\n\n---\n"
+

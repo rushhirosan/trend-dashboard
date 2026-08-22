@@ -194,6 +194,8 @@ def test_compute_weekly_rising_score(gaws):
         ("github_us", 10),
         ("openalex_ai_jp", 7),
         ("book_us_fiction", 3),
+        ("appstore_jp", 0),
+        ("appstore_us", 0),
         ("bls_us", 7),
         ("usaspending_us", 7),
         ("prtimes_jp", 7),
@@ -883,7 +885,7 @@ def test_build_mechanical_weekly_preview_lead_prefers_rising(gaws):
     assert "3日" in lead
 
 
-def test_run_generate_mechanical_omits_flow_from_body(gaws, monkeypatch):
+def test_run_generate_mechanical_includes_flow_and_hot(gaws, monkeypatch):
     gaws.configure_weekly_region("jp")
     week_mon = date(2026, 6, 8)
     meta_base = {
@@ -898,11 +900,32 @@ def test_run_generate_mechanical_omits_flow_from_body(gaws, monkeypatch):
             {
                 "label": "Rising JP",
                 "link_line": "[Rising JP](https://example.com/jp)",
+                "day_count": 3,
+                "days": ["2026-06-08", "2026-06-09", "2026-06-10"],
+                "series_key": "google_trends_jp",
                 "rank_evidence_by_day": {},
             }
         ]
     }
-    category = {"jp": [{"category": "ニュース", "items": [], "quiet": True}]}
+    category = {
+        "jp": [
+            {
+                "category": "ニュース",
+                "items": [
+                    {
+                        "label": "News Hot",
+                        "day_count": 4,
+                        "days": ["a", "b", "c", "d"],
+                        "series_key": "nhk_jp",
+                        "cross_source": True,
+                        "best_rank": 1,
+                        "link_line": "[News Hot](https://example.com/news)",
+                    }
+                ],
+                "quiet": False,
+            }
+        ]
+    }
     monkeypatch.setattr(
         gaws,
         "build_week_snapshot_rollups",
@@ -912,6 +935,10 @@ def test_run_generate_mechanical_omits_flow_from_body(gaws, monkeypatch):
         gaws,
         "build_daily_rollups",
         lambda *a, **k: ("", {"missing_dates": []}),
+    )
+    monkeypatch.setattr(
+        "services.summary.morning_brief.render_weekly_brief_markdown",
+        lambda *a, **k: "## 🗓 今週のカレンダー\n\n**今週** test\n\n---\n",
     )
     text, meta = gaws.run_generate_mechanical(
         week_mon,
@@ -925,8 +952,17 @@ def test_run_generate_mechanical_omits_flow_from_body(gaws, monkeypatch):
     assert meta["generator"] == "mechanical"
     assert "generator: mechanical" in text
     assert "preview_lead:" in text
-    assert "先週の流れ" not in text.split("---", 2)[-1]
-    assert "先週いちばん動いた話題" in text
+    assert "生成・送信完了" not in text
+    assert "time not filled" not in text
+    body = text.split("---", 2)[-1]
+    assert "先週の流れ" in body
+    assert "Rising JP" in body
+    assert "週のホットトピック" in body
+    assert "News Hot" in body
+    assert "先週いちばん動いた話題" in body
+    assert "今週のカレンダー" in text
+    # オープナー → 流れ の順
+    assert text.index("今週のカレンダー") < text.index("先週の流れ")
 
 
 def test_merge_front_matter_mechanical_weekly(gaws):
@@ -952,3 +988,75 @@ def test_merge_front_matter_mechanical_weekly(gaws):
     assert "generator: mechanical" in full
     assert 'preview_lead: "先週の機械リード全文。"' in full
     assert "model:" not in full.split("---")[1]
+
+
+def test_aggregate_weekly_rising_skips_appstore(gaws):
+    daily = {
+        "2026-06-08": [
+            {
+                "label": "Some App",
+                "series_key": "appstore_jp",
+                "jump": 20.0,
+                "freq_slots": 3,
+                "ranks": {"07": 10, "13": 1},
+            },
+            {
+                "label": "News Topic",
+                "series_key": "nhk_jp",
+                "jump": 8.0,
+                "freq_slots": 2,
+                "ranks": {"07": 5, "13": 2},
+            },
+        ]
+    }
+    out = gaws.aggregate_weekly_rising(daily, count=5)
+    labels = [x["label"] for x in out]
+    assert "Some App" not in labels
+    assert "News Topic" in labels
+
+
+def test_build_mechanical_weekly_flow_and_hot_topics(gaws):
+    gaws.configure_weekly_region("jp")
+    rising = {
+        "jp": [
+            {
+                "label": "Rising JP",
+                "day_count": 3,
+                "days": ["a", "b", "c"],
+                "series_key": "google_trends_jp",
+            }
+        ]
+    }
+    category = {
+        "jp": [
+            {
+                "category": "ニュース",
+                "items": [
+                    {
+                        "label": "News Hot",
+                        "day_count": 4,
+                        "series_key": "nhk_jp",
+                        "cross_source": True,
+                        "best_rank": 1,
+                    },
+                    {
+                        "label": "Skip App",
+                        "day_count": 5,
+                        "series_key": "appstore_jp",
+                        "cross_source": False,
+                        "best_rank": 1,
+                    },
+                ],
+            }
+        ]
+    }
+    flow = gaws.build_mechanical_weekly_flow(rising, category)
+    assert "Rising JP" in flow
+    assert "News Hot" in flow
+    assert "Skip App" not in flow
+    hot = gaws.build_mechanical_weekly_hot_topics(rising, category)
+    titles = [h["title"] for h in hot]
+    assert "News Hot" in titles
+    assert "Skip App" not in titles
+    assert all("why" in h for h in hot)
+

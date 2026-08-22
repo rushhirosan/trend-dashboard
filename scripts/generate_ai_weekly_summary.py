@@ -3,9 +3,10 @@
 直前に終了した ISO 週（月〜日）の trend_daily_snapshots を集計し、
 週次サマリー Markdown を生成する（既定: 機械生成・OpenAI 不使用）。
 
-メール本文は **タイトル+URL+順位** の機械セクションのみ
-（先週の流れ・ホットトピック・来週論点は本文に含めない）。
-Web 用リードは frontmatter の ``teaser`` / ``preview_lead`` に置く。
+メール本文は機械生成:
+オープナー（今週カレンダー・先週マーケット・ひと息）+
+先週の流れ（短文）+ いちばん動いた話題 + ホットトピック + カテゴリ top3。
+来週論点は本文に含めない。Web 用リードは frontmatter の ``teaser`` / ``preview_lead``。
 
 ``--use-llm`` で従来の OpenAI 編集 JSON 生成（メール本文から編集セクションは除外）。
 ``--daily-only`` はレガシー（日次 md のみ・要 ``--use-llm``）。
@@ -183,11 +184,17 @@ _WEEKLY_SERIES_WEIGHT_10 = (
 _WEEKLY_SERIES_WEIGHT_3 = (
     "book_",
 )
+# App Store は週次「いちばん動いた」の顔にしにくいので除外
+_WEEKLY_SERIES_WEIGHT_0 = (
+    "appstore_",
+)
 
 
 def weekly_series_weight(series_key: str) -> int:
-    """週次 rising 用: 系列の読者向け重要度（大きいほど優先）。"""
+    """週次 rising 用: 系列の読者向け重要度（大きいほど優先。0 は除外）。"""
     sk = (series_key or "").strip().lower()
+    if any(sk.startswith(p) for p in _WEEKLY_SERIES_WEIGHT_0):
+        return 0
     if any(sk.startswith(p) for p in _WEEKLY_SERIES_WEIGHT_15):
         return 15
     if any(sk.startswith(p) for p in _WEEKLY_SERIES_WEIGHT_12):
@@ -478,6 +485,8 @@ def aggregate_weekly_rising(
             nk = sr.normalize_label_key(label)
             sk = str(item.get("series_key") or "")
             sw = weekly_series_weight(sk)
+            if sw <= 0:
+                continue
             agg = by_label.get(nk)
             if agg is None:
                 agg = {
@@ -487,6 +496,7 @@ def aggregate_weekly_rising(
                     "slot_obs": 0,
                     "best_rank": 999,
                     "series_weight": sw,
+                    "series_key": sk,
                     "category": item.get("category") or "",
                     "url": item.get("url"),
                     "link_line": item.get("link_line"),
@@ -504,6 +514,7 @@ def aggregate_weekly_rising(
                 agg["best_rank"] = min(agg["best_rank"], int(item["r_best"]))
             if sw > agg["series_weight"]:
                 agg["series_weight"] = sw
+                agg["series_key"] = sk
                 if item.get("url"):
                     agg["url"] = item["url"]
                 if item.get("link_line"):
@@ -553,6 +564,7 @@ def aggregate_weekly_rising(
                 "cross_source": raw["cross_source"],
                 "best_rank": raw["best_rank"] if raw["best_rank"] < 999 else None,
                 "category": raw["category"],
+                "series_key": raw.get("series_key") or "",
                 "url": raw.get("url"),
                 "link_line": raw.get("link_line"),
                 "rank_evidence_by_day": raw.get("rank_evidence_by_day") or {},
@@ -1612,6 +1624,155 @@ def build_mechanical_weekly_preview_lead(
     return "先週のカテゴリ別トップと順位の動きは以下のとおり。"
 
 
+
+def _is_appstore_series(series_key: str) -> bool:
+    return weekly_series_weight(series_key) <= 0
+
+
+def build_mechanical_weekly_flow(
+    weekly_rising: Dict[str, List[Dict[str, Any]]],
+    weekly_category: Dict[str, List[Dict[str, Any]]],
+) -> str:
+    """LLM なしの「先週の流れ」短文。rising top + カテゴリ上位ラベル。"""
+    region = WEEKLY_REGIONS[0]
+    bits: List[str] = []
+    rising = weekly_rising.get(region) or []
+    if rising:
+        it = rising[0]
+        label = str(it.get("label") or "").strip()
+        dc = int(it.get("day_count") or len(it.get("days") or []) or 0)
+        if label:
+            if _ACTIVE_REGION == "us":
+                days_bit = f" across {dc} day(s)" if dc else ""
+                bits.append(
+                    f'The sharpest rank move last week was "{label}"{days_bit}.'
+                )
+            else:
+                days_bit = f"（{dc}日）" if dc else ""
+                bits.append(f"順位の動きが最も大きかったのは「{label}」{days_bit}。")
+    labels: List[str] = []
+    for block in weekly_category.get(region) or []:
+        for it in block.get("items") or []:
+            lab = str(it.get("label") or "").strip()
+            sk = str(it.get("series_key") or "")
+            if not lab or _is_appstore_series(sk):
+                continue
+            if lab in labels:
+                continue
+            labels.append(lab)
+            if len(labels) >= 3:
+                break
+        if len(labels) >= 3:
+            break
+    if labels:
+        if _ACTIVE_REGION == "us":
+            joined = ", ".join(f'"{x}"' for x in labels)
+            bits.append(f"Category leaders included {joined}.")
+        else:
+            bits.append("カテゴリ上位には「" + "」「".join(labels) + "」などが入った。")
+    if bits:
+        return " ".join(bits)
+    if _ACTIVE_REGION == "us":
+        return "Last week's category leaders and rank movers are summarized below."
+    return "先週のカテゴリ別トップと順位の動きは以下のとおり。"
+
+
+def build_mechanical_weekly_hot_topics(
+    weekly_rising: Dict[str, List[Dict[str, Any]]],
+    weekly_category: Dict[str, List[Dict[str, Any]]],
+    *,
+    limit: int = WEEKLY_HOT_MAX,
+) -> List[Dict[str, str]]:
+    """カテゴリ digest から機械ホットトピックを抽出（App Store 除外）。"""
+    region = WEEKLY_REGIONS[0]
+    candidates: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+    for block in weekly_category.get(region) or []:
+        cat = str(block.get("category") or "")
+        for it in block.get("items") or []:
+            label = str(it.get("label") or "").strip()
+            sk = str(it.get("series_key") or "")
+            if not label or _is_appstore_series(sk):
+                continue
+            nk = sr.normalize_label_key(label)
+            if nk in seen:
+                continue
+            seen.add(nk)
+            day_count = int(it.get("day_count") or len(it.get("days") or []) or 0)
+            cross = bool(it.get("cross_source"))
+            score = int(it.get("weekly_score") or 0) or (
+                day_count * 10 + (15 if cross else 0) + weekly_series_weight(sk)
+            )
+            candidates.append(
+                {
+                    "title": label,
+                    "day_count": day_count,
+                    "cross_source": cross,
+                    "category": cat,
+                    "best_rank": it.get("best_rank"),
+                    "score": score,
+                    "link_line": it.get("link_line") or "",
+                    "url": it.get("url"),
+                }
+            )
+    # rising を補完
+    for it in weekly_rising.get(region) or []:
+        label = str(it.get("label") or "").strip()
+        sk = str(it.get("series_key") or "")
+        if not label or _is_appstore_series(sk):
+            continue
+        nk = sr.normalize_label_key(label)
+        if nk in seen:
+            continue
+        seen.add(nk)
+        day_count = int(it.get("day_count") or len(it.get("days") or []) or 0)
+        candidates.append(
+            {
+                "title": label,
+                "day_count": day_count,
+                "cross_source": bool(it.get("cross_source")),
+                "category": str(it.get("category") or ""),
+                "best_rank": it.get("best_rank"),
+                "score": int(it.get("weekly_score") or 0) or day_count * 10,
+                "link_line": it.get("link_line") or "",
+                "url": it.get("url"),
+            }
+        )
+    candidates.sort(key=lambda x: (-int(x["score"]), -int(x["day_count"]), str(x["title"])))
+    out: List[Dict[str, str]] = []
+    for c in candidates[: max(0, limit)]:
+        dc = int(c["day_count"])
+        if _ACTIVE_REGION == "us":
+            why_bits = []
+            if dc:
+                why_bits.append(f"appeared on {dc} day(s)")
+            if c["cross_source"]:
+                why_bits.append("crossed multiple sources")
+            if c.get("best_rank"):
+                why_bits.append(f"best rank {c['best_rank']}")
+            if c.get("category"):
+                why_bits.append(f"category {c['category']}")
+            why = "; ".join(why_bits) + "." if why_bits else "Stood out in last week's digest."
+        else:
+            why_bits = []
+            if dc:
+                why_bits.append(f"{dc}日登場")
+            if c["cross_source"]:
+                why_bits.append("複数ソースで重なった")
+            if c.get("best_rank"):
+                why_bits.append(f"最高順位 {c['best_rank']}")
+            if c.get("category"):
+                why_bits.append(f"区分 {c['category']}")
+            why = "。".join(why_bits) + "。" if why_bits else "先週の digest で目立った話題。"
+        row: Dict[str, str] = {"title": str(c["title"]), "why": why}
+        if c.get("link_line"):
+            row["link_line"] = str(c["link_line"])
+        if c.get("url"):
+            row["url"] = str(c["url"])
+        out.append(row)
+    return out
+
+
 def assemble_weekly_markdown(
     iso_week: str,
     mon: date,
@@ -1631,44 +1792,44 @@ def assemble_weekly_markdown(
         title = f"# Weekly summary — {iso_week} (observation week JST {mon.isoformat()}–{sun.isoformat()})"
         meta_lines = [
             f"- **Week**: {mon.isoformat()} – {sun.isoformat()} (JST)",
-            "- **Generated**: automatic (time not filled)",
             "",
         ]
-        if include_flow:
-            meta_lines.extend(
-                [
-                    "## Last week in review",
-                    "",
-                    (
-                        editorial.get("flow_us")
-                        or editorial.get("flow_jp")
-                        or "(Could not generate the U.S. weekly brief.)"
-                    ).strip(),
-                    "",
-                ]
-            )
     else:
         title = f"# 週次サマリー — {iso_week}（対象週 JST {mon.isoformat()}〜{sun.isoformat()}）"
         meta_lines = [
             f"- **対象週**: {mon.isoformat()} 〜 {sun.isoformat()}",
-            "- **生成・送信完了**: 自動生成（時刻未入力）",
             "",
         ]
-        if include_flow:
-            meta_lines.extend(
-                [
-                    "## 先週の流れ（短文）",
-                    "",
-                    (
-                        editorial.get("flow_jp")
-                        or "（日本向けの週次要約を生成できませんでした）"
-                    ).strip(),
-                    "",
-                ]
-            )
 
     lines: List[str] = [title, *meta_lines]
-    body_parts: List[str] = [render_weekly_rising_markdown(weekly_rising).rstrip()]
+    # 1) オープナー（配信週カレンダー・先週マーケット・ひと息）
+    try:
+        from services.summary.morning_brief import render_weekly_brief_markdown
+
+        brief = render_weekly_brief_markdown(mon, sun, _ACTIVE_REGION)
+        if brief:
+            lines.append(brief.rstrip())
+            lines.append("")
+    except Exception as exc:
+        # オープナー失敗で本文全体を落とさない
+        meta.setdefault("brief_warnings", []).append(str(exc))
+    # 2) 先週の流れ → 動いた話題 → ホット → カテゴリ
+    body_parts: List[str] = []
+    if include_flow:
+        if _ACTIVE_REGION == "us":
+            flow_text = (
+                editorial.get("flow_us")
+                or editorial.get("flow_jp")
+                or "(Could not generate the U.S. weekly brief.)"
+            ).strip()
+            body_parts.append("## Last week in review\n\n" + flow_text)
+        else:
+            flow_text = (
+                editorial.get("flow_jp")
+                or "（日本向けの週次要約を生成できませんでした）"
+            ).strip()
+            body_parts.append("## 先週の流れ（短文）\n\n" + flow_text)
+    body_parts.append(render_weekly_rising_markdown(weekly_rising).rstrip())
     if include_hot_topics:
         body_parts.append(render_weekly_hot_topics_markdown(editorial).rstrip())
     if include_next_week:
@@ -1844,7 +2005,7 @@ LEGACY_SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集
 - 出力は日本語の Markdown のみ（YAML フロントマターは書かない。先頭から # 見出しでよい）。
 - 見出し構造:
   - `# 週次サマリー — ISO_WEEK（対象週 JST WEEK_MON〜WEEK_SUN）`
-  - `- **対象週**:` と `- **生成・送信完了**:` の2行（生成時刻は「自動生成（時刻未入力）」でよい）
+  - `- **対象週**:` 1行（タイトルと重複するがスキャン用に残す）
   - `## 先週の流れ（短文）`
 - 「先週の流れ」は日次の繰り返しにせず、週としての要約にする。
 - 日次ファイルが欠けている日がある場合は `## データ前提` を短く置く。
@@ -1976,10 +2137,12 @@ def run_generate_mechanical(
         meta["error"] = "no_snapshot_days"
         return "", meta
 
+    flow = build_mechanical_weekly_flow(weekly_rising, weekly_category)
+    hot_topics = build_mechanical_weekly_hot_topics(weekly_rising, weekly_category)
     editorial: Dict[str, Any] = {
-        "flow_jp": "",
-        "flow_us": "",
-        "hot_topics": [],
+        "flow_jp": flow if _ACTIVE_REGION != "us" else "",
+        "flow_us": flow if _ACTIVE_REGION == "us" else "",
+        "hot_topics": hot_topics,
         "next_week": [],
         "category_themes": {"jp": {}, "us": {}},
     }
@@ -1994,8 +2157,8 @@ def run_generate_mechanical(
         weekly_rising,
         weekly_category,
         meta,
-        include_flow=False,
-        include_hot_topics=False,
+        include_flow=True,
+        include_hot_topics=True,
         include_next_week=False,
     )
     warnings: List[str] = []

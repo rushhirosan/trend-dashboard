@@ -1,4 +1,4 @@
-[`generate_ai_weekly_summary.py`](../../scripts/generate_ai_weekly_summary.py) が、**7日分の trend_daily_snapshots**（既定）を **`--region` ごとに**集計し、OpenAI で週次サマリーを生成します。
+[`generate_ai_weekly_summary.py`](../../scripts/generate_ai_weekly_summary.py) が、**7日分の trend_daily_snapshots**（既定）を **`--region` ごとに**集計し、機械集計で週次サマリーを生成します（`--use-llm` 時のみ OpenAI）。
 
 | `--region` | 出力 | 言語 | 対象ソース |
 |------------|------|------|------------|
@@ -7,18 +7,21 @@
 
 日次 Markdown は同地域のファイルを補助コンテキストとして読む（欠損可）。
 
-## 構成（1枚向け・単一地域）
+## 構成（1枚向け・単一地域・機械生成）
 
-1. **先週いちばん動いた話題 / Biggest movers** — 週内で実質ジャンプしたものだけ（横ばい除外・機械）
-2. **カテゴリ別 — 先週の top3 / Category top3** — 日次カテゴリ top3 の週次集約（機械）
+1. **オープナー** — 今週のカレンダー（祝日） / 先週マーケット / ひと息
+2. **先週の流れ** — rising + カテゴリ上位からの短文（機械）
+3. **いちばん動いた話題** — 週内ジャンプ（App Store 除外・機械）
+4. **ホットトピック** — カテゴリ digest から機械抽出
+5. **カテゴリ別 — 先週の top3** — 日次カテゴリ top3 の週次集約（機械）
 
-メール本文に含めない（Web 用は frontmatter の `teaser` / `preview_lead`）:
+本文に含めない:
 
-- ~~先週の流れ / Last week in review~~（旧: OpenAI）
-- ~~週のホットトピック / Hot topics~~（旧: OpenAI）
-- ~~来週に残る論点 / What to watch next week~~（旧: OpenAI）
+- ~~来週に残る論点 / What to watch next week~~（LLM 時も本文除外）
 
-`--use-llm` 指定時も編集セクションは **メール本文には載せない**（`preview_lead` のみ frontmatter）。
+Web 用リードは frontmatter の `teaser` / `preview_lead`。
+
+`--use-llm` 指定時も編集系の「来週論点」は **メール本文には載せない**（`preview_lead` のみ frontmatter）。
 
 > 以前は1ファイルに日本・アメリカを対称配置していましたが、**日本語ページ／USページで原稿を分けました**。
 

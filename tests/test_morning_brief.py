@@ -14,6 +14,10 @@ from services.summary.morning_brief import (
     build_morning_brief_lines,
     delivery_day_for_business_day,
     render_morning_brief_markdown,
+    WeeklyBriefLines,
+    build_week_calendar_line,
+    delivery_week_for_observation_week,
+    render_weekly_brief_markdown,
 )
 
 SAMPLE_TOUNOU_HTML = """
@@ -182,3 +186,48 @@ def test_build_morning_brief_lines_skips_market_when_disabled(monkeypatch):
     market_mock.assert_not_called()
     assert lines.fx is None
     assert lines.stock is None
+
+
+def test_delivery_week_follows_observation_sunday():
+    mon, sun = delivery_week_for_observation_week(date(2026, 8, 16))
+    assert mon == date(2026, 8, 17)
+    assert sun == date(2026, 8, 23)
+
+
+def test_build_week_calendar_line_lists_holidays_in_delivery_week():
+    week_mon = date(2026, 9, 21)
+    week_sun = date(2026, 9, 27)
+    holidays = {
+        "2026-09-21": "敬老の日",
+        "2026-09-23": "秋分の日",
+        "2026-10-12": "スポーツの日",
+    }
+    with patch(
+        "services.summary.morning_brief._holiday_map_for_day",
+        return_value=holidays,
+    ):
+        line = build_week_calendar_line(week_mon, week_sun, "jp")
+    assert "**今週**" in line
+    assert "敬老の日" in line
+    assert "秋分の日" in line
+    assert "スポーツの日" not in line
+
+
+def test_render_weekly_brief_markdown_sections():
+    lines = WeeklyBriefLines(
+        calendar="**今週** 8/17（月）〜8/23（日） · 祝日なし",
+        fx="**為替** USD/JPY 150.0（週次 +0.5%）",
+        stock="**株** 日経 40000（週次 -1.2%）",
+        history="**歴史** 1868年 — 例",
+        breath_second="**格言** 「例」（10秒名言）",
+    )
+    md = render_weekly_brief_markdown(
+        date(2026, 8, 10),
+        date(2026, 8, 16),
+        "jp",
+        lines=lines,
+    )
+    assert "## 🗓 今週のカレンダー" in md
+    assert "## 💹 マーケット（先週）" in md
+    assert "## ☕ ひと息（歴史 + 格言）" in md
+

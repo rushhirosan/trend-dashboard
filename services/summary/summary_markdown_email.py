@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import html
+import os
 import re
 from pathlib import Path
 from typing import Optional, Tuple
@@ -15,15 +16,21 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SUMMARIES_ROOT = _REPO_ROOT / "docs" / "summaries"
 
 WORLD_FRONT_PAGE_BASE = "https://g7-dashboard.vercel.app/"
+_DEFAULT_SITE_BASE_URL = "https://trends-dashboard.com"
+_EMAIL_LINK_STYLE = "color:#0d6efd;text-decoration:underline;"
 
 _FOOTER_COPY = {
     "jp": {
-        "text": "関連: 世界9カ国のニュース表紙 → World Front Page\n{url}",
-        "html": "関連: {link} — G7・中国・インドの主要メディア表紙見出し",
+        "dashboard_text": "ダッシュボードで最新データを見る\n{url}",
+        "dashboard_label": "ダッシュボードで最新データを見る",
+        "related_text": "関連: 世界9カ国のニュース表紙 → World Front Page\n{url}",
+        "related_html": "関連: {link} — G7・中国・インドの主要メディア表紙見出し",
     },
     "us": {
-        "text": "Related: Top headlines from G7 countries → World Front Page\n{url}",
-        "html": "Related: {link} — Top headlines from G7, China & India",
+        "dashboard_text": "See the latest on the dashboard\n{url}",
+        "dashboard_label": "See the latest on the dashboard",
+        "related_text": "Related: Top headlines from G7 countries → World Front Page\n{url}",
+        "related_html": "Related: {link} — Top headlines from G7, China & India",
     },
 }
 
@@ -348,19 +355,46 @@ def markdown_to_email_html(
     )
 
 
+def _public_base_url() -> str:
+    return (
+        os.getenv("PUBLIC_BASE_URL")
+        or os.getenv("TREND_DASHBOARD_BASE_URL")
+        or _DEFAULT_SITE_BASE_URL
+    ).strip().rstrip("/")
+
+
+def _footer_utm(*, region: str, kind: str) -> str:
+    return urlencode(
+        {
+            "utm_source": "trends_dashboard",
+            "utm_medium": "summary_email",
+            "utm_campaign": region,
+            "utm_content": kind,
+        }
+    )
+
+
+def _email_anchor(url: str, label: str) -> str:
+    return (
+        f'<a href="{html.escape(url, quote=True)}" style="{_EMAIL_LINK_STYLE}">'
+        f"{html.escape(label)}</a>"
+    )
+
+
+def dashboard_email_url(*, region: str, kind: str) -> str:
+    """サマリーメールフッター用の Trend Dashboard URL（効果測定用 UTM 付き）。"""
+    region_n = (region or "jp").strip().lower()
+    kind_n = (kind or "daily").strip().lower()
+    base = _public_base_url()
+    path = "/us" if region_n == "us" else "/"
+    return f"{base}{path}?{_footer_utm(region=region_n, kind=kind_n)}"
+
+
 def world_front_page_email_url(*, region: str, kind: str) -> str:
     """サマリーメールフッター用の World Front Page URL（効果測定用 UTM 付き）。"""
     region_n = (region or "jp").strip().lower()
     kind_n = (kind or "daily").strip().lower()
-    params = urlencode(
-        {
-            "utm_source": "trends_dashboard",
-            "utm_medium": "summary_email",
-            "utm_campaign": region_n,
-            "utm_content": kind_n,
-        }
-    )
-    return f"{WORLD_FRONT_PAGE_BASE}?{params}"
+    return f"{WORLD_FRONT_PAGE_BASE}?{_footer_utm(region=region_n, kind=kind_n)}"
 
 
 def append_summary_email_footer(
@@ -370,20 +404,28 @@ def append_summary_email_footer(
     region: str,
     kind: str,
 ) -> Tuple[str, str]:
-    """配信メール末尾に World Front Page（G7 Dashboard）へのリンクを付ける。"""
+    """配信メール末尾に Trend Dashboard と World Front Page へのリンクを付ける。"""
     region_n = (region or "jp").strip().lower()
     if region_n not in _FOOTER_COPY:
         region_n = "jp"
-    url = world_front_page_email_url(region=region_n, kind=kind)
+    dash_url = dashboard_email_url(region=region_n, kind=kind)
+    wfp_url = world_front_page_email_url(region=region_n, kind=kind)
     copy = _FOOTER_COPY[region_n]
-    text_out = text.rstrip() + "\n\n---\n" + copy["text"].format(url=url) + "\n"
-    link = (
-        f'<a href="{html.escape(url, quote=True)}">World Front Page</a>'
+    text_out = (
+        text.rstrip()
+        + "\n\n---\n"
+        + copy["dashboard_text"].format(url=dash_url)
+        + "\n\n"
+        + copy["related_text"].format(url=wfp_url)
+        + "\n"
     )
+    dash_link = _email_anchor(dash_url, copy["dashboard_label"])
+    wfp_link = _email_anchor(wfp_url, "World Front Page")
     footer_html = (
         '<hr style="border:none;border-top:1px solid #ddd;margin:2em 0 1em;">'
+        f'<p style="font-size:0.9em;margin:0 0 0.75em;">{dash_link}</p>'
         f'<p style="font-size:0.9em;color:#666;margin:0;">'
-        f"{copy['html'].format(link=link)}"
+        f"{copy['related_html'].format(link=wfp_link)}"
         "</p>"
     )
     if "</body>" in html_body:

@@ -12,6 +12,7 @@ from services.summary.summary_dogfood_email import (
 )
 from services.summary.summary_markdown_email import (
     append_summary_email_footer,
+    dashboard_email_url,
     load_summary_email_bodies,
     markdown_to_email_text,
     summary_markdown_path,
@@ -52,7 +53,13 @@ def test_summary_markdown_path_jp_us(tmp_path: Path):
     ) == tmp_path / "daily" / "us" / "2026-07-22.md"
 
 
-def test_load_summary_email_bodies_daily(tmp_path: Path):
+def _use_default_site_base(monkeypatch):
+    monkeypatch.delenv("PUBLIC_BASE_URL", raising=False)
+    monkeypatch.delenv("TREND_DASHBOARD_BASE_URL", raising=False)
+
+
+def test_load_summary_email_bodies_daily(tmp_path: Path, monkeypatch):
+    _use_default_site_base(monkeypatch)
     daily = tmp_path / "daily"
     daily.mkdir()
     (daily / "2026-07-22.md").write_text(
@@ -76,9 +83,13 @@ def test_load_summary_email_bodies_daily(tmp_path: Path):
     assert "utm_medium=summary_email" in text
     assert "utm_content=daily" in html
     assert "G7・中国・インド" in html
+    assert "ダッシュボードで最新データを見る" in text
+    assert "ダッシュボードで最新データを見る</a>" in html
+    assert "trends-dashboard.com/" in html
 
 
-def test_load_summary_email_bodies_us_footer(tmp_path: Path):
+def test_load_summary_email_bodies_us_footer(tmp_path: Path, monkeypatch):
+    _use_default_site_base(monkeypatch)
     daily = tmp_path / "daily" / "us"
     daily.mkdir(parents=True)
     (daily / "2026-07-22.md").write_text(
@@ -91,6 +102,8 @@ def test_load_summary_email_bodies_us_footer(tmp_path: Path):
     assert "Related: Top headlines from G7 countries" in text
     assert "G7, China & India" in html
     assert "utm_campaign=us" in html
+    assert "See the latest on the dashboard" in text
+    assert "trends-dashboard.com/us?" in html
 
 
 def test_world_front_page_email_url():
@@ -100,7 +113,18 @@ def test_world_front_page_email_url():
     assert "utm_content=weekly" in url
 
 
-def test_append_summary_email_footer():
+def test_dashboard_email_url(monkeypatch):
+    _use_default_site_base(monkeypatch)
+    jp = dashboard_email_url(region="jp", kind="daily")
+    assert jp.startswith("https://trends-dashboard.com/?")
+    assert "utm_medium=summary_email" in jp
+    us = dashboard_email_url(region="us", kind="weekly")
+    assert us.startswith("https://trends-dashboard.com/us?")
+    assert "utm_content=weekly" in us
+
+
+def test_append_summary_email_footer(monkeypatch):
+    _use_default_site_base(monkeypatch)
     text, html = append_summary_email_footer(
         "body\n",
         "<html><body><h1>x</h1></body></html>",
@@ -110,6 +134,9 @@ def test_append_summary_email_footer():
     assert "World Front Page" in text
     assert "g7-dashboard.vercel.app" in text
     assert "World Front Page</a>" in html
+    assert "ダッシュボードで最新データを見る</a>" in html
+    assert "trends-dashboard.com/" in html
+    assert html.index("ダッシュボードで最新データを見る") < html.index("World Front Page")
     assert html.index("<hr") < html.index("</body>")
 
 

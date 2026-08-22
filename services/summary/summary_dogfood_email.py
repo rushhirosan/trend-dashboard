@@ -69,15 +69,8 @@ def dogfood_enabled() -> bool:
     return bool(resolve_dogfood_to())
 
 
-def build_subject(
-    kind: str, region: str, doc_id: str, *, cross_source: bool = False
-) -> str:
-    base = f"[Trends-dashboard][{region.upper()}][{kind}] {doc_id}"
-    if kind == "daily" and cross_source:
-        if (region or "").lower() == "us":
-            return f"{base} (cross-source)"
-        return f"{base}（横断あり）"
-    return base
+def build_subject(kind: str, region: str, doc_id: str) -> str:
+    return f"[Trends-dashboard][{region.upper()}][{kind}] {doc_id}"
 
 
 def send_summary_dogfood(
@@ -151,13 +144,7 @@ def send_summary_dogfood(
             )
             continue
 
-        has_cross = (
-            "複数ソースで重なった話題" in text
-            or "Topics that overlapped across sources" in text
-        )
-        subject = build_subject(
-            kind, region_n, doc_id, cross_source=has_cross
-        )
+        subject = build_subject(kind, region_n, doc_id)
         header = (
             f"{DOGFOOD_BANNER}\n"
             f"kind={kind} region={region_n} id={doc_id}\n"

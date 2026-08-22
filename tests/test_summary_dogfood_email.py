@@ -35,12 +35,12 @@ def test_build_subject():
         == "[Trends-dashboard][JP][daily] 2026-07-22"
     )
     assert (
-        build_subject("daily", "jp", "2026-07-22", cross_source=True)
-        == "[Trends-dashboard][JP][daily] 2026-07-22（横断あり）"
+        build_subject("daily", "us", "2026-07-22")
+        == "[Trends-dashboard][US][daily] 2026-07-22"
     )
     assert (
-        build_subject("daily", "us", "2026-07-22", cross_source=True)
-        == "[Trends-dashboard][US][daily] 2026-07-22 (cross-source)"
+        build_subject("weekly", "jp", "2026-W30")
+        == "[Trends-dashboard][JP][weekly] 2026-W30"
     )
 
 

@@ -138,11 +138,7 @@ def send_summary_paid(
                 )
             continue
 
-        has_cross = (
-            "複数ソースで重なった話題" in text
-            or "Topics that overlapped across sources" in text
-        )
-        subject = build_subject(kind, region, doc_id, cross_source=has_cross)
+        subject = build_subject(kind, region, doc_id)
 
         for sub in region_subs:
             email = sub["email"]

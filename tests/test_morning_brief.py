@@ -5,7 +5,10 @@ from unittest.mock import patch
 
 from services.summary.morning_brief import (
     MorningBriefLines,
+    _author_from_tounou_lines,
     _extract_tounou_article_lines,
+    _format_en_on_this_day_line,
+    _format_jp_history_line,
     _format_jp_proverb_line,
     _meaning_from_tounou_lines,
     _select_tounou_item_for_day,
@@ -79,23 +82,75 @@ def test_build_calendar_line_us_next_holiday():
     assert "Next holiday: 9/7 (Mon) Labor Day" in line
 
 
+def test_format_en_on_this_day_uses_api_year_and_calendar_day():
+    line = _format_en_on_this_day_line(
+        date(2026, 8, 23),
+        "A 5.8 MW earthquake struck the Piedmont region of Virginia, "
+        "and was felt by more people than any other quake in U.S. history.",
+        year=2011,
+    )
+    assert line is not None
+    assert line.startswith("**On this day** Aug 23, 2011 — ")
+    assert "earthquake" in line
+    assert "(Wikipedia)" in line
+
+
+def test_format_en_on_this_day_without_year_still_shows_month_day():
+    line = _format_en_on_this_day_line(
+        date(2026, 8, 23),
+        "A 5.8 MW earthquake struck the Piedmont region of Virginia.",
+    )
+    assert line is not None
+    assert "Aug 23" in line
+    assert "2011" not in line
+
+
+def test_format_jp_history_line_includes_month_day_and_year():
+    line = _format_jp_history_line(
+        date(2026, 8, 23),
+        "1059",
+        "ローマ教皇がノルマン人を諸侯に任命",
+    )
+    assert line == (
+        "**歴史** 8/23 · 1059年 — ローマ教皇がノルマン人を諸侯に任命（Wikipedia）"
+    )
+
+
 def test_extract_tounou_article_lines_and_meaning():
     lines = _extract_tounou_article_lines(SAMPLE_TOUNOU_HTML)
     assert lines[0].startswith("新井正明")
     meaning = _meaning_from_tounou_lines(lines)
     assert meaning is not None
     assert "右足" in meaning
+    assert _author_from_tounou_lines(lines) == "新井正明"
+
+
+def test_author_from_tounou_lines_without_bio_parens():
+    assert _author_from_tounou_lines(["コピーライター吉田一馬"]) == "コピーライター吉田一馬"
 
 
 def test_format_jp_proverb_line():
     line = _format_jp_proverb_line(
         "急がば回れ",
-        "慌てず確実な道を選ぶ方が、結果的に早い",
+        author="新井正明",
     )
-    assert line == (
-        "**格言** 「急がば回れ」 — 慌てず確実な道を選ぶ方が、"
-        "結果的に早い（10秒名言）"
+    assert line == "**格言** 「急がば回れ」 — 新井正明（10秒名言）"
+
+
+def test_format_jp_proverb_line_prefers_author_over_meaning():
+    quote = (
+        "ぼくはキャリアを通じて9000回以上のシュートをはずした。"
+        "300回近い試合に負けた。勝敗を決するシュートを託され、"
+        "失敗したことは26回ある。人生で何度も失敗を重ねてきた。だから成功できた。"
     )
+    line = _format_jp_proverb_line(
+        quote,
+        meaning="２０１６年に東京大学で行わた、マウスを迷路に入れた実験で、",
+        author="マイケル・ジョーダン",
+    )
+    assert line == f"**格言** 「{quote}」 — マイケル・ジョーダン（10秒名言）"
+    assert "…" not in line
+    assert "マウス" not in line
 
 
 def test_select_tounou_item_for_day_is_stable():
@@ -116,15 +171,12 @@ def test_build_jp_proverb_line_from_tounou():
         "services.summary.morning_brief._fetch_tounou_rss_items",
         return_value=items,
     ), patch(
-        "services.summary.morning_brief._fetch_tounou_meaning",
-        return_value="慌てず確実な道を選ぶ方が、結果的に早い",
+        "services.summary.morning_brief._fetch_tounou_speaker",
+        return_value="新井正明",
     ):
         line = build_jp_proverb_line(date(2026, 8, 22))
 
-    assert line is not None
-    assert "（10秒名言）" in line
-    assert "急がば回れ" in line
-    assert "慌てず" in line
+    assert line == "**格言** 「急がば回れ」 — 新井正明（10秒名言）"
 
 
 def test_render_morning_brief_markdown_jp():
@@ -132,11 +184,8 @@ def test_render_morning_brief_markdown_jp():
         calendar="**カレンダー** 金曜 · 次の祝日は 9/21（月）敬老の日",
         fx="**為替** USD/JPY 154.2（前日終値比 +0.3）",
         stock="**株** 日経 38,420（前日終値 -0.4%）",
-        history="**歴史** 697年 — 文武天皇が譲位（Wikipedia）",
-        breath_second=(
-            "**格言** 「急がば回れ」— 慌てず確実な道を選ぶ方が、"
-            "結果的に早い（10秒名言）"
-        ),
+        history="**歴史** 8/21 · 697年 — 文武天皇が譲位（Wikipedia）",
+        breath_second="**格言** 「急がば回れ」 — 新井正明（10秒名言）",
     )
     md = render_morning_brief_markdown(
         date(2026, 8, 21),
@@ -155,7 +204,7 @@ def test_render_morning_brief_markdown_us():
         calendar="**Calendar** Friday · Next holiday: 9/1 (Mon) Labor Day",
         fx="**FX** USD/JPY 154.2 (+0.3 vs prior close)",
         stock="**Stocks** S&P 500 closed at 5,234.18 (-0.4%)",
-        history="**On this day** 1962 — sample event (Wikipedia)",
+        history="**On this day** Aug 21, 1962 — sample event (Wikipedia)",
         breath_second='**Quote** "Sample quote." — Author (ZenQuotes)',
     )
     md = render_morning_brief_markdown(
@@ -218,7 +267,7 @@ def test_render_weekly_brief_markdown_sections():
         calendar="**今週** 8/17（月）〜8/23（日） · 祝日なし",
         fx="**為替** USD/JPY 150.0（週次 +0.5%）",
         stock="**株** 日経 40000（週次 -1.2%）",
-        history="**歴史** 1868年 — 例",
+        history="**歴史** 8/12 · 1868年 — 例",
         breath_second="**格言** 「例」（10秒名言）",
     )
     md = render_weekly_brief_markdown(

@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import requests
 
@@ -216,6 +216,71 @@ def build_market_lines(region: str) -> tuple[Optional[str], Optional[str]]:
     return fx_line, stock_line
 
 
+_US_MONTH_ABBR = (
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+)
+
+
+def _format_history_year_en(year_val: Any) -> Optional[str]:
+    try:
+        year = int(year_val)
+    except (TypeError, ValueError):
+        return None
+    if year < 0:
+        return f"{abs(year)} BCE"
+    if year == 0:
+        return None
+    return str(year)
+
+
+def _format_en_on_this_day_line(
+    day: date,
+    text: str,
+    year: Any = None,
+) -> Optional[str]:
+    """『この暦日・何年の出来事か』が本文だけだと分からないので両方出す。"""
+    cleaned = _strip_wikitext(text)
+    if not cleaned:
+        return None
+    year_s = _format_history_year_en(year)
+    if year_s is None:
+        year_match = re.search(r"\b(1[0-9]{3}|20[0-9]{2})\b", cleaned)
+        if year_match:
+            year_s = year_match.group(1)
+            cleaned = cleaned[year_match.end() :].lstrip(" –—-,")
+    else:
+        cleaned = re.sub(
+            rf"^(?:in\s+)?{re.escape(year_s)}\s*[,–—:-]\s*",
+            "",
+            cleaned,
+            flags=re.I,
+        )
+    cleaned = _clip(cleaned, 55)
+    if not cleaned:
+        return None
+    month_day = f"{_US_MONTH_ABBR[day.month - 1]} {day.day}"
+    when = f"{month_day}, {year_s}" if year_s else month_day
+    return f"**On this day** {when} — {cleaned} (Wikipedia)"
+
+
+def _format_jp_history_line(day: date, year: str, rest: str) -> Optional[str]:
+    event = _clip(str(rest or "").strip(), 50)
+    if not event:
+        return None
+    return f"**歴史** {day.month}/{day.day} · {year}年 — {event}（Wikipedia）"
+
+
 def _fetch_wikipedia_history_en(day: date) -> Optional[str]:
     mm = f"{day.month:02d}"
     dd = f"{day.day:02d}"
@@ -230,16 +295,12 @@ def _fetch_wikipedia_history_en(day: date) -> Optional[str]:
     items = data.get("selected") or []
     if not items:
         return None
-    text = _strip_wikitext(str(items[0].get("text") or ""))
-    if not text:
-        return None
-    year_match = re.search(r"\b(1[0-9]{3}|20[0-9]{2})\b", text)
-    if year_match:
-        year = year_match.group(1)
-        rest = text[year_match.end() :].lstrip(" –—-,")
-        rest = _clip(rest, 55)
-        return f"**On this day** {year} — {rest} (Wikipedia)"
-    return f"**On this day** {_clip(text, 80)} (Wikipedia)"
+    item = items[0]
+    return _format_en_on_this_day_line(
+        day,
+        str(item.get("text") or ""),
+        year=item.get("year"),
+    )
 
 
 def _fetch_wikipedia_history_jp(day: date) -> Optional[str]:
@@ -292,10 +353,9 @@ def _fetch_wikipedia_history_jp(day: date) -> Optional[str]:
         year = year_match.group(1)
         rest = cleaned[year_match.end() :].lstrip("—－-・ ")
         rest = re.split(r"[（(]", rest, maxsplit=1)[0].strip(" 　—-")
-        rest = _clip(rest, 50)
-        if not rest:
-            continue
-        return f"**歴史** {year}年 — {rest}（Wikipedia）"
+        line = _format_jp_history_line(day, year, rest)
+        if line:
+            return line
     return None
 
 
@@ -317,14 +377,28 @@ _SKIP_TOUNOU_LINE_MARKERS = (
 
 
 def _normalize_proverb_title(title: str) -> str:
+    """RSS タイトルは名言全文。短いので切り詰めない。"""
     t = str(title or "").strip()
     if not t:
         return t
     if t.startswith("「"):
         return t
-    if len(t) > 72:
-        return _clip(t, 72)
     return f"「{t}」"
+
+
+def _author_from_tounou_lines(lines: List[str]) -> Optional[str]:
+    """本文先頭の『氏名（肩書…）』から発言者名だけ取る。"""
+    if not lines:
+        return None
+    first = str(lines[0] or "").strip()
+    if not first:
+        return None
+    match = re.match(r"^(.+?)\s*[（(]", first)
+    name = (match.group(1) if match else first).strip()
+    name = re.sub(r"\s+", " ", name)
+    if len(name) < 2:
+        return None
+    return _clip(name, 40)
 
 
 def _extract_tounou_article_lines(html: str) -> List[str]:
@@ -384,7 +458,7 @@ def _fetch_tounou_rss_items(*, max_items: int = 30) -> List[Dict[str, str]]:
     return out
 
 
-def _fetch_tounou_meaning(article_url: str) -> Optional[str]:
+def _fetch_tounou_speaker(article_url: str) -> Optional[str]:
     try:
         resp = requests.get(article_url, timeout=12, headers=HTTP_HEADERS)
         resp.raise_for_status()
@@ -392,7 +466,7 @@ def _fetch_tounou_meaning(article_url: str) -> Optional[str]:
         logger.warning("morning_brief: tounou article fetch failed: %s", exc)
         return None
     lines = _extract_tounou_article_lines(resp.text)
-    return _meaning_from_tounou_lines(lines)
+    return _author_from_tounou_lines(lines)
 
 
 def _select_tounou_item_for_day(items: List[Dict[str, str]], day: date) -> Optional[Dict[str, str]]:
@@ -402,10 +476,18 @@ def _select_tounou_item_for_day(items: List[Dict[str, str]], day: date) -> Optio
     return items[idx]
 
 
-def _format_jp_proverb_line(title: str, meaning: Optional[str]) -> str:
+def _format_jp_proverb_line(
+    title: str,
+    meaning: Optional[str] = None,
+    author: Optional[str] = None,
+) -> str:
     proverb = _normalize_proverb_title(title)
-    if meaning:
-        return f"**格言** {proverb} — {meaning}（{TOUNOU_ATTRIBUTION}）"
+    speaker = str(author or "").strip()
+    if speaker:
+        return f"**格言** {proverb} — {speaker}（{TOUNOU_ATTRIBUTION}）"
+    note = str(meaning or "").strip()
+    if note:
+        return f"**格言** {proverb} — {note}（{TOUNOU_ATTRIBUTION}）"
     return f"**格言** {proverb}（{TOUNOU_ATTRIBUTION}）"
 
 
@@ -414,8 +496,8 @@ def build_jp_proverb_line(day: date) -> Optional[str]:
     item = _select_tounou_item_for_day(items, day)
     if not item:
         return None
-    meaning = _fetch_tounou_meaning(item["link"])
-    return _format_jp_proverb_line(item["title"], meaning)
+    author = _fetch_tounou_speaker(item["link"])
+    return _format_jp_proverb_line(item["title"], author=author)
 
 
 def _fetch_zenquotes_today() -> Optional[str]:

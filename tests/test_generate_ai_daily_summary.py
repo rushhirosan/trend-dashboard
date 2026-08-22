@@ -1896,3 +1896,23 @@ def test_merge_front_matter_mechanical(gads):
     assert 'teaser: "短いリード"' in full
     assert 'preview_lead: "Web 向けの一行リード全文。"' in full
     assert "model:" not in full.split("---")[1]
+
+
+def test_script_imports_when_run_as_python_scripts_path():
+    """GHA は `python scripts/generate_ai_daily_summary.py`。sys.path[0] は scripts/。"""
+    import os
+    import subprocess
+    import sys
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = ""
+    result = subprocess.run(
+        [sys.executable, str(_SCRIPT), "--help"],
+        cwd=_SCRIPT.resolve().parents[1],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "--business-day" in result.stdout

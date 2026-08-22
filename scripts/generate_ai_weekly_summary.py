@@ -44,8 +44,11 @@ from dotenv import load_dotenv
 JST = ZoneInfo("Asia/Tokyo")
 _SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = _SCRIPT_DIR.parent
+# `python scripts/foo.py` では sys.path[0] が scripts/ になる。GHA も同じ。
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 import snapshot_rising as sr
 

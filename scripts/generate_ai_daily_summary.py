@@ -54,17 +54,18 @@ from dotenv import load_dotenv
 from psycopg2.extras import RealDictCursor
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = Path(__file__).resolve().parents[1]
+# `python scripts/foo.py` では sys.path[0] が scripts/ になる。GHA も同じ。
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
-
-import snapshot_rising as sr
-
-from services.summary.morning_brief import render_morning_brief_markdown
-
-JST = ZoneInfo("Asia/Tokyo")
-REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+
+import snapshot_rising as sr  # noqa: E402
+
+from services.summary.morning_brief import render_morning_brief_markdown  # noqa: E402
+
+JST = ZoneInfo("Asia/Tokyo")
 DAILY_DIR = REPO_ROOT / "docs" / "summaries" / "daily"
 _ACTIVE_REGION = "jp"
 

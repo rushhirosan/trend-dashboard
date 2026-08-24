@@ -455,6 +455,19 @@ def summary_markdown_path(
     raise ValueError(f"unsupported kind: {kind}")
 
 
+def summary_email_heading(kind: str, doc_id: str, region: str = "jp") -> str:
+    """メール HTML の <title>/<h1>。原稿先頭 H1 は省略するので地域の言語に合わせる。"""
+    region_u = (region or "jp").strip().upper() or "JP"
+    kind = (kind or "").strip().lower()
+    if region_u == "US":
+        if kind == "weekly":
+            return f"Weekly summary — {doc_id} (US)"
+        return f"Daily summary — {doc_id} (US)"
+    if kind == "weekly":
+        return f"週次サマリー — {doc_id} ({region_u})"
+    return f"日次サマリー — {doc_id} ({region_u})"
+
+
 def load_summary_email_bodies(
     kind: str,
     doc_id: str,
@@ -470,12 +483,8 @@ def load_summary_email_bodies(
     if not path.is_file():
         raise FileNotFoundError(path)
     raw = path.read_text(encoding="utf-8")
-    region_u = (region or "jp").upper()
     if title is None:
-        if kind == "daily":
-            title = f"日次サマリー — {doc_id} ({region_u})"
-        else:
-            title = f"週次サマリー — {doc_id} ({region_u})"
+        title = summary_email_heading(kind, doc_id, region)
     text = markdown_to_email_text(raw)
     html_body = markdown_to_email_html(raw, title=title)
     text, html_body = append_summary_email_footer(

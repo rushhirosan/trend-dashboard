@@ -8,6 +8,7 @@ import calendar
 import gc
 import os
 import re
+import time
 import requests
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
@@ -60,6 +61,30 @@ def _ranking_fetch_count() -> int:
         except (TypeError, ValueError):
             pass
     return RANKING_COUNT
+
+
+# JP chunk subprocess 上限（既定 600s）より短く打ち切り、kill 前に stale cache を返す。
+_KKJ_FETCH_DEADLINE_DEFAULT = 480.0
+_KKJ_FETCH_DEADLINE_MAX = 570.0
+
+
+class KkjFetchDeadlineExceeded(Exception):
+    """官公需APIの連続取得が全体期限を超えた。"""
+
+
+def _kkj_fetch_deadline_seconds() -> float:
+    raw = os.environ.get("KKJ_FETCH_DEADLINE_SECONDS")
+    if raw is not None and str(raw).strip() != "":
+        try:
+            return max(60.0, min(_KKJ_FETCH_DEADLINE_MAX, float(raw)))
+        except (TypeError, ValueError):
+            pass
+    return _KKJ_FETCH_DEADLINE_DEFAULT
+
+
+def _ensure_kkj_deadline(deadline_at: Optional[float]) -> None:
+    if deadline_at is not None and time.monotonic() >= deadline_at:
+        raise KkjFetchDeadlineExceeded("kkj_fetch_deadline")
 
 # JIS X 0401 都道府県コード → 都道府県名（APIの LG_Code 用）
 LG_CODE_TO_PREFECTURE = {
@@ -298,13 +323,16 @@ def _fetch_hits_for_date_range(
     date_to: str,
     count: int = 1,
     rate_limiter=None,
+    deadline_at: Optional[float] = None,
 ) -> Tuple[Optional[int], bool]:
     """
     指定期間（開始日/終了日）で SearchHits のみ取得。月次件数用。
     Returns: (search_hits or 0, connection_ok).
     """
+    _ensure_kkj_deadline(deadline_at)
     if rate_limiter:
         rate_limiter.wait_if_needed()
+    _ensure_kkj_deadline(deadline_at)
     # APIガイド: 開始日/終了日 で期間指定
     period = f"{date_from}/{date_to}"
     params = {
@@ -324,7 +352,11 @@ def _fetch_hits_for_date_range(
 
 
 def _fetch_hits_for_query(
-    query: str, date_from: str, count: int = 1, rate_limiter=None
+    query: str,
+    date_from: str,
+    count: int = 1,
+    rate_limiter=None,
+    deadline_at: Optional[float] = None,
 ) -> Tuple[Optional[int], List[Dict[str, Any]], bool]:
     """
     1回の検索で SearchHits（総件数）と結果リストを返す。
@@ -332,8 +364,10 @@ def _fetch_hits_for_query(
     Returns: (search_hits or None, list_of_result_dicts, connection_ok).
     connection_ok が False のときはタイムアウト等でAPIに接続できなかった。
     """
+    _ensure_kkj_deadline(deadline_at)
     if rate_limiter:
         rate_limiter.wait_if_needed()
+    _ensure_kkj_deadline(deadline_at)
     params = {
         "Query": query,
         "CFT_Issue_Date": date_from if date_from.endswith("/") else date_from + "/",
@@ -394,14 +428,37 @@ class KKJTrendsManager(BaseTrendsManager):
     def _fetch_trends(self, *args, **kwargs) -> Dict[str, Any]:
         date_from = _parse_date_range(SIGNALS_DAYS)
         as_of = datetime.now().strftime("%Y-%m-%d %H:%M")
+        deadline_at = time.monotonic() + _kkj_fetch_deadline_seconds()
 
+        try:
+            return self._fetch_trends_within_deadline(
+                date_from, as_of, deadline_at
+            )
+        except KkjFetchDeadlineExceeded:
+            logger.warning(
+                "⚠️ kkj fetch が %.0fs 以内に終わらなかったため打ち切り（stale cache へ）",
+                _kkj_fetch_deadline_seconds(),
+            )
+            return {
+                "success": False,
+                "error": "kkj_fetch_deadline",
+                "data": None,
+            }
+
+    def _fetch_trends_within_deadline(
+        self, date_from: str, as_of: str, deadline_at: float
+    ) -> Dict[str, Any]:
         # --- Public Sector Signals: キーワード別件数 ---
         signals = []
         connection_ok_count = 0
         keyword_category: Dict[str, str] = {}
         for key, label, query, category_key in SIGNALS_QUERIES:
             total, _, ok = _fetch_hits_for_query(
-                query, date_from, count=1, rate_limiter=self.rate_limiter
+                query,
+                date_from,
+                count=1,
+                rate_limiter=self.rate_limiter,
+                deadline_at=deadline_at,
             )
             if ok:
                 connection_ok_count += 1
@@ -421,7 +478,12 @@ class KKJTrendsManager(BaseTrendsManager):
             for y, m in _last_n_months(SIGNALS_MONTHS):
                 first, last = _month_range(y, m)
                 cnt, ok = _fetch_hits_for_date_range(
-                    query, first, last, count=1, rate_limiter=self.rate_limiter
+                    query,
+                    first,
+                    last,
+                    count=1,
+                    rate_limiter=self.rate_limiter,
+                    deadline_at=deadline_at,
                 )
                 if ok:
                     connection_ok_count += 1
@@ -440,7 +502,11 @@ class KKJTrendsManager(BaseTrendsManager):
         ranking_result_count: Dict[str, int] = {}  # 県別集計の元になった一覧取得件数（総件数と異なる場合あり）
         for key, label, query, _ in SIGNALS_QUERIES:
             _, results, ok = _fetch_hits_for_query(
-                query, date_from, count=_ranking_fetch_count(), rate_limiter=self.rate_limiter
+                query,
+                date_from,
+                count=_ranking_fetch_count(),
+                rate_limiter=self.rate_limiter,
+                deadline_at=deadline_at,
             )
             if ok:
                 connection_ok_count += 1

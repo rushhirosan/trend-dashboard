@@ -68,6 +68,15 @@ def test_kkj_moves_to_last_chunk_when_six_chunks():
     assert any(t[0] == "kkj" for t in parts[-1])
 
 
+def test_is_isolated_kkj_chunk():
+    from utils.jp_refresh_chunks import is_isolated_kkj_chunk
+
+    assert is_isolated_kkj_chunk(8, 8) is True
+    assert is_isolated_kkj_chunk(1, 8) is False
+    assert is_isolated_kkj_chunk(4, 4) is False
+    assert is_isolated_kkj_chunk(5, 5) is True
+
+
 def test_expected_jp_key_count_without_twitch(monkeypatch):
     monkeypatch.delenv("TWITCH_CLIENT_ID", raising=False)
     monkeypatch.delenv("TWITCH_CLIENT_SECRET", raising=False)

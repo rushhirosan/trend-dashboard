@@ -1191,6 +1191,7 @@ class TrendsScheduler:
         jp_subchunks = SCHEDULER_JP_SUBCHUNKS if low_memory_mode else 1
         jp_timeout, us_timeout = _subprocess_phase_timeouts(jp_subchunks, job_timeout_seconds)
         jp_chunk_results: list[dict] = []
+        kkj_chunk_timed_out = False
 
         for chunk_idx in range(1, jp_subchunks + 1):
             jp_result, jp_timed_out = self._run_refresh_region_subprocess(
@@ -1213,6 +1214,20 @@ class TrendsScheduler:
                 jp_result.get("error"),
             )
             if jp_timed_out:
+                from utils.jp_refresh_chunks import is_isolated_kkj_chunk
+
+                if is_isolated_kkj_chunk(chunk_idx, jp_subchunks):
+                    # 官公需だけハングしても US とスナップショットを落とさない
+                    logger.warning(
+                        "⚠️ JP chunk %s/%s (kkj 単独) が %ss でタイムアウト — US は継続",
+                        chunk_idx,
+                        jp_subchunks,
+                        jp_timeout,
+                    )
+                    kkj_chunk_timed_out = True
+                    if chunk_idx < jp_subchunks:
+                        self._pause_between_subprocess_phases()
+                    continue
                 merged = _merge_phase_refresh_results(
                     _merge_jp_chunk_results(jp_chunk_results),
                     {"success": False, "results": {}},
@@ -1275,6 +1290,11 @@ class TrendsScheduler:
             timeout_seconds=us_timeout,
         )
         merged = _merge_phase_refresh_results(jp_result, us_result)
+        if kkj_chunk_timed_out:
+            merged["kkj_chunk_timed_out"] = True
+            merged["failed_jp_chunk"] = jp_subchunks
+            merged["failed_jp_chunks"] = jp_subchunks
+            merged["jp_phase_timeout_seconds"] = jp_timeout
         if merged.get("phase_success_mismatch"):
             logger.warning(
                 "⚠️ refresh マージ: phase_success とソース成功数が不一致 "
@@ -1654,6 +1674,26 @@ class TrendsScheduler:
                             "PID": str(pid),
                         },
                     )
+
+            elif result.get("kkj_chunk_timed_out"):
+                jp_limit = result.get("jp_phase_timeout_seconds", "?")
+                failed_chunk = result.get("failed_jp_chunk")
+                failed_chunks = result.get("failed_jp_chunks")
+                self._send_alert(
+                    "warning",
+                    "官公需 (kkj) chunk タイムアウト",
+                    (
+                        f"JP chunk {failed_chunk}/{failed_chunks}（kkj 単独）が {jp_limit} 秒以内に終わりませんでした。"
+                        " 官公需は前回キャッシュのまま、US 取得は継続しています。"
+                    ),
+                    {
+                        "実行ID": execution_id,
+                        "トリガー": self._trigger_label(trigger_source),
+                        "JP上限（秒）": str(jp_limit),
+                        "ホスト": host_short,
+                        "PID": str(pid),
+                    },
+                )
 
             snapshot_status: dict = {}
             prior_slot_gaps: list[str] = []

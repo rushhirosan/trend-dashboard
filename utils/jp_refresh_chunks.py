@@ -28,6 +28,13 @@ def _isolated_bucket_index(key: str, chunk_count: int) -> int:
     return 0
 
 
+def is_isolated_kkj_chunk(chunk_index: int, chunk_count: int) -> bool:
+    """chunk_index（1始まり）が kkj 単独 subprocess か。"""
+    if not _isolate_key_for_chunk_count("kkj", chunk_count):
+        return False
+    return _isolated_bucket_index("kkj", chunk_count) == chunk_index - 1
+
+
 def expected_jp_result_key_count(tasks: list) -> int:
     """refresh 結果 dict に含まれるべき JP ソースキー数（book/openalex 等は1キーに集約）。"""
     return len({task[0] for task in tasks})

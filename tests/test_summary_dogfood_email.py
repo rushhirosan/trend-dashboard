@@ -15,6 +15,7 @@ from services.summary.summary_markdown_email import (
     dashboard_email_url,
     load_summary_email_bodies,
     markdown_to_email_text,
+    summary_email_heading,
     summary_markdown_path,
     world_front_page_email_url,
 )
@@ -76,6 +77,7 @@ def test_load_summary_email_bodies_daily(tmp_path: Path, monkeypatch):
     assert "https://ex.com" not in text
     assert " and a\n" in text or text.rstrip().endswith("and a")
     assert "<h1>" in html
+    assert "日次サマリー — 2026-07-22 (JP)" in html
     assert '<a href="https://ex.com">a</a>' in html
     assert "<strong>bold</strong>" in html
     assert "World Front Page" in text
@@ -86,6 +88,13 @@ def test_load_summary_email_bodies_daily(tmp_path: Path, monkeypatch):
     assert "ダッシュボードで最新データを見る" in text
     assert "ダッシュボードで最新データを見る</a>" in html
     assert "trends-dashboard.com/" in html
+
+
+def test_summary_email_heading_follows_region_language():
+    assert summary_email_heading("daily", "2026-08-23", "jp") == "日次サマリー — 2026-08-23 (JP)"
+    assert summary_email_heading("daily", "2026-08-23", "us") == "Daily summary — 2026-08-23 (US)"
+    assert summary_email_heading("weekly", "2026-W34", "jp") == "週次サマリー — 2026-W34 (JP)"
+    assert summary_email_heading("weekly", "2026-W34", "us") == "Weekly summary — 2026-W34 (US)"
 
 
 def test_load_summary_email_bodies_us_footer(tmp_path: Path, monkeypatch):
@@ -99,6 +108,8 @@ def test_load_summary_email_bodies_us_footer(tmp_path: Path, monkeypatch):
     _, text, html = load_summary_email_bodies(
         "daily", "2026-07-22", region="us", summaries_root=tmp_path
     )
+    assert "Daily summary — 2026-07-22 (US)" in html
+    assert "日次サマリー" not in html
     assert "Related: Top headlines from G7 countries" in text
     assert "G7, China & India" in html
     assert "utm_campaign=us" in html

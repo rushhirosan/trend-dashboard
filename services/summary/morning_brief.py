@@ -144,9 +144,9 @@ def build_calendar_line(
     if observation_day is not None:
         obs = f"{observation_day.month}/{observation_day.day}"
         if region_n == "us":
-            parts.append(f"Observed {obs}")
+            parts.append(f"Summary date {obs}")
         else:
-            parts.append(f"観測 {obs}")
+            parts.append(f"サマリー生成対象日 {obs}")
     if iso in holidays:
         name = holidays[iso]
         if region_n == "us":

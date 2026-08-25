@@ -205,14 +205,17 @@ def markdown_to_email_text(markdown: str) -> str:
     return "\n".join(lines).strip() + "\n"
 
 
-# 英文ピリオド: 数字直後（1. や 7.5）は除外。空白＋続きがあるときだけ
-_EN_SENTENCE_END_RE = re.compile(r"(?<!\d)\.(?=\s+\S)")
+# 英文ピリオド: 数字直後（1. や 7.5）は除外。空白＋続きがあるときだけ。
+# 出典カッコ（Wikipedia）の直前では割らない。
+_EN_SENTENCE_END_RE = re.compile(r"(?<!\d)\.(?=\s+(?!\())")
+# 閉じ引用・出典カッコの直前の句点は、歴史・格言の一行を守るため割らない
+_JP_SENTENCE_BREAK_RE = re.compile(r"。(?![）」\"'（(])")
 _INLINE_BOLD_RE = re.compile(r"\*\*([^*]+)\*\*")
 
 
 def _insert_sentence_breaks_text(text: str) -> str:
     """句点・文末ピリオドの後に改行を入れる（プレーンテキスト）。"""
-    out = text.replace("。", "。\n")
+    out = _JP_SENTENCE_BREAK_RE.sub("。\n", text)
     out = _EN_SENTENCE_END_RE.sub(".\n", out)
     return re.sub(r"\n{3,}", "\n\n", out).strip()
 
@@ -226,7 +229,7 @@ def _insert_sentence_breaks_html(fragment: str) -> str:
         return f"\x00TAG{len(slots) - 1}\x00"
 
     parked = re.sub(r"<[^>]+>", _park, fragment)
-    parked = parked.replace("。", "。<br>\n")
+    parked = _JP_SENTENCE_BREAK_RE.sub("。<br>\n", parked)
     parked = _EN_SENTENCE_END_RE.sub(".<br>\n", parked)
     parked = re.sub(r"(?:<br>\n)+$", "", parked)
 

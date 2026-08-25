@@ -1669,7 +1669,7 @@ def test_assemble_daily_markdown_includes_morning_brief(gads, monkeypatch):
     monkeypatch.setenv("MORNING_BRIEF_ENABLED", "true")
     brief = (
         "## 🗓 今日どう動くか\n\n"
-        "**8/22（土）** · 観測 8/21 · 次の祝日は 9/21（月）敬老の日\n\n"
+        "**8/22（土）** · サマリー生成対象日 8/21 · 次の祝日は 9/21（月）敬老の日\n\n"
         "---\n"
     )
     monkeypatch.setattr(

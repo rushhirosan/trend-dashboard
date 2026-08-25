@@ -97,8 +97,25 @@ def test_build_calendar_line_includes_observation_day():
             day, "jp", observation_day=date(2026, 8, 24)
         )
     assert line.startswith("**8/25（火）**")
-    assert "観測 8/24" in line
+    assert "サマリー生成対象日 8/24" in line
+    assert "観測 " not in line
     assert "次の祝日は 9/21（月）敬老の日" in line
+
+
+def test_build_calendar_line_includes_summary_date_us():
+    day = date(2026, 8, 25)
+    holidays = {"2026-09-07": "Labor Day"}
+    with patch(
+        "services.summary.morning_brief._holiday_map_for_day",
+        return_value=holidays,
+    ):
+        line = build_calendar_line(
+            day, "us", observation_day=date(2026, 8, 24)
+        )
+    assert line.startswith("**8/25 (Tue)**")
+    assert "Summary date 8/24" in line
+    assert "Observed " not in line
+    assert "Next holiday: 9/7 (Mon) Labor Day" in line
 
 
 def test_format_en_on_this_day_uses_api_year_and_calendar_day():
@@ -223,7 +240,7 @@ def test_build_jp_proverb_line_from_tounou():
 
 def test_render_morning_brief_markdown_jp():
     lines = MorningBriefLines(
-        calendar="**8/21（金）** · 観測 8/20 · 次の祝日は 9/21（月）敬老の日",
+        calendar="**8/21（金）** · サマリー生成対象日 8/20 · 次の祝日は 9/21（月）敬老の日",
         fx="**為替** USD/JPY 154.2（前日終値比 +0.3）",
         stock="**株** 日経 38,420（前日終値 -0.4%）",
         history="**歴史** 8/21 · 697年 — 文武天皇が譲位（Wikipedia）",
@@ -243,7 +260,7 @@ def test_render_morning_brief_markdown_jp():
 
 def test_render_morning_brief_markdown_us():
     lines = MorningBriefLines(
-        calendar="**8/21 (Fri)** · Observed 8/20 · Next holiday: 9/1 (Mon) Labor Day",
+        calendar="**8/21 (Fri)** · Summary date 8/20 · Next holiday: 9/1 (Mon) Labor Day",
         fx="**FX** USD/JPY 154.2 (+0.3 vs prior close)",
         stock="**Stocks** S&P 500 closed at 5,234.18 (-0.4%)",
         history="**On this day** Aug 21, 1962 — sample event (Wikipedia)",
@@ -263,7 +280,7 @@ def test_build_morning_brief_lines_skips_market_when_disabled(monkeypatch):
     monkeypatch.setenv("MORNING_BRIEF_SKIP_MARKET", "true")
     with patch(
         "services.summary.morning_brief.build_calendar_line",
-        return_value="**8/21（金）** · 観測 8/20",
+        return_value="**8/21（金）** · サマリー生成対象日 8/20",
     ), patch(
         "services.summary.morning_brief.build_history_line",
         return_value=None,

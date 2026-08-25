@@ -708,7 +708,8 @@ def _weekly_item_belongs_to_category(category: str, item: Dict[str, Any]) -> boo
     if not sk:
         return False
     daily = _daily()
-    if daily.categorize_series_key(sk) != category:
+    label = str(item.get("label") or "")
+    if daily.categorize_item(sk, label) != category:
         return False
     if category == "検索・動画":
         sk_l = sk.lower()

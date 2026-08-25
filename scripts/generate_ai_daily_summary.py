@@ -482,6 +482,7 @@ def categorize_series_key(series_key: str) -> str:
             "twitch_",
             "bluesky_",
             "ebay_",
+            "note_",
         )
     ):
         return "エンタメ・ショッピング"
@@ -499,7 +500,6 @@ def categorize_series_key(series_key: str) -> str:
             "cisa_",
             "producthunt_",
             "medium_",
-            "note_",
             "openalex_",
             "appstore_",
             "hatena_",
@@ -519,10 +519,33 @@ def categorize_series_key(series_key: str) -> str:
     return "テック・開発"
 
 
+# note は総合ブログ。開発寄りのタイトルだけテックへ戻す。
+_NOTE_TECH_RE = re.compile(
+    r"(エンジニア|プログラミング|プログラマ|フロントエンド|バックエンド|"
+    r"TypeScript|JavaScript|Python|React|Vue\.?js|Rust|Go言語|"
+    r"\bAPI\b|LLM|Claude|ChatGPT|実装|リファクタ|インフラ|Docker|"
+    r"Kubernetes|デプロイ|開発者|CI/?CD|コードレビュー)",
+    re.I,
+)
+
+
+def categorize_item(series_key: str, label: str = "") -> str:
+    """系列の既定カテゴリ + タイトルによる note の振り分け。"""
+    sk = (series_key or "").strip().lower()
+    if sk.startswith("note_"):
+        if _NOTE_TECH_RE.search(label or ""):
+            return "テック・開発"
+        return "エンタメ・ショッピング"
+    return categorize_series_key(series_key)
+
+
 def series_in_digest_scope(series_key: str) -> bool:
     """カテゴリ top3・急上昇・クロスソースに載せてよい系列か。"""
     sk = (series_key or "").strip().lower()
     if not sk:
+        return False
+    # 単体 PR は広報ノイズ。はてブ付きだけ残す。
+    if sk.startswith("prtimes") and not sk.startswith("prtimes_hatena"):
         return False
     return not any(sk.startswith(p) for p in DIGEST_EXCLUDED_SERIES_PREFIXES)
 
@@ -539,9 +562,9 @@ def digest_scope_note_markdown() -> str:
         )
     return (
         "> **対象ソース:** 検索・報道・テック・エンタメなど話題が見えるソース"
-        "（World News、DEV.to、App Store、はてな、note、PR TIMES を含む）。"
+        "（World News、DEV.to、App Store、はてな、note、PR TIMES × はてブ を含む）。"
         "**対象外:** Medium（タグRSS・新着順）、OpenAlex、GlobeNewswire（企業IR）、"
-        "eBay、Bluesky、Twitch（同時視聴）、行政データ。"
+        "eBay、Bluesky、Twitch（同時視聴）、行政データ、PR TIMES 単体。"
     )
 
 
@@ -954,8 +977,9 @@ def _shorten_digest_title(label: str, series_key: str = "", max_len: int = _DIGE
             cut = cut[:idx].rstrip()
             break
     if len(cut) < len(s):
+        cut = sr.balance_title_parens(cut)
         return cut + "…"
-    return cut
+    return sr.balance_title_parens(cut)
 
 
 def _ranks_are_flat(ranks: dict[str, int]) -> bool:
@@ -1125,11 +1149,11 @@ def _daytime_label_sort_key(
     stale: bool = False,
     series_pref: int = 0,
 ) -> tuple:
-    """一日評価: 定番除外 → 順位改善 → 複数スロット観測 → 最良順位 → 系列優先。"""
+    """一日評価: 定番除外 → 複数スロット観測 → 順位改善 → 最良順位 → 系列優先。"""
     return (
         1 if stale else 0,
-        -jump,
         -coverage,
+        -jump,
         _daytime_best_rank(ranks),
         -series_pref,
     )
@@ -1209,7 +1233,7 @@ def build_rising_highlights(
     for raw in items:
         ranks = dict(raw.get("ranks") or {})
         category = category_display_name(
-            categorize_series_key(str(raw.get("series_key") or ""))
+            categorize_item(str(raw.get("series_key") or ""), str(raw.get("display") or ""))
         )
         picked = {
             "label": raw["display"],
@@ -1257,7 +1281,6 @@ def _collect_label_index(
         if not series_in_digest_scope(series_key):
             continue
         aggs = _aggregate_labels_for_series(series_by_slot, series_key)
-        category = categorize_series_key(series_key)
         for nk, agg in aggs.items():
             display = _pick_display_from_agg(agg)
             if (
@@ -1266,6 +1289,7 @@ def _collect_label_index(
                 or _is_generic_cross_source_label(display)
             ):
                 continue
+            category = categorize_item(series_key, display)
             ranks = agg.get("ranks") or {}
             jump = _rank_jump_score(ranks)
             r_day_best = _daytime_best_rank(ranks)
@@ -1365,17 +1389,13 @@ def build_category_top3(
 
     out: List[Dict[str, Any]] = []
     for category in CATEGORY_DIGEST_ORDER:
-        cat_series = sorted(
-            [
-                sk
-                for sk in all_series
-                if categorize_series_key(sk) == category and series_in_digest_scope(sk)
-            ],
+        scoped_series = sorted(
+            [sk for sk in all_series if series_in_digest_scope(sk)],
             key=lambda sk: (-_series_pref_score(sk), sk),
         )
         seen: set[str] = set()
         pool: List[Dict[str, Any]] = []
-        for series_key in cat_series:
+        for series_key in scoped_series:
             aggs = _aggregate_labels_for_series(series_by_slot, series_key)
             for _nk, agg in aggs.items():
                 ranks = agg.get("ranks") or {}
@@ -1383,6 +1403,8 @@ def build_category_top3(
                     continue
                 display = _pick_display_from_agg(agg)
                 if _is_noisy_label(display, series_key):
+                    continue
+                if categorize_item(series_key, display) != category:
                     continue
                 jump = _rank_jump_score(ranks)
                 coverage = len(set(ranks.keys()) & set(DAYTIME_SLOTS))
@@ -1626,16 +1648,12 @@ def build_category_leaders_from_rows(
 
     leaders: List[Dict[str, Any]] = []
     for category in CATEGORY_DIGEST_ORDER:
-        cat_series = sorted(
-            [
-                sk
-                for sk in all_series
-                if categorize_series_key(sk) == category and series_in_digest_scope(sk)
-            ],
+        scoped_series = sorted(
+            [sk for sk in all_series if series_in_digest_scope(sk)],
             key=lambda sk: (-_series_pref_score(sk), sk),
         )
         best: Optional[Dict[str, Any]] = None
-        for series_key in cat_series:
+        for series_key in scoped_series:
             aggs = _aggregate_labels_for_series(series_by_slot, series_key)
             for _nk, agg in aggs.items():
                 ranks = agg.get("ranks") or {}
@@ -1645,6 +1663,8 @@ def build_category_leaders_from_rows(
                     or _is_noisy_label(display, series_key)
                     or _is_stale_label(display)
                 ):
+                    continue
+                if categorize_item(series_key, display) != category:
                     continue
                 jump = _rank_jump_score(ranks)
                 coverage = len(set(ranks.keys()) & set(DAYTIME_SLOTS))
@@ -1772,16 +1792,11 @@ def render_rising_highlights_markdown(
     items: List[Dict[str, Any]],
     rising_notes: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
-    """昨日いちばん動いた3つ（07→13→19 の順位改善・機械生成 + AI 補足）。"""
-    notes_by_label: Dict[str, str] = {}
-    for n in rising_notes or []:
-        if not isinstance(n, dict):
-            continue
-        ml = str(n.get("match_label") or "").strip()
-        note = str(n.get("note") or "").strip()
-        if ml and note:
-            notes_by_label[_normalize_label_key(ml)] = note
+    """昨日いちばん動いた3つ（07→13→19 の順位改善・機械生成）。
 
+    順位はタイトル行に載せる。補足（順位の言い換え）は出さない。
+    """
+    del rising_notes  # kept for call-site compatibility
     lines: List[str] = [_RISING_HEADING, ""]
     if not items:
         if _ACTIVE_REGION == "us":
@@ -1793,15 +1808,10 @@ def render_rising_highlights_markdown(
                 f"（{DAYTIME_SLOTS_ARROW} の間で、順位が大きく上がった話題はありませんでした）"
             )
         return "\n".join(lines).rstrip() + "\n"
-    note_label = "Note" if _ACTIVE_REGION == "us" else "補足"
     for i, it in enumerate(items, 1):
-        lines.append(f"{i}. {_compact_daily_link_line(it)}")
+        line = str(it.get("link_line") or "").strip() or _compact_daily_link_line(it)
+        lines.append(f"{i}. {line}")
         lines.append("")
-        label_nk = _normalize_label_key(str(it.get("label") or ""))
-        note = notes_by_label.get(label_nk)
-        if note:
-            lines.append(f"   - **{note_label}**: {note}")
-            lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
 

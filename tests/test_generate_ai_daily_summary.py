@@ -105,6 +105,7 @@ def test_use_http_snapshots_gha_fly_private_fallback(monkeypatch, gads, gha, db,
         ("bluesky_jp", "エンタメ・ショッピング"),
         ("ebay_us", "エンタメ・ショッピング"),
         ("book_jp_fiction", "エンタメ・ショッピング"),
+        ("note_jp", "エンタメ・ショッピング"),
         ("globenewswire_market_us", "ニュース"),
         ("estat_jp", "行政"),
         ("kkj_jp", "行政"),
@@ -130,12 +131,132 @@ def test_categorize_series_key(gads, series_key, expected):
         ("twitch_jp", False),
         ("hatena_jp", True),
         ("note_jp", True),
-        ("prtimes_jp", True),
+        ("prtimes_jp", False),
+        ("prtimes_hatena_jp", True),
         ("nhk_jp", True),
     ],
 )
 def test_series_in_digest_scope(gads, series_key, expected):
     assert gads.series_in_digest_scope(series_key) is expected
+
+
+def test_categorize_item_sends_note_travel_to_entertainment(gads):
+    assert gads.categorize_item("note_jp", "伊豆半島ひとり旅｜大人になってもなつやすみをしたい") == (
+        "エンタメ・ショッピング"
+    )
+    assert gads.categorize_item("note_jp", "Claude Code でフロントエンド実装を試す") == (
+        "テック・開発"
+    )
+
+
+def test_build_category_top3_excludes_plain_prtimes(gads):
+    rows = [
+        {
+            "slot": "19",
+            "series_key": "prtimes_jp",
+            "items": [{"t": "NPO法人ポッドキャスト開始", "r": 1, "u": "https://prtimes.jp/a"}],
+            "captured_at": "2026-08-24T19:00:00+09:00",
+        },
+        {
+            "slot": "13",
+            "series_key": "prtimes_hatena_jp",
+            "items": [{"t": "はてブされた発表", "r": 4, "u": "https://prtimes.jp/b"}],
+            "captured_at": "2026-08-24T13:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "prtimes_hatena_jp",
+            "items": [{"t": "はてブされた発表", "r": 1}],
+            "captured_at": "2026-08-24T19:00:00+09:00",
+        },
+    ]
+    top3 = gads.build_category_top3(rows, count=3)
+    news = next(b for b in top3 if b["category"] == "ニュース")
+    labels = [it["label"] for it in news.get("items") or []]
+    assert "NPO法人ポッドキャスト開始" not in labels
+    assert "はてブされた発表" in labels
+
+
+def test_build_category_top3_prefers_multi_slot_over_late_spike(gads):
+    rows = [
+        {
+            "slot": "19",
+            "series_key": "google_trends_jp",
+            "items": [{"t": "花火大会 今日", "r": 1}],
+            "captured_at": "2026-08-24T19:00:00+09:00",
+        },
+        {
+            "slot": "07",
+            "series_key": "google_trends_jp",
+            "items": [{"t": "上沼恵美子", "r": 8}],
+            "captured_at": "2026-08-24T07:00:00+09:00",
+        },
+        {
+            "slot": "13",
+            "series_key": "google_trends_jp",
+            "items": [{"t": "上沼恵美子", "r": 3}],
+            "captured_at": "2026-08-24T13:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "google_trends_jp",
+            "items": [{"t": "上沼恵美子", "r": 2}],
+            "captured_at": "2026-08-24T19:00:00+09:00",
+        },
+    ]
+    top3 = gads.build_category_top3(rows, count=1)
+    search = next(b for b in top3 if b["category"] == "検索・動画")
+    assert search["items"][0]["label"] == "上沼恵美子"
+
+
+def test_build_category_top3_drops_worldnews_game_card(gads):
+    gads.configure_daily_region("us")
+    rows = [
+        {
+            "slot": "13",
+            "series_key": "worldnews_us",
+            "items": [
+                {
+                    "t": "Dallas Wings vs. Seattle Storm - August 23, 2026",
+                    "r": 6,
+                    "u": "https://bleacherreport.com/game/x",
+                }
+            ],
+            "captured_at": "2026-08-23T13:00:00+09:00",
+        },
+        {
+            "slot": "13",
+            "series_key": "worldnews_us",
+            "items": [
+                {
+                    "t": "Patriots OT Marcus Bryant out with an ankle injury",
+                    "r": 9,
+                    "u": "https://www.nbcsports.com/nfl/x",
+                }
+            ],
+            "captured_at": "2026-08-23T13:00:00+09:00",
+        },
+        {
+            "slot": "19",
+            "series_key": "worldnews_us",
+            "items": [
+                {
+                    "t": "Patriots OT Marcus Bryant out with an ankle injury",
+                    "r": 4,
+                }
+            ],
+            "captured_at": "2026-08-23T19:00:00+09:00",
+        },
+    ]
+    top3 = gads.build_category_top3(rows, count=3)
+    news = next(b for b in top3 if b["category"] == "News")
+    labels = [it["label"] for it in news.get("items") or []]
+    assert "Dallas Wings vs. Seattle Storm - August 23, 2026" not in labels
+    assert any("Marcus Bryant" in lab for lab in labels)
+
+
+def test_clean_rising_display_strips_extra_closing_paren(gads):
+    assert gads._clean_rising_display("Michael Wright (actor))") == "Michael Wright (actor)"
 
 
 def test_build_category_top3_excludes_medium(gads):
@@ -229,7 +350,8 @@ def test_digest_scope_note_mentions_medium_exclusion(gads):
     assert "Medium" in note_jp
     assert "対象外" in note_jp
     assert "Twitch" in note_jp
-    assert "Twitch、はてな" not in note_jp
+    assert "PR TIMES × はてブ" in note_jp
+    assert "PR TIMES 単体" in note_jp
     gads.configure_daily_region("us")
     note_us = gads.digest_scope_note_markdown()
     assert "Out of scope" in note_us
@@ -389,6 +511,14 @@ def test_is_noisy_label_filters_procurement(gads):
     )
     assert not gads._is_noisy_label("豊臣秀長", "wikipedia_jp")
     assert gads._is_noisy_label("に参加したレポマンガ！", "note_jp")
+    assert gads._is_noisy_label(
+        "Dallas Wings vs. Seattle Storm - August 23, 2026",
+        "worldnews_us",
+    )
+    assert not gads._is_noisy_label(
+        "Patriots OT Marcus Bryant out with an ankle injury",
+        "worldnews_us",
+    )
 
 
 def test_pick_display_from_agg_prefers_longer_non_fragment(gads):
@@ -983,7 +1113,8 @@ def test_render_rising_highlights_markdown_lists_items(gads):
         [{"match_label": "Climber", "note": "7時18位から19時2位へ上昇。"}],
     )
     assert "1. [Climber]" in md
-    assert "**補足**: 7時18位から19時2位へ上昇。" in md
+    assert "YouTube · 7時18位 → 19時2位" in md
+    assert "**補足**" not in md
     assert "jump" not in md
     assert "| 07 | 13 | 19 |" not in md
     assert "**順位の動き**" not in md
@@ -1489,7 +1620,7 @@ def test_render_editorial_markdown_one_liner_only(gads):
     assert "### 1. 台風" not in md
 
 
-def test_render_rising_highlights_includes_notes(gads):
+def test_render_rising_highlights_omits_notes(gads):
     items = [
         {
             "link_line": "[Climber](https://example.com)（YouTube · 19時2位）",
@@ -1501,8 +1632,9 @@ def test_render_rising_highlights_includes_notes(gads):
     md = gads.render_rising_highlights_markdown(
         items, [{"match_label": "Climber", "note": "日中に順位が大きく上昇。"}]
     )
-    assert "**補足**" in md
-    assert "順位が大きく上昇" in md
+    assert "**補足**" not in md
+    assert "順位が大きく上昇" not in md
+    assert "YouTube · 19時2位" in md
 
 
 def test_render_cross_source_includes_intro(gads):
@@ -1537,7 +1669,7 @@ def test_assemble_daily_markdown_includes_morning_brief(gads, monkeypatch):
     monkeypatch.setenv("MORNING_BRIEF_ENABLED", "true")
     brief = (
         "## 🗓 今日どう動くか\n\n"
-        "**カレンダー** 金曜 · 次の祝日は 9/21（月）敬老の日\n\n"
+        "**8/22（土）** · 観測 8/21 · 次の祝日は 9/21（月）敬老の日\n\n"
         "---\n"
     )
     monkeypatch.setattr(
@@ -1778,13 +1910,15 @@ def test_us_render_uses_english_labels_not_japanese(gads):
         [
             {
                 "label": "Lindsey Graham",
-                "link_line": "[Lindsey Graham](https://example.com)（Wikipedia (EN)）",
+                "link_line": "[Lindsey Graham](https://example.com)"
+                "（Wikipedia (EN) · out@7 → #1@13 → #1@19）",
             }
         ],
         [{"match_label": "Lindsey Graham", "note": "Held the top of Search & Video."}],
     )
-    assert "**Note**:" in rising_md
+    assert "**Note**:" not in rising_md
     assert "補足" not in rising_md
+    assert "out@7 → #1@13 → #1@19" in rising_md
 
     top3_md = gads.render_category_top3_markdown(
         [

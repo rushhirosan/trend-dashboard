@@ -30,7 +30,6 @@ HTTP_HEADERS = {
 
 WIKI_UA = HTTP_HEADERS["User-Agent"]
 
-JP_WEEKDAYS = ("月曜", "火曜", "水曜", "木曜", "金曜", "土曜", "日曜")
 JP_WEEKDAY_SHORT = ("月", "火", "水", "木", "金", "土", "日")
 US_WEEKDAYS = (
     "Monday",
@@ -60,12 +59,6 @@ def delivery_day_for_business_day(business_day: date) -> date:
     return business_day + timedelta(days=1)
 
 
-def _weekday_label(day: date, region: str) -> str:
-    if (region or "jp").lower() == "us":
-        return US_WEEKDAYS[day.weekday()]
-    return JP_WEEKDAYS[day.weekday()]
-
-
 def _format_short_date(day: date, region: str) -> str:
     if (region or "jp").lower() == "us":
         wd = US_WEEKDAYS[day.weekday()]
@@ -89,7 +82,14 @@ def _clip(text: str, max_len: int) -> str:
     s = str(text or "").strip()
     if len(s) <= max_len:
         return s
-    return s[: max_len - 1].rstrip() + "…"
+    budget = max_len - 1
+    cut = s[:budget].rstrip()
+    # 英単語の途中で切らない（man-ma… を避ける）
+    if cut and re.search(r"[A-Za-z0-9]$", cut):
+        word_break = cut.rfind(" ")
+        if word_break >= max(12, budget // 3):
+            cut = cut[:word_break].rstrip()
+    return cut.rstrip(" ,;:-") + "…"
 
 
 def _signed_delta(value: float, *, decimals: int = 1) -> str:
@@ -131,17 +131,29 @@ def _holiday_map_for_day(day: date, region: str) -> Dict[str, str]:
     return merged
 
 
-def build_calendar_line(day: date, region: str) -> str:
+def build_calendar_line(
+    day: date,
+    region: str,
+    *,
+    observation_day: Optional[date] = None,
+) -> str:
     region_n = (region or "jp").lower()
-    weekday = _weekday_label(day, region_n)
     holidays = _holiday_map_for_day(day, region_n)
     iso = day.isoformat()
+    parts: List[str] = [f"**{_format_short_date(day, region_n)}**"]
+    if observation_day is not None:
+        obs = f"{observation_day.month}/{observation_day.day}"
+        if region_n == "us":
+            parts.append(f"Observed {obs}")
+        else:
+            parts.append(f"観測 {obs}")
     if iso in holidays:
-        label = _format_short_date(day, region_n)
         name = holidays[iso]
         if region_n == "us":
-            return f"**Calendar** {weekday} · Today: {label} {name}"
-        return f"**カレンダー** {weekday} · 今日は {label}{name}（祝日）"
+            parts.append(f"Today: {name}")
+        else:
+            parts.append(f"{name}（祝日）")
+        return " · ".join(parts)
     upcoming: List[tuple[date, str]] = []
     for ds, name in sorted(holidays.items()):
         try:
@@ -150,17 +162,13 @@ def build_calendar_line(day: date, region: str) -> str:
             continue
         if d > day:
             upcoming.append((d, name))
-    if region_n == "us":
-        base = f"**Calendar** {weekday}"
-        if not upcoming:
-            return base
+    if upcoming:
         nd, name = upcoming[0]
-        return f"{base} · Next holiday: {_format_short_date(nd, region_n)} {name}"
-    base = f"**カレンダー** {weekday}"
-    if not upcoming:
-        return base
-    nd, name = upcoming[0]
-    return f"{base} · 次の祝日は {_format_short_date(nd, region_n)}{name}"
+        if region_n == "us":
+            parts.append(f"Next holiday: {_format_short_date(nd, region_n)} {name}")
+        else:
+            parts.append(f"次の祝日は {_format_short_date(nd, region_n)}{name}")
+    return " · ".join(parts)
 
 
 def _fetch_yahoo_prior_close(ticker: str) -> Optional[tuple[float, float]]:
@@ -266,7 +274,7 @@ def _format_en_on_this_day_line(
             cleaned,
             flags=re.I,
         )
-    cleaned = _clip(cleaned, 55)
+    cleaned = _clip(cleaned, 80)
     if not cleaned:
         return None
     month_day = f"{_US_MONTH_ABBR[day.month - 1]} {day.day}"
@@ -386,6 +394,11 @@ def _normalize_proverb_title(title: str) -> str:
     return f"「{t}」"
 
 
+_AUTHOR_REJECT_RE = re.compile(
+    r"(実験|マウス|迷路|ため|です|である|について|における)|[でて]、?$|[。！？]$"
+)
+
+
 def _author_from_tounou_lines(lines: List[str]) -> Optional[str]:
     """本文先頭の『氏名（肩書…）』から発言者名だけ取る。"""
     if not lines:
@@ -396,9 +409,13 @@ def _author_from_tounou_lines(lines: List[str]) -> Optional[str]:
     match = re.match(r"^(.+?)\s*[（(]", first)
     name = (match.group(1) if match else first).strip()
     name = re.sub(r"\s+", " ", name)
-    if len(name) < 2:
+    if len(name) < 2 or len(name) > 24:
         return None
-    return _clip(name, 40)
+    if _AUTHOR_REJECT_RE.search(name):
+        return None
+    if match is None and re.search(r"[をがには]、", name):
+        return None
+    return name
 
 
 def _extract_tounou_article_lines(html: str) -> List[str]:
@@ -535,7 +552,7 @@ def build_morning_brief_lines(
 ) -> MorningBriefLines:
     day = delivery_day_for_business_day(business_day)
     region_n = (region or "jp").lower()
-    calendar = build_calendar_line(day, region_n)
+    calendar = build_calendar_line(day, region_n, observation_day=business_day)
     fx_line = stock_line = None
     if include_market and not _morning_brief_market_disabled():
         fx_line, stock_line = build_market_lines(region_n)

@@ -51,7 +51,8 @@ def test_build_calendar_line_jp_next_holiday():
     ):
         line = build_calendar_line(day, "jp")
 
-    assert line.startswith("**カレンダー** 土曜")
+    assert line.startswith("**8/22（土）**")
+    assert "カレンダー" not in line
     assert "次の祝日は 9/21（月）敬老の日" in line
 
 
@@ -65,7 +66,9 @@ def test_build_calendar_line_jp_today_holiday():
     ):
         line = build_calendar_line(day, "jp")
 
-    assert "今日は 8/11（火）山の日（祝日）" in line
+    assert line.startswith("**8/11（火）**")
+    assert "山の日（祝日）" in line
+    assert "カレンダー" not in line
 
 
 def test_build_calendar_line_us_next_holiday():
@@ -78,8 +81,24 @@ def test_build_calendar_line_us_next_holiday():
     ):
         line = build_calendar_line(day, "us")
 
-    assert "**Calendar** Saturday" in line
+    assert line.startswith("**8/22 (Sat)**")
+    assert "Calendar" not in line
     assert "Next holiday: 9/7 (Mon) Labor Day" in line
+
+
+def test_build_calendar_line_includes_observation_day():
+    day = date(2026, 8, 25)
+    holidays = {"2026-09-21": "敬老の日"}
+    with patch(
+        "services.summary.morning_brief._holiday_map_for_day",
+        return_value=holidays,
+    ):
+        line = build_calendar_line(
+            day, "jp", observation_day=date(2026, 8, 24)
+        )
+    assert line.startswith("**8/25（火）**")
+    assert "観測 8/24" in line
+    assert "次の祝日は 9/21（月）敬老の日" in line
 
 
 def test_format_en_on_this_day_uses_api_year_and_calendar_day():
@@ -93,6 +112,20 @@ def test_format_en_on_this_day_uses_api_year_and_calendar_day():
     assert line.startswith("**On this day** Aug 23, 2011 — ")
     assert "earthquake" in line
     assert "(Wikipedia)" in line
+
+
+def test_format_en_on_this_day_does_not_clip_mid_word():
+    line = _format_en_on_this_day_line(
+        date(2026, 8, 25),
+        "The NASA space probe Voyager 1 became the first man-made object "
+        "to enter interstellar space.",
+        year=2012,
+    )
+    assert line is not None
+    assert "man-ma…" not in line
+    assert "Voyager 1" in line
+    assert "man-made" in line
+    assert line.endswith("(Wikipedia)")
 
 
 def test_format_en_on_this_day_without_year_still_shows_month_day():
@@ -127,6 +160,15 @@ def test_extract_tounou_article_lines_and_meaning():
 
 def test_author_from_tounou_lines_without_bio_parens():
     assert _author_from_tounou_lines(["コピーライター吉田一馬"]) == "コピーライター吉田一馬"
+
+
+def test_author_from_tounou_lines_rejects_commentary():
+    assert (
+        _author_from_tounou_lines(
+            ["２０１６年に東京大学で行わた、マウスを迷路に入れた実験で、"]
+        )
+        is None
+    )
 
 
 def test_format_jp_proverb_line():
@@ -181,7 +223,7 @@ def test_build_jp_proverb_line_from_tounou():
 
 def test_render_morning_brief_markdown_jp():
     lines = MorningBriefLines(
-        calendar="**カレンダー** 金曜 · 次の祝日は 9/21（月）敬老の日",
+        calendar="**8/21（金）** · 観測 8/20 · 次の祝日は 9/21（月）敬老の日",
         fx="**為替** USD/JPY 154.2（前日終値比 +0.3）",
         stock="**株** 日経 38,420（前日終値 -0.4%）",
         history="**歴史** 8/21 · 697年 — 文武天皇が譲位（Wikipedia）",
@@ -201,7 +243,7 @@ def test_render_morning_brief_markdown_jp():
 
 def test_render_morning_brief_markdown_us():
     lines = MorningBriefLines(
-        calendar="**Calendar** Friday · Next holiday: 9/1 (Mon) Labor Day",
+        calendar="**8/21 (Fri)** · Observed 8/20 · Next holiday: 9/1 (Mon) Labor Day",
         fx="**FX** USD/JPY 154.2 (+0.3 vs prior close)",
         stock="**Stocks** S&P 500 closed at 5,234.18 (-0.4%)",
         history="**On this day** Aug 21, 1962 — sample event (Wikipedia)",
@@ -221,7 +263,7 @@ def test_build_morning_brief_lines_skips_market_when_disabled(monkeypatch):
     monkeypatch.setenv("MORNING_BRIEF_SKIP_MARKET", "true")
     with patch(
         "services.summary.morning_brief.build_calendar_line",
-        return_value="**カレンダー** 金曜",
+        return_value="**8/21（金）** · 観測 8/20",
     ), patch(
         "services.summary.morning_brief.build_history_line",
         return_value=None,

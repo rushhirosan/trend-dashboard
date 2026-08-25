@@ -22,6 +22,13 @@ NOISY_PROCUREMENT = re.compile(
     r"(LICENSE\s+RENEWAL|POP:\s*\d|INFINIBAND|FIBRE\s+OPTIC|usaspending|調達|契約番号)",
     re.I,
 )
+# World News の試合カード（Dallas Wings vs. Seattle Storm - August 23, 2026）
+_SPORTS_GAME_CARD_RE = re.compile(
+    r"\bvs\.?\s+.{2,48}?\s*[-–—]\s*"
+    r"(?:January|February|March|April|May|June|July|August|"
+    r"September|October|November|December)\s+\d{1,2},\s+\d{4}",
+    re.I,
+)
 
 
 def snapshot_top_n() -> int:
@@ -39,9 +46,20 @@ def normalize_label_key(t: str) -> str:
     return re.sub(r"\s+", " ", str(t).strip()).lower()[:600]
 
 
+def balance_title_parens(text: str) -> str:
+    """Wikipedia 等の余剰閉じ括弧（例: ``(actor))``）を落とす。"""
+    s = str(text or "")
+    while s.endswith(")") and s.count(")") > s.count("("):
+        s = s[:-1].rstrip()
+    while s.endswith("(") and s.count("(") > s.count(")"):
+        s = s[:-1].rstrip()
+    return s
+
+
 def clean_rising_display(display: str) -> str:
     s = re.sub(r"^【[^】]{1,16}】\s*", "", str(display).strip())
-    return re.sub(r"\s+", " ", s).strip()
+    s = re.sub(r"\s+", " ", s).strip()
+    return balance_title_parens(s)
 
 
 # 先頭欠落タイトル（例: 「リポジトリに参加した…」が「に参加した…」だけ残る）
@@ -94,6 +112,8 @@ def is_noisy_label(display: str, series_key: str = "") -> bool:
     if NOISY_PROCUREMENT.search(s):
         return True
     if any(p in sk for p in ("usaspending_", "kkj_", "estat_", "bls_")) and len(s) > 45:
+        return True
+    if sk.startswith("worldnews_") and _SPORTS_GAME_CARD_RE.search(s):
         return True
     if _ascii_ratio(s) > 0.88 and len(s) > 50 and series_pref_score(series_key) < 2:
         return True

@@ -210,6 +210,53 @@ def test_upsert_endpoint_success(mock_upsert, client, monkeypatch):
     mock_upsert.assert_called_once_with("daily", "jp", "2026-07-17", _PAYLOAD["body_md"])
 
 
+def test_get_document_exists_requires_token(client, monkeypatch):
+    monkeypatch.delenv("SUMMARY_UPSERT_TOKEN", raising=False)
+    res = client.get(
+        "/api/summaries/documents",
+        query_string={"kind": "daily", "region": "jp", "id": "2026-08-26"},
+    )
+    assert res.status_code == 503
+
+
+@patch("services.summary.summary_store.has_document", return_value=True)
+def test_get_document_exists_true(mock_has, client, monkeypatch):
+    monkeypatch.setenv("SUMMARY_UPSERT_TOKEN", "secret-token")
+    res = client.get(
+        "/api/summaries/documents",
+        query_string={"kind": "daily", "region": "jp", "id": "2026-08-26"},
+        headers={"Authorization": "Bearer secret-token"},
+    )
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["success"] is True
+    assert data["exists"] is True
+    mock_has.assert_called_once_with("daily", "jp", "2026-08-26")
+
+
+@patch("services.summary.summary_store.has_document", return_value=False)
+def test_get_document_exists_false(mock_has, client, monkeypatch):
+    monkeypatch.setenv("SUMMARY_UPSERT_TOKEN", "secret-token")
+    res = client.get(
+        "/api/summaries/documents",
+        query_string={"kind": "daily", "region": "us", "id": "2026-08-26"},
+        headers={"Authorization": "Bearer secret-token"},
+    )
+    assert res.status_code == 200
+    assert res.get_json()["exists"] is False
+
+
+@patch("services.summary.summary_store.has_document", return_value=None)
+def test_get_document_exists_db_error(mock_has, client, monkeypatch):
+    monkeypatch.setenv("SUMMARY_UPSERT_TOKEN", "secret-token")
+    res = client.get(
+        "/api/summaries/documents",
+        query_string={"kind": "daily", "region": "jp", "id": "2026-08-26"},
+        headers={"Authorization": "Bearer secret-token"},
+    )
+    assert res.status_code == 500
+
+
 def test_weekly_monday_parsing():
     assert summary_store.weekly_monday("2026-W29") == date(2026, 7, 13)
     assert summary_store.weekly_monday("invalid") is None

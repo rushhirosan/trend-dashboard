@@ -85,5 +85,6 @@ docs/summaries/daily/us/2026-05-12.md
 ## 自動化
 
 - GitHub Actions: `.github/workflows/ai-weekly-summary.yml`（UTC 日曜 `30 22 * * 0` ≒ **JST 月曜 07:30**）。同一ジョブで jp → us を直列生成。
+- 手動 Run のあとに遅延 cron が来た場合、**jp+us がすでに DB にあれば生成・メールをスキップ**（`workflow_dispatch` の `force` で上書き可）。
 
 親ドキュメント: [`docs/summaries/README.md`](../README.md)

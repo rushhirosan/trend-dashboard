@@ -1,12 +1,18 @@
 # JST 06:50 ≒ UTC 21:50 (previous calendar day in UTC) — before the 07:00 JST bulk refresh.
 # Writes JP docs/summaries/daily/{yesterday}.md and US docs/summaries/daily/us/{yesterday}.md.
 # slot 01 for that business_day is written by the 01:00 job on the next calendar day.
+# If jp+us are already in summary_documents (e.g. manual Run then delayed cron), skip all work.
 name: AI daily summary
 
 on:
   schedule:
     - cron: "50 21 * * *"
   workflow_dispatch:
+    inputs:
+      force:
+        description: "Regenerate even if already published in DB"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -27,10 +33,23 @@ jobs:
         run: |
           pip install "requests>=2.31" "psycopg2-binary>=2.9" "python-dotenv>=0.19" "pytz>=2023.3" "yfinance>=0.2.0"
 
+      - name: Skip if already published
+        id: already
+        env:
+          TREND_DASHBOARD_BASE_URL: https://trends-dashboard.com
+          SUMMARY_UPSERT_TOKEN: ${{ secrets.SUMMARY_UPSERT_TOKEN }}
+        run: |
+          FORCE_FLAG=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.force }}" = "true" ]; then
+            FORCE_FLAG=--force
+          fi
+          python scripts/check_summary_already_published.py --kind daily --github-output $FORCE_FLAG
+
       # Writes daily markdown and companion .generation.json (--write). On failure we still
       # record .generation.json; continue-on-error so Commit can push the status file, then we fail the job.
       - name: Generate JP daily summary
         id: summarize_jp
+        if: steps.already.outputs.skip != 'true'
         continue-on-error: true
         env:
           TREND_DASHBOARD_BASE_URL: https://trends-dashboard.com
@@ -38,13 +57,14 @@ jobs:
 
       - name: Generate US daily summary
         id: summarize_us
+        if: steps.already.outputs.skip != 'true'
         continue-on-error: true
         env:
           TREND_DASHBOARD_BASE_URL: https://trends-dashboard.com
         run: python scripts/generate_ai_daily_summary.py --from-api --write --force --region us
 
       - name: Commit if changed
-        if: always()
+        if: always() && steps.already.outputs.skip != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -69,7 +89,7 @@ jobs:
       # 閲覧ページは DB（summary_documents）を優先して読むため、ここで upsert すれば
       # fly deploy なしで当日分が公開される。片方の生成が失敗しても揃った分は送る。
       - name: Publish summaries to site (DB)
-        if: always()
+        if: always() && steps.already.outputs.skip != 'true'
         env:
           TREND_DASHBOARD_BASE_URL: https://trends-dashboard.com
           SUMMARY_UPSERT_TOKEN: ${{ secrets.SUMMARY_UPSERT_TOKEN }}
@@ -82,7 +102,7 @@ jobs:
 
       # 自分宛 dogfood（draft 可）。Resend（検証=本番と同じ経路）。Secrets 未設定ならスキップ。
       - name: Dogfood email (daily JP+US)
-        if: always()
+        if: always() && steps.already.outputs.skip != 'true'
         env:
           EMAIL_PROVIDER: resend
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
@@ -98,7 +118,7 @@ jobs:
       # 有料購読者へ（dogfood の後）。購読者は本番 API（SUMMARY_UPSERT_TOKEN）。
       # エンドポイント未デプロイ時は skip してジョブは落とさない。
       - name: Paid subscriber email (daily)
-        if: always()
+        if: always() && steps.already.outputs.skip != 'true'
         env:
           EMAIL_PROVIDER: resend
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
@@ -117,5 +137,5 @@ jobs:
           python scripts/send_summary_paid_email.py --kind daily --from-api
 
       - name: Fail if either summary step failed
-        if: steps.summarize_jp.outcome == 'failure' || steps.summarize_us.outcome == 'failure'
+        if: steps.already.outputs.skip != 'true' && (steps.summarize_jp.outcome == 'failure' || steps.summarize_us.outcome == 'failure')
         run: exit 1

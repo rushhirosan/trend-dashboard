@@ -401,6 +401,62 @@ def get_daily_snapshots_for_ai_summary():
     )
 
 
+def _require_summary_upsert_token():
+    """SUMMARY_UPSERT_TOKEN 認証。成功時 None、失敗時 (jsonify, status) を返す。"""
+    token = (os.getenv('SUMMARY_UPSERT_TOKEN') or '').strip()
+    if not token:
+        return jsonify({
+            'success': False,
+            'error': 'SUMMARY_UPSERT_TOKEN が未設定のため、このエンドポイントは無効です',
+        }), 503
+    provided = request.headers.get('Authorization') or ''
+    if not hmac.compare_digest(provided, f'Bearer {token}'):
+        return jsonify({'success': False, 'error': 'unauthorized'}), 401
+    return None
+
+
+@data_bp.route('/summaries/documents', methods=['GET'])
+def get_summary_document_exists():
+    """summary_documents に行があるかだけ返す（本文は返さない）。
+
+    GHA が手動実行後の遅延 cron で二重生成・二重メールしないための存在確認。
+    認証: ``Authorization: Bearer $SUMMARY_UPSERT_TOKEN``。
+    query: kind=daily|weekly, region=jp|us, id=YYYY-MM-DD|YYYY-Www
+    """
+    from services.summary import summary_store
+
+    auth_err = _require_summary_upsert_token()
+    if auth_err is not None:
+        return auth_err
+
+    kind = str(request.args.get('kind') or '').strip().lower()
+    region = str(request.args.get('region') or '').strip().lower()
+    doc_id = str(request.args.get('id') or '').strip()
+
+    if not summary_store.valid_doc(kind, region, doc_id):
+        return jsonify({
+            'success': False,
+            'error': 'kind は daily/weekly、region は jp/us、id は YYYY-MM-DD / YYYY-Www 形式が必要です',
+        }), 400
+
+    exists = summary_store.has_document(kind, region, doc_id)
+    if exists is None:
+        return jsonify({
+            'success': False,
+            'error': 'summary_documents の参照に失敗しました',
+            'kind': kind,
+            'region': region,
+            'id': doc_id,
+        }), 500
+    return jsonify({
+        'success': True,
+        'kind': kind,
+        'region': region,
+        'id': doc_id,
+        'exists': exists,
+    })
+
+
 @data_bp.route('/summaries/documents', methods=['POST'])
 def upsert_summary_document():
     """サマリー原稿（Markdown）を summary_documents に upsert する。
@@ -411,15 +467,9 @@ def upsert_summary_document():
     """
     from services.summary import summary_store
 
-    token = (os.getenv('SUMMARY_UPSERT_TOKEN') or '').strip()
-    if not token:
-        return jsonify({
-            'success': False,
-            'error': 'SUMMARY_UPSERT_TOKEN が未設定のため、このエンドポイントは無効です',
-        }), 503
-    provided = request.headers.get('Authorization') or ''
-    if not hmac.compare_digest(provided, f'Bearer {token}'):
-        return jsonify({'success': False, 'error': 'unauthorized'}), 401
+    auth_err = _require_summary_upsert_token()
+    if auth_err is not None:
+        return auth_err
 
     payload = request.get_json(silent=True) or {}
     kind = str(payload.get('kind') or '').strip().lower()

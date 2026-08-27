@@ -10,7 +10,7 @@
 - 週次の数値 → [週次メモ](#週次メモ)
 - 日次サマリー品質・SLA の詳細手順 → [`summary_pattern_a_phase1.md`](summary_pattern_a_phase1.md)
 
-**最終更新:** 2026-08-19（GHA 有料送信ステップ追加。Fly デプロイ後に本番送信）
+**最終更新:** 2026-08-27（GHA 日次サマリー欠走を Fly 08:15 JST で検知）
 
 ---
 
@@ -364,6 +364,7 @@ dogfood は `draft` のまま自分宛に送っている。公開・有料の ap
 - [x] `captured_at` スロット窓チェック + Discord 警告
 - [x] `trend_daily_snapshots` / `scheduler_slot_run` **10日 purge**（03:00 JST）
 - [x] `docs/summaries` 日次10日・週次30日 purge（DB: 03:00 JST / git: GHA `summary-retention-purge.yml`）
+- [x] GHA 日次サマリー欠走: Fly **08:15 JST** に `summary_documents` 存在チェック、無いときだけ Discord（生成・メールしない）
 - [x] `scripts/inspect_scheduler_slots.py --business-day`
 - [x] `docs/grafana-oom-alerts.md`
 
@@ -481,6 +482,7 @@ dogfood は `draft` のまま自分宛に送っている。公開・有料の ap
 | 2026-08-18 | **配信は目標であり保証しない。** 日次欠配1回は課金を触らない。週次欠配 or 月内の日次複数欠配は Dashboard で翌月無料 or 返金。受信側未到達は対象外。Stripe 期間延長は使わない。 |
 | 2026-08-19 | 有料配信の GHA は **DB 直結しない**。本番アプリの購読者 API + ワークスペースの Markdown + Resend。 |
 | 2026-08-19 | ユーザー向け文言から **「出勤前」「メールです」を外す**。時刻は目標のみ。Checkout 受付開始は Waitlist 待ちではなく **Fly に Stripe secrets を入れたとき**。 |
+| 2026-08-27 | GHA 日次欠走は Healthchecks 等を増やさず、Fly 08:15 JST で `summary_documents` を見る。成功日は SELECT のみ。無いとき Discord。 |
 
 ### KPI（週次記録用）
 

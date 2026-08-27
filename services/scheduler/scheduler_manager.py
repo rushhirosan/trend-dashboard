@@ -9,7 +9,7 @@ import threading
 import time
 import signal
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 try:
     import fcntl
 except ImportError:
@@ -621,6 +621,18 @@ class TrendsScheduler:
                     coalesce=True,
                     max_instances=1,
                 )
+
+                # GHA 日次サマリー欠走検知。成功日は SELECT のみ。生成・メールはしない。
+                self.scheduler.add_job(
+                    func=self._check_daily_summary_published,
+                    trigger=CronTrigger(hour=8, minute=15, timezone=jst),
+                    id="daily_summary_miss_watch",
+                    name="日次サマリー欠走チェック (08:15 JST)",
+                    replace_existing=True,
+                    misfire_grace_time=3600,
+                    coalesce=True,
+                    max_instances=1,
+                )
                 
                 # スケジューラーを開始
                 self.scheduler.start()
@@ -633,7 +645,8 @@ class TrendsScheduler:
                 logger.info(
                     "📅 毎日1:00/7:00/13:00/19:00 JST に全トレンド取得。"
                     " 各スロット+%s分に欠損リトライ。"
-                    " 03:00 JST にスナップショット保持クリーンアップ",
+                    " 03:00 JST にスナップショット保持クリーンアップ。"
+                    " 08:15 JST に日次サマリー欠走チェック",
                     gap_retry_minute,
                 )
                 
@@ -2246,6 +2259,71 @@ class TrendsScheduler:
             purge_expired_snapshots(db=self.db)
         except Exception as e:
             logger.warning("⚠️ スナップショット保持クリーンアップエラー: %s", e, exc_info=True)
+
+    def _daily_summary_business_day_jst(self, now=None) -> str:
+        """GHA 日次と同じく、JST カレンダーの昨日（観測日）。"""
+        jst = pytz.timezone("Asia/Tokyo")
+        if now is None:
+            now = datetime.now(jst)
+        elif now.tzinfo is None:
+            now = jst.localize(now)
+        else:
+            now = now.astimezone(jst)
+        return (now.date() - timedelta(days=1)).isoformat()
+
+    def _check_daily_summary_published(self, now=None) -> None:
+        """08:15 JST: 前日 business_day の日次原稿が DB にあるか。欠けているときだけ Discord。
+
+        生成・メール再送はしない（GHA 欠走の検知専用）。DB 参照失敗は欠走扱いしない。
+        """
+        from services.summary.summary_store import has_document
+
+        doc_id = self._daily_summary_business_day_jst(now)
+        missing: list[str] = []
+        lookup_failed: list[str] = []
+        for region in ("jp", "us"):
+            exists = has_document("daily", region, doc_id)
+            if exists is True:
+                continue
+            if exists is False:
+                missing.append(region)
+            else:
+                lookup_failed.append(region)
+
+        if lookup_failed and not missing:
+            logger.warning(
+                "⚠️ 日次サマリー欠走チェック: DB 参照失敗 region=%s doc_id=%s（欠走扱いしない）",
+                ",".join(lookup_failed),
+                doc_id,
+            )
+            return
+
+        if not missing:
+            logger.info(
+                "✅ 日次サマリー欠走チェック: %s は jp/us とも DB にあり（通知なし）",
+                doc_id,
+            )
+            return
+
+        logger.warning(
+            "⚠️ 日次サマリー欠走: business_day=%s missing=%s",
+            doc_id,
+            ",".join(missing),
+        )
+        self._send_alert(
+            "warning",
+            "⚠️ 日次サマリーが未着です",
+            (
+                f"GHA AI daily summary が {doc_id} を 08:15 JST までに "
+                f"summary_documents へ載せていません（{', '.join(missing)}）。"
+                "生成・再送はしていません。Actions で手動 Run workflow してください。"
+            ),
+            {
+                "business_day": doc_id,
+                "missing": ", ".join(missing),
+                "対応": "Actions → AI daily summary → Run workflow",
+            },
+        )
 
     def _retry_missed_slot_if_needed(self) -> None:
         """各スロット T+35 分: スナップショット欠損時のみ1回リトライ（通知数は完了1通のみ）。"""

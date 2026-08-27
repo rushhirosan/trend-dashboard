@@ -213,3 +213,62 @@ def test_upsert_endpoint_success(mock_upsert, client, monkeypatch):
 def test_weekly_monday_parsing():
     assert summary_store.weekly_monday("2026-W29") == date(2026, 7, 13)
     assert summary_store.weekly_monday("invalid") is None
+
+
+def test_has_document_invalid_id_returns_none():
+    assert summary_store.has_document("daily", "jp", "not-a-date") is None
+
+
+def test_has_document_true_false_and_db_error(monkeypatch):
+    class _Cursor:
+        def __init__(self, row):
+            self._row = row
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def execute(self, *_args, **_kwargs):
+            return None
+
+        def fetchone(self):
+            return self._row
+
+    class _Conn:
+        def __init__(self, row):
+            self._row = row
+
+        def cursor(self):
+            return _Cursor(self._row)
+
+    class _ConnCtx:
+        def __init__(self, inner):
+            self.inner = inner
+
+        def __enter__(self):
+            return self.inner
+
+        def __exit__(self, *args):
+            return False
+
+    class _Cache:
+        def __init__(self, row):
+            self._row = row
+
+        def get_connection(self):
+            return _ConnCtx(_Conn(self._row))
+
+    monkeypatch.setattr(summary_store, "TrendsCache", lambda: _Cache((1,)))
+    assert summary_store.has_document("daily", "jp", "2026-08-26") is True
+
+    monkeypatch.setattr(summary_store, "TrendsCache", lambda: _Cache(None))
+    assert summary_store.has_document("daily", "us", "2026-08-26") is False
+
+    class _Boom:
+        def get_connection(self):
+            raise RuntimeError("db down")
+
+    monkeypatch.setattr(summary_store, "TrendsCache", lambda: _Boom())
+    assert summary_store.has_document("daily", "jp", "2026-08-26") is None

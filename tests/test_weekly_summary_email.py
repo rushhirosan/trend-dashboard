@@ -134,28 +134,35 @@ def test_email_hyperlink_with_brackets_in_title():
 def test_history_and_quote_lines_stay_one_line():
     md = (
         "**歴史** 8/26 · 1071年 — マラズギルトの戦い。（Wikipedia）\n\n"
-        "**格言** 「毎日毎日、嫌なことばかりだけれども、"
-        "これは砥石で研がれているようなもんだな。」 — 新井正明（10秒名言）\n"
+        "**格言** 「後悔するよりも反省する事だ。"
+        "後悔は人をネガティブにする。」 — メタルギア ソリッド・スネーク（10秒名言）\n"
     )
     html = weekly_markdown_to_email_html(md)
     assert "戦い。<br>" not in html
-    assert "もんだな。<br>" not in html
+    assert "事だ。<br>" not in html
     assert "戦い。（Wikipedia）" in html
-    assert "もんだな。」 — 新井正明（10秒名言）" in html
+    assert "事だ。後悔は人をネガティブにする。」 — メタルギア ソリッド・スネーク（10秒名言）" in html
     text = weekly_markdown_to_email_text(md)
     assert "戦い。\n" not in text
-    assert "もんだな。\n" not in text
+    assert "事だ。\n" not in text
+    assert "事だ。後悔は人をネガティブにする。」" in text
 
 
-def test_english_history_line_stays_one_line_before_wikipedia():
+def test_english_history_and_quote_lines_stay_one_line():
     md = (
-        "**On this day** Aug 26, 1071 — The Battle of Manzikert. (Wikipedia)\n"
+        "**On this day** Aug 26, 1071 — The Battle of Manzikert. (Wikipedia)\n\n"
+        '**Quote** "Bad things are not the worst things that an happen to us. '
+        'NOTHING is the worst thing…" — Richard Bach (ZenQuotes)\n'
     )
     html = weekly_markdown_to_email_html(md)
     assert "Manzikert.<br>" not in html
+    assert "us.<br>" not in html
     assert "Manzikert. (Wikipedia)" in html
+    assert "us. NOTHING is the worst thing…" in html
     text = weekly_markdown_to_email_text(md)
     assert "Manzikert.\n" not in text
+    assert "us.\n" not in text
+    assert "us. NOTHING is the worst thing…" in text
 
 
 def test_weekly_flow_inserts_breaks_after_japanese_periods():

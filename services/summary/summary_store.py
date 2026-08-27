@@ -102,6 +102,37 @@ def upsert_document(kind: str, region: str, doc_id: str, body_md: str) -> bool:
         return False
 
 
+def has_document(kind: str, region: str, doc_id: str) -> Optional[bool]:
+    """行の有無だけ見る。True=ある / False=無い / None=形式不正または DB エラー。
+
+    本文は読まない（欠走チェック用）。DB 障害は欠走と区別するため None。
+    """
+    if not valid_doc(kind, region, doc_id):
+        return None
+    try:
+        cache = TrendsCache()
+        with cache.get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT 1 FROM summary_documents
+                    WHERE kind = %s AND region = %s AND doc_id = %s
+                    LIMIT 1
+                    """,
+                    (kind, region, doc_id),
+                )
+                return cursor.fetchone() is not None
+    except Exception as e:
+        logger.warning(
+            "⚠️ summary_documents 存在確認スキップ (%s/%s/%s): %s",
+            kind,
+            region,
+            doc_id,
+            e,
+        )
+        return None
+
+
 def get_document(kind: str, region: str, doc_id: str) -> Optional[str]:
     """原稿本文を返す。行が無い・DB が使えない場合は None（ファイル fallback 用）。"""
     if not valid_doc(kind, region, doc_id):

@@ -195,7 +195,11 @@ def markdown_to_email_text(markdown: str) -> str:
             table_buf.append(cells)
             continue
         _flush_table()
-        if line.startswith(("#", ">", "-", "*")) or re.match(r"^\d+\.\s", line):
+        if (
+            line.startswith(("#", ">", "-", "*"))
+            or re.match(r"^\d+\.\s", line)
+            or _keep_one_line(line)
+        ):
             lines.append(line)
         elif line.strip():
             lines.append(_insert_sentence_breaks_text(line))
@@ -210,7 +214,16 @@ def markdown_to_email_text(markdown: str) -> str:
 _EN_SENTENCE_END_RE = re.compile(r"(?<!\d)\.(?=\s+(?!\())")
 # 閉じ引用・出典カッコの直前の句点は、歴史・格言の一行を守るため割らない
 _JP_SENTENCE_BREAK_RE = re.compile(r"。(?![）」\"'（(])")
+# ** 除去後のテキスト行にも効く（格言・Quote は複数文でも一行）
+_KEEP_ONE_LINE_RE = re.compile(
+    r"^(?:\*\*)?(?:歴史|格言|Quote|On this day)(?:\*\*)?\s"
+)
 _INLINE_BOLD_RE = re.compile(r"\*\*([^*]+)\*\*")
+
+
+def _keep_one_line(line: str) -> bool:
+    """歴史・格言は本文の可読化改行を入れない。"""
+    return bool(_KEEP_ONE_LINE_RE.match(line.lstrip()))
 
 
 def _insert_sentence_breaks_text(text: str) -> str:
@@ -340,7 +353,12 @@ def markdown_to_email_html(
             )
         elif line.strip():
             # 番号付きリスト行は文分割しない（"1. タイトル" を壊さない）
-            if re.match(r"^\d+\.\s", line) or line.lstrip().startswith(("- ", "* ")):
+            # 歴史・格言も複数文のまま一行
+            if (
+                re.match(r"^\d+\.\s", line)
+                or line.lstrip().startswith(("- ", "* "))
+                or _keep_one_line(line)
+            ):
                 parts.append(f"<p>{_inline_markdown_to_html(line)}</p>")
             else:
                 inner = _insert_sentence_breaks_html(_inline_markdown_to_html(line))

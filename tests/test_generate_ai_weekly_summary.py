@@ -340,6 +340,21 @@ def test_format_weekly_rank_trend_block_shows_trend_line(gaws):
     assert " ↑" in block
 
 
+def test_format_weekly_rank_trend_block_us_is_english(gaws):
+    gaws.configure_weekly_region("us")
+    block = gaws.format_weekly_rank_trend_block(
+        "The Whisper Man",
+        {
+            "2026-08-17": "7時7位 → 13時7位 → 19時7位",
+            "2026-08-23": "7時9位 → 13時9位 → 19時9位",
+        },
+    )
+    assert "**Best rank by day**" in block
+    assert "順位の動き" not in block
+    assert "上ほど良い" not in block
+    gaws.configure_weekly_region("jp")
+
+
 def test_format_weekly_rank_trend_block_skips_flat_ranks(gaws):
     assert gaws.format_weekly_rank_trend_block(
         "Flat",

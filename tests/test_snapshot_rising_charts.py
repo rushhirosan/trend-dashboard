@@ -40,3 +40,14 @@ def test_format_rank_svg_chart_skips_flat_ranks(sr):
 def test_rank_chart_coordinates_top_is_better_rank(sr):
     _, ys, _, _, _, _ = sr.rank_chart_coordinates([8, 2])
     assert ys[1] < ys[0]
+
+
+def test_format_rank_trend_markdown_locale(sr):
+    labels = ["7 (#7)", "13 (#8)", "19 (#9)"]
+    ranks = [7, 8, 9]
+    ja = sr.format_rank_trend_markdown(labels, ranks)
+    en = sr.format_rank_trend_markdown(labels, ranks, locale="en")
+    assert ja.startswith("> **順位の動き**（上ほど良い）:")
+    assert en.startswith("> **Rank movement** (higher is better):")
+    assert en.endswith("↓")
+    assert "順位" not in en

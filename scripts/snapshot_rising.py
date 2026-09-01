@@ -153,6 +153,8 @@ def daytime_best_rank(ranks: dict[str, int]) -> int:
 def format_rank_trend_markdown(
     x_axis_labels: list[str],
     rank_vals: list[int],
+    *,
+    locale: str = "ja",
 ) -> str:
     """順位推移の一行（日次向け・Y 軸なし・全 Markdown ビューア対応）。
 
@@ -169,6 +171,8 @@ def format_rank_trend_markdown(
         arrow = " ↓"
     else:
         arrow = ""
+    if str(locale or "ja").lower() == "en":
+        return f"> **Rank movement** (higher is better): {trend}{arrow}"
     return f"> **順位の動き**（上ほど良い）: {trend}{arrow}"
 
 

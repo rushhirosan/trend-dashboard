@@ -613,10 +613,32 @@ def test_format_rank_evidence_shows_oob_for_missing_slots(gads):
         ("nhk_jp", "NHK"),
         ("ebay_us", "eBay (US)"),
         ("prtimes_hatena_jp", "PR TIMES × はてブ"),
+        ("movie_jp", "映画"),
     ],
 )
 def test_format_series_key_display(gads, series_key, expected):
     assert gads._format_series_key_display(series_key) == expected
+
+
+def test_format_series_key_display_us_uses_english_names(gads):
+    gads.configure_daily_region("us")
+    assert gads._format_series_key_display("movie_us") == "Movies (US)"
+    assert gads._format_series_key_display("wikipedia_en") == "Wikipedia (EN)"
+    assert gads._format_series_key_display("crypto_global") == "Crypto"
+    assert gads._format_series_key_display("stock_us") == "Stocks (US)"
+
+
+_CJK_RE = re.compile(r"[\u3040-\u30ff\u3400-\u9fff]")
+
+
+def test_us_series_key_displays_have_no_japanese(gads):
+    gads.configure_daily_region("us")
+    bad = []
+    for key in sorted(_all_snapshot_series_keys()):
+        display = gads._format_series_key_display(key)
+        if _CJK_RE.search(display):
+            bad.append(f"{key!r} → {display!r}")
+    assert not bad, "US source labels must be English:\n  " + "\n  ".join(bad)
 
 
 def _all_snapshot_series_keys() -> frozenset[str]:
@@ -1130,6 +1152,20 @@ def test_format_daily_slot_rank_trend_shows_labels_and_direction(gads):
     assert "7時 (18位)" in trend
     assert "19時 (1位)" in trend
     assert trend.endswith("↑")
+
+
+def test_format_daily_slot_rank_trend_us_is_english(gads):
+    gads.configure_daily_region("us")
+    trend = gads.format_daily_slot_rank_trend(
+        "The Whisper Man",
+        {"07": 7, "13": 8, "19": 9},
+    )
+    assert trend.startswith("> **Rank movement** (higher is better):")
+    assert "7 (#7)" in trend
+    assert "19 (#9)" in trend
+    assert trend.endswith("↓")
+    assert "順位" not in trend
+    assert "上ほど良い" not in trend
 
 
 def test_format_daily_slot_rank_trend_small_ranks(gads):
@@ -1944,6 +1980,33 @@ def test_us_render_uses_english_labels_not_japanese(gads):
     assert "昨日の傾向" not in top3_md
     assert "ニュース" not in top3_md
     assert "検索・動画" not in top3_md
+
+    cross_md = gads.render_cross_source_highlights_markdown(
+        [
+            {
+                "label": "The Whisper Man",
+                "sources_display": "Movies (US), Wikipedia (EN)",
+                "source_links": [
+                    {
+                        "display": "Movies (US)",
+                        "url": "https://www.themoviedb.org/movie/1",
+                    },
+                    {
+                        "display": "Wikipedia (EN)",
+                        "url": "https://en.wikipedia.org/wiki/The_Whisper_Man",
+                    },
+                ],
+                "ranks": {"07": 7, "13": 8, "19": 9},
+            }
+        ],
+        date(2026, 8, 31),
+    )
+    assert "Movies (US)" in cross_md
+    assert "Wikipedia (EN)" in cross_md
+    assert "**Rank movement**" in cross_md
+    assert "映画" not in cross_md
+    assert "順位の動き" not in cross_md
+    assert "上ほど良い" not in cross_md
 
 
 def test_exclude_market_default_is_false():

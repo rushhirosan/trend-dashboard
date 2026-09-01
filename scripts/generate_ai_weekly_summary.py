@@ -1268,9 +1268,12 @@ def format_weekly_rank_trend_block(
     if not series:
         return ""
     x_labels, _, rank_vals = series
-    trend = sr.format_rank_trend_markdown(x_labels, rank_vals)
+    locale = "en" if _ACTIVE_REGION == "us" else "ja"
+    trend = sr.format_rank_trend_markdown(x_labels, rank_vals, locale=locale)
     if not trend:
         return ""
+    if locale == "en":
+        return trend.replace("**Rank movement**", "**Best rank by day**", 1) + "\n"
     return trend.replace("**順位の動き**", "**日別ベスト順位**", 1) + "\n"
 
 

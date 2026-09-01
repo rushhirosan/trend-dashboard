@@ -295,6 +295,19 @@ _PROVIDER_DISPLAY: Dict[str, str] = {
     "bls": "BLS",
     "usaspending": "USAspending",
 }
+# US メール/原稿向け。日本語名が残るプロバイダだけ上書きする。
+_PROVIDER_DISPLAY_EN: Dict[str, str] = {
+    "hatena": "Hatena",
+    "prtimes_hatena": "PR TIMES × Hatena",
+    "book_jp": "Rakuten Books",
+    "rakuten": "Rakuten",
+    "stock": "Stocks",
+    "crypto": "Crypto",
+    "movie": "Movies",
+    "kkj": "Gov procurement",
+    "estat": "e-Stat",
+    "jpcert": "JPCERT/CC",
+}
 SLOT_LABELS = {
     "07": "7時台ジョブ後",
     "13": "13時台ジョブ後",
@@ -790,22 +803,13 @@ def _format_series_key_display(series_key: str) -> str:
     if not sk or sk == "?":
         return "?"
     if sk.startswith("prtimes_hatena"):
+        provider = "prtimes_hatena"
         name = _PROVIDER_DISPLAY["prtimes_hatena"]
     else:
         provider = _series_provider(sk)
         name = _PROVIDER_DISPLAY.get(provider) or provider.replace("_", " ")
-        if _ACTIVE_REGION == "us":
-            us_name = {
-                "stock": "Stocks",
-                "crypto": "Crypto",
-                "hatena": "Hatena",
-                "rakuten": "Rakuten",
-                "estat": "e-Stat",
-                "kkj": "Gov procurement",
-                "jpcert": "JPCERT/CC",
-            }.get(provider)
-            if us_name:
-                name = us_name
+    if _ACTIVE_REGION == "us":
+        name = _PROVIDER_DISPLAY_EN.get(provider, name)
     if sk.endswith("_us"):
         return f"{name} (US)"
     if sk.endswith("_en"):
@@ -1127,7 +1131,8 @@ def format_daily_slot_rank_trend(label: str, ranks: dict[str, int]) -> str:
         x_labels = [f"{h} (#{r})" for h, r in points]
     else:
         x_labels = [f"{h} ({r}位)" for h, r in points]
-    return sr.format_rank_trend_markdown(x_labels, rank_vals)
+    locale = "en" if _ACTIVE_REGION == "us" else "ja"
+    return sr.format_rank_trend_markdown(x_labels, rank_vals, locale=locale)
 
 
 def _compact_daily_link_line(item: Dict[str, Any]) -> str:

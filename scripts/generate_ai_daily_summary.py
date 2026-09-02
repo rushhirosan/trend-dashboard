@@ -1107,34 +1107,6 @@ def format_daily_rank_table(ranks: dict[str, int]) -> str:
     return "\n".join([header, sep, row])
 
 
-def format_daily_slot_rank_trend(label: str, ranks: dict[str, int]) -> str:
-    """一日のスロット別順位を一行テキストで示す。
-
-    2スロット以上かつ順位に変化があるときのみ（同順の横ばいは表だけ）。
-    """
-    del label  # 表・リンク行でラベル済み
-    points: List[tuple[str, int]] = []
-    for slot in DAYTIME_SLOTS:
-        r = ranks.get(slot)
-        if r is not None:
-            hour = _slot_hour_label(slot)
-            if _ACTIVE_REGION == "us":
-                points.append((hour, int(r)))
-            else:
-                points.append((f"{hour}時", int(r)))
-    if len(points) < 2:
-        return ""
-    rank_vals = [r for _, r in points]
-    if len(set(rank_vals)) < 2:
-        return ""
-    if _ACTIVE_REGION == "us":
-        x_labels = [f"{h} (#{r})" for h, r in points]
-    else:
-        x_labels = [f"{h} ({r}位)" for h, r in points]
-    locale = "en" if _ACTIVE_REGION == "us" else "ja"
-    return sr.format_rank_trend_markdown(x_labels, rank_vals, locale=locale)
-
-
 def _compact_daily_link_line(item: Dict[str, Any]) -> str:
     """表示用: link_line から順位表記を除き、ソース名だけ残す。"""
     link = str(item.get("link_line") or "").strip()
@@ -1859,10 +1831,6 @@ def render_cross_source_highlights_markdown(
         if table:
             lines.append("")
             lines.append(table)
-        trend = format_daily_slot_rank_trend(str(h.get("label") or ""), ranks)
-        if trend:
-            lines.append("")
-            lines.append(trend)
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 

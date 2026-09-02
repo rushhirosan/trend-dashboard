@@ -12,6 +12,7 @@ from services.summary.morning_brief import (
     _format_jp_proverb_line,
     _meaning_from_tounou_lines,
     _select_tounou_item_for_day,
+    _split_jp_history_year,
     build_calendar_line,
     build_jp_proverb_line,
     build_morning_brief_lines,
@@ -166,6 +167,30 @@ def test_format_jp_history_line_includes_month_day_and_year():
     )
 
 
+def test_split_jp_history_year_keeps_bce_prefix():
+    year, rest = _split_jp_history_year(
+        "紀元前44年 - キケロが初のピリッピカ"
+    )
+    assert year == "紀元前44"
+    assert rest == "キケロが初のピリッピカ"
+    line = _format_jp_history_line(date(2026, 9, 2), year, rest)
+    assert line == (
+        "**歴史** 9/2 · 紀元前44年 — キケロが初のピリッピカ（Wikipedia）"
+    )
+
+
+def test_split_jp_history_year_short_mae_prefix_is_bce():
+    year, rest = _split_jp_history_year("前44年 - キケロが初のピリッピカ")
+    assert year == "紀元前44"
+    assert rest == "キケロが初のピリッピカ"
+
+
+def test_split_jp_history_year_ce_has_no_era_prefix():
+    year, rest = _split_jp_history_year("1059年 — ローマ教皇がノルマン人を諸侯に任命")
+    assert year == "1059"
+    assert rest == "ローマ教皇がノルマン人を諸侯に任命"
+
+
 def test_extract_tounou_article_lines_and_meaning():
     lines = _extract_tounou_article_lines(SAMPLE_TOUNOU_HTML)
     assert lines[0].startswith("新井正明")
@@ -251,7 +276,7 @@ def test_render_morning_brief_markdown_jp():
         "jp",
         lines=lines,
     )
-    assert "## 🗓 今日どう動くか" in md
+    assert "## 🗓 今日のカレンダー" in md
     assert "## 💹 マーケット（前日まで）" in md
     assert "## ☕ ひと息（歴史 + 格言）" in md
     assert "（10秒名言）" in md
@@ -271,7 +296,7 @@ def test_render_morning_brief_markdown_us():
         "us",
         lines=lines,
     )
-    assert "## 🗓 Today at a glance" in md
+    assert "## 🗓 Today's calendar" in md
     assert "## ☕ A breath (history + quote)" in md
     assert "**Quote**" in md
 

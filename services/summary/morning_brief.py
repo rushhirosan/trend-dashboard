@@ -282,6 +282,18 @@ def _format_en_on_this_day_line(
     return f"**On this day** {when} — {cleaned} (Wikipedia)"
 
 
+def _split_jp_history_year(cleaned: str) -> Optional[tuple[str, str]]:
+    """できごと行から年号と本文を分ける。紀元前は落とさない。"""
+    year_match = re.search(r"(紀元前|前)?(\d{1,4})年", cleaned)
+    if not year_match:
+        return None
+    era = "紀元前" if year_match.group(1) else ""
+    year = f"{era}{year_match.group(2)}"
+    rest = cleaned[year_match.end() :].lstrip("—－-・ ")
+    rest = re.split(r"[（(]", rest, maxsplit=1)[0].strip(" 　—-")
+    return year, rest
+
+
 def _format_jp_history_line(day: date, year: str, rest: str) -> Optional[str]:
     event = _clip(str(rest or "").strip(), 50)
     if not event:
@@ -355,12 +367,10 @@ def _fetch_wikipedia_history_jp(day: date) -> Optional[str]:
         if not line.strip().startswith("*"):
             continue
         cleaned = _strip_wikitext(line.lstrip("* ").strip())
-        year_match = re.search(r"(\d{1,4})年", cleaned)
-        if not year_match:
+        parsed = _split_jp_history_year(cleaned)
+        if not parsed:
             continue
-        year = year_match.group(1)
-        rest = cleaned[year_match.end() :].lstrip("—－-・ ")
-        rest = re.split(r"[（(]", rest, maxsplit=1)[0].strip(" 　—-")
+        year, rest = parsed
         line = _format_jp_history_line(day, year, rest)
         if line:
             return line
@@ -591,10 +601,11 @@ def render_morning_brief_markdown(
     glance_lines = [data.calendar]
     if data.alert:
         glance_lines.append(data.alert)
+    # 中身は配信日の日付・曜日・祝日のみ（動向コメントではない）
     if region_n == "us":
-        sections.append("## 🗓 Today at a glance\n\n" + "\n".join(glance_lines))
+        sections.append("## 🗓 Today's calendar\n\n" + "\n".join(glance_lines))
     else:
-        sections.append("## 🗓 今日どう動くか\n\n" + "\n".join(glance_lines))
+        sections.append("## 🗓 今日のカレンダー\n\n" + "\n".join(glance_lines))
     market_lines = [x for x in (data.fx, data.stock) if x]
     if market_lines:
         if region_n == "us":

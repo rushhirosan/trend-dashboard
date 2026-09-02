@@ -1142,48 +1142,6 @@ def test_render_rising_highlights_markdown_lists_items(gads):
     assert "**順位の動き**" not in md
 
 
-def test_format_daily_slot_rank_trend_shows_labels_and_direction(gads):
-    trend = gads.format_daily_slot_rank_trend(
-        "Climber",
-        {"07": 18, "13": 3, "19": 1},
-    )
-    assert trend.startswith("> **順位の動き**")
-    assert '"7時 (18位)"' not in trend
-    assert "7時 (18位)" in trend
-    assert "19時 (1位)" in trend
-    assert trend.endswith("↑")
-
-
-def test_format_daily_slot_rank_trend_us_is_english(gads):
-    gads.configure_daily_region("us")
-    trend = gads.format_daily_slot_rank_trend(
-        "The Whisper Man",
-        {"07": 7, "13": 8, "19": 9},
-    )
-    assert trend.startswith("> **Rank movement** (higher is better):")
-    assert "7 (#7)" in trend
-    assert "19 (#9)" in trend
-    assert trend.endswith("↓")
-    assert "順位" not in trend
-    assert "上ほど良い" not in trend
-
-
-def test_format_daily_slot_rank_trend_small_ranks(gads):
-    trend = gads.format_daily_slot_rank_trend("Moved", {"13": 4, "19": 2})
-    assert "13時 (4位)" in trend
-    assert "19時 (2位)" in trend
-    assert "↑" in trend
-
-
-def test_format_daily_slot_rank_trend_skips_single_slot(gads):
-    assert gads.format_daily_slot_rank_trend("Only", {"19": 1}) == ""
-
-
-def test_format_daily_slot_rank_trend_skips_flat_ranks(gads):
-    assert gads.format_daily_slot_rank_trend("Flat", {"13": 1, "19": 1}) == ""
-    assert gads.format_daily_slot_rank_trend("Moved", {"13": 4, "19": 2}) != ""
-
-
 def test_render_cross_source_highlights_markdown_empty(gads):
     md = gads.render_cross_source_highlights_markdown([], date(2026, 5, 27))
     assert md == ""
@@ -1215,7 +1173,7 @@ def test_render_cross_source_highlights_markdown_lists_items(gads):
     assert "[Google Trends (JP)](https://www.google.com/search?" in md
     assert "| 時 | 07 | 13 | 19 |" in md
     assert "| 順位 |" in md
-    assert "**順位の動き**" in md
+    assert "**順位の動き**" not in md
     assert "```mermaid" not in md
     assert "**根拠**" not in md
     assert gads._CROSS_NONE_LINE not in md
@@ -1704,7 +1662,7 @@ def test_render_category_top3_omits_trend_blurbs(gads):
 def test_assemble_daily_markdown_includes_morning_brief(gads, monkeypatch):
     monkeypatch.setenv("MORNING_BRIEF_ENABLED", "true")
     brief = (
-        "## 🗓 今日どう動くか\n\n"
+        "## 🗓 今日のカレンダー\n\n"
         "**8/22（土）** · サマリー生成対象日 8/21 · 次の祝日は 9/21（月）敬老の日\n\n"
         "---\n"
     )
@@ -1716,8 +1674,8 @@ def test_assemble_daily_markdown_includes_morning_brief(gads, monkeypatch):
     bd = date(2026, 8, 21)
     editorial = {"one_liner": "", "rising_notes": [], "category_intros": {}}
     md = gads.assemble_daily_markdown(bd, editorial, {}, [], [], [])
-    assert "## 🗓 今日どう動くか" in md
-    assert md.index("今日どう動くか") < md.index(gads._RISING_HEADING)
+    assert "## 🗓 今日のカレンダー" in md
+    assert md.index("今日のカレンダー") < md.index(gads._RISING_HEADING)
 
 
 def test_assemble_daily_markdown_structure(gads):
@@ -2003,7 +1961,8 @@ def test_us_render_uses_english_labels_not_japanese(gads):
     )
     assert "Movies (US)" in cross_md
     assert "Wikipedia (EN)" in cross_md
-    assert "**Rank movement**" in cross_md
+    assert "| Slot | 07 | 13 | 19 |" in cross_md
+    assert "**Rank movement**" not in cross_md
     assert "映画" not in cross_md
     assert "順位の動き" not in cross_md
     assert "上ほど良い" not in cross_md

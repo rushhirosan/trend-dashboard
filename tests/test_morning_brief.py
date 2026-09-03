@@ -119,6 +119,20 @@ def test_build_calendar_line_includes_summary_date_us():
     assert "Next holiday: 9/7 (Mon) Labor Day" in line
 
 
+def test_format_en_on_this_day_keeps_full_sentence():
+    text = (
+        "North Korea conducted its sixth and most powerful nuclear test "
+        "at Punggye-ri, causing a magnitude-6.3 earthquake."
+    )
+    line = _format_en_on_this_day_line(date(2026, 9, 3), text, year=2017)
+    assert line == (
+        "**On this day** Sep 3, 2017 — North Korea conducted its sixth "
+        "and most powerful nuclear test at Punggye-ri, causing a "
+        "magnitude-6.3 earthquake. (Wikipedia)"
+    )
+    assert "…" not in line
+
+
 def test_format_en_on_this_day_uses_api_year_and_calendar_day():
     line = _format_en_on_this_day_line(
         date(2026, 8, 23),
@@ -132,7 +146,7 @@ def test_format_en_on_this_day_uses_api_year_and_calendar_day():
     assert "(Wikipedia)" in line
 
 
-def test_format_en_on_this_day_does_not_clip_mid_word():
+def test_format_en_on_this_day_keeps_full_voyager_sentence():
     line = _format_en_on_this_day_line(
         date(2026, 8, 25),
         "The NASA space probe Voyager 1 became the first man-made object "
@@ -140,9 +154,8 @@ def test_format_en_on_this_day_does_not_clip_mid_word():
         year=2012,
     )
     assert line is not None
-    assert "man-ma…" not in line
-    assert "Voyager 1" in line
-    assert "man-made" in line
+    assert "…" not in line
+    assert "man-made object to enter interstellar space." in line
     assert line.endswith("(Wikipedia)")
 
 
@@ -189,6 +202,19 @@ def test_split_jp_history_year_ce_has_no_era_prefix():
     year, rest = _split_jp_history_year("1059年 — ローマ教皇がノルマン人を諸侯に任命")
     assert year == "1059"
     assert rest == "ローマ教皇がノルマン人を諸侯に任命"
+
+
+def test_format_jp_history_line_keeps_full_event():
+    rest = (
+        "アメリカ独立戦争: ロングアイランドの戦いの本格的な戦闘が始まる。"
+    )
+    line = _format_jp_history_line(date(2026, 8, 27), "1776", rest)
+    assert line == (
+        "**歴史** 8/27 · 1776年 — "
+        "アメリカ独立戦争: ロングアイランドの戦いの本格的な戦闘が始まる。"
+        "（Wikipedia）"
+    )
+    assert "…" not in line
 
 
 def test_extract_tounou_article_lines_and_meaning():

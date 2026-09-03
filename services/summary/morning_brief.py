@@ -78,20 +78,6 @@ def _strip_wikitext(text: str) -> str:
     return s
 
 
-def _clip(text: str, max_len: int) -> str:
-    s = str(text or "").strip()
-    if len(s) <= max_len:
-        return s
-    budget = max_len - 1
-    cut = s[:budget].rstrip()
-    # 英単語の途中で切らない（man-ma… を避ける）
-    if cut and re.search(r"[A-Za-z0-9]$", cut):
-        word_break = cut.rfind(" ")
-        if word_break >= max(12, budget // 3):
-            cut = cut[:word_break].rstrip()
-    return cut.rstrip(" ,;:-") + "…"
-
-
 def _signed_delta(value: float, *, decimals: int = 1) -> str:
     fmt = f"{{:+.{decimals}f}}"
     return fmt.format(value)
@@ -274,7 +260,6 @@ def _format_en_on_this_day_line(
             cleaned,
             flags=re.I,
         )
-    cleaned = _clip(cleaned, 80)
     if not cleaned:
         return None
     month_day = f"{_US_MONTH_ABBR[day.month - 1]} {day.day}"
@@ -295,7 +280,7 @@ def _split_jp_history_year(cleaned: str) -> Optional[tuple[str, str]]:
 
 
 def _format_jp_history_line(day: date, year: str, rest: str) -> Optional[str]:
-    event = _clip(str(rest or "").strip(), 50)
+    event = str(rest or "").strip()
     if not event:
         return None
     return f"**歴史** {day.month}/{day.day} · {year}年 — {event}（Wikipedia）"
@@ -371,9 +356,9 @@ def _fetch_wikipedia_history_jp(day: date) -> Optional[str]:
         if not parsed:
             continue
         year, rest = parsed
-        line = _format_jp_history_line(day, year, rest)
-        if line:
-            return line
+        formatted = _format_jp_history_line(day, year, rest)
+        if formatted:
+            return formatted
     return None
 
 
@@ -455,7 +440,7 @@ def _meaning_from_tounou_lines(lines: List[str]) -> Optional[str]:
     for line in lines[start:]:
         if len(line) < 12:
             continue
-        return _clip(line, 45)
+        return line
     return None
 
 
@@ -538,7 +523,7 @@ def _fetch_zenquotes_today() -> Optional[str]:
     if not rows:
         return None
     row = rows[0]
-    quote = _clip(str(row.get("q") or "").strip(), 90)
+    quote = str(row.get("q") or "").strip()
     author = str(row.get("a") or "").strip()
     if not quote:
         return None

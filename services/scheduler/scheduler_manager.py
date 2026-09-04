@@ -438,11 +438,15 @@ class TrendsScheduler:
         )
         return True
 
-    def _try_acquire_scheduler_lock(self):
+    def _try_acquire_scheduler_lock(self, resume_after_recover: bool = False):
         """分散ロックを取得（非ブロッキング）。
         
         1) DB分散ロックを優先: 複数マシン間で二重実行を防止
         2) DB失敗時はファイルロックにフォールバック: 同一マシン内の複数ワーカー用
+
+        resume_after_recover:
+            True のとき stale lock 回収後に1回だけ取り直す（gap_retry 用）。
+            定時ジョブは False のままにし、OOM 再起動直後の即再取得ループを避ける。
         
         Returns:
             ('db', holder_id) or ('file', fd): 取得成功時
@@ -457,8 +461,15 @@ class TrendsScheduler:
                     if self.db.try_acquire_scheduler_lock_db(holder_id, SCHEDULER_LOCK_MINUTES):
                         logger.debug("🔒 スケジューラーDB分散ロックを取得しました")
                         return ('db', holder_id)
-                    # OOM 等で holder が死んでいればロックを回収（同一呼び出しでは再取得しない）
+                    # OOM 等で holder が死んでいればロックを回収
                     if self._try_recover_stale_scheduler_lock():
+                        if resume_after_recover and self.db.try_acquire_scheduler_lock_db(
+                            holder_id, SCHEDULER_LOCK_MINUTES
+                        ):
+                            logger.info(
+                                "🔒 stale lock 回収後に gap_retry 用ロックを再取得しました"
+                            )
+                            return ('db', holder_id)
                         jst = pytz.timezone("Asia/Tokyo")
                         recovery_slot = self._resolve_scheduler_slot_key(datetime.now(jst))
                         logger.info(
@@ -650,19 +661,16 @@ class TrendsScheduler:
                     gap_retry_minute,
                 )
                 
-                # 起動時の自動実行: SKIP_STARTUP_EXECUTION=false のときのみ補完を検討
-                # デプロイ直後（deploy_marker が直近）の場合は補完スキップ＝クラッシュ時のみ補完
+                # 全量 startup_catchup は _schedule_startup_slot_recovery が行わない。
+                # SKIP_STARTUP / 直近デプロイでも、未完了スロットの delayed gap_retry は検討する
+                # （定時中デプロイで 07 スロットが欠けるのを防ぐ）。
                 skip_startup = os.getenv('SKIP_STARTUP_EXECUTION', 'true').lower() == 'true'
-                if not skip_startup:
-                    if self._is_recent_deploy():
-                        logger.info(
-                            "⏭️ 起動時補完をスキップします（直近にデプロイされたため。クラッシュ再起動時のみ補完します）"
-                        )
-                    else:
-                        logger.info("🔄 起動時の自動実行を実行します（デプロイ以外の再起動と判定）")
-                        self._check_and_execute_missed_job(jst)
-                else:
-                    logger.info("⏭️ 起動時の自動実行をスキップします（SKIP_STARTUP_EXECUTION=true）")
+                if skip_startup:
+                    logger.info(
+                        "ℹ️ SKIP_STARTUP_EXECUTION=true: 全量起動時補完はせず、"
+                        "未完了スロットの delayed gap_retry のみ検討します"
+                    )
+                self._check_and_execute_missed_job(jst)
                 
             except Exception as e:
                 logger.error(f"❌ スケジューラー開始エラー: {e}", exc_info=True)
@@ -921,6 +929,7 @@ class TrendsScheduler:
 
         now_jst = datetime.now(jst)
         slots_to_retry: list[str] = []
+        current_slot = slot_key_for_datetime(now_jst)
         for sk in missed_slot_keys:
             gap_hour, gap_minute = self._gap_retry_time_for_slot_key(sk, gap_min)
             if gap_hour is None:
@@ -928,7 +937,8 @@ class TrendsScheduler:
             gap_at = now_jst.replace(
                 hour=gap_hour, minute=gap_minute, second=0, microsecond=0
             )
-            if now_jst < gap_at:
+            # T+35 前でも、今のスロット窓にいる未完了スロットはデプロイ直後に取り直す
+            if now_jst < gap_at and current_slot != sk:
                 continue
             retry_marker = f"gap_retry_{sk}"
             if self.db and hasattr(self.db, "has_slot_completed"):
@@ -1473,7 +1483,9 @@ class TrendsScheduler:
             return False
 
         # 分散ロック取得（DB優先→ファイルロック、複数マシン・二重Discord通知を防ぐ）
-        lock_handle = self._try_acquire_scheduler_lock()
+        lock_handle = self._try_acquire_scheduler_lock(
+            resume_after_recover=(trigger_source == "gap_retry"),
+        )
         if lock_handle is None:
             host_short, pid = _process_identity()
             logger.warning(
@@ -2370,7 +2382,7 @@ class TrendsScheduler:
 
     def _send_scheduler_skip_notification(self, trigger_source: str, reason: str) -> None:
         """スケジューラ実行がスキップされた理由をDiscord通知する。"""
-        if trigger_source != 'scheduler' or not self.alert_service:
+        if trigger_source not in AUTO_FETCH_TRIGGERS or not self.alert_service:
             return
         host_short, pid = _process_identity()
         self._send_alert(

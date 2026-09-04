@@ -80,5 +80,9 @@ def test_send_scheduler_skip_notification_only_for_scheduler():
     assert sent[0][1] == "⏭️ トレンド取得ジョブをスキップ"
 
     sent.clear()
+    scheduler._send_scheduler_skip_notification("gap_retry", "lock skip")
+    assert len(sent) == 1
+
+    sent.clear()
     scheduler._send_scheduler_skip_notification("api", "ignored")
     assert len(sent) == 0

@@ -2,6 +2,7 @@
 
 import os
 import socket
+from unittest.mock import patch
 
 from utils.scheduler_lock import is_local_holder_process_dead, parse_scheduler_lock_holder
 
@@ -18,7 +19,28 @@ def test_parse_scheduler_lock_holder():
 def test_is_local_holder_process_dead_current_pid():
     host = socket.gethostname()
     holder = f"{host}-{os.getpid()}-12345"
-    assert is_local_holder_process_dead(holder) is False
+    with patch("utils.scheduler_lock.current_process_start_unix", return_value=None):
+        assert is_local_holder_process_dead(holder) is False
+
+
+def test_is_local_holder_process_dead_pid_reuse_after_restart():
+    host = socket.gethostname()
+    holder = f"{host}-{os.getpid()}-1000"
+    with patch(
+        "utils.scheduler_lock.current_process_start_unix",
+        return_value=2000.0,
+    ):
+        assert is_local_holder_process_dead(holder) is True
+
+
+def test_is_local_holder_process_dead_same_pid_lock_after_start():
+    host = socket.gethostname()
+    holder = f"{host}-{os.getpid()}-3000"
+    with patch(
+        "utils.scheduler_lock.current_process_start_unix",
+        return_value=2000.0,
+    ):
+        assert is_local_holder_process_dead(holder) is False
 
 
 def test_is_local_holder_process_dead_other_host():

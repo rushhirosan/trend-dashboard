@@ -9,8 +9,7 @@ primary_region = "nrt"
   DEBUG = "False"
   # スケジューラ二重実行防止: DB分散ロックを有効化（複数マシン・プロセスで1本のみ実行）
   TRENDS_SCHEDULER_USE_DB_LOCK = "true"
-  # 起動時の取り逃し補完: OOM 再起動のたびに全量再取得が走ると通知ループになるため true 推奨
-  # 取り逃しは定時(1/7/13/19)と T+35 分の gap_retry で補完
+  # 起動時の全量 catchup はしない（OOM 再取得ループ防止）。未完了スロットは delayed gap_retry で補完
   SKIP_STARTUP_EXECUTION = "true"
   # デプロイ時のメール送信を無効化（スケジューラー実行時のみメール送信）
   SKIP_EMAIL_ON_UPDATE = "false"

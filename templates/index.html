@@ -151,9 +151,8 @@
     <main class="container-fluid main-content-compact">
         <div id="mainContent">
             <header class="page-header-compact mb-1">
-                <p class="page-header-oneliner small text-muted mb-3 d-flex flex-wrap align-items-baseline justify-content-between gap-2">
-                    <span>対象ソースが1日4回更新（1・7・13・19時 JST）されます。</span>
-                    <a href="/about">このサイトについて</a>
+                <p class="page-header-oneliner small text-muted mb-3">
+                    対象ソースが1日4回更新（1・7・13・19時 JST）されます。
                 </p>
                 {% set dashboard_show_ai = (ENABLE_AI_SUMMARY_FAKE_DOOR and AI_SUMMARY_FAKE_DOOR) or (SHOW_LOCAL_AI_SUMMARY_MOCK and AI_SUMMARY_MOCK) %}
                 <div class="dashboard-summary-grid gap-2 mb-0 {% if dashboard_show_ai %}dashboard-summary-grid--2{% endif %}" aria-label="ダッシュボード要約">

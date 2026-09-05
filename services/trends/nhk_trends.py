@@ -11,7 +11,19 @@ logger = get_logger(__name__)
 
 # ニュース速報の張り付き防止（URL 日付 / published_date がこれより古い記事は除外）
 _NHK_MAX_AGE_DAYS = 3
-_NHK_URL_DATE_RE = re.compile(r"/html/(\d{8})/")
+# 旧 NEWS WEB: /html/YYYYMMDD/  /  NHK ONE: nd-YYYYMMDD...
+_NHK_URL_DATE_RE = re.compile(r"(?:/html/|nd-)(\d{8})")
+
+# NHK ONE RSS（2025-10 の NEWS WEB 集約後。www3 は更新停止で 200 のまま古い記事を返す）
+# https://www.nhk.or.jp/toppage/rss/index.html
+NHK_RSS_URLS = {
+    "main": "https://news.web.nhk/n-data/conf/na/rss/cat0.xml",  # 主要ニュース
+    "domestic": "https://news.web.nhk/n-data/conf/na/rss/cat1.xml",  # 社会
+    "international": "https://news.web.nhk/n-data/conf/na/rss/cat6.xml",  # 国際
+    "economy": "https://news.web.nhk/n-data/conf/na/rss/cat5.xml",  # 経済
+    "sports": "https://news.web.nhk/n-data/conf/na/rss/cat7.xml",  # スポーツ
+    "science": "https://news.web.nhk/n-data/conf/na/rss/cat3.xml",  # 科学・医療
+}
 
 
 class NHKTrendsManager(BaseTrendsManager):
@@ -22,15 +34,7 @@ class NHKTrendsManager(BaseTrendsManager):
         # ベースクラスを初期化（rate_limiterも自動的に初期化される）
         super().__init__(service_name='nhk', max_requests=10, window_seconds=60)
         
-        # NHK RSSフィードURL
-        self.rss_urls = {
-            'main': 'https://www3.nhk.or.jp/rss/news/cat0.xml',  # 主要ニュース
-            'domestic': 'https://www3.nhk.or.jp/rss/news/cat1.xml',  # 国内
-            'international': 'https://www3.nhk.or.jp/rss/news/cat2.xml',  # 国際
-            'economy': 'https://www3.nhk.or.jp/rss/news/cat3.xml',  # 経済
-            'sports': 'https://www3.nhk.or.jp/rss/news/cat4.xml',  # スポーツ
-            'science': 'https://www3.nhk.or.jp/rss/news/cat5.xml',  # 科学・文化
-        }
+        self.rss_urls = dict(NHK_RSS_URLS)
         
         logger.info("NHK Trends Manager初期化:")
         logger.info(f"  RSS URL: {self.rss_urls['main']}")
@@ -40,7 +44,7 @@ class NHKTrendsManager(BaseTrendsManager):
         return 'nhk_trends'
 
     def _article_datetime(self, item: dict):
-        """published_date または URL 内の /html/YYYYMMDD/ から記事日時を推定。"""
+        """published_date または URL 内の日付（/html/YYYYMMDD/ または nd-YYYYMMDD）から記事日時を推定。"""
         published_date_str = item.get("published_date")
         if published_date_str:
             try:
@@ -222,7 +226,7 @@ class NHKTrendsManager(BaseTrendsManager):
             except Exception as e:
                 logger.warning(f"⚠️ 主要ニュース取得エラー: {e}")
             
-            # 2. 国内（cat1）からトップ10件を取得
+            # 2. 社会（cat1）からトップ10件を取得
             try:
                 url = self.rss_urls['domestic']
                 # レート制限をチェック
@@ -233,9 +237,9 @@ class NHKTrendsManager(BaseTrendsManager):
                     root = ET.fromstring(response.content)
                     items = self._parse_rss_items(root)
                     all_items.extend(items[:10])  # トップ10件のみ
-                    logger.info(f"✅ 国内: {len(items[:10])}件取得")
+                    logger.info(f"✅ 社会: {len(items[:10])}件取得")
             except Exception as e:
-                logger.warning(f"⚠️ 国内取得エラー: {e}")
+                logger.warning(f"⚠️ 社会取得エラー: {e}")
             
             # 3. 国際（cat2）からトップ10件を取得
             try:

@@ -317,16 +317,22 @@ def _parse_daily_rising(content: str) -> list[dict]:
                 items.append(cur)
             link = re.match(r"^\[(.+?)\]\((.+?)\)（(.+)）$", head.group(1))
             if link:
-                title, url, source = link.group(1), link.group(2), link.group(3)
+                title, url, meta = link.group(1), link.group(2), link.group(3)
+                _, _, evidence = meta.partition(" · ")
                 cur = {
+                    "title": title,
                     "title_html": render_inline(f"[{title}]({url})"),
-                    "source": source,
+                    # テンプレは source に「ソース · 順位推移」全体を出す
+                    "source": meta,
+                    "rank_evidence": evidence.strip() if evidence else "",
                     "note": "",
                 }
             else:
                 cur = {
+                    "title": head.group(1),
                     "title_html": Markup(str(escape(head.group(1)))),
                     "source": "",
+                    "rank_evidence": "",
                     "note": "",
                 }
             continue
@@ -336,6 +342,54 @@ def _parse_daily_rising(content: str) -> list[dict]:
     if cur:
         items.append(cur)
     return items
+
+
+def _rank_evidence_is_flat(evidence: str) -> bool:
+    """一覧フォールバック用: 順位表記が一日中同じか。"""
+    s = (evidence or "").strip()
+    if not s:
+        return False
+    if "圏外" in s or re.search(r"\bout@", s, re.I):
+        return False
+    ranks = [int(n) for n in re.findall(r"(?:#)?(\d+)\s*(?:位|@)", s)]
+    if not ranks:
+        ranks = [int(n) for n in re.findall(r"(\d+)位", s)]
+    return len(ranks) >= 2 and len(set(ranks)) == 1
+
+
+def _looks_like_flat_sticky_lead(text: str) -> bool:
+    """機械生成の「一日中同じニュース首位」リードか（一覧が連日同一になる典型）。"""
+    s = (text or "").strip()
+    if not s:
+        return False
+    # 「一日を通して上位」文言でも、括弧内が動いていれば sticky ではない
+    m = re.search(r"[（(]([^）)]+)[）)]", s)
+    evidence = m.group(1).strip() if m else ""
+    if "一日を通して上位" in s:
+        return _rank_evidence_is_flat(evidence) if evidence else True
+    if s.startswith("News lead:") and evidence and _rank_evidence_is_flat(evidence):
+        return True
+    return False
+
+
+def _one_liner_from_rising(rising: list[dict], *, region: str) -> str:
+    """急上昇先頭から一覧・プレビュー用の1文を組み立てる。"""
+    if not rising:
+        return ""
+    first = rising[0]
+    title = str(first.get("title") or "").strip()
+    if not title:
+        return ""
+    # 表示用に長すぎるタイトルは切る
+    lab = title if len(title) <= 48 else title[:47].rstrip() + "…"
+    ev = str(first.get("rank_evidence") or "").strip()
+    if region == "us":
+        if ev:
+            return f"Biggest highlight: 「{lab}」 ({ev})."
+        return f"Biggest highlight: 「{lab}」."
+    if ev:
+        return f"「{lab}」が大きく動いた（{ev}）。"
+    return f"「{lab}」が大きく動いた。"
 
 
 def load_daily_page(
@@ -363,12 +417,17 @@ def load_daily_page(
 
     sections = _split_sections(body, "## ")
     one_liner = _join_paragraph(_find_section(sections, *_ONE_LINER_KEYS))
+    rising = _parse_daily_rising(_find_section(sections, *_RISING_KEYS))
     if not one_liner.strip():
         one_liner = str(meta.get("preview_lead") or meta.get("teaser") or "").strip()
+        # フラットなニュース首位リードは日次一覧が連日同一になるので、急上昇先頭へ寄せる
+        if _looks_like_flat_sticky_lead(one_liner) and rising:
+            alt = _one_liner_from_rising(rising, region=region)
+            if alt:
+                one_liner = alt
     # 本文中のリンクを対応表にして、一行結論のトピック名にリンクを張る
     topic_links = _collect_topic_links(body)
     one_liner_sentences = [_linkify(s, topic_links) for s in _split_sentences(one_liner)]
-    rising = _parse_daily_rising(_find_section(sections, *_RISING_KEYS))
     locked = [
         _clean_title(title)
         for title, _ in sections

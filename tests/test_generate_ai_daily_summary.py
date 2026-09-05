@@ -1463,6 +1463,43 @@ def test_one_liner_is_acceptable_requires_single_topic(gads):
     assert "カピピン" in mech
     assert "Ariana" not in mech or mech.count("「") <= 1
     assert gads.one_liner_is_acceptable(mech, news, rising)
+    assert "一日を通して上位" not in mech  # 圏外→上昇は「上位に」
+    assert "上位に" in mech
+
+
+def test_mechanical_one_liner_skips_flat_news_for_rising(gads):
+    """一日中同じニュース1位は rising 先頭を優先（一覧が連日同一になるのを防ぐ）。"""
+    news = [
+        {
+            "label": "北日本と東日本中心 9日も大気の状態が非常に不安定の見込み",
+            "category": "ニュース",
+            "reason": "category_leader",
+            "rank_evidence": "7時1位 → 13時1位 → 19時1位",
+        }
+    ]
+    rising = [
+        {
+            "label": "お散歩カーに電動アシスト搭載",
+            "category": "ニュース",
+            "rank_evidence": "7時圏外 → 13時1位 → 19時1位",
+        }
+    ]
+    pick = gads._preferred_highlight_candidate(news, rising, [])
+    assert pick is not None
+    assert pick["kind"] == "rising"
+    assert "お散歩カー" in str(pick["label"])
+    mech = gads.build_mechanical_one_liner(news, rising, [])
+    assert "お散歩カー" in mech
+    assert "北日本" not in mech
+    assert "大きく動いた" in mech
+
+
+def test_rank_evidence_is_flat(gads):
+    assert gads._rank_evidence_is_flat("7時1位 → 13時1位 → 19時1位")
+    assert not gads._rank_evidence_is_flat("7時圏外 → 13時1位 → 19時1位")
+    assert not gads._rank_evidence_is_flat("7時3位 → 13時2位 → 19時1位")
+    assert gads._rank_evidence_is_flat("#1@7 → #1@13 → #1@19")
+    assert not gads._rank_evidence_is_flat("out@7 → #1@13 → #1@19")
 
 
 def test_finalize_editorial_replaces_one_liner_and_filters_generic_notes(gads):

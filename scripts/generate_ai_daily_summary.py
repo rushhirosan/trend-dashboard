@@ -2009,7 +2009,8 @@ def build_llm_payload(
             "Entertainment & Shopping, Gov Data). "
             "rank_evidence uses out@H / #N@H for 07→13→19 daytime moves. "
             "one_liner (= Yesterday's highlight) must cover ONE lead topic only "
-            "(prefer a News category_leader, else first rising). "
+            "(prefer a News category_leader that moved during the day; "
+            "skip flat all-day #1 news in favor of first rising). "
             "Do not list multiple movers in one_liner. Do not output URLs or Japanese UI words."
         )
     else:
@@ -2018,7 +2019,8 @@ def build_llm_payload(
             "「昨日」= business_day。未来予測は禁止。"
             "候補の rank_evidence は 07→13→19 の一日推移（圏外含む）。"
             "one_liner（= 昨日の注目）は **トピックを1つだけ**。"
-            "優先: ニュースの category_leader。無ければ rising_highlights 先頭。"
+            "優先: 日内に順位が動いたニュースの category_leader。"
+            "一日中同じ1位のニュースは避け、rising_highlights 先頭を使う。"
             "複数トピックの列挙は禁止。URL は出力しない。"
         )
     return {
@@ -2075,19 +2077,50 @@ def _label_mentioned_in_text(label: str, text: str) -> bool:
     return len(probe) >= 10 and probe in tn
 
 
+def _rank_evidence_is_flat(evidence: str) -> bool:
+    """``7時1位 → 13時1位 → 19時1位`` のように順位が一日中同じか。
+
+    圏外/out が混ざる、または位が変わっていれば False（動きあり）。
+    """
+    s = (evidence or "").strip()
+    if not s:
+        return False
+    if "圏外" in s or re.search(r"\bout@", s, re.I):
+        return False
+    ranks = [int(n) for n in re.findall(r"(?:#)?(\d+)\s*(?:位|@)", s)]
+    if not ranks:
+        ranks = [int(n) for n in re.findall(r"(\d+)位", s)]
+    return len(ranks) >= 2 and len(set(ranks)) == 1
+
+
 def _preferred_highlight_candidate(
     editorial_candidates: List[Dict[str, Any]],
     rising_items: List[Dict[str, Any]],
     cross_items: List[Dict[str, Any]],
 ) -> Optional[Dict[str, Any]]:
-    """昨日の注目用: ニュース首位 → クロス → 急上昇先頭。"""
+    """昨日の注目用: 動きのあるニュース首位 → クロス → 急上昇 → フラットなニュース首位。
+
+    一日中同じ1位のニュース（気象速報の張り付き等）を優先すると、日次の
+    teaser / 一覧リードが連日ほぼ同一になる。動きのない首位は rising のあとに回す。
+    """
+    news: Optional[Dict[str, Any]] = None
     for c in editorial_candidates:
         if c.get("reason") == "category_leader" and c.get("category") == news_category_key():
-            return {
+            news = {
                 "label": c.get("label"),
                 "rank_evidence": c.get("rank_evidence"),
                 "kind": "news",
             }
+            break
+
+    news_moved = bool(
+        news
+        and str(news.get("label") or "").strip()
+        and not _rank_evidence_is_flat(str(news.get("rank_evidence") or ""))
+    )
+    if news_moved:
+        return news
+
     if cross_items:
         h = cross_items[0]
         return {
@@ -2102,6 +2135,8 @@ def _preferred_highlight_candidate(
             "rank_evidence": r.get("rank_evidence"),
             "kind": "rising",
         }
+    if news and str(news.get("label") or "").strip():
+        return news
     return None
 
 
@@ -2210,10 +2245,12 @@ def build_mechanical_one_liner(
             tail = f"（{ev}）" if ev else ""
             out = f"複数の取得元で「{lab}」が重なった{tail}。"
         elif kind == "news":
-            if ev:
+            if ev and _rank_evidence_is_flat(ev):
                 out = f"ニュースでは「{lab}」が一日を通して上位（{ev}）。"
+            elif ev:
+                out = f"ニュースでは「{lab}」が上位に（{ev}）。"
             else:
-                out = f"ニュースでは「{lab}」が一日を通して上位。"
+                out = f"ニュースでは「{lab}」が上位に。"
         else:
             if ev:
                 out = f"「{lab}」が大きく動いた（{ev}）。"
@@ -2729,7 +2766,7 @@ SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集者だ�
   one_liner と同じ1トピックの label をそのまま含める。順位の動きは括弧で短く（例: 7時圏外→19時1位）。
   2件目以降のトピックは書かない。
 - `one_liner` (string): **昨日の注目**。最大2文・**トピックは1つだけ**。
-  優先: reason=category_leader かつ category=ニュース の label。無ければ rising_highlights 先頭。
+  優先: 日内に順位が動いたニュースの category_leader。一日中同じ1位のニュースは避け rising 先頭。
   その label をそのまま含め、必要なら rank_evidence を括弧で添える。
   複数トピックの列挙・「順位の動きが大きかったのはAとBとC」は禁止。
   「注目を集めて」「人気です」等の抽象表現は禁止。
@@ -2765,7 +2802,7 @@ insert Japanese category labels or phrases like 補足 / 圏外 / 時位.
   Use the same single topic as one_liner. Optionally short rank move in parentheses
   (e.g. out@7 → #1@19). Do not mention 2nd+ topics here.
 - `one_liner` (string): **Yesterday's highlight**. Up to 2 sentences in **English**. **One topic only**.
-  Prefer a News category_leader label; else the first rising_highlights label.
+  Prefer a News category_leader that moved during the day; skip flat all-day #1 news for first rising.
   Include that label verbatim; optional rank_evidence in parentheses.
   Do not list multiple movers. Ban vague fillers ("trending", "gaining attention").
 - `rising_notes` (array): `{ "match_label", "note" }` — one short **English** note per rising label.

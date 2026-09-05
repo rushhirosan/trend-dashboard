@@ -9,6 +9,11 @@ from services.trends.base_trends_manager import BaseTrendsManager
 
 logger = get_logger(__name__)
 
+# ニュース速報の張り付き防止（URL 日付 / published_date がこれより古い記事は除外）
+_NHK_MAX_AGE_DAYS = 3
+_NHK_URL_DATE_RE = re.compile(r"/html/(\d{8})/")
+
+
 class NHKTrendsManager(BaseTrendsManager):
     """NHK RSSフィードを使用してニューストレンドを取得・管理するクラス"""
     
@@ -34,10 +39,53 @@ class NHKTrendsManager(BaseTrendsManager):
         """キャッシュキーを返す"""
         return 'nhk_trends'
 
+    def _article_datetime(self, item: dict):
+        """published_date または URL 内の /html/YYYYMMDD/ から記事日時を推定。"""
+        published_date_str = item.get("published_date")
+        if published_date_str:
+            try:
+                if isinstance(published_date_str, datetime):
+                    return published_date_str.replace(tzinfo=None)
+                published_date = datetime.fromisoformat(
+                    str(published_date_str).replace("Z", "+00:00")
+                )
+                return published_date.replace(tzinfo=None)
+            except Exception:
+                pass
+        url = str(item.get("url") or "")
+        m = _NHK_URL_DATE_RE.search(url)
+        if m:
+            try:
+                return datetime.strptime(m.group(1), "%Y%m%d")
+            except ValueError:
+                return None
+        return None
+
+    def _filter_fresh(self, items: list, *, max_age_days: int = _NHK_MAX_AGE_DAYS) -> list:
+        """公開から max_age_days 以内の記事だけ残す（日付不明は残す）。"""
+        if not items:
+            return []
+        cutoff = datetime.now() - timedelta(days=max_age_days)
+        fresh = []
+        dropped = 0
+        for item in items:
+            article_dt = self._article_datetime(item)
+            if article_dt is not None and article_dt < cutoff:
+                dropped += 1
+                continue
+            fresh.append(item)
+        if dropped:
+            logger.info(
+                f"🔄 NHK: {dropped}件の古い記事を除外しました"
+                f"（{max_age_days}日超・残り: {len(fresh)}件）"
+            )
+        return fresh
+
     def _get_from_cache(self, *args, **kwargs):
-        """キャッシュからデータを取得（保存時に重複排除済みのためそのまま返す）"""
+        """キャッシュからデータを取得（古い記事は除外。空なら RSS 再取得を促す）。"""
         try:
-            return self.db.get_nhk_trends_from_cache() or []
+            cached = self.db.get_nhk_trends_from_cache() or []
+            return self._filter_fresh(cached)
         except Exception as e:
             logger.error(f"❌ NHK: キャッシュ取得エラー: {e}", exc_info=True)
             return []
@@ -213,7 +261,15 @@ class NHKTrendsManager(BaseTrendsManager):
             
             # 重複排除（共通メソッドを使用）
             unique_items = self._remove_duplicates(all_items)
-            
+            unique_items = self._filter_fresh(unique_items)
+
+            if len(unique_items) == 0:
+                logger.warning("NHK RSS: 鮮度フィルタ後に記事が残りませんでした")
+                return {
+                    'error': 'NHK RSSで新しい記事が取得できませんでした',
+                    'success': False
+                }
+
             # 公開日でソート（新しい順）
             unique_items.sort(key=lambda x: x.get('published_date', ''), reverse=True)
             

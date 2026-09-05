@@ -92,6 +92,58 @@ snapshot_slots_included: ["07", "13", "19", "01"]
     assert "機械生成の Web リードです。" in page["one_liner"]
 
 
+def test_load_daily_page_replaces_flat_sticky_news_lead(daily_dir):
+    """フラットなニュース首位 teaser は急上昇先頭の文に差し替える。"""
+    day = _recent_day()
+    md = f"""---
+status: draft
+generator: mechanical
+business_day: "{day}"
+teaser: "ニュースでは「北日本と東日本中心 9日も大気の状態が非常に不安定の見込み」が一日を通して上位（7時1位 → 13時1位 → 19時1位）。"
+preview_lead: "ニュースでは「北日本と東日本中心 9日も大気の状態が非常に不安定の見込み」が一日を通して上位（7時1位 → 13時1位 → 19時1位）。"
+snapshot_slots_included: ["07", "13", "19", "01"]
+---
+
+# 日次サマリー — {day}
+
+## 📈 昨日いちばん動いた3つ
+
+1. [お散歩カーに電動アシスト搭載](https://example.com/a)（World News · 7時圏外 → 13時1位 → 19時1位）
+"""
+    (daily_dir / f"{day}.md").write_text(md, encoding="utf-8")
+
+    page = summary_pages.load_daily_page(day, region="jp", allow_draft=True)
+    assert page is not None
+    assert "お散歩カー" in page["one_liner"]
+    assert "北日本" not in page["one_liner"]
+    assert "大きく動いた" in page["one_liner"]
+
+
+def test_load_daily_page_keeps_moved_news_lead(daily_dir):
+    """日内に動いたニュース首位リードは急上昇へ差し替えない。"""
+    day = _recent_day()
+    md = f"""---
+status: draft
+generator: mechanical
+business_day: "{day}"
+preview_lead: "ニュースでは「Emooove」が一日を通して上位（7時3位 → 13時2位 → 19時1位）。"
+snapshot_slots_included: ["07", "13", "19", "01"]
+---
+
+# 日次サマリー — {day}
+
+## 📈 昨日いちばん動いた3つ
+
+1. [別トピック](https://example.com/a)（World News · 7時圏外 → 13時1位 → 19時1位）
+"""
+    (daily_dir / f"{day}.md").write_text(md, encoding="utf-8")
+
+    page = summary_pages.load_daily_page(day, region="jp", allow_draft=True)
+    assert page is not None
+    assert "Emooove" in page["one_liner"]
+    assert "別トピック" not in page["one_liner"]
+
+
 def test_load_weekly_page_mechanical_preview_lead(tmp_path, monkeypatch):
     weekly_dir = tmp_path / "weekly"
     weekly_dir.mkdir()

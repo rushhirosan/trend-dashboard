@@ -216,7 +216,7 @@ _EN_SENTENCE_END_RE = re.compile(r"(?<!\d)\.(?=\s+(?!\())")
 _JP_SENTENCE_BREAK_RE = re.compile(r"。(?![）」\"'（(])")
 # ** 除去後のテキスト行にも効く（格言・Quote は複数文でも一行）
 _KEEP_ONE_LINE_RE = re.compile(
-    r"^(?:\*\*)?(?:歴史|格言|Quote|On this day)(?:\*\*)?\s"
+    r"^(?:\*\*)?(?:歴史|今週の歴史|格言|Quote|On this day|This week in history)(?:\*\*)?\s"
 )
 _INLINE_BOLD_RE = re.compile(r"\*\*([^*]+)\*\*")
 

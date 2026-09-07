@@ -729,8 +729,30 @@ def build_week_breath_lines(
     mid = week_mon + timedelta(days=min(2, (week_sun - week_mon).days))
     region_n = (region or "jp").lower()
     history = build_history_line(mid, region_n)
+    history = _rewrite_history_line_for_weekly(history, region_n)
     second = build_breath_second_line(week_mon, region_n)
     return history, second
+
+
+_JP_WEEKLY_HISTORY_DATE_RE = re.compile(
+    r"^\*\*歴史\*\*\s+\d{1,2}/\d{1,2}\s*·\s*(.+)$",
+    re.DOTALL,
+)
+
+
+def _rewrite_history_line_for_weekly(
+    history: Optional[str], region: str
+) -> Optional[str]:
+    """週次では日次の『この日』感を弱める（特定の暦日を前面に出さない）。"""
+    if not history:
+        return history
+    if region == "us" and history.startswith("**On this day**"):
+        return history.replace("**On this day**", "**This week in history**", 1)
+    if region == "jp":
+        m = _JP_WEEKLY_HISTORY_DATE_RE.match(history.strip())
+        if m:
+            return f"**今週の歴史** {m.group(1).strip()}"
+    return history
 
 
 def build_weekly_brief_lines(

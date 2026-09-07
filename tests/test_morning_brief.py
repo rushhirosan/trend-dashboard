@@ -16,6 +16,7 @@ from services.summary.morning_brief import (
     build_calendar_line,
     build_jp_proverb_line,
     build_morning_brief_lines,
+    build_week_breath_lines,
     delivery_day_for_business_day,
     render_morning_brief_markdown,
     WeeklyBriefLines,
@@ -390,3 +391,37 @@ def test_render_weekly_brief_markdown_sections():
     assert "## 💹 マーケット（先週）" in md
     assert "## ☕ ひと息（歴史 + 格言）" in md
 
+
+def test_build_week_breath_lines_us_uses_week_in_history():
+    with patch(
+        "services.summary.morning_brief.build_history_line",
+        return_value="**On this day** Aug 26, 2008 — Sample event (Wikipedia)",
+    ), patch(
+        "services.summary.morning_brief.build_breath_second_line",
+        return_value='**Quote** "Hello." — Author (ZenQuotes)',
+    ):
+        history, second = build_week_breath_lines(
+            date(2026, 8, 24), date(2026, 8, 30), "us"
+        )
+    assert history is not None
+    assert history.startswith("**This week in history**")
+    assert "On this day" not in history
+    assert second is not None
+    assert second.startswith("**Quote**")
+
+
+def test_build_week_breath_lines_jp_drops_calendar_day():
+    with patch(
+        "services.summary.morning_brief.build_history_line",
+        return_value="**歴史** 9/2 · 紀元前44年 — キケロが初のピリッピカ（Wikipedia）",
+    ), patch(
+        "services.summary.morning_brief.build_breath_second_line",
+        return_value="**格言** 「例」 — 著者（10秒名言）",
+    ):
+        history, second = build_week_breath_lines(
+            date(2026, 8, 31), date(2026, 9, 6), "jp"
+        )
+    assert history == "**今週の歴史** 紀元前44年 — キケロが初のピリッピカ（Wikipedia）"
+    assert "9/2" not in history
+    assert second is not None
+    assert second.startswith("**格言**")

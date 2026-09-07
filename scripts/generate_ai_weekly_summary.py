@@ -73,13 +73,17 @@ _ACTIVE_REGION = "jp"
 
 
 def configure_weekly_region(region: str) -> None:
-    """生成対象地域を切り替え（jp → weekly/、us → weekly/us/）。"""
+    """生成対象地域を切り替え（jp → weekly/、us → weekly/us/）。
+
+    日次ヘルパ（カテゴリ表示名・ソース名「Crypto」等）も同地域に揃える。
+    """
     global WEEKLY_REGIONS, _ACTIVE_REGION
     r = (region or "jp").strip().lower()
     if r not in ("jp", "us"):
         r = "jp"
     _ACTIVE_REGION = r
     WEEKLY_REGIONS = (r,)
+    _daily().configure_daily_region(r)
 
 
 def weekly_output_dir() -> Path:
@@ -957,6 +961,7 @@ def build_mechanical_llm_payload(
 
 
 _RANK_EVIDENCE_SLOT_RE = re.compile(r"(\d+)時(?:(\d+)位|圏外)")
+_RANK_EVIDENCE_SLOT_RE_EN = re.compile(r"(?:out|#(\d+))@(\d+)")
 _DAYTIME_SLOT_KEYS = ("07", "13", "19")
 
 
@@ -969,13 +974,23 @@ def _short_calendar_date(ds: str) -> str:
 
 
 def parse_rank_evidence(evidence: str) -> Dict[str, Optional[int]]:
-    """rank_evidence 文字列を {07,13,19} → 順位（圏外は None）に分解。"""
+    """rank_evidence 文字列を {07,13,19} → 順位（圏外は None）に分解。
+
+    JP（7時1位）と US（#1@7 / out@7）の両方を受理する。
+    """
     ranks: Dict[str, Optional[int]] = {s: None for s in _DAYTIME_SLOT_KEYS}
-    for m in _RANK_EVIDENCE_SLOT_RE.finditer(evidence or ""):
+    text = evidence or ""
+    for m in _RANK_EVIDENCE_SLOT_RE.finditer(text):
         slot = m.group(1).zfill(2)
         if slot not in ranks:
             continue
         rank_str = m.group(2)
+        ranks[slot] = int(rank_str) if rank_str else None
+    for m in _RANK_EVIDENCE_SLOT_RE_EN.finditer(text):
+        slot = m.group(2).zfill(2)
+        if slot not in ranks:
+            continue
+        rank_str = m.group(1)
         ranks[slot] = int(rank_str) if rank_str else None
     return ranks
 
@@ -991,14 +1006,30 @@ def _day_count_for_item(item: Dict[str, Any]) -> int:
     return int(day_count or 0)
 
 
+def _rank_number_label(rank: int) -> str:
+    """読者向け順位表記（US: #1 / JP: 1位）。"""
+    if _ACTIVE_REGION == "us":
+        return f"#{int(rank)}"
+    return f"{int(rank)}位"
+
+
+def _oob_rank_label() -> str:
+    return "out" if _ACTIVE_REGION == "us" else "圏外"
+
+
+def _category_heading_label(cat: str) -> str:
+    """内部カテゴリキーを表示名へ（US は News / Market 等）。"""
+    return _daily().category_display_name(cat)
+
+
 def _compact_rank_display(rank_display: str) -> str:
-    """スロット横断の順位表記を短くする（全スロット同順位なら N位 のみ）。"""
+    """スロット横断の順位表記を短くする（全スロット同順位なら N位 / #N のみ）。"""
     ranks = parse_rank_evidence(rank_display)
     vals = [r for r in ranks.values() if r is not None]
     if not vals:
-        return (rank_display or "").strip() or "圏外"
+        return (rank_display or "").strip() or _oob_rank_label()
     if len(set(vals)) == 1:
-        return f"{vals[0]}位"
+        return _rank_number_label(vals[0])
     return (rank_display or "").strip()
 
 
@@ -1013,8 +1044,10 @@ def _format_rank_chain(rank_by_day: Dict[str, str]) -> str:
         return ""
     if len(points) == 1:
         ds, r = points[0]
-        return f"{_short_calendar_date(ds)} {r}位"
-    return " → ".join(f"{_short_calendar_date(ds)} ({r}位)" for ds, r in points)
+        return f"{_short_calendar_date(ds)} {_rank_number_label(r)}"
+    return " → ".join(
+        f"{_short_calendar_date(ds)} ({_rank_number_label(r)})" for ds, r in points
+    )
 
 
 def merge_theme_rank_by_day(items: List[Dict[str, Any]]) -> Dict[str, str]:
@@ -1042,7 +1075,9 @@ def format_theme_evidence_line(items: List[Dict[str, Any]]) -> str:
         return ""
     parts: List[str] = [chain]
     if any(item.get("cross_source") for item in items):
-        parts.append("複数ソース")
+        parts.append(
+            "multiple sources" if _ACTIVE_REGION == "us" else "複数ソース"
+        )
     return "> " + " · ".join(parts)
 
 
@@ -1189,7 +1224,7 @@ def render_weekly_category_markdown(
         for block in theme_blocks:
             cat = str(block.get("category") or "")
             themes = block.get("themes") or []
-            lines.append(f"#### {cat}")
+            lines.append(f"#### {_category_heading_label(cat)}")
             lines.append("")
             for i, theme in enumerate(themes, 1):
                 lines.append(f"{i}. {format_theme_display_line(theme)}")
@@ -1208,7 +1243,8 @@ def format_weekly_rising_movement_block(item: Dict[str, Any]) -> str:
     chain = _format_rank_chain(rank_by_day)
     if not chain:
         return ""
-    return f"> **週内の動き**: {chain}\n"
+    label = "Movement last week" if _ACTIVE_REGION == "us" else "週内の動き"
+    return f"> **{label}**: {chain}\n"
 
 
 def format_weekly_rank_table(rank_evidence_by_day: Dict[str, str]) -> str:
@@ -1255,7 +1291,7 @@ def _weekly_rank_chart_series(
     if len(set(rank_vals)) < 2:
         return None
     date_labels = [d for d, _ in points]
-    x_labels = [f"{d} ({r}位)" for d, r in points]
+    x_labels = [f"{d} ({_rank_number_label(r)})" for d, r in points]
     return x_labels, date_labels, rank_vals
 
 
@@ -1636,6 +1672,19 @@ def _is_appstore_series(series_key: str) -> bool:
     return weekly_series_weight(series_key) <= 0
 
 
+def _is_sticky_hot_topic_series(series_key: str, *, day_count: int) -> bool:
+    """週の大半で居座る定番（暗号資産・ほぼ全日の株）はホットから外す。
+
+    カテゴリ top3 には残し、Hot topics だけ編集価値の高い話題を優先する。
+    """
+    sk = (series_key or "").strip().lower()
+    if sk.startswith("crypto_"):
+        return True
+    if day_count >= 6 and sk.startswith("stock_"):
+        return True
+    return False
+
+
 def build_mechanical_weekly_flow(
     weekly_rising: Dict[str, List[Dict[str, Any]]],
     weekly_category: Dict[str, List[Dict[str, Any]]],
@@ -1662,7 +1711,12 @@ def build_mechanical_weekly_flow(
         for it in block.get("items") or []:
             lab = str(it.get("label") or "").strip()
             sk = str(it.get("series_key") or "")
-            if not lab or _is_appstore_series(sk):
+            day_count = int(it.get("day_count") or len(it.get("days") or []) or 0)
+            if (
+                not lab
+                or _is_appstore_series(sk)
+                or _is_sticky_hot_topic_series(sk, day_count=day_count)
+            ):
                 continue
             if lab in labels:
                 continue
@@ -1690,7 +1744,7 @@ def build_mechanical_weekly_hot_topics(
     *,
     limit: int = WEEKLY_HOT_MAX,
 ) -> List[Dict[str, str]]:
-    """カテゴリ digest から機械ホットトピックを抽出（App Store 除外）。"""
+    """カテゴリ digest から機械ホットトピックを抽出（App Store・定番 crypto/stock 除外）。"""
     region = WEEKLY_REGIONS[0]
     candidates: List[Dict[str, Any]] = []
     seen: set[str] = set()
@@ -1699,13 +1753,17 @@ def build_mechanical_weekly_hot_topics(
         for it in block.get("items") or []:
             label = str(it.get("label") or "").strip()
             sk = str(it.get("series_key") or "")
-            if not label or _is_appstore_series(sk):
+            day_count = int(it.get("day_count") or len(it.get("days") or []) or 0)
+            if (
+                not label
+                or _is_appstore_series(sk)
+                or _is_sticky_hot_topic_series(sk, day_count=day_count)
+            ):
                 continue
             nk = sr.normalize_label_key(label)
             if nk in seen:
                 continue
             seen.add(nk)
-            day_count = int(it.get("day_count") or len(it.get("days") or []) or 0)
             cross = bool(it.get("cross_source"))
             score = int(it.get("weekly_score") or 0) or (
                 day_count * 10 + (15 if cross else 0) + weekly_series_weight(sk)
@@ -1726,13 +1784,17 @@ def build_mechanical_weekly_hot_topics(
     for it in weekly_rising.get(region) or []:
         label = str(it.get("label") or "").strip()
         sk = str(it.get("series_key") or "")
-        if not label or _is_appstore_series(sk):
+        day_count = int(it.get("day_count") or len(it.get("days") or []) or 0)
+        if (
+            not label
+            or _is_appstore_series(sk)
+            or _is_sticky_hot_topic_series(sk, day_count=day_count)
+        ):
             continue
         nk = sr.normalize_label_key(label)
         if nk in seen:
             continue
         seen.add(nk)
-        day_count = int(it.get("day_count") or len(it.get("days") or []) or 0)
         candidates.append(
             {
                 "title": label,
@@ -1749,6 +1811,7 @@ def build_mechanical_weekly_hot_topics(
     out: List[Dict[str, str]] = []
     for c in candidates[: max(0, limit)]:
         dc = int(c["day_count"])
+        cat_disp = _category_heading_label(str(c.get("category") or ""))
         if _ACTIVE_REGION == "us":
             why_bits = []
             if dc:
@@ -1757,8 +1820,8 @@ def build_mechanical_weekly_hot_topics(
                 why_bits.append("crossed multiple sources")
             if c.get("best_rank"):
                 why_bits.append(f"best rank {c['best_rank']}")
-            if c.get("category"):
-                why_bits.append(f"category {c['category']}")
+            if cat_disp:
+                why_bits.append(f"category {cat_disp}")
             why = "; ".join(why_bits) + "." if why_bits else "Stood out in last week's digest."
         else:
             why_bits = []
@@ -1768,8 +1831,8 @@ def build_mechanical_weekly_hot_topics(
                 why_bits.append("複数ソースで重なった")
             if c.get("best_rank"):
                 why_bits.append(f"最高順位 {c['best_rank']}")
-            if c.get("category"):
-                why_bits.append(f"区分 {c['category']}")
+            if cat_disp:
+                why_bits.append(f"区分 {cat_disp}")
             why = "。".join(why_bits) + "。" if why_bits else "先週の digest で目立った話題。"
         row: Dict[str, str] = {"title": str(c["title"]), "why": why}
         if c.get("link_line"):
@@ -1970,7 +2033,7 @@ flow では pool の **具体ラベル・固有名詞** をそのまま引用す
 - `hot_topics` (array): 最大5件。各要素 `{ "title", "why" }`。
   title は pool / rising の具体ラベル（URL・Markdown リンクは付けない。リンクは後段で機械付与）。
   why は2〜4文で「なぜその週ホットか」（ラベル文言は不要・本文のみ）。
-  定番株・一過性の季節ネタ・事故の単日首位だけは避ける。厳選すること。
+  定番の暗号資産（Bitcoin/Ethereum）・ほぼ全日で動かない株・一過性の季節ネタ・事故の単日首位だけは避ける。厳選すること。
 - `next_week` (array of string): 2〜3件。来週も残りうる論点（各1〜2文）。未来の断定予測は禁止。
 
 禁止: 入力に無いラベル・URL・未来予測・Markdown 見出し・抽象カテゴリ名だけの記述。"""
@@ -1996,7 +2059,8 @@ Ban vague phrases like "entertainment topics" or "tech adoption" without labels.
 - `hot_topics` (array): up to 5 items `{ "title", "why" }`.
   title = concrete pool/rising label (no URL/Markdown link; links are attached mechanically later).
   why = 2–4 sentences on why it was hot (body only; no "Why hot:" label).
-  Skip evergreen tickers and one-day accident spikes. Be selective.
+  Skip evergreen crypto (Bitcoin/Ethereum), week-long flat stock leaders, and one-day accident spikes.
+  Prefer multi-source or moving stories. Be selective.
 - `next_week` (array of string): 2–3 carry-over points (1–2 sentences each). No hard forecasts.
 
 Forbidden: labels/URLs not in input, forecasts, Markdown headings, abstract category-only prose."""

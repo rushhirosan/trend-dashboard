@@ -1076,6 +1076,168 @@ def test_build_mechanical_weekly_flow_and_hot_topics(gaws):
     assert all("why" in h for h in hot)
 
 
+def test_configure_weekly_region_us_syncs_daily_locale(gaws):
+    gaws.configure_weekly_region("us")
+    daily = gaws._daily()
+    assert daily._ACTIVE_REGION == "us"
+    assert daily.category_display_name("マーケット") == "Market"
+    assert daily._format_series_key_display("crypto_global") == "Crypto"
+    gaws.configure_weekly_region("jp")
+    assert daily._ACTIVE_REGION == "jp"
+
+
+def test_parse_rank_evidence_accepts_us_slot_format(gaws):
+    ranks = gaws.parse_rank_evidence("out@7 → #1@13 → #2@19")
+    assert ranks == {"07": None, "13": 1, "19": 2}
+
+
+def test_us_weekly_rendering_is_english(gaws):
+    gaws.configure_weekly_region("us")
+    movement = gaws.format_weekly_rising_movement_block(
+        {
+            "rank_evidence_by_day": {
+                "2026-08-31": "out@7 → #4@13 → #4@19",
+                "2026-09-03": "#1@7 → #1@13 → #1@19",
+            }
+        }
+    )
+    assert "**Movement last week**" in movement
+    assert "#4" in movement
+    assert "位" not in movement
+    assert "週内" not in movement
+
+    category = {
+        "us": [
+            {
+                "category": "ニュース",
+                "items": [
+                    {
+                        "label": "News Topic",
+                        "day_count": 2,
+                        "best_rank": 1,
+                        "rank_display_by_day": {
+                            "2026-09-01": "#1@7 → #1@13 → #1@19",
+                        },
+                        "cross_source": True,
+                        "link_line": "[News Topic](https://example.com/n)（World News (US)）",
+                    }
+                ],
+                "pool": [],
+            }
+        ]
+    }
+    md = gaws.render_weekly_category_markdown(
+        category, {"category_themes": {"jp": {}, "us": {}}}
+    )
+    assert "#### News" in md
+    assert "multiple sources" in md
+    assert "ニュース" not in md
+    assert "複数ソース" not in md
+    gaws.configure_weekly_region("jp")
+
+
+def test_hot_topics_exclude_sticky_crypto_and_stocks(gaws):
+    gaws.configure_weekly_region("us")
+    rising = {"us": []}
+    category = {
+        "us": [
+            {
+                "category": "マーケット",
+                "items": [
+                    {
+                        "label": "Bitcoin",
+                        "day_count": 7,
+                        "series_key": "crypto_global",
+                        "best_rank": 1,
+                        "weekly_score": 100,
+                    },
+                    {
+                        "label": "Ethereum",
+                        "day_count": 7,
+                        "series_key": "crypto_global",
+                        "best_rank": 2,
+                        "weekly_score": 90,
+                    },
+                    {
+                        "label": "KLA Corporation",
+                        "day_count": 7,
+                        "series_key": "stock_us",
+                        "best_rank": 1,
+                        "weekly_score": 80,
+                    },
+                ],
+            },
+            {
+                "category": "エンタメ・ショッピング",
+                "items": [
+                    {
+                        "label": "Coyote vs. Acme",
+                        "day_count": 2,
+                        "series_key": "movie_us",
+                        "cross_source": True,
+                        "best_rank": 3,
+                        "weekly_score": 40,
+                    },
+                ],
+            },
+        ]
+    }
+    hot = gaws.build_mechanical_weekly_hot_topics(rising, category)
+    titles = [h["title"] for h in hot]
+    assert "Bitcoin" not in titles
+    assert "Ethereum" not in titles
+    assert "KLA Corporation" not in titles
+    assert "Coyote vs. Acme" in titles
+    assert "category Entertainment & Shopping" in hot[0]["why"]
+    gaws.configure_weekly_region("jp")
+
+
+def test_hot_topics_exclude_sticky_crypto_jp(gaws):
+    gaws.configure_weekly_region("jp")
+    rising = {"jp": []}
+    category = {
+        "jp": [
+            {
+                "category": "マーケット",
+                "items": [
+                    {
+                        "label": "Bitcoin",
+                        "day_count": 7,
+                        "series_key": "crypto_global",
+                        "best_rank": 1,
+                        "weekly_score": 100,
+                    },
+                    {
+                        "label": "ソフトバンクグループ",
+                        "day_count": 7,
+                        "series_key": "stock_jp",
+                        "best_rank": 1,
+                        "weekly_score": 80,
+                    },
+                ],
+            },
+            {
+                "category": "エンタメ・ショッピング",
+                "items": [
+                    {
+                        "label": "見知らぬ糸",
+                        "day_count": 5,
+                        "series_key": "music_trends_jp",
+                        "best_rank": 6,
+                        "weekly_score": 50,
+                    },
+                ],
+            },
+        ]
+    }
+    hot = gaws.build_mechanical_weekly_hot_topics(rising, category)
+    titles = [h["title"] for h in hot]
+    assert "Bitcoin" not in titles
+    assert "ソフトバンクグループ" not in titles
+    assert "見知らぬ糸" in titles
+    assert "区分 エンタメ・ショッピング" in hot[0]["why"]
+
+
 def test_script_imports_when_run_as_python_scripts_path():
     """GHA は `python scripts/generate_ai_weekly_summary.py`。sys.path[0] は scripts/。"""
     import os

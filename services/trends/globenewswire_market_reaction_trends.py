@@ -53,17 +53,75 @@ DEFAULT_RSS_URL = (
     "feedTitle/GlobeNewswire%20-%20News%20about%20Public%20Companies"
 )
 
-# ティッカー抽出用正規表現: (NASDAQ:AAPL), (NYSE:MSFT), (AMEX:XXX), (TSX:XXX) など
+# タイトル等向け: (NASDAQ:AAPL) / NYSE:MSFT など（後方互換）
 TICKER_PATTERN = re.compile(
-    r'\(?(?:NASDAQ|NYSE|AMEX|TSX|OTC)[:\s]+([A-Z0-9\.\-]+)\)?',
-    re.IGNORECASE
+    r'\(?(?:NASDAQ(?:CM|GM|GS)?|NYSE(?:\s+AMERICAN)?|AMEX|TSX(?:-?V)?|OTC|PARIS|LSE|LONDON)'
+    r'[:\s]+([A-Z0-9\.\-]+)\)?',
+    re.IGNORECASE,
 )
+
+# category term "Paris:ALD" / "NYSE:DLR"（stock scheme）向け
+STOCK_TAG_PATTERN = re.compile(
+    r'^([A-Za-z][A-Za-z0-9 \-]{0,24}):([A-Z0-9][A-Z0-9\.\-]{0,9})$'
+)
+
+# GlobeNewswire の取引所名 → Yahoo Finance サフィックス（空文字=米国など無印）
+# Public Companies フィードは欧州寄りになることがあり、US限定だと 0 件になる
+EXCHANGE_YAHOO_SUFFIX: dict[str, str] = {
+    'NASDAQ': '',
+    'NASDAQCM': '',
+    'NASDAQGM': '',
+    'NASDAQGS': '',
+    'NYSE': '',
+    'NYSE AMERICAN': '',
+    'AMEX': '',
+    'OTC': '',
+    'OTCQB': '',
+    'OTCQX': '',
+    'TSX': 'TO',
+    'TSXV': 'V',
+    'TSX-V': 'V',
+    'CSE': 'CN',
+    'PARIS': 'PA',
+    'LSE': 'L',
+    'LONDON': 'L',
+    'STOCKHOLM': 'ST',
+    'OSLO': 'OL',
+    'AMSTERDAM': 'AS',
+    'BRUSSELS': 'BR',
+    'HELSINKI': 'HE',
+    'COPENHAGEN': 'CO',
+    'FRANKFURT': 'F',
+    'XETRA': 'DE',
+    'SWISS': 'SW',
+    'SIX': 'SW',
+    'ASX': 'AX',
+    'HKEX': 'HK',
+    'HONG KONG': 'HK',
+    'TOKYO': 'T',
+}
 
 TOP_N = 15
 # GlobeNewswire は間欠的に遅いことがあるため、15秒ではタイムアウトしやすい
 RSS_TIMEOUT_SECONDS = 30
 # 初回失敗後に 1 回だけリトライ（合計 2 試行）
 RSS_MAX_ATTEMPTS = 2
+
+
+def _normalize_exchange(name: str) -> str:
+    return re.sub(r'\s+', ' ', (name or '').strip().upper())
+
+
+def _to_yahoo_symbol(exchange: str, symbol: str) -> str | None:
+    """取引所名 + 銘柄コードを yfinance 用シンボルに変換。未対応取引所は None。"""
+    exch = _normalize_exchange(exchange)
+    sym = (symbol or '').strip().upper()
+    if not sym or len(sym) > 10:
+        return None
+    if exch not in EXCHANGE_YAHOO_SUFFIX:
+        return None
+    suffix = EXCHANGE_YAHOO_SUFFIX[exch]
+    return f'{sym}.{suffix}' if suffix else sym
 
 
 class GlobeNewswireMarketReactionTrendsManager(BaseTrendsManager):
@@ -112,7 +170,36 @@ class GlobeNewswireMarketReactionTrendsManager(BaseTrendsManager):
             return False
 
     def _extract_ticker(self, item: dict) -> str | None:
-        """タイトル・タグ・description からティッカーを抽出"""
+        """
+        タイトル・タグ・description から yfinance 用ティッカーを抽出。
+        優先: stock scheme の category（例: Paris:ALD / NYSE:DLR）
+        """
+        # 1) RSS stock category（最も信頼できる）
+        for t in (item.get('tags') or []):
+            if isinstance(t, dict):
+                term = t.get('term')
+                scheme = (t.get('scheme') or '') or ''
+                label = t.get('label')
+            else:
+                term = getattr(t, 'term', None)
+                scheme = getattr(t, 'scheme', None) or ''
+                label = getattr(t, 'label', None)
+
+            prefer_stock_scheme = 'rss/stock' in str(scheme).lower()
+            for raw in (term, label):
+                if not raw:
+                    continue
+                m = STOCK_TAG_PATTERN.match(str(raw).strip())
+                if not m:
+                    continue
+                yahoo = _to_yahoo_symbol(m.group(1), m.group(2))
+                if yahoo:
+                    return yahoo
+                # stock scheme で未対応取引所なら次へ（誤抽出を避ける）
+                if prefer_stock_scheme:
+                    continue
+
+        # 2) タイトル / description / 全タグ文字列（従来形式）
         text_parts = []
         if item.get('title'):
             text_parts.append(item['title'])
@@ -120,15 +207,29 @@ class GlobeNewswireMarketReactionTrendsManager(BaseTrendsManager):
             text_parts.append(item['description'])
         for t in (item.get('tags') or []):
             term = t.get('term') if isinstance(t, dict) else getattr(t, 'term', None)
+            label = t.get('label') if isinstance(t, dict) else getattr(t, 'label', None)
             if term:
                 text_parts.append(str(term))
+            if label:
+                text_parts.append(str(label))
 
         combined = ' '.join(text_parts)
         match = TICKER_PATTERN.search(combined)
-        if match:
-            ticker = match.group(1).strip().upper()
-            if len(ticker) >= 1 and len(ticker) <= 10:
-                return ticker
+        if not match:
+            return None
+        symbol = match.group(1).strip().upper()
+        around = combined[max(0, match.start() - 24):match.end()]
+        exch_match = re.search(
+            r'(NASDAQ(?:CM|GM|GS)?|NYSE(?:\s+AMERICAN)?|AMEX|TSX(?:-?V)?|OTC(?:QB|QX)?'
+            r'|PARIS|LSE|LONDON|STOCKHOLM|OSLO|AMSTERDAM|BRUSSELS|HELSINKI|'
+            r'COPENHAGEN|FRANKFURT|XETRA|SWISS|SIX|ASX|HKEX|HONG\s+KONG|TOKYO|CSE)',
+            around,
+            re.IGNORECASE,
+        )
+        if exch_match:
+            return _to_yahoo_symbol(exch_match.group(1), symbol)
+        if 1 <= len(symbol) <= 10:
+            return symbol
         return None
 
     def _entries_from_parsed(self, parsed) -> list[dict]:
@@ -378,10 +479,28 @@ class GlobeNewswireMarketReactionTrendsManager(BaseTrendsManager):
 
             unique_tickers = list(ticker_to_items.keys())
             if not unique_tickers:
-                reason = (
-                    f"RSSエントリは{len(items)}件ありましたが、"
-                    "ティッカー（NASDAQ/NYSE/AMEX/TSX/OTC）を抽出できませんでした。"
-                )
+                seen_exchanges: list[str] = []
+                for item in items:
+                    for t in (item.get('tags') or []):
+                        term = t.get('term') if isinstance(t, dict) else getattr(t, 'term', None)
+                        if not term:
+                            continue
+                        m = STOCK_TAG_PATTERN.match(str(term).strip())
+                        if m:
+                            exch = _normalize_exchange(m.group(1))
+                            if exch not in seen_exchanges:
+                                seen_exchanges.append(exch)
+                if seen_exchanges:
+                    reason = (
+                        f"RSSエントリは{len(items)}件ありましたが、"
+                        f"対応マーケットへ変換できるティッカーがありませんでした"
+                        f"（検出: {', '.join(seen_exchanges[:8])}）。"
+                    )
+                else:
+                    reason = (
+                        f"RSSエントリは{len(items)}件ありましたが、"
+                        "ティッカー（NYSE/NASDAQ/Paris/LSE 等）を抽出できませんでした。"
+                    )
                 logger.warning("GlobeNewswire × Market Reaction: %s", reason)
                 return {
                     'success': True,

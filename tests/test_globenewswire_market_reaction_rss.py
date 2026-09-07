@@ -7,6 +7,7 @@ import requests
 from services.trends.globenewswire_market_reaction_trends import (
     RSS_MAX_ATTEMPTS,
     GlobeNewswireMarketReactionTrendsManager,
+    _to_yahoo_symbol,
 )
 
 
@@ -101,3 +102,77 @@ def test_fetch_trends_no_tickers_sets_empty_reason():
     assert result["data"] == []
     assert "ティッカー" in result["empty_reason"]
     m._fetch_market_data_batch.assert_not_called()
+
+
+def test_to_yahoo_symbol_maps_us_and_europe():
+    assert _to_yahoo_symbol("NYSE", "DLR") == "DLR"
+    assert _to_yahoo_symbol("NASDAQ", "AAPL") == "AAPL"
+    assert _to_yahoo_symbol("Paris", "ALD") == "ALD.PA"
+    assert _to_yahoo_symbol("LSE", "RAT") == "RAT.L"
+    assert _to_yahoo_symbol("TSX", "ADN") == "ADN.TO"
+    assert _to_yahoo_symbol("UnknownEx", "ABC") is None
+
+
+def test_extract_ticker_from_paris_stock_tag():
+    m = _manager()
+    item = {
+        "title": "Share buyback programme",
+        "description": "",
+        "tags": [
+            {
+                "term": "Paris:ALD",
+                "scheme": "https://www.globenewswire.com/rss/stock",
+                "label": None,
+            }
+        ],
+    }
+    assert m._extract_ticker(item) == "ALD.PA"
+
+
+def test_extract_ticker_from_nyse_stock_tag():
+    m = _manager()
+    item = {
+        "title": "Digital Realty announcement",
+        "description": "",
+        "tags": [
+            {
+                "term": "NYSE:DLR",
+                "scheme": "https://www.globenewswire.com/rss/stock",
+                "label": None,
+            }
+        ],
+    }
+    assert m._extract_ticker(item) == "DLR"
+
+
+def test_fetch_trends_extracts_paris_tickers():
+    m = _manager()
+    m._parse_feed = MagicMock(
+        return_value=(
+            [
+                {
+                    "title": "ALD buyback",
+                    "url": "https://example.com/ald",
+                    "description": "",
+                    "tags": [
+                        {
+                            "term": "Paris:ALD",
+                            "scheme": "https://www.globenewswire.com/rss/stock",
+                            "label": None,
+                        }
+                    ],
+                }
+            ],
+            None,
+        )
+    )
+    m._fetch_market_data_batch = MagicMock(
+        return_value={"ALD.PA": {"change_percent": 1.5, "volume_spike": 2.0}}
+    )
+
+    result = m._fetch_trends(limit=5)
+
+    assert result["success"] is True
+    assert len(result["data"]) == 1
+    assert result["data"][0]["ticker"] == "ALD.PA"
+    m._fetch_market_data_batch.assert_called_once_with(["ALD.PA"])

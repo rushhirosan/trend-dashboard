@@ -53,11 +53,15 @@ def test_index_removed_page_specific_css():
     assert "subscription.css" not in head
 
 
-def test_data_status_and_subscription_keep_own_css():
-    ds = (TEMPLATES / "data-status.html").read_text(encoding="utf-8")
+def test_subscription_keeps_own_css():
     sub = (TEMPLATES / "subscription.html").read_text(encoding="utf-8")
-    assert "data-status.css" in ds
     assert "subscription.css" in sub
+
+
+def test_data_status_page_removed():
+    assert not (TEMPLATES / "data-status.html").exists()
+    assert not (ROOT / "static" / "css" / "data-status.css").exists()
+    assert not (ROOT / "static" / "js" / "data-freshness.js").exists()
 
 
 def test_vendor_assets_self_hosted():

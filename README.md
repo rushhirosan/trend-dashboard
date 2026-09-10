@@ -8,7 +8,6 @@
 
 - **日本トレンド**: https://trends-dashboard.com/
 - **USトレンド**: https://trends-dashboard.com/us
-- **データ鮮度**: https://trends-dashboard.com/data-status
 - **このサイトについて**: https://trends-dashboard.com/about
 
 ## 📊 機能
@@ -66,7 +65,6 @@
 ### 主な機能
 
 - 📈 **リアルタイムトレンド表示**: 各プラットフォームの最新トレンドを一覧表示
-- 📊 **データ鮮度情報**: 各トレンドデータの最終更新時刻とデータ件数を確認
 - 🔄 **自動更新**: 毎日1時、7時、13時、19時（JST）に更新処理を開始（完了まで通常10〜15分程度、状況により延びる場合があります）
 - 💾 **キャッシュシステム**: PostgreSQLを使用した高速なデータ取得
 

@@ -121,10 +121,51 @@ def freshness_lookup_keys(base_cache_key: str, country: str) -> list[str]:
         keys.append(f"{base_cache_key}_{country}")
     elif base_cache_key.endswith("_trends") and base_cache_key in _REGION_SUFFIX_BASE_KEYS:
         keys.append(f"{base_cache_key}_{country}")
+    elif (
+        country == "US"
+        and base_cache_key.endswith("_trends")
+        and not base_cache_key.endswith("_JP")
+        and not base_cache_key.endswith("_US")
+        and not base_cache_key.endswith("_jp")
+        and not base_cache_key.endswith("_us")
+        and not base_cache_key.endswith("_ja")
+        and not base_cache_key.endswith("_en")
+    ):
+        # US 専用ソースもスケジューラが *_US 行を作ることがある（例: cnn_trends_US）
+        keys.append(f"{base_cache_key}_US")
 
     if base_cache_key not in keys:
         keys.append(base_cache_key)
     return keys
+
+
+def select_freshness_cache_info(
+    all_cache_status: dict[str, dict[str, Any]],
+    lookup_keys: list[str],
+) -> dict[str, Any] | None:
+    """lookup 候補から鮮度表示用の1件を選ぶ。
+
+    スケジューラが作る count=0 の地域キー（時刻だけの空行）より、
+    実データ件数があるキーを優先する。件数がある候補が複数なら最新の
+    last_updated を採用する。
+    """
+    candidates: list[dict[str, Any]] = []
+    for key in lookup_keys:
+        info = all_cache_status.get(key)
+        if info:
+            candidates.append(info)
+    if not candidates:
+        return None
+
+    with_data = [c for c in candidates if (c.get("data_count") or 0) > 0]
+    pool = with_data or candidates
+
+    def _sort_key(info: dict[str, Any]):
+        lu = info.get("last_updated")
+        # None は最古扱い。datetime / ISO 文字列どちらも比較できるよう str 化
+        return (0, "") if lu is None else (1, str(lu))
+
+    return max(pool, key=_sort_key)
 
 
 def region_refresh_stats(results: dict) -> dict[str, dict[str, int | bool]]:

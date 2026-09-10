@@ -11,7 +11,7 @@ Stack: **HTML templates**, **Bootstrap 5.1.3**, **Font Awesome**, vanilla **Java
 
 | Area | Path |
 |------|------|
-| Templates | `templates/` (e.g. `index.html`, `us_trends.html`, `about.html`, `data-status.html`) |
+| Templates | `templates/` (e.g. `index.html`, `us_trends.html`, `about.html`) |
 | Styles | `static/css/` (`main.css`, feature-specific CSS) |
 | Scripts | `static/js/` (`app.js`, `app-common.js`, region- or feature-specific JS) |
 

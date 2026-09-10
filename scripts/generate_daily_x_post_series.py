@@ -1082,7 +1082,7 @@ def compose_daily_markdown(date_str: str, jp_inner: str, us_inner: str) -> str:
         "- **手動のみ:** `scripts/generate_daily_x_post_series.py --write` でこの md を生成できる（非本番）。",
         "- **選定ロジック:** `trend_daily_snapshots` の **07 / 13 / 19** + **AI 日次サマリーと同じ急上昇判定**（全ソース横断・最大3件）。",
         f"- {JP_LIST_LINE}",
-        "- 鮮度: https://trends-dashboard.com/data-status",
+        "- 更新頻度: About（1/7/13/19 JST） https://trends-dashboard.com/about",
         "",
         "**US 返信に足す場合（任意・英語）:**",
         "",

@@ -305,7 +305,7 @@ curl -sS "https://trends-dashboard.com/api/nhk-trends?force_refresh=false" | jq 
 | ------------------------- | ------------------------------------------------------------------------------------------- |
 | レスに `cache_as_of` が付かなかった | World News（JP/US）                                                                           |
 | `(データなし)`                 | BLS、USAspending（`/us-admin-trends` 経由）                                                      |
-| `cache_as_of` が他より古い      | 楽天（**2026-02-07** と表示。鮮度は [/data-status](https://trends-dashboard.com/data-status) で確認） |
+| `cache_as_of` が他より古い      | 楽天（**2026-02-07** と表示。本体ダッシュボードの全部入りタブでも更新時刻を確認） |
 
 
 ---

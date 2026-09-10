@@ -1,10 +1,13 @@
 """cache_status 地域キー mapping のユニットテスト"""
 
+from datetime import datetime
+
 from utils.cache_status_keys import (
     freshness_lookup_keys,
     map_refresh_result_key_to_cache_keys,
     region_refresh_stats,
     resolve_cache_status_key,
+    select_freshness_cache_info,
 )
 
 
@@ -32,6 +35,64 @@ def test_freshness_lookup_keys_prefers_regional():
     keys = freshness_lookup_keys("google_trends", "JP")
     assert keys[0] == "google_trends_JP"
     assert "google_trends" in keys
+
+
+def test_freshness_lookup_keys_us_source_includes_us_suffix():
+    keys = freshness_lookup_keys("cnn_trends", "US")
+    assert keys[0] == "cnn_trends_US"
+    assert "cnn_trends" in keys
+
+
+def test_select_freshness_skips_empty_regional_stub():
+    """スケジューラが作った count=0 の地域キーより、本体キーの件数・時刻を優先。"""
+    status = {
+        "nhk_trends_JP": {
+            "last_updated": datetime(2026, 9, 10, 16, 23, 55),
+            "data_count": 0,
+        },
+        "nhk_trends": {
+            "last_updated": datetime(2026, 9, 10, 16, 5, 2),
+            "data_count": 24,
+        },
+    }
+    picked = select_freshness_cache_info(
+        status, freshness_lookup_keys("nhk_trends", "JP")
+    )
+    assert picked is not None
+    assert picked["data_count"] == 24
+    assert picked["last_updated"] == datetime(2026, 9, 10, 16, 5, 2)
+
+
+def test_select_freshness_prefers_newer_among_populated():
+    status = {
+        "google_trends_JP": {
+            "last_updated": datetime(2026, 9, 10, 16, 23, 55),
+            "data_count": 10,
+        },
+        "google_trends": {
+            "last_updated": datetime(2026, 9, 10, 16, 14, 24),
+            "data_count": 10,
+        },
+    }
+    picked = select_freshness_cache_info(
+        status, freshness_lookup_keys("google_trends", "JP")
+    )
+    assert picked is not None
+    assert picked["last_updated"] == datetime(2026, 9, 10, 16, 23, 55)
+
+
+def test_select_freshness_falls_back_to_stub_when_only_empty():
+    status = {
+        "qiita_trends_JP": {
+            "last_updated": datetime(2026, 9, 10, 16, 23, 55),
+            "data_count": 0,
+        },
+    }
+    picked = select_freshness_cache_info(
+        status, freshness_lookup_keys("qiita_trends", "JP")
+    )
+    assert picked is not None
+    assert picked["data_count"] == 0
 
 
 def test_region_refresh_stats():

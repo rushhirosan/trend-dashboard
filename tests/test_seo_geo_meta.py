@@ -89,3 +89,25 @@ def test_about_has_faq_schema(app_client):
     assert '"@type": "FAQPage"' in html
     assert 'id="faq"' in html
     assert "World Front Page" in html
+
+
+def test_data_status_redirects_to_about(app_client):
+    res = app_client.get("/data-status", follow_redirects=False)
+    assert res.status_code == 301
+    assert res.headers.get("Location", "").endswith("/about")
+
+
+def test_sitemap_omits_data_status(app_client):
+    res = app_client.get("/sitemap.xml")
+    assert res.status_code == 200
+    text = res.get_data(as_text=True)
+    assert "/data-status" not in text
+    assert "/about" in text
+
+
+def test_llms_txt_omits_data_status(app_client):
+    res = app_client.get("/llms.txt")
+    assert res.status_code == 200
+    text = res.get_data(as_text=True)
+    assert "/data-status" not in text
+    assert "/about" in text

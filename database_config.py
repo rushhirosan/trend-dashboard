@@ -2212,35 +2212,33 @@ class TrendsCache:
                     # 重複を除去
                     unique_cache_keys = list(set(cache_keys))
                     
-                    # 成功したcache_keyのみタイムスタンプを更新
-                    # INSERT ... ON CONFLICTを使用して、存在しないcache_keyも自動的にINSERTする
-                    # data_countは既存の値を保持（存在しない場合は0）
+                    # 既存行の last_updated のみ更新する。
+                    # count=0 の地域キーを新規 INSERT すると鮮度 API が空行を優先して
+                    # 実データ件数・時刻が隠れるため、行が無いキーはスキップする。
                     updated_count = 0
-                    inserted_count = 0
+                    skipped_count = 0
                     for cache_key in unique_cache_keys:
-                        cursor.execute("""
-                            INSERT INTO cache_status (cache_key, last_updated, data_count)
-                            VALUES (%s, %s, 0)
-                            ON CONFLICT (cache_key) DO UPDATE SET
-                                last_updated = EXCLUDED.last_updated
-                        """, (cache_key, timestamp))
-                        # rowcountでINSERT/UPDATEのどちらが実行されたかを判定
-                        if cursor.rowcount == 1:
-                            # 既存のレコードを更新した場合
+                        cursor.execute(
+                            """
+                            UPDATE cache_status
+                            SET last_updated = %s
+                            WHERE cache_key = %s
+                            """,
+                            (timestamp, cache_key),
+                        )
+                        if cursor.rowcount > 0:
                             updated_count += 1
                         else:
-                            # 新規にINSERTした場合
-                            inserted_count += 1
+                            skipped_count += 1
                     
                     conn.commit()
-                    total_count = updated_count + inserted_count
-                    logger.info(f"✅ 成功したトレンドの更新時刻を更新しました: {total_count}件のcache_keyを処理 (更新: {updated_count}件, 新規: {inserted_count}件) ({timestamp.strftime('%Y-%m-%d %H:%M:%S JST')})")
+                    logger.info(
+                        f"✅ 成功したトレンドの更新時刻を更新しました: "
+                        f"更新 {updated_count}件 / スキップ（行なし）{skipped_count}件 "
+                        f"({timestamp.strftime('%Y-%m-%d %H:%M:%S JST')})"
+                    )
                     if unique_cache_keys:
-                        logger.info(f"📋 更新されたcache_keyの例（最初の10件）: {', '.join(unique_cache_keys[:10])}")
-                    
-                    # 処理したcache_key数と実際のcache_key数が一致しない場合に警告
-                    if total_count != len(unique_cache_keys):
-                        logger.warning(f"⚠️ 処理したcache_key数({total_count})と対象cache_key数({len(unique_cache_keys)})が一致しません")
+                        logger.info(f"📋 対象cache_keyの例（最初の10件）: {', '.join(unique_cache_keys[:10])}")
                     
                     return True
                 

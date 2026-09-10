@@ -15,11 +15,9 @@
         {% if banner_locale == 'en' %}
         <strong class="d-block">Data refresh in progress</strong>
         <span>Showing the latest cached data. Updates usually finish in about 10–15 minutes.</span>
-        <a href="{{ url_for('data_status') }}" class="ms-1">Status</a>
         {% else %}
         <strong class="d-block">データ更新中です</strong>
         <span>表示はキャッシュの最新内容です。完了まで通常10〜15分程度かかります。</span>
-        <a href="{{ url_for('data_status') }}" class="ms-1">更新状況</a>
         {% endif %}
       </div>
       <button

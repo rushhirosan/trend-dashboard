@@ -8,7 +8,7 @@ import os
 from datetime import date
 from flask import Blueprint, jsonify, request, current_app
 from database_config import TrendsCache
-from utils.cache_status_keys import freshness_lookup_keys
+from utils.cache_status_keys import freshness_lookup_keys, select_freshness_cache_info
 from utils.logger_config import get_logger
 
 # ロガーの初期化
@@ -122,11 +122,11 @@ def get_data_freshness():
         
         for cache_key, display_name in cache_key_map.items():
             try:
-                cache_info = None
-                for lookup_key in freshness_lookup_keys(cache_key, country):
-                    cache_info = all_cache_status.get(lookup_key)
-                    if cache_info:
-                        break
+                # 地域キーが count=0 の空行でも、本体キーに件数があればそちらを採用
+                cache_info = select_freshness_cache_info(
+                    all_cache_status,
+                    freshness_lookup_keys(cache_key, country),
+                )
                 
                 if cache_info:
                     # last_updatedがdatetimeオブジェクトの場合はisoformatに変換

@@ -261,8 +261,7 @@
                                 データは <strong>1日4回更新処理を開始</strong> します（1時、7時、13時、19時 JST、完了まで通常10〜15分程度（状況により延びる場合があります））。
                             </p>
                             <p class="mb-2 small text-muted">
-                                ソースごとに<strong>最終更新時刻</strong>や取得状況が異なる場合があります。トレンド一覧の「全部入り」（USページでは <strong>All</strong>）タブでは、各カードに更新時刻の目安が表示されます。詳細は
-                                <a href="{{ url_for('data_status') }}">データ鮮度情報</a>ページを参照してください。
+                                ソースごとに<strong>最終更新時刻</strong>や取得状況が異なる場合があります。トレンド一覧の「全部入り」（USページでは <strong>All</strong>）タブでは、各カードに更新時刻の目安が表示されます。
                             </p>
                             <p class="mb-0 small text-muted">
                                 表示内容は各ソースの公開API・公開データを<strong>キャッシュ経由</strong>で集約したものです。遅延・欠損・仕様変更により実際のランキングと差が出ることがあります。
@@ -294,7 +293,7 @@
                                 <dt class="fw-bold mb-1">無料ですか？</dt>
                                 <dd class="mb-3">ダッシュボード本体の閲覧は無料です。</dd>
                                 <dt class="fw-bold mb-1">更新頻度は？</dt>
-                                <dd class="mb-3">毎日1・7・13・19時（JST）に更新処理を開始します（完了まで通常10〜15分程度）。詳細は<a href="{{ url_for('data_status') }}">データ鮮度情報</a>へ。</dd>
+                                <dd class="mb-3">毎日1・7・13・19時（JST）に更新処理を開始します（完了まで通常10〜15分程度）。</dd>
                                 <dt class="fw-bold mb-1">World Front Page との違いは？</dt>
                                 <dd class="mb-0">
                                     <a href="https://g7-dashboard.vercel.app/" target="_blank" rel="noopener noreferrer">World Front Page</a>
@@ -469,8 +468,7 @@
                                 Update jobs start <strong>four times a day</strong> (1 AM, 7 AM, 1 PM, and 7 PM JST; completion typically takes about 10–15 minutes (may take longer in some cases)).
                             </p>
                             <p class="mb-2 small text-muted">
-                                <strong>Last updated</strong> times can differ by source. On the Japan/US trends pages, the <strong>All</strong> tab shows a freshness hint on each card. See the
-                                <a href="{{ url_for('data_status') }}">Data Status</a> page for details.
+                                <strong>Last updated</strong> times can differ by source. On the Japan/US trends pages, the <strong>All</strong> tab shows a freshness hint on each card.
                             </p>
                             <p class="mb-0 small text-muted">
                                 Content is aggregated from public APIs and feeds via <strong>cached</strong> snapshots. Delays, gaps, or upstream changes may make it differ from live rankings.
@@ -502,7 +500,7 @@
                                 <dt class="fw-bold mb-1">Is it free?</dt>
                                 <dd class="mb-3">Yes. Viewing the dashboard itself is free.</dd>
                                 <dt class="fw-bold mb-1">How often does data refresh?</dt>
-                                <dd class="mb-3">Update jobs start at 1, 7, 13, and 19 JST (typically 10–15 minutes to finish). See <a href="{{ url_for('data_status') }}">Data Status</a>.</dd>
+                                <dd class="mb-3">Update jobs start at 1, 7, 13, and 19 JST (typically 10–15 minutes to finish).</dd>
                                 <dt class="fw-bold mb-1">How is this different from World Front Page?</dt>
                                 <dd class="mb-0">
                                     <a href="https://g7-dashboard.vercel.app/" target="_blank" rel="noopener noreferrer">World Front Page</a>
@@ -552,7 +550,6 @@
                     <ul class="list-unstyled small">
                         <li class="mb-2"><a href="/" class="text-decoration-none text-muted">🇯🇵 日本トレンド / Japan Trends Dashboard</a></li>
                         <li class="mb-2"><a href="/us" class="text-decoration-none text-muted">🇺🇸 USトレンド / US Trends Dashboard</a></li>
-                        <li class="mb-2"><a href="/data-status" class="text-decoration-none text-muted">📊 データ鮮度情報 / Data Status</a></li>
                         <li class="mb-2"><a href="/about" class="text-decoration-none text-muted">ℹ️ このサイトについて / About</a></li>
                     </ul>
                     {% set footer_lang = 'bilingual' %}

@@ -44,7 +44,7 @@ python tests/test_ui.py
 ### test_pages.py（統合）
 本番URLへHTTPリクエストし、ステータス・コンテンツを検証。
 
-- **ページ**: `/`, `/us`, `/data-status`, `/subscription/`
+- **ページ**: `/`, `/us`, `/about`, `/subscription/`
 - **API**: 各種トレンドAPI
 
 ### test_ui.py（E2E）

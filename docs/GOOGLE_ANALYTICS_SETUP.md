@@ -55,7 +55,7 @@ fly secrets set GOOGLE_ANALYTICS_ID=G-XXXXXXXXXX -a trends-dashboard
 - 以下のページでトラッキングされます：
   - `/` (日本トレンドページ)
   - `/us` (USトレンドページ)
-  - `/data-status` (データ鮮度情報ページ)
+  - `/about` (このサイトについて)
   - `/subscription` (サブスクリプションページ)
 
 ## 確認方法

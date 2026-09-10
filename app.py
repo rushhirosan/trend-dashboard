@@ -353,14 +353,10 @@ def create_app():
     try:
         @app.route('/data-status')
         def data_status():
-            """データ鮮度情報ページ"""
-            try:
-                # Google Analytics IDをテンプレートに渡す
-                ga_id = app.config.get('GOOGLE_ANALYTICS_ID')
-                return render_template('data-status.html', config={'GOOGLE_ANALYTICS_ID': ga_id})
-            except Exception as e:
-                logger.error(f"❌ データステータスページレンダリングエラー: {e}", exc_info=True)
-                return f"Error rendering data status page: {e}", 500
+            """旧データ鮮度ページ → About（更新頻度の説明あり）へリダイレクト"""
+            from flask import redirect
+
+            return redirect('/about', code=301)
     except Exception as e:
         logger.error(f"❌ /data-status ルート定義エラー: {e}", exc_info=True)
     
@@ -556,8 +552,7 @@ def create_app():
 ## 主要ページ
 - 日本トレンド: {base}/
 - USトレンド: {base}/us
-- データ鮮度・更新状況: {base}/data-status
-- このサイトについて（FAQ・使い方）: {base}/about
+- このサイトについて（FAQ・使い方・更新頻度）: {base}/about
 
 ## 兄弟サイト
 - World Front Page: https://g7-dashboard.vercel.app/ （世界のニュース表紙をざっと見る。本サイトは多ソースの日次トレンド横断）
@@ -636,7 +631,6 @@ Sitemap: {AppConfig.PUBLIC_BASE_URL}/sitemap.xml
 
                 trends_lastmod_str = trends_last_update_jst.strftime('%Y-%m-%dT%H:%M:%S') + '+09:00'
                 about_lastmod_str = _template_lastmod('about.html').strftime('%Y-%m-%dT%H:%M:%S') + '+09:00'
-                status_lastmod_str = _template_lastmod('data-status.html').strftime('%Y-%m-%dT%H:%M:%S') + '+09:00'
 
                 # 公開中のサマリー（過去分プレビュー）を sitemap に反映
                 summary_urls = ''
@@ -695,12 +689,6 @@ Sitemap: {AppConfig.PUBLIC_BASE_URL}/sitemap.xml
     <loc>{base}/about</loc>
     <lastmod>{about_lastmod_str}</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>{base}/data-status</loc>
-    <lastmod>{status_lastmod_str}</lastmod>
-    <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>

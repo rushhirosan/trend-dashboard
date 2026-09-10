@@ -10,7 +10,7 @@
 - 週次の数値 → [週次メモ](#週次メモ)
 - 日次サマリー品質・SLA の詳細手順 → [`summary_pattern_a_phase1.md`](summary_pattern_a_phase1.md)
 
-**最終更新:** 2026-08-27（GHA 二重生成スキップ + Fly 欠走検知）
+**最終更新:** 2026-09-11（Stripe 閉鎖確定 → 課金本線を PAY.JP・JP 先行に切替）
 
 ---
 
@@ -38,8 +38,8 @@
 
 | 領域 | 状態 | 次のアクション |
 |------|------|----------------|
-| **課金入り口（2b）** | **ローカル実装・検証済**（未コミット）。GHA 有料送信ステップは追加済（本番 API 経由） | **本線:** commit → Fly デプロイ（購読者 API + Stripe secrets）→ 本番課金 → GHA 有料メール受信 |
-| **AIサマリー配信** | 日次・週次とも GHA → 自分宛 dogfood が安定。有料送信は dogfood の後（`--from-api`） | Fly に `GET /api/billing/ai-summary/subscribers` を載せてから本番送信が有効 |
+| **課金入り口（2b）** | Stripe アカウント閉鎖確定。Checkout 実装は資産として残すが **本番本線にしない** | **本線:** PAY.JP 審査・Plan 作成 → 自サイト定期課金（JP 先行）→ `ai_summary_subscribers` 登録 → 有料メール受信 |
+| **AIサマリー配信** | 日次・週次とも GHA → 自分宛 dogfood が安定。有料送信は dogfood の後（`--from-api`） | 購読者 API は本番済。決済プロバイダ差し替え後に本番購読者を載せる |
 | **定時取得** | 1536MB で JP/US 安定 | Grafana OOM アラート（任意・後回し可） |
 | **データ保持** | DB / 原稿 10日・週次30日 purge 実装済 | 変更なし |
 
@@ -47,31 +47,33 @@
 
 ## 次にフォーカスするステップ
 
-dogfood 配信は回っている。GHA 有料送信ステップは追加済み。**次は commit → Fly デプロイ（購読者 API）→ 本番に購読者を載せて、GHA から有料メールが届くこと。**
+dogfood 配信は回っている。GHA 有料送信・購読者 API は用意済み。**決済本線を Stripe → PAY.JP（JP 先行）に切り替える。** US / both の自サイト課金は後回し（PayPal 等は別途）。
 
 ### 本線 — フェーズ2b 残り（この順で）
 
 | # | タスク | 状態 | やること |
 |---|--------|------|----------|
 | 1 | **有料配信 GHA 連携** | 済 | dogfood の後に `--from-api`。購読者 API は 2026-08-19 デプロイ済 |
-| 2 | **有料メールのローカル確認** | 未 | `--dry-run` → 実送信。件名に `(dogfood)` が付かないこと |
-| 3 | **変更を commit** | 済 | 2026-08-19 `--ship` |
-| 4 | **Fly 本番デプロイ** | コード済 / **secrets 未** | Checkout が「準備中」なのは `STRIPE_SECRET_KEY` + `STRIPE_PRICE_ID` が Fly に無いため。Waitlist 待ちではない。**今すぐ** `fly secrets set` すれば受付開始 |
-| 5 | **本番 Webhook** | 未 | `https://trends-dashboard.com/api/billing/stripe/webhook` |
-| 6 | **本番で初回課金 → 有料メール受信** | 一部 | secrets + Webhook のあと、本番 Checkout で購読者を載せる |
+| 2 | **Stripe 本番** | **中止** | アカウント閉鎖（`advisory_investment_tos` / 株・暗号資産トレンド情報）。マーケット表示は残す方針のため再審査しない |
+| 3 | **PAY.JP アカウント・審査** | 未 | 加盟店登録。商品説明は「公開トレンドの独自要約メール（月額）」に寄せる |
+| 4 | **PAY.JP Plan 作成** | 未 | 月額1本（JPY）。初版は `region_plan=jp` 固定 |
+| 5 | **PAY.JP 定期課金実装** | 未 | Customer + card token + Subscription + Webhook → `ai_summary_subscribers`。既存 Stripe コードは残し、本番フラグは PAY.JP 側へ |
+| 6 | **ローカル E2E** | 未 | テスト鍵で購読 → Webhook → DB 登録 |
+| 7 | **Fly secrets + 本番 Webhook** | 未 | `PAYJP_*` + Webhook URL |
+| 8 | **本番で初回課金 → 有料メール受信** | 未 | JP 購読者1人で GHA 有料メール確認 |
 
 10人・継続率は入り口の条件ではない。動いてから限定で広げる。
 
 ### 2b 最小セット — 進捗（実装チェック）
 
-- [x] **SKU は Stripe Price 1本** — 日次+週次メールの月額（JP/US/両方は同額）。地域は `region_plan` で配信のみ出し分け
-- [x] **決済は Stripe Checkout** — Price 1本 + Session metadata に `region_plan`（`jp` / `us` / `both`）。`services/subscription/` は使わない
-- [x] **有料配信リスト** — `ai_summary_subscribers`（email, region_plan, stripe_*, is_active）。dogfood とは分離
+- [x] **SKU 設計（旧）** — Stripe Price 1本 + `region_plan`（実装資産。本番本線から外す）
+- [x] **決済（旧）** — Stripe Checkout + Webhook ローカル E2E 済（2026-08-18）。**本番投入しない**
+- [ ] **決済（新）** — PAY.JP 定期課金（Plan + Customer + Subscription + Webhook）。初版は **JP のみ**
+- [x] **有料配信リスト** — `ai_summary_subscribers`（email, region_plan, stripe_*, is_active）。PAY.JP 用に `payjp_*` 列追加予定。dogfood とは分離
 - [x] **送信スクリプト** — `send_summary_paid_email.py` + `summary_paid_email.py`（region_plan 別・dogfood ラベルなし）
-- [x] **UI の入り口** — 地域3択 +「購読する」→ Checkout（`ENABLE_AI_SUMMARY_CHECKOUT` 時）。Waitlist は開かない。配信免責（目標時刻・重大欠配は翌月無料 or 返金）を Checkout / 成功ページ / Stripe custom_text に掲載
-- [x] **ローカル E2E（決済〜DB）** — テスト Checkout 成功 → Webhook 200 → DB に購読者登録（2026-08-18 確認）
-- [x] **有料配信を GHA に載せる** — dogfood の後に `send_summary_paid_email.py --from-api`（購読者は本番 API。Fly デプロイ前は skip）
-- [ ] **有料メール受信確認** — 選んだプランの通数で SLA 内配信（本番購読者 + GHA、または手動送信で最初の1通）
+- [x] **UI の入り口（旧）** — 地域3択 + Stripe Checkout。PAY.JP 切替時は初版 **JP 固定**（us/both は UI から外すか disabled）
+- [x] **有料配信を GHA に載せる** — dogfood の後に `send_summary_paid_email.py --from-api`
+- [ ] **有料メール受信確認** — 本番購読者1人 + GHA（または手動送信で最初の1通）
 
 ### 並行 — コンテンツ改善（課金の後でも可）
 
@@ -85,8 +87,10 @@ dogfood 配信は回っている。GHA 有料送信ステップは追加済み�
 - `draft` → `approved` の自動ゲート（dogfood は draft 送信のまま）
 - Web プレビュー公開（フェーズ3）
 - 既存 Subscription UI（`ENABLE_SUBSCRIPTION_UI`）の復活
-- note / Substack / B2B / BMC
-- Stripe の日数単位の期間延長 / 欠配1回ごとの自動返金 / 利用規約ページ
+- note / Substack / B2B / BMC（検証用として後から可。いまの本線ではない）
+- Stripe 本番 secrets / Webhook / 再審査（マーケット削除前提の再開はしない）
+- US / both の自サイト課金（PAY.JP は JPY・国内向け。海外は後で PayPal 等）
+- 決済の日数単位の期間延長 / 欠配1回ごとの自動返金 / 利用規約ページ
 
 ---
 
@@ -121,21 +125,20 @@ dogfood 配信は回っている。GHA 有料送信ステップは追加済み�
 
 - ダッシュボード上の地域タブ（JP/US）と **同じ言語・同じ原稿** をメールする（JP=日本語、US=英語）
 - **`both` は1通にまとめない** — 読みやすさと件名の明確さのため、地域ごとに別メール（dogfood と同じ分割）
-- 有料リストの最小スキーマ案: `email`, `region_plan`, `stripe_customer_id`, `is_active`, `created_at`
-- Stripe: **Price 1本**（月額共通）。Checkout Session の metadata に `region_plan` を載せ、Webhook で DB に保存
-- 価格案（仮）: 月 ¥500〜980（地域プラン共通。`both` も同額 — 2通分はバンドル扱い）
-- プラン変更（JP→both 等）は **入り口完了後**。最初は Stripe ダッシュボードで手動でも可
+- 有料リスト: `email`, `region_plan`, プロバイダ顧客/購読 ID（`stripe_*` 既存 + `payjp_*` 追加予定）, `is_active`, `created_at`
+- **決済本線（2026-09-11〜）:** PAY.JP 定期課金。Plan 1本（JPY・月額）。初版は `region_plan=jp` 固定
+- **Stripe 実装**はローカル検証済み資産として残すが、本番 secrets は入れない
+- 価格案（仮）: 月 ¥500〜980（初版は JP のみ。`us` / `both` は後続）
+- プラン変更（JP→both 等）は **入り口完了後**。海外課金は別プロバイダ検討
 
-**UI（購読モーダル）案**
+**UI（購読・初版 PAY.JP）案**
 
 ```
-○ 日本のサマリー（日次・週次）
-○ US summary (daily & weekly)
-○ 両方（JP + US）
-[ 購読する ] → 選んだプランの Stripe Checkout
+日本のサマリー（日次・週次）— 月額
+[ 購読する ] → PAY.JP カード登録 → 定期課金作成
 ```
 
-JP/US ダッシュボードそれぞれの Fake door では、**その地域をデフォルト選択**しつつ3択は常に見せる。
+US / both の3択は **PAY.JP 本番開始までは出さない**（または disabled）。US 課金は後続。
 
 ### コンテンツ線引き（案1: ティーザー公開 — 採用方針）
 
@@ -215,7 +218,6 @@ Stripe の日数単位の期間延長は使わない（Dashboard に +1日がな
 - [ ] 生成結果に `missing_sources` / `partial_sources` を持たせる
 - [ ] 欠損時の短縮メールテンプレ
 - [ ] 送信成功/失敗ログ・再送キュー
-- [ ] メール内 `/data-status` リンク
 
 ### ロードマップ
 
@@ -279,16 +281,16 @@ dogfood は `draft` のまま自分宛に送っている。公開・有料の ap
 
 詳細は [次にフォーカスするステップ](#次にフォーカスするステップ)。
 
-- [x] Stripe Price 1本 + Checkout API + Webhook + `ai_summary_subscribers`（初版）
-- [x] UI: 地域3択 + 購読ボタン（Checkout 有効時）
-- [x] Checkout / 成功ページ / Stripe custom_text に配信免責（目標時刻・重大欠配は翌月無料 or 返金）
-- [x] ローカル: Checkout 成功 → Webhook 200 → DB 登録（2026-08-18）
-- [x] 有料送信スクリプト（`send_summary_paid_email.py`）
-- [x] GHA: dogfood の後に有料送信（`--from-api`。Fly の購読者 API デプロイが必要）
-- [ ] 有料配信 GHA が本番で実際に送る（Fly デプロイ + 本番購読者）
+- [x] Stripe Checkout + Webhook + `ai_summary_subscribers`（ローカル初版・**本番中止**）
+- [x] UI: 地域3択 + 購読ボタン（Stripe 用。PAY.JP 切替で JP 固定に変更予定）
+- [x] 有料送信スクリプト（`send_summary_paid_email.py`）+ GHA `--from-api`
+- [ ] PAY.JP 加盟店登録・審査
+- [ ] PAY.JP Plan（月額 JPY）+ 定期課金 API + Webhook
+- [ ] DB: `payjp_customer_id` / `payjp_subscription_id`（または provider 汎用列）
+- [ ] UI: JP のみ購読 + カード入力（payjp.js）+ 免責文言
+- [ ] ローカル E2E（PAY.JP test）→ DB 登録
+- [ ] Fly: `PAYJP_*` secrets + Webhook URL
 - [ ] 初回課金者1人で有料メール受信 + SLA 内配信確認
-- [ ] Fly 本番: Stripe secrets + Webhook URL
-- [ ] 変更の commit / deploy
 - [ ] 有料会員10人 + 2週継続率（入り口完了後の目標）
 
 #### フェーズ3 — サイト内プレビュー + 配信自動化
@@ -341,7 +343,7 @@ dogfood は `draft` のまま自分宛に送っている。公開・有料の ap
 | 日次 / 週次生成 | `scripts/generate_ai_daily_summary.py`, `generate_ai_weekly_summary.py` |
 | Fake door | `templates/partials/ai_summary_fake_door.html`, `static/js/ai-summary-fake-door.js` |
 | Waitlist | `routes/waitlist_routes.py`, `services/waitlist/` |
-| **有料サマリー（Stripe）** | `routes/billing_routes.py`, `services/billing/`, `static/js/ai-summary-checkout.js` |
+| **有料サマリー（課金）** | `routes/billing_routes.py`, `services/billing/`（Stripe 資産 + PAY.JP 追加予定）, `static/js/ai-summary-checkout.js` |
 | **有料メール送信** | `scripts/send_summary_paid_email.py`, `services/summary/summary_paid_email.py`, GHA `ai-*-summary.yml`（dogfood の後、`--from-api`） |
 | 購読者 API | `GET /api/billing/ai-summary/subscribers`（`SUMMARY_UPSERT_TOKEN`。GHA は DB 直結しない） |
 | 購読者 DB | `services/billing/ai_summary_subscriber_manager.py` → テーブル `ai_summary_subscribers` |
@@ -459,6 +461,7 @@ dogfood は `draft` のまま自分宛に送っている。公開・有料の ap
 | 2026-08-18 | **2b ローカル検証完了:** Checkout（test）→ Webhook 200 → `ai_summary_subscribers` に登録。次は GHA 有料配信 → commit → Fly 本番。 |
 | 2026-08-18 | 有料メールの免責を Checkout に載せる。重大欠配の救済は Stripe 期間延長ではなく翌月無料/返金。 |
 | 2026-08-19 | GHA 有料配信を dogfood の後に追加。購読者は `GET /api/billing/ai-summary/subscribers`（`SUMMARY_UPSERT_TOKEN`）。DATABASE_URL は GHA に置かない。 |
+| 2026-09-11 | Stripe サポートよりアカウント閉鎖確定（制限カテゴリ: 金融・投資のガイダンス／情報。例: 株式・暗号資産トレンド情報）。マーケット表示は残すため再審査しない。課金本線を **PAY.JP・JP 先行** に切替。US は後続。 |
 
 ### 決定ログ
 
@@ -485,6 +488,8 @@ dogfood は `draft` のまま自分宛に送っている。公開・有料の ap
 | 2026-08-19 | ユーザー向け文言から **「出勤前」「メールです」を外す**。時刻は目標のみ。Checkout 受付開始は Waitlist 待ちではなく **Fly に Stripe secrets を入れたとき**。 |
 | 2026-08-27 | GHA 日次欠走は Healthchecks 等を増やさず、Fly 08:15 JST で `summary_documents` を見る。成功日は SELECT のみ。無いとき Discord。 |
 | 2026-08-27 | 手動 Run + 遅延 cron の二重メールは、GHA 先頭で DB 存在確認してスキップ。再生成は workflow_dispatch `force`。 |
+| 2026-09-11 | **Stripe 本番課金は中止。** 理由: アカウント閉鎖（株・暗号資産トレンド情報が制限カテゴリに該当）。マーケット／株／暗号資産表示はプロダクトから外さない。 |
+| 2026-09-11 | **課金本線 = PAY.JP（JP 先行）。** 既存 Stripe コードは資産として残す。配信リスト・GHA 有料メールは再利用。US/both 自サイト課金は後回し。 |
 
 ### KPI（週次記録用）
 

@@ -143,19 +143,6 @@ def main():
         )
         results.append(("USトレンドページ", result))
         
-        # データ鮮度情報ページのテスト
-        result = _check_page_ui(
-            driver,
-            f"{BASE_URL}/data-status",
-            "データ鮮度情報ページ",
-            {
-                "ページが読み込まれた": lambda d: d.find_element(By.TAG_NAME, "body") is not None,
-                "データ鮮度情報が表示されている": lambda d: "データ鮮度" in d.page_source or "Data Status" in d.page_source,
-                "更新ボタンが存在": lambda d: len(d.find_elements(By.CSS_SELECTOR, "button, [role='button']")) > 0,
-            }
-        )
-        results.append(("データ鮮度情報ページ", result))
-        
         # サブスクリプションページのテスト
         result = _check_page_ui(
             driver,

@@ -216,7 +216,11 @@ def create_app():
                     allow_draft=AppConfig.AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT,
                 ),
             }
-        from services.billing.stripe_service import checkout_enabled
+        from services.billing.payjp_service import (
+            checkout_enabled,
+            trial_amount_jpy,
+            trial_days,
+        )
         return {
             'public_base_url': AppConfig.PUBLIC_BASE_URL,
             'ENABLE_SUBSCRIPTION_UI': AppConfig.ENABLE_SUBSCRIPTION_UI,
@@ -226,6 +230,8 @@ def create_app():
             'ENABLE_AI_SUMMARY_FAKE_DOOR': AppConfig.ENABLE_AI_SUMMARY_FAKE_DOOR,
             'AI_SUMMARY_FAKE_DOOR': ai_summary_fake_door,
             'ENABLE_AI_SUMMARY_CHECKOUT': checkout_enabled(),
+            'PAYJP_TRIAL_AMOUNT_JPY': trial_amount_jpy(),
+            'PAYJP_TRIAL_DAYS': trial_days(),
         }
 
     @app.before_request

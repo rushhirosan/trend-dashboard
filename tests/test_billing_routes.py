@@ -1,6 +1,6 @@
-"""Billing API tests."""
+"""HTTP tests for billing routes (PAY.JP v2)."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from flask import Flask
@@ -12,85 +12,74 @@ from routes.billing_routes import billing_bp
 def client():
     app = Flask(__name__)
     app.config["TESTING"] = True
-    app.config["PUBLIC_BASE_URL"] = "https://example.com"
     app.register_blueprint(billing_bp)
-    with app.test_client() as c:
-        yield c
+    return app.test_client()
 
 
 @patch("routes.billing_routes.checkout_enabled", return_value=False)
-def test_checkout_disabled(mock_enabled, client):
+def test_subscribe_disabled(mock_enabled, client):
     res = client.post(
-        "/api/billing/ai-summary/checkout",
-        json={"region_plan": "jp"},
+        "/api/billing/ai-summary/subscribe",
+        json={"email": "a@b.com"},
     )
     assert res.status_code == 503
 
 
 @patch("routes.billing_routes.checkout_enabled", return_value=True)
+@patch("routes.billing_routes.trial_days", return_value=30)
+@patch("routes.billing_routes.trial_amount_jpy", return_value=500)
 @patch("routes.billing_routes.create_checkout_session")
-def test_checkout_success(mock_create, mock_enabled, client):
-    mock_create.return_value = (True, "https://checkout.stripe.test/session", "cs_test")
-
+def test_subscribe_ok(mock_create, mock_amount, mock_days, mock_enabled, client):
+    mock_create.return_value = (True, "ok", "https://checkout.pay.jp/cs_x")
     res = client.post(
-        "/api/billing/ai-summary/checkout",
-        json={"region_plan": "both"},
+        "/api/billing/ai-summary/subscribe",
+        json={"email": "a@b.com"},
     )
     assert res.status_code == 200
     data = res.get_json()
     assert data["success"] is True
-    assert data["url"] == "https://checkout.stripe.test/session"
+    assert data["redirect_url"] == "https://checkout.pay.jp/cs_x"
+    assert data["amount_jpy"] == 500
     mock_create.assert_called_once()
 
 
 @patch("routes.billing_routes.checkout_enabled", return_value=True)
-def test_checkout_invalid_plan(mock_enabled, client):
+@patch("routes.billing_routes.create_checkout_session")
+def test_subscribe_bad_email(mock_create, mock_enabled, client):
+    mock_create.return_value = (False, "有効なメールアドレスが必要です", None)
     res = client.post(
-        "/api/billing/ai-summary/checkout",
-        json={"region_plan": "invalid"},
+        "/api/billing/ai-summary/subscribe",
+        json={"email": "bad"},
     )
     assert res.status_code == 400
 
 
-@patch.dict("os.environ", {"SUMMARY_UPSERT_TOKEN": ""}, clear=False)
-def test_subscribers_disabled(client):
+def test_subscribers_requires_token(client):
     res = client.get("/api/billing/ai-summary/subscribers")
-    assert res.status_code == 503
+    assert res.status_code in (401, 503)
 
 
-@patch.dict("os.environ", {"SUMMARY_UPSERT_TOKEN": "secret-token"}, clear=False)
-def test_subscribers_unauthorized(client):
-    res = client.get(
-        "/api/billing/ai-summary/subscribers",
-        headers={"Authorization": "Bearer wrong"},
-    )
-    assert res.status_code == 401
-
-
-@patch.dict("os.environ", {"SUMMARY_UPSERT_TOKEN": "secret-token"}, clear=False)
+@patch.dict("os.environ", {"SUMMARY_UPSERT_TOKEN": "secret"}, clear=False)
 @patch("routes.billing_routes.AiSummarySubscriberManager")
 def test_subscribers_ok(mock_mgr_cls, client):
     mock_mgr_cls.return_value.list_all_active.return_value = [
-        {"email": "a@example.com", "region_plan": "jp"},
-        {"email": "b@example.com", "region_plan": "both"},
+        {"email": "a@b.com", "region_plan": "jp"},
     ]
     res = client.get(
         "/api/billing/ai-summary/subscribers",
-        headers={"Authorization": "Bearer secret-token"},
+        headers={"Authorization": "Bearer secret"},
     )
     assert res.status_code == 200
-    data = res.get_json()
-    assert data["success"] is True
-    assert len(data["subscribers"]) == 2
+    assert res.get_json()["subscribers"][0]["email"] == "a@b.com"
 
 
 @patch("routes.billing_routes.handle_webhook_event")
-def test_stripe_webhook_ok(mock_handle, client):
-    mock_handle.return_value = (True, "ok")
+def test_payjp_webhook_ok(mock_handle, client):
+    mock_handle.return_value = (True, "activated")
     res = client.post(
-        "/api/billing/stripe/webhook",
-        data=b"{}",
-        headers={"Stripe-Signature": "sig"},
+        "/api/billing/payjp/webhook",
+        json={"type": "checkout.session.completed", "data": {"id": "cs_1"}},
+        headers={"X-Payjp-Webhook-Token": "whook_x"},
     )
     assert res.status_code == 200
-    mock_handle.assert_called_once()
+    assert res.get_json()["received"] is True

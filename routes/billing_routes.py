@@ -1,4 +1,4 @@
-"""Stripe Checkout / Webhook ルート（有料 AI サマリー）。"""
+"""有料 AI サマリー課金ルート（PAY.JP v2 お試し・JP）。"""
 
 import hmac
 import os
@@ -7,11 +7,12 @@ from flask import Blueprint, jsonify, render_template, request
 
 from config.app_config import AppConfig
 from services.billing.ai_summary_subscriber_manager import AiSummarySubscriberManager
-from services.billing.region_plan import normalize_region_plan
-from services.billing.stripe_service import (
+from services.billing.payjp_service import (
     checkout_enabled,
     create_checkout_session,
     handle_webhook_event,
+    trial_amount_jpy,
+    trial_days,
 )
 from utils.logger_config import get_logger
 
@@ -20,43 +21,38 @@ logger = get_logger(__name__)
 billing_bp = Blueprint("billing", __name__)
 
 
-@billing_bp.route("/api/billing/ai-summary/checkout", methods=["POST"])
-def ai_summary_checkout():
-    """地域プランを選び Stripe Checkout へ。"""
+@billing_bp.route("/api/billing/ai-summary/subscribe", methods=["POST"])
+def ai_summary_subscribe():
+    """メールアドレスから Checkout Session を作り、PAY.JP 決済 URL を返す。"""
     if not checkout_enabled():
         return jsonify({"success": False, "error": "決済は現在利用できません"}), 503
 
     data = request.get_json(silent=True) or {}
-    region_plan = normalize_region_plan(
-        data.get("region_plan"),
-        default=(data.get("region") or "jp"),
-    )
-    if not region_plan:
-        return jsonify({"success": False, "error": "region_plan が不正です"}), 400
+    email = data.get("email") or ""
 
-    base = AppConfig.PUBLIC_BASE_URL.rstrip("/")
-    success_url = f"{base}/billing/success?session_id={{CHECKOUT_SESSION_ID}}"
-    cancel_url = f"{base}/billing/cancel"
+    ok, message, checkout_url = create_checkout_session(email=email)
+    if not ok or not checkout_url:
+        return jsonify({"success": False, "error": message}), 400
+    return jsonify({
+        "success": True,
+        "message": message,
+        "redirect_url": checkout_url,
+        "trial_days": trial_days(),
+        "amount_jpy": trial_amount_jpy(),
+    })
 
-    ok, message, _session_id = create_checkout_session(
-        region_plan=region_plan,
-        success_url=success_url,
-        cancel_url=cancel_url,
-    )
+
+@billing_bp.route("/api/billing/payjp/webhook", methods=["POST"])
+def payjp_webhook():
+    """PAY.JP Webhook（JSON + X-Payjp-Webhook-Token）。"""
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "invalid payload"}), 400
+    token = request.headers.get("X-Payjp-Webhook-Token")
+    ok, message = handle_webhook_event(payload, token)
     if not ok:
-        return jsonify({"success": False, "error": message}), 502
-    return jsonify({"success": True, "url": message})
-
-
-@billing_bp.route("/api/billing/stripe/webhook", methods=["POST"])
-def stripe_webhook():
-    """Stripe Webhook（raw body + 署名検証）。"""
-    payload = request.get_data()
-    sig = request.headers.get("Stripe-Signature")
-    ok, message = handle_webhook_event(payload, sig)
-    if not ok:
-        logger.warning("Stripe webhook rejected: %s", message)
-        status = 400 if message in ("invalid payload", "invalid signature") else 500
+        logger.warning("PAY.JP webhook rejected: %s", message)
+        status = 400 if "token" in message or "payload" in message else 500
         return jsonify({"error": message}), status
     return jsonify({"received": True, "detail": message})
 
@@ -89,11 +85,11 @@ def ai_summary_subscribers():
 
 @billing_bp.route("/billing/success")
 def billing_success():
-    """Checkout 成功後の簡易ページ。"""
+    """お試し購入完了の簡易ページ（Webhook 反映まで数分かかる場合あり）。"""
     return render_template("billing_success.html")
 
 
 @billing_bp.route("/billing/cancel")
 def billing_cancel():
-    """Checkout キャンセル。"""
+    """決済キャンセル（Checkout 中断など）。"""
     return render_template("billing_cancel.html")

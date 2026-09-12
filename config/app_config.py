@@ -63,14 +63,35 @@ class AppConfig:
         'ENABLE_AI_SUMMARY_FAKE_DOOR', 'true'
     ).lower() in ('true', '1', 'yes')
 
-    # 有料 AI サマリー Stripe Checkout（Price 1本 + region_plan metadata）
+    # 有料 AI サマリー（PAY.JP API v2 お試しワンショット・JP）
+    PAYJP_SECRET_KEY = os.getenv('PAYJP_SECRET_KEY', '').strip()
+    PAYJP_PUBLIC_KEY = os.getenv('PAYJP_PUBLIC_KEY', '').strip()  # Widgets 用（Checkout v2 では不要）
+    PAYJP_WEBHOOK_TOKEN = os.getenv('PAYJP_WEBHOOK_TOKEN', '').strip()
+    # 管理画面の Price ID（未設定時は price_data でインライン作成）
+    PAYJP_PRICE_ID = os.getenv('PAYJP_PRICE_ID', '').strip()
+    # 旧 v1 定期用（お試しでは使わない）
+    PAYJP_PLAN_ID = os.getenv('PAYJP_PLAN_ID', '').strip()
+    try:
+        PAYJP_TRIAL_AMOUNT_JPY = int(os.getenv('PAYJP_TRIAL_AMOUNT_JPY', '500') or '500')
+    except ValueError:
+        PAYJP_TRIAL_AMOUNT_JPY = 500
+    try:
+        PAYJP_TRIAL_DAYS = int(os.getenv('PAYJP_TRIAL_DAYS', '30') or '30')
+    except ValueError:
+        PAYJP_TRIAL_DAYS = 30
+    # 例: card,paypay（PayPay は加盟店審査後。未審査なら card のみにする）
+    PAYJP_PAYMENT_METHOD_TYPES = os.getenv(
+        'PAYJP_PAYMENT_METHOD_TYPES', 'card,paypay'
+    ).strip()
+    ENABLE_AI_SUMMARY_CHECKOUT = os.getenv(
+        'ENABLE_AI_SUMMARY_CHECKOUT', 'true'
+    ).lower() in ('true', '1', 'yes')
+
+    # 旧 Stripe（許可されず未使用。残してあるだけ）
     STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '').strip()
     STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY', '').strip()
     STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', '').strip()
     STRIPE_PRICE_ID = os.getenv('STRIPE_PRICE_ID', '').strip()
-    ENABLE_AI_SUMMARY_CHECKOUT = os.getenv(
-        'ENABLE_AI_SUMMARY_CHECKOUT', 'true'
-    ).lower() in ('true', '1', 'yes')
     # 本番は approved のみ表示。ローカル DEBUG では draft も可（明示 false で無効化）
     _allow_draft_env = os.getenv('AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT')
     if _allow_draft_env is not None and _allow_draft_env.strip() != '':
@@ -100,8 +121,9 @@ class AppConfig:
             'BUY_ME_A_COFFEE_USERNAME': cls.BUY_ME_A_COFFEE_USERNAME,
             'ENABLE_AI_SUMMARY_FAKE_DOOR': cls.ENABLE_AI_SUMMARY_FAKE_DOOR,
             'AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT': cls.AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT,
-            'STRIPE_PUBLISHABLE_KEY': cls.STRIPE_PUBLISHABLE_KEY,
-            'STRIPE_PRICE_ID': cls.STRIPE_PRICE_ID,
+            'PAYJP_PUBLIC_KEY': cls.PAYJP_PUBLIC_KEY,
+            'PAYJP_TRIAL_AMOUNT_JPY': cls.PAYJP_TRIAL_AMOUNT_JPY,
+            'PAYJP_TRIAL_DAYS': cls.PAYJP_TRIAL_DAYS,
             'ENABLE_AI_SUMMARY_CHECKOUT': cls.ENABLE_AI_SUMMARY_CHECKOUT,
         }
 

@@ -37,5 +37,6 @@ feedparser==6.0.12
 # Tests
 pytest>=7.0.0
 
-# Billing
+# Billing（Stripe は未使用。PAY.JP v2 は requests 直叩き。v1 SDK は将来の定期用に残す）
 stripe>=8.0.0
+payjp>=1.6.0

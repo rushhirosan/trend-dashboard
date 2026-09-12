@@ -187,6 +187,8 @@
     </footer>
 
     <script defer src="{{ url_for('static', filename='vendor/bootstrap/5.1.3/bootstrap.bundle.min.js') }}"></script>
-    <script defer src="{{ url_for('static', filename='js/ai-summary-checkout.js') }}?v=20260818-checkout"></script>
+    {% if ENABLE_AI_SUMMARY_CHECKOUT %}
+    <script defer src="{{ url_for('static', filename='js/ai-summary-checkout.js') }}?v=20260912-payjp-v2"></script>
+    {% endif %}
 </body>
 </html>

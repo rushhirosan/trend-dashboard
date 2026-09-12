@@ -366,7 +366,7 @@ dogfood は `draft` のまま自分宛に送っている。公開・有料の ap
 - [x] `captured_at` スロット窓チェック + Discord 警告
 - [x] `trend_daily_snapshots` / `scheduler_slot_run` **10日 purge**（03:00 JST）
 - [x] `docs/summaries` 日次10日・週次30日 purge（DB: 03:00 JST / git: GHA `summary-retention-purge.yml`）
-- [x] GHA 日次サマリー欠走: Fly **08:15 JST** に `summary_documents` 存在チェック、無いときだけ Discord（生成・メールしない）
+- [x] GHA 日次サマリー欠走: Fly **09:00 JST** に `summary_documents` 存在チェック、無いときだけ Discord（生成・メールしない）
 - [x] GHA 日次/週次: 手動後の遅延 cron で二重メールしないよう、DB に jp+us があれば生成・メールをスキップ（`force` で再生成可）
 - [x] `scripts/inspect_scheduler_slots.py --business-day`
 - [x] `docs/grafana-oom-alerts.md`
@@ -489,6 +489,7 @@ dogfood は `draft` のまま自分宛に送っている。公開・有料の ap
 | 2026-08-27 | 手動 Run + 遅延 cron の二重メールは、GHA 先頭で DB 存在確認してスキップ。再生成は workflow_dispatch `force`。 |
 | 2026-09-12 | **Stripe は許可をもらえなかった**ため使わない。PAY.JP（JP）を決済候補に。US/both 自サイト課金は後回し。 |
 | 2026-09-12 | **お試し実装:** PAY.JP Checkout v2 hosted（`card,paypay`）+ `expires_at`。本番は申告・secrets・購入確認が残。 |
+| 2026-09-13 | 日次欠走チェックを **08:15 → 09:00 JST** に変更。GHA 実着地が ~08:25–08:45 のため偽陽性が続いていた。 |
 
 ### KPI（週次記録用）
 

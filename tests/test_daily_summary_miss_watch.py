@@ -1,4 +1,4 @@
-"""Fly 08:15 JST 日次サマリー欠走チェック（生成・メールはしない）。"""
+"""Fly 09:00 JST 日次サマリー欠走チェック（生成・メールはしない）。"""
 
 from datetime import datetime
 from unittest.mock import MagicMock, patch
@@ -8,7 +8,7 @@ import pytz
 from services.scheduler.scheduler_manager import TrendsScheduler
 
 JST = pytz.timezone("Asia/Tokyo")
-_NOW = JST.localize(datetime(2026, 8, 27, 8, 15, 0))
+_NOW = JST.localize(datetime(2026, 8, 27, 9, 0, 0))
 _DOC = "2026-08-26"
 
 

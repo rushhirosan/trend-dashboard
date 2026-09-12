@@ -634,11 +634,12 @@ class TrendsScheduler:
                 )
 
                 # GHA 日次サマリー欠走検知。成功日は SELECT のみ。生成・メールはしない。
+                # 08:15 だと GHA cron 遅延（実測 ~08:25–08:45 着地）で偽陽性になるため 09:00。
                 self.scheduler.add_job(
                     func=self._check_daily_summary_published,
-                    trigger=CronTrigger(hour=8, minute=15, timezone=jst),
+                    trigger=CronTrigger(hour=9, minute=0, timezone=jst),
                     id="daily_summary_miss_watch",
-                    name="日次サマリー欠走チェック (08:15 JST)",
+                    name="日次サマリー欠走チェック (09:00 JST)",
                     replace_existing=True,
                     misfire_grace_time=3600,
                     coalesce=True,
@@ -657,7 +658,7 @@ class TrendsScheduler:
                     "📅 毎日1:00/7:00/13:00/19:00 JST に全トレンド取得。"
                     " 各スロット+%s分に欠損リトライ。"
                     " 03:00 JST にスナップショット保持クリーンアップ。"
-                    " 08:15 JST に日次サマリー欠走チェック",
+                    " 09:00 JST に日次サマリー欠走チェック",
                     gap_retry_minute,
                 )
                 
@@ -2284,7 +2285,7 @@ class TrendsScheduler:
         return (now.date() - timedelta(days=1)).isoformat()
 
     def _check_daily_summary_published(self, now=None) -> None:
-        """08:15 JST: 前日 business_day の日次原稿が DB にあるか。欠けているときだけ Discord。
+        """09:00 JST: 前日 business_day の日次原稿が DB にあるか。欠けているときだけ Discord。
 
         生成・メール再送はしない（GHA 欠走の検知専用）。DB 参照失敗は欠走扱いしない。
         """
@@ -2326,7 +2327,7 @@ class TrendsScheduler:
             "warning",
             "⚠️ 日次サマリーが未着です",
             (
-                f"GHA AI daily summary が {doc_id} を 08:15 JST までに "
+                f"GHA AI daily summary が {doc_id} を 09:00 JST までに "
                 f"summary_documents へ載せていません（{', '.join(missing)}）。"
                 "生成・再送はしていません。Actions で手動 Run workflow してください。"
             ),

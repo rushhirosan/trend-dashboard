@@ -42,7 +42,7 @@
 | 5/19（月） | 同上 | **5/20 06:50** 前後 |
 
 - スクリプト既定: `generate_ai_daily_summary.py` は **JST の昨日** を `business_day` にする（`--business-day` で上書き可）。
-- **欠走検知（Fly）**: 毎日 **08:15 JST** に `summary_documents` へ前日分（jp/us）があるかだけ見る。無いとき Discord。生成・メールはしない。
+- **欠走検知（Fly）**: 毎日 **09:00 JST** に `summary_documents` へ前日分（jp/us）があるかだけ見る。無いとき Discord。生成・メールはしない。
 - **二重実行ガード（GHA）**: 手動 Run 後に遅延 cron が来ても、jp+us が DB にあれば生成・メールをスキップ（`force` で再生成可）。
 - **夜の X 投稿案**（`docs/x_post_samples/daily/`）— **使用していない（2026-07 停止）**。日次の読み物は AI 日次サマリーのみ。
 

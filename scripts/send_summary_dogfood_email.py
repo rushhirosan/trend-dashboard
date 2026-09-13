@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AI サマリー dogfood メールを送る（自分宛・draft 可）。
+"""トレンドサマリー dogfood メールを送る（自分宛・draft 可）。
 
 例:
   # 昨日分 JP+US 日次（dry-run）
@@ -44,7 +44,7 @@ from services.summary.summary_dogfood_email import (  # noqa: E402
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Send AI summary dogfood emails")
+    parser = argparse.ArgumentParser(description="Send trend summary dogfood emails")
     parser.add_argument("--kind", choices=("daily", "weekly"), required=True)
     parser.add_argument(
         "--id",

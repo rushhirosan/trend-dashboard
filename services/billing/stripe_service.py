@@ -1,4 +1,4 @@
-"""Stripe Checkout / Webhook（有料 AI サマリー）。"""
+"""Stripe Checkout / Webhook（有料トレンドサマリー）。"""
 
 from __future__ import annotations
 

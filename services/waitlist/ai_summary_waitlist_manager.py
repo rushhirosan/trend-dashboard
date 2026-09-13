@@ -1,4 +1,4 @@
-"""AIサマリー有料版の事前登録（Fake door / Waitlist）"""
+"""トレンドサマリー有料版の事前登録（Fake door / Waitlist）"""
 
 import re
 from typing import Tuple
@@ -71,8 +71,8 @@ class AiSummaryWaitlistManager:
                         (email, region, src),
                     )
                     conn.commit()
-            logger.info("📧 AIサマリー waitlist 登録: %s (%s)", email, region)
+            logger.info("📧 トレンドサマリー waitlist 登録: %s (%s)", email, region)
             return True, "登録を受け付けました。"
         except Exception as e:
-            logger.error("❌ AIサマリー waitlist 登録エラー: %s", e, exc_info=True)
+            logger.error("❌ トレンドサマリー waitlist 登録エラー: %s", e, exc_info=True)
             return False, "登録に失敗しました"

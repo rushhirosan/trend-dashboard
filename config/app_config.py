@@ -58,12 +58,12 @@ class AppConfig:
     # Buy Me a Coffee設定
     BUY_ME_A_COFFEE_USERNAME = os.getenv('BUY_ME_A_COFFEE_USERNAME', '')
     
-    # AIサマリー Fake door（ティーザー + Waitlist モーダル）
+    # トレンドサマリー Fake door（ティーザー + Waitlist モーダル）
     ENABLE_AI_SUMMARY_FAKE_DOOR = os.getenv(
         'ENABLE_AI_SUMMARY_FAKE_DOOR', 'true'
     ).lower() in ('true', '1', 'yes')
 
-    # 有料 AI サマリー（PAY.JP API v2 お試しワンショット・JP）
+    # 有料トレンドサマリー（PAY.JP API v2 お試しワンショット・JP）
     PAYJP_SECRET_KEY = os.getenv('PAYJP_SECRET_KEY', '').strip()
     PAYJP_PUBLIC_KEY = os.getenv('PAYJP_PUBLIC_KEY', '').strip()  # Widgets 用（Checkout v2 では不要）
     PAYJP_WEBHOOK_TOKEN = os.getenv('PAYJP_WEBHOOK_TOKEN', '').strip()

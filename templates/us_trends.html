@@ -150,10 +150,10 @@
                         {% set fake_door_embedded = true %}
                         {% include 'partials/ai_summary_fake_door.html' %}
                         {% elif SHOW_LOCAL_AI_SUMMARY_MOCK and AI_SUMMARY_MOCK %}
-                        <section id="dashboard-summary-ai" class="mb-0 min-w-0 dashboard-summary-panel rounded border bg-white d-flex flex-column" aria-label="AI summary (local mock)">
+                        <section id="dashboard-summary-ai" class="mb-0 min-w-0 dashboard-summary-panel rounded border bg-white d-flex flex-column" aria-label="Trend summary (local mock)">
                             <details class="m-0">
                                 <summary class="px-2 py-2 small" style="cursor: pointer; background: #f0f4ff; border-bottom: 1px solid #dbe6ff;">
-                                    AI Summary (Daily / Weekly) ▶
+                                    Trend Summary (Daily / Weekly) ▶
                                 </summary>
                                 <div class="p-2 small">
                                     <div class="alert alert-info py-2 px-2 mb-2 small">
@@ -163,7 +163,7 @@
                                         <div class="col-12">
                                             <div class="card border-primary mb-2">
                                                 <div class="card-header bg-primary text-white py-1 px-2">
-                                                    <h3 class="h6 mb-0 small"><i class="fas fa-calendar-day me-1"></i>Daily AI Summary (Top 5)</h3>
+                                                    <h3 class="h6 mb-0 small"><i class="fas fa-calendar-day me-1"></i>Daily Trend Summary (Top 5)</h3>
                                                 </div>
                                                 <div class="card-body py-2 px-2">
                                                     <p class="small text-muted mb-1">{{ AI_SUMMARY_MOCK.today_label }}</p>
@@ -178,7 +178,7 @@
                                         <div class="col-12">
                                             <div class="card border-success mb-0">
                                                 <div class="card-header bg-success text-white py-1 px-2">
-                                                    <h3 class="h6 mb-0 small"><i class="fas fa-calendar-week me-1"></i>Weekly AI Summary (Top 5)</h3>
+                                                    <h3 class="h6 mb-0 small"><i class="fas fa-calendar-week me-1"></i>Weekly Trend Summary (Top 5)</h3>
                                                 </div>
                                                 <div class="card-body py-2 px-2">
                                                     <p class="small text-muted mb-1">{{ AI_SUMMARY_MOCK.week_label }}</p>

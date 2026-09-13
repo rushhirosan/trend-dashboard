@@ -2296,7 +2296,7 @@ def main() -> int:
     load_dotenv(REPO_ROOT / ".env")
     load_dotenv()
     p = argparse.ArgumentParser(
-        description="Generate weekly AI summary from trend_daily_snapshots (default) or daily Markdown"
+        description="Generate weekly trend summary from trend_daily_snapshots (default) or daily Markdown"
     )
     p.add_argument(
         "--weekly-for-date",

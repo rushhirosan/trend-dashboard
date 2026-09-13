@@ -1,4 +1,4 @@
-"""有料 AI サマリー課金ルート（PAY.JP v2 お試し・JP）。"""
+"""有料トレンドサマリー課金ルート（PAY.JP v2 お試し・JP）。"""
 
 import hmac
 import os

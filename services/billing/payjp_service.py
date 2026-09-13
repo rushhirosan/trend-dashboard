@@ -1,4 +1,4 @@
-"""PAY.JP API v2 都度払い（AI サマリーお試し・JP・約30日）。
+"""PAY.JP API v2 都度払い（トレンドサマリーお試し・JP・約30日）。
 
 Checkout Session（hosted）でクレカ / PayPay を受け付け、
 Webhook ``checkout.session.completed`` で購読者 DB に登録する。

@@ -1,5 +1,5 @@
 /**
- * AIサマリー Fake door: モーダル計測（Checkout は ai-summary-checkout.js）
+ * トレンドサマリー Fake door: モーダル計測（Checkout は ai-summary-checkout.js）
  */
 (function () {
   function sendGa(eventName, params) {

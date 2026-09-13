@@ -1,4 +1,4 @@
-{# 有料サマリー PAY.JP v2 お試し（JP・約30日）— Checkout へリダイレクト
+{# 有料トレンドサマリー PAY.JP v2 お試し（JP・約30日）— Checkout へリダイレクト
    checkout_form_prefix で ID を分離（fake door / summary CTA 等） #}
 {% set cfp = checkout_form_prefix | default('ai-summary') %}
 {% set checkout_on = ENABLE_AI_SUMMARY_CHECKOUT | default(false) %}

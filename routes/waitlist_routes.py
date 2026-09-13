@@ -1,4 +1,4 @@
-"""Waitlist API（AIサマリー Fake door）"""
+"""Waitlist API（トレンドサマリー Fake door）"""
 
 from flask import Blueprint, jsonify, request
 

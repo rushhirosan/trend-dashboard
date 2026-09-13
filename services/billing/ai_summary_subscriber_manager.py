@@ -1,4 +1,4 @@
-"""有料 AI サマリー購読者（PAY.JP v2 お試し / 将来の定期）。"""
+"""有料トレンドサマリー購読者（PAY.JP v2 お試し / 将来の定期）。"""
 
 from __future__ import annotations
 
@@ -162,14 +162,14 @@ class AiSummarySubscriberManager:
                     )
                     conn.commit()
             logger.info(
-                "📧 AIサマリー有料購読 upsert: %s plan=%s expires=%s",
+                "📧 トレンドサマリー有料購読 upsert: %s plan=%s expires=%s",
                 email_n,
                 plan,
                 expires_store,
             )
             return True, "購読を登録しました"
         except Exception as e:
-            logger.error("❌ AIサマリー有料購読 upsert エラー: %s", e, exc_info=True)
+            logger.error("❌ トレンドサマリー有料購読 upsert エラー: %s", e, exc_info=True)
             return False, "購読登録に失敗しました"
 
     def deactivate_by_subscription_id(self, subscription_id: str) -> bool:

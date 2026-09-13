@@ -1,4 +1,4 @@
-"""有料 AI サマリーメール送信（購読者の region_plan に応じて JP/US を配信）。"""
+"""有料トレンドサマリーメール送信（購読者の region_plan に応じて JP/US を配信）。"""
 
 from __future__ import annotations
 

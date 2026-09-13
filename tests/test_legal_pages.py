@@ -30,6 +30,13 @@ def test_legal_pages_ok(client, path, needle):
     assert "/legal/terms" in text
 
 
+def test_legal_pages_avoid_ai_summary_label(client):
+    for path in ("/legal/sct", "/legal/privacy", "/legal/terms"):
+        text = client.get(path).get_data(as_text=True)
+        assert "AI サマリー" not in text
+        assert "AIサマリー" not in text
+
+
 def test_sitemap_includes_legal(client):
     res = client.get("/sitemap.xml")
     assert res.status_code == 200

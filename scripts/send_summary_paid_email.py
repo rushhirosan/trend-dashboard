@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""有料購読者へ AI サマリーメールを送る。
+"""有料購読者へトレンドサマリーメールを送る。
 
 例:
   python scripts/send_summary_paid_email.py --kind daily --dry-run
@@ -38,7 +38,7 @@ from services.summary.summary_paid_email import (  # noqa: E402
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Send AI summary paid subscriber emails")
+    parser = argparse.ArgumentParser(description="Send trend summary paid subscriber emails")
     parser.add_argument("--kind", choices=("daily", "weekly"), required=True)
     parser.add_argument("--id", default="", help="daily: YYYY-MM-DD / weekly: YYYY-Www")
     parser.add_argument("--dry-run", action="store_true")

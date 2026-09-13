@@ -1,1 +1,1 @@
-"""AI summary preview helpers for the dashboard."""
+"""Trend summary preview helpers for the dashboard."""

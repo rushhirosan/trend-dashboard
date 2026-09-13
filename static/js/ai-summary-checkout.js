@@ -1,5 +1,5 @@
 /**
- * AIサマリー PAY.JP v2 お試し（JP → Checkout Session → hosted 決済へリダイレクト）
+ * トレンドサマリー PAY.JP v2 お試し（JP → Checkout Session → hosted 決済へリダイレクト）
  * Events: checkout_start, checkout_error, checkout_success
  */
 (function () {

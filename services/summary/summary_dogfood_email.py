@@ -1,4 +1,4 @@
-"""AI サマリー dogfood メール送信（自分宛・draft 可・生成直後想定）。"""
+"""トレンドサマリー dogfood メール送信（自分宛・draft 可・生成直後想定）。"""
 
 from __future__ import annotations
 

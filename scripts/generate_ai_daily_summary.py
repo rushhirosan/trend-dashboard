@@ -3026,7 +3026,7 @@ def openai_api_key() -> str:
 def main() -> int:
     load_dotenv(_SCRIPT_DIR.parent / ".env")
     load_dotenv()
-    p = argparse.ArgumentParser(description="Generate daily AI summary from trend_daily_snapshots")
+    p = argparse.ArgumentParser(description="Generate daily trend summary from trend_daily_snapshots")
     p.add_argument(
         "--business-day",
         metavar="YYYY-MM-DD",

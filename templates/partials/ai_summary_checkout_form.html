@@ -40,6 +40,17 @@
   <button type="button" class="btn btn-primary btn-sm ai-summary-checkout-btn" id="{{ cfp }}-checkout-btn">
     {{ btn_checkout }}
   </button>
+  <p class="small text-muted mb-0 mt-2">
+    {% if checkout_locale == 'en' %}
+    <a href="/legal/terms">Terms</a> ·
+    <a href="/legal/privacy">Privacy</a> ·
+    <a href="/legal/sct">Specified Commercial Transactions</a>
+    {% else %}
+    <a href="/legal/terms">利用規約</a> ·
+    <a href="/legal/privacy">プライバシー</a> ·
+    <a href="/legal/sct">特定商取引法に基づく表記</a>
+    {% endif %}
+  </p>
   {% else %}
   <p class="small text-muted mb-0">{{ checkout_closed }}</p>
   {% endif %}

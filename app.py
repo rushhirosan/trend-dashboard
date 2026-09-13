@@ -232,6 +232,12 @@ def create_app():
             'ENABLE_AI_SUMMARY_CHECKOUT': checkout_enabled(),
             'PAYJP_TRIAL_AMOUNT_JPY': trial_amount_jpy(),
             'PAYJP_TRIAL_DAYS': trial_days(),
+            'LEGAL_SELLER_NAME': AppConfig.LEGAL_SELLER_NAME,
+            'LEGAL_OPERATOR_NAME': AppConfig.LEGAL_OPERATOR_NAME
+            or AppConfig.LEGAL_SELLER_NAME,
+            'LEGAL_ADDRESS': AppConfig.LEGAL_ADDRESS,
+            'LEGAL_EMAIL': AppConfig.LEGAL_EMAIL,
+            'LEGAL_PHONE': AppConfig.LEGAL_PHONE,
         }
 
     @app.before_request
@@ -379,6 +385,49 @@ def create_app():
                 return f"Error rendering about page: {e}", 500
     except Exception as e:
         logger.error(f"❌ /about ルート定義エラー: {e}", exc_info=True)
+
+    try:
+        def _render_legal(template_name: str, *, page_title: str, page_description: str, page_path: str):
+            ga_id = app.config.get('GOOGLE_ANALYTICS_ID')
+            return render_template(
+                template_name,
+                config={'GOOGLE_ANALYTICS_ID': ga_id},
+                page_title=page_title,
+                page_description=page_description,
+                page_path=page_path,
+            )
+
+        @app.route('/legal/sct')
+        def legal_sct():
+            """特定商取引法に基づく表記（PAY.JP 申請用）"""
+            return _render_legal(
+                'legal_sct.html',
+                page_title='特定商取引法に基づく表記',
+                page_description='Trends Dashboard の特定商取引法に基づく表記',
+                page_path='/legal/sct',
+            )
+
+        @app.route('/legal/privacy')
+        def legal_privacy():
+            """プライバシーポリシー"""
+            return _render_legal(
+                'legal_privacy.html',
+                page_title='プライバシーポリシー',
+                page_description='Trends Dashboard のプライバシーポリシー',
+                page_path='/legal/privacy',
+            )
+
+        @app.route('/legal/terms')
+        def legal_terms():
+            """利用規約"""
+            return _render_legal(
+                'legal_terms.html',
+                page_title='利用規約',
+                page_description='Trends Dashboard の利用規約',
+                page_path='/legal/terms',
+            )
+    except Exception as e:
+        logger.error(f"❌ /legal/* ルート定義エラー: {e}", exc_info=True)
     
     # --- サマリー（日次・週次）: JP は /summaries/...、US は /us/summaries/... ---
     def _render_summaries_index(region):
@@ -696,6 +745,24 @@ Sitemap: {AppConfig.PUBLIC_BASE_URL}/sitemap.xml
     <lastmod>{about_lastmod_str}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>{base}/legal/sct</loc>
+    <lastmod>{about_lastmod_str}</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>{base}/legal/privacy</loc>
+    <lastmod>{about_lastmod_str}</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>{base}/legal/terms</loc>
+    <lastmod>{about_lastmod_str}</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
   </url>
   <url>
     <loc>{base}/us/summaries</loc>

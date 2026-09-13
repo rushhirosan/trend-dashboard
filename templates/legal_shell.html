@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title }} — Trends Dashboard</title>
+    <meta name="description" content="{{ page_description }}">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="{{ public_base_url }}{{ page_path }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
+    {% include 'partials/vendor_assets.html' %}
+    <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container py-4 py-md-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <nav class="small mb-3" aria-label="パンくず">
+                    <a href="/" class="text-decoration-none">トップ</a>
+                    <span class="text-muted mx-1">/</span>
+                    <span class="text-muted">{{ page_title }}</span>
+                </nav>
+                <article class="bg-white border rounded p-4 p-md-5 shadow-sm">
+                    <h1 class="h3 mb-4">{{ page_title }}</h1>
+                    {% block legal_content %}{% endblock %}
+                    <hr class="my-4">
+                    <p class="small text-muted mb-2">関連ページ</p>
+                    <ul class="list-unstyled small mb-0">
+                        <li class="mb-1"><a href="/legal/sct">特定商取引法に基づく表記</a></li>
+                        <li class="mb-1"><a href="/legal/privacy">プライバシーポリシー</a></li>
+                        <li class="mb-1"><a href="/legal/terms">利用規約</a></li>
+                        <li class="mb-1"><a href="/about">このサイトについて</a></li>
+                    </ul>
+                </article>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

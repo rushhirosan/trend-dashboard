@@ -87,6 +87,13 @@ class AppConfig:
         'ENABLE_AI_SUMMARY_CHECKOUT', 'true'
     ).lower() in ('true', '1', 'yes')
 
+    # 特商法・問い合わせ表記（公開リポジトリに個人情報を載せない。Fly secrets / .env で設定）
+    LEGAL_SELLER_NAME = os.getenv('LEGAL_SELLER_NAME', '').strip()
+    LEGAL_OPERATOR_NAME = os.getenv('LEGAL_OPERATOR_NAME', '').strip()
+    LEGAL_ADDRESS = os.getenv('LEGAL_ADDRESS', '').strip()
+    LEGAL_EMAIL = os.getenv('LEGAL_EMAIL', '').strip()
+    LEGAL_PHONE = os.getenv('LEGAL_PHONE', '').strip()
+
     # 旧 Stripe（許可されず未使用。残してあるだけ）
     STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '').strip()
     STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY', '').strip()

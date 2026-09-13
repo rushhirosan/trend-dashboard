@@ -1,0 +1,65 @@
+{% extends "legal_shell.html" %}
+{% block legal_content %}
+<p class="small text-muted mb-4">有料 AI サマリーお試し等の通信販売に関する表記です。</p>
+{% if not LEGAL_SELLER_NAME or not LEGAL_ADDRESS %}
+<div class="alert alert-warning small" role="alert">
+  事業者情報（環境変数 <code>LEGAL_*</code>）が未設定です。PAY.JP 申請・公開前に設定してください。
+</div>
+{% endif %}
+<dl class="row mb-0">
+  <dt class="col-sm-4">販売事業者名</dt>
+  <dd class="col-sm-8">{{ LEGAL_SELLER_NAME or '（未設定）' }}</dd>
+
+  <dt class="col-sm-4">運営統括責任者</dt>
+  <dd class="col-sm-8">{{ LEGAL_OPERATOR_NAME or LEGAL_SELLER_NAME or '（未設定）' }}</dd>
+
+  <dt class="col-sm-4">所在地</dt>
+  <dd class="col-sm-8">{{ LEGAL_ADDRESS or '（未設定）' }}</dd>
+
+  <dt class="col-sm-4">お問い合わせ（メール）</dt>
+  <dd class="col-sm-8">
+    {% if LEGAL_EMAIL %}
+    <a href="mailto:{{ LEGAL_EMAIL }}">{{ LEGAL_EMAIL }}</a>
+    {% else %}
+    （未設定）
+    {% endif %}
+  </dd>
+
+  <dt class="col-sm-4">お問い合わせ（電話）</dt>
+  <dd class="col-sm-8">
+    {% if LEGAL_PHONE %}
+    {{ LEGAL_PHONE }}
+    {% else %}
+    電話番号の開示を希望される場合は、上記メールアドレスへご連絡いただければ遅滞なく開示いたします。
+    {% endif %}
+  </dd>
+
+  <dt class="col-sm-4">販売価格</dt>
+  <dd class="col-sm-8">
+    日本向け AI サマリーお試し（約{{ PAYJP_TRIAL_DAYS | default(30) }}日・日次＋週次メール）：税込 {{ PAYJP_TRIAL_AMOUNT_JPY | default(500) }}円（自動更新なし）。
+    ダッシュボード本体の閲覧は無料です。
+  </dd>
+
+  <dt class="col-sm-4">商品代金以外の必要料金</dt>
+  <dd class="col-sm-8">なし（インターネット接続等の通信費はお客様負担）</dd>
+
+  <dt class="col-sm-4">お支払い方法</dt>
+  <dd class="col-sm-8">クレジットカード決済（PAY.JP）。利用可能な場合は PayPay 等の決済手段も含みます。</dd>
+
+  <dt class="col-sm-4">代金の支払時期</dt>
+  <dd class="col-sm-8">都度課金：クレジットカード決済は購入時。</dd>
+
+  <dt class="col-sm-4">商品の引渡し時期</dt>
+  <dd class="col-sm-8">
+    決済完了後、直ちに配信登録を行い、日本向け AI サマリー（日次・週次）のメール配信を開始します（約{{ PAYJP_TRIAL_DAYS | default(30) }}日間）。
+    反映まで数分かかる場合があります。
+  </dd>
+
+  <dt class="col-sm-4">返品・キャンセル・解約</dt>
+  <dd class="col-sm-8">
+    本サービスはデジタルコンテンツ（メール配信）のため、お客様都合による購入後のキャンセル・返金は原則お受けできません。
+    重大な配信欠配など当方起因の事由がある場合は、個別にご相談のうえ返金等を対応します。
+    お試し期間終了後は自動更新されません。継続する場合は再度ご購入ください。
+  </dd>
+</dl>
+{% endblock %}

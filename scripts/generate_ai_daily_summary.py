@@ -118,9 +118,22 @@ def category_display_name(cat: str) -> str:
     return c
 
 
+def canonical_category_key(cat: str) -> str:
+    """表示名（News 等）を内部キー（ニュース 等）へ戻す。既に内部キーならそのまま。"""
+    c = (cat or "").strip()
+    if not c:
+        return c
+    if c in CATEGORY_LABELS_EN:
+        return c
+    for jp_key, en_label in CATEGORY_LABELS_EN.items():
+        if c == en_label:
+            return jp_key
+    return c
+
+
 def news_category_key() -> str:
-    """editorial / mechanical 判定用のニュース区分名（地域表示に合わせる）。"""
-    return category_display_name("ニュース")
+    """editorial / mechanical 判定用のニュース区分（常に内部キー）。"""
+    return "ニュース"
 
 
 BASE_DEFAULT = "https://trends-dashboard.com"
@@ -1209,8 +1222,8 @@ def build_rising_highlights(
     out: List[Dict[str, Any]] = []
     for raw in items:
         ranks = dict(raw.get("ranks") or {})
-        category = category_display_name(
-            categorize_item(str(raw.get("series_key") or ""), str(raw.get("display") or ""))
+        category = categorize_item(
+            str(raw.get("series_key") or ""), str(raw.get("display") or "")
         )
         picked = {
             "label": raw["display"],
@@ -1439,14 +1452,15 @@ def build_category_top3(
         if picked:
             out.append(
                 {
-                    "category": category_display_name(category),
+                    # 内部キーのまま保持（表示名変換は render 時）。週次集計が JP キー前提のため。
+                    "category": category,
                     "items": picked,
                 }
             )
         else:
             out.append(
                 {
-                    "category": category_display_name(category),
+                    "category": category,
                     "items": [],
                     "quiet": True,
                 }
@@ -1647,7 +1661,7 @@ def build_category_leaders_from_rows(
                 coverage = len(set(ranks.keys()) & set(DAYTIME_SLOTS))
                 cand = {
                     "label": display,
-                    "category": category_display_name(category),
+                    "category": category,
                     "series_key": series_key,
                     "rank_display": _format_rank_evidence(ranks),
                     "url": _url_for_label_in_series(series_by_slot, series_key, display),

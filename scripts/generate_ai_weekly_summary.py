@@ -833,7 +833,7 @@ def aggregate_weekly_category_top3(
 
     for ds, blocks in daily_category_by_day.items():
         for block in blocks:
-            cat = str(block.get("category") or "")
+            cat = daily.canonical_category_key(str(block.get("category") or ""))
             if cat not in by_category:
                 continue
             for item in block.get("items") or []:

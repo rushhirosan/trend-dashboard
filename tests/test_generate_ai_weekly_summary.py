@@ -551,6 +551,43 @@ def test_aggregate_weekly_category_top3_prefers_multi_day(gaws):
     assert news["items"][0]["best_rank"] == 1
 
 
+def test_aggregate_weekly_category_accepts_us_display_category_names(gaws):
+    """日次が誤って News 等の表示名を入れても、週次は内部キーへ正規化する（W37 空振り対策）。"""
+    gaws.configure_weekly_region("us")
+    daily = {
+        "2026-09-10": [
+            {
+                "category": "News",
+                "items": [
+                    {
+                        "label": "Example Headline",
+                        "series_key": "cnn_us",
+                        "rank_display": "out@7 → #2@13 → #1@19",
+                        "link_line": "[Example Headline](https://example.com/n)",
+                    }
+                ],
+            },
+            {
+                "category": "Entertainment & Shopping",
+                "items": [
+                    {
+                        "label": "Janice STFU",
+                        "series_key": "music_us",
+                        "rank_display": "#3@7 → #3@13 → #3@19",
+                        "link_line": "[Janice STFU](https://example.com/j)",
+                    }
+                ],
+            },
+        ],
+    }
+    blocks = gaws.aggregate_weekly_category_top3(daily, count=3)
+    by_cat = {b["category"]: b for b in blocks}
+    assert by_cat["ニュース"]["items"][0]["label"] == "Example Headline"
+    assert by_cat["エンタメ・ショッピング"]["items"][0]["label"] == "Janice STFU"
+    assert sum(len(b.get("items") or []) for b in blocks) >= 2
+    gaws.configure_weekly_region("jp")
+
+
 def test_render_weekly_category_markdown_fallback_mechanical(gaws):
     category = {
         "jp": [

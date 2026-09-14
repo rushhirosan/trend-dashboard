@@ -249,7 +249,7 @@ def test_build_category_top3_drops_worldnews_game_card(gads):
         },
     ]
     top3 = gads.build_category_top3(rows, count=3)
-    news = next(b for b in top3 if b["category"] == "News")
+    news = next(b for b in top3 if b["category"] == "ニュース")
     labels = [it["label"] for it in news.get("items") or []]
     assert "Dallas Wings vs. Seattle Storm - August 23, 2026" not in labels
     assert any("Marcus Bryant" in lab for lab in labels)
@@ -288,7 +288,7 @@ def test_build_category_top3_excludes_medium(gads):
     ]
     gads.configure_daily_region("us")
     top3 = gads.build_category_top3(rows, count=3)
-    tech = next(b for b in top3 if b["category"] == "Tech")
+    tech = next(b for b in top3 if b["category"] == "テック・開発")
     labels = [it["label"] for it in tech.get("items") or []]
     assert "Arabic Tutorial Spam" not in labels
     assert "Real HN Story" in labels
@@ -1934,6 +1934,10 @@ def test_us_render_uses_english_labels_not_japanese(gads):
     gads.configure_daily_region("us")
     assert gads.category_display_name("ニュース") == "News"
     assert gads.category_display_name("検索・動画") == "Search & Video"
+    assert gads.canonical_category_key("News") == "ニュース"
+    assert gads.canonical_category_key("Search & Video") == "検索・動画"
+    assert gads.canonical_category_key("ニュース") == "ニュース"
+    assert gads.news_category_key() == "ニュース"
     assert gads._format_rank_evidence({"13": 1}) == "out@7 → #1@13 → out@19"
     assert gads.describe_rank_movement({"13": 1, "19": 1}).startswith("Surged")
 
@@ -1951,11 +1955,12 @@ def test_us_render_uses_english_labels_not_japanese(gads):
     assert "補足" not in rising_md
     assert "out@7 → #1@13 → #1@19" in rising_md
 
+    # 構造データは内部キー。表示だけ英語。
     top3_md = gads.render_category_top3_markdown(
         [
-            {"category": "News", "items": [], "quiet": True},
+            {"category": "ニュース", "items": [], "quiet": True},
             {
-                "category": "Search & Video",
+                "category": "検索・動画",
                 "items": [
                     {
                         "label": "Lindsey Graham",

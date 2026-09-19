@@ -553,6 +553,7 @@ class TrendsCache:
                     language VARCHAR(10),
                     item_url TEXT,
                     affiliate_url TEXT,
+                    amazon_link TEXT,
                     preview_link TEXT,
                     info_link TEXT,
                     buy_link TEXT,
@@ -1010,11 +1011,12 @@ class TrendsCache:
                         logger.info("✅ movie_trends_cacheテーブルのスキーマ更新完了")
                     except Exception as e:
                         logger.warning(f"⚠️ movie_trends_cacheのスキーマ更新に失敗しました: {e}", exc_info=True)
-                    # book_trends_cache: カテゴリ対応
+                    # book_trends_cache: カテゴリ対応 + Amazonアフィリエイトリンク
                     try:
                         cur.execute("ALTER TABLE book_trends_cache ADD COLUMN IF NOT EXISTS category VARCHAR(20) DEFAULT 'all'")
+                        cur.execute("ALTER TABLE book_trends_cache ADD COLUMN IF NOT EXISTS amazon_link TEXT")
                         conn.commit()
-                        logger.info("✅ book_trends_cache categoryカラム追加完了")
+                        logger.info("✅ book_trends_cache category/amazon_linkカラム追加完了")
                     except Exception as e:
                         logger.warning(f"⚠️ book_trends_cacheのスキーマ更新に失敗しました: {e}", exc_info=True)
                 
@@ -4613,6 +4615,7 @@ class TrendsCache:
                             item.get('language', ''),
                             item.get('item_url', ''),
                             item.get('affiliate_url', ''),
+                            item.get('amazon_link', ''),
                             item.get('preview_link', ''),
                             item.get('info_link', ''),
                             item.get('buy_link', ''),
@@ -4630,9 +4633,9 @@ class TrendsCache:
                             (country, category, book_id, isbn, title, subtitle, author, authors, publisher,
                              price, sales, published_date, release_date, description, page_count,
                              categories, average_rating, ratings_count, language, item_url,
-                             affiliate_url, preview_link, info_link, buy_link, image_url,
+                             affiliate_url, amazon_link, preview_link, info_link, buy_link, image_url,
                              thumbnail, small_thumbnail, medium, large, rank, updated_at)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """, params)
                     import pytz
                     jst = pytz.timezone('Asia/Tokyo')
@@ -4680,7 +4683,7 @@ class TrendsCache:
                         SELECT country, book_id, isbn, title, subtitle, author, authors, publisher,
                                price, sales, published_date, release_date, description, page_count,
                                categories, average_rating, ratings_count, language, item_url,
-                               affiliate_url, preview_link, info_link, buy_link, image_url,
+                               affiliate_url, amazon_link, preview_link, info_link, buy_link, image_url,
                                thumbnail, small_thumbnail, medium, large, rank, updated_at, cached_at
                         FROM book_trends_cache 
                         WHERE country = %s AND (category = %s OR category IS NULL)

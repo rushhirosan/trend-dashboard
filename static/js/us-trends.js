@@ -534,8 +534,13 @@ function displayBookResultsUS(data) {
             
             const author = item.author || (item.authors && item.authors.length > 0 ? item.authors.join(', ') : 'N/A') || 'N/A';
             const price = item.price ? `$${parseFloat(item.price).toFixed(2)}` : 'N/A';
-            // リンクの優先順位: amazon_link > buy_link > info_link > preview_link
-            const bookLink = item.amazon_link || item.buy_link || item.info_link || item.preview_link || '#';
+            // 主リンクは Google Books。Amazon は二次アクション（Movie と同じ）
+            const bookLink = item.info_link || item.preview_link || item.buy_link || '#';
+            const amazonButton = item.amazon_link
+                ? `<br><a href="${item.amazon_link}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-warning mt-1 row-action-link" style="font-size: 0.75rem;">
+                    <i class="fas fa-shopping-cart"></i> View on Amazon
+                   </a>`
+                : '';
             // 画像URLの優先順位: image_url > thumbnail > small_thumbnail
             const imageUrl = item.image_url || item.thumbnail || item.small_thumbnail || '';
             
@@ -544,6 +549,7 @@ function displayBookResultsUS(data) {
                 <td>
                     ${imageUrl ? `<img src="${imageUrl}" alt="${item.title}" loading="lazy" decoding="async" style="width: 40px; height: 60px; object-fit: cover; margin-right: 10px; float: left;">` : ''}
                     <strong><a href="${bookLink}" target="_blank" rel="noopener noreferrer">${item.title || 'N/A'}</a></strong>
+                    ${amazonButton}
                 </td>
                 <td>${author}</td>
                 <td>${price}</td>

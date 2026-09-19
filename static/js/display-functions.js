@@ -223,8 +223,13 @@ function displayBookResults(data) {
 
             const author = item.author || (item.authors && item.authors.length > 0 ? item.authors.join(', ') : 'N/A') || 'N/A';
             const price = item.price ? `¥${parseInt(item.price).toLocaleString()}` : 'N/A';
-        // リンクの優先順位: amazon_link > affiliate_url > item_url
-        const bookLink = item.amazon_link || item.affiliate_url || item.item_url || '#';
+            // 主リンクは楽天ブックス（アフィリエイト）。Amazonは二次アクション
+            const bookLink = item.affiliate_url || item.item_url || '#';
+            const amazonButton = item.amazon_link
+                ? `<br><a href="${item.amazon_link}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-warning mt-1 row-action-link" style="font-size: 0.75rem;">
+                    <i class="fas fa-shopping-cart"></i> Amazonで見る
+                   </a>`
+                : '';
             const imageUrl = item.image_url || '';
 
             const bookTitle = item.title || 'N/A';
@@ -233,6 +238,7 @@ function displayBookResults(data) {
                 <td>
                     ${imageUrl ? `<img src="${imageUrl}" alt="${bookTitle}" loading="lazy" decoding="async" style="width: 40px; height: 60px; object-fit: cover; margin-right: 10px; float: left;">` : ''}
                     <strong><a href="${bookLink}" target="_blank" rel="noopener noreferrer">${bookTitle}</a></strong>
+                    ${amazonButton}
                 </td>
                 <td>${author}</td>
                 <td>${price}</td>

@@ -204,6 +204,22 @@ class BookTrendsManager(BaseTrendsManager):
     def _normalize_us_book_records(self, records: list) -> list:
         return [self._normalize_us_book_record(dict(r)) for r in (records or [])]
 
+    def _backfill_amazon_links(self, result: dict, country: str) -> dict:
+        """キャッシュに amazon_link が無い場合、表示用にその場で補完する。"""
+        if not result or not result.get('data'):
+            return result
+        for item in result['data']:
+            if item.get('amazon_link'):
+                continue
+            link = self._generate_amazon_link(
+                item.get('title') or '',
+                item.get('isbn') or None,
+                country,
+            )
+            if link:
+                item['amazon_link'] = link
+        return result
+
     def _finalize_us_book_result(self, result: dict) -> dict:
         """US 向け API レスポンスの画像 URL を正規化して返す。"""
         if result.get('data'):
@@ -260,10 +276,16 @@ class BookTrendsManager(BaseTrendsManager):
                     'total_count': len(dummy_data),
                 }
             if country == 'JP':
-                return self._get_rakuten_books_trends(limit, force_refresh, category=category)
+                return self._backfill_amazon_links(
+                    self._get_rakuten_books_trends(limit, force_refresh, category=category),
+                    'JP',
+                )
             elif country == 'US':
                 return self._finalize_us_book_result(
-                    self._get_google_books_trends(limit, force_refresh, category=category)
+                    self._backfill_amazon_links(
+                        self._get_google_books_trends(limit, force_refresh, category=category),
+                        'US',
+                    )
                 )
             else:
                 return {

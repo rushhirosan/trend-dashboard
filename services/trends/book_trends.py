@@ -126,6 +126,24 @@ class BookTrendsManager(BaseTrendsManager):
             logger.warning(f"⚠️ Book: cache_status更新エラー: {e}")
             return False
     
+    def _isbn_to_amazon_asin(self, isbn) -> str | None:
+        """Amazon /dp/ 用の ASIN（ISBN-10）を返す。
+
+        amazon.co.jp の /dp/{ISBN-13} は 404 になることが多い。
+        978 始まりの ISBN-13 は ISBN-10 に変換する。979 は変換不可のため None。
+        """
+        if not isbn:
+            return None
+        raw = ''.join(c for c in str(isbn).upper() if c.isdigit() or c == 'X')
+        if len(raw) == 10:
+            return raw
+        if len(raw) == 13 and raw.startswith('978'):
+            core = raw[3:12]
+            total = sum((10 - i) * int(d) for i, d in enumerate(core))
+            check = (11 - (total % 11)) % 11
+            return core + ('X' if check == 10 else str(check))
+        return None
+
     def _generate_amazon_link(self, title, isbn=None, country='JP'):
         """書籍タイトルからAmazonアソシエイトリンクを生成
         
@@ -143,17 +161,14 @@ class BookTrendsManager(BaseTrendsManager):
         # 国コードに応じてドメインを決定
         domain = 'amazon.co.jp' if country == 'JP' else 'amazon.com'
         
-        # ISBNがあれば使用、なければタイトルで検索
-        if isbn:
-            # ISBNから直接リンクを生成
-            url = f"https://www.{domain}/dp/{isbn}?tag={self.amazon_affiliate_id}"
-        else:
-            # タイトルで検索
-            from urllib.parse import quote
-            search_query = quote(title)
-            url = f"https://www.{domain}/s?k={search_query}&tag={self.amazon_affiliate_id}"
-        
-        return url
+        asin = self._isbn_to_amazon_asin(isbn)
+        if asin:
+            return f"https://www.{domain}/dp/{asin}?tag={self.amazon_affiliate_id}"
+
+        # ISBN-13(979) や ASIN 化できない場合・ISBN無しはタイトル検索
+        from urllib.parse import quote
+        search_query = quote(title or '')
+        return f"https://www.{domain}/s?k={search_query}&tag={self.amazon_affiliate_id}"
     
     def _add_rakuten_affiliate(self, url: str) -> str:
         """楽天アイテムURLへaffiliateIdを付与（既存クエリは保持）
@@ -205,12 +220,10 @@ class BookTrendsManager(BaseTrendsManager):
         return [self._normalize_us_book_record(dict(r)) for r in (records or [])]
 
     def _backfill_amazon_links(self, result: dict, country: str) -> dict:
-        """キャッシュに amazon_link が無い場合、表示用にその場で補完する。"""
+        """表示用に amazon_link を常に再生成（ISBN-13 /dp/ など古い形式を上書き）。"""
         if not result or not result.get('data'):
             return result
         for item in result['data']:
-            if item.get('amazon_link'):
-                continue
             link = self._generate_amazon_link(
                 item.get('title') or '',
                 item.get('isbn') or None,

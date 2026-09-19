@@ -36,3 +36,54 @@ def test_normalize_us_book_record_all_image_fields():
     assert out["image_url"].startswith("https://")
     assert out["thumbnail"].startswith("https://")
     assert out["image_links"]["thumbnail"].startswith("https://")
+
+
+def _mgr_with_affiliate(tag='trendsdashboa-22'):
+    mgr = BookTrendsManager.__new__(BookTrendsManager)
+    mgr.amazon_affiliate_id = tag
+    return mgr
+
+
+def test_isbn13_978_converts_to_isbn10_asin():
+    mgr = _mgr_with_affiliate()
+    assert mgr._isbn_to_amazon_asin('9784088851747') == '4088851749'
+    assert mgr._isbn_to_amazon_asin('978-4-08-885174-7') == '4088851749'
+
+
+def test_isbn10_passthrough():
+    mgr = _mgr_with_affiliate()
+    assert mgr._isbn_to_amazon_asin('4088851749') == '4088851749'
+
+
+def test_isbn13_979_cannot_convert():
+    mgr = _mgr_with_affiliate()
+    assert mgr._isbn_to_amazon_asin('9791234567896') is None
+
+
+def test_generate_amazon_link_jp_uses_isbn10_dp():
+    mgr = _mgr_with_affiliate()
+    url = mgr._generate_amazon_link('ジャンプ', '9784088851747', 'JP')
+    assert url == 'https://www.amazon.co.jp/dp/4088851749?tag=trendsdashboa-22'
+
+
+def test_generate_amazon_link_falls_back_to_title_search():
+    mgr = _mgr_with_affiliate()
+    url = mgr._generate_amazon_link('Some Title', '9791234567896', 'JP')
+    assert '/s?k=' in url
+    assert 'tag=trendsdashboa-22' in url
+    assert '/dp/' not in url
+
+
+def test_backfill_overwrites_stale_isbn13_dp_link():
+    mgr = _mgr_with_affiliate()
+    result = {
+        'data': [{
+            'title': 'ジャンプ',
+            'isbn': '9784088851747',
+            'amazon_link': 'https://www.amazon.co.jp/dp/9784088851747?tag=trendsdashboa-22',
+        }]
+    }
+    out = mgr._backfill_amazon_links(result, 'JP')
+    assert out['data'][0]['amazon_link'] == (
+        'https://www.amazon.co.jp/dp/4088851749?tag=trendsdashboa-22'
+    )

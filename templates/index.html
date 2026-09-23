@@ -119,7 +119,7 @@
     
     {% include 'partials/vendor_assets.html' %}
     <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
-    {% set async_css_href = url_for('static', filename='css/trends.css') + '?v=20260728-amazon-row-action' %}
+    {% set async_css_href = url_for('static', filename='css/trends.css') + '?v=20260923-edition-strip' %}
     {% include 'partials/async_stylesheet.html' %}
     <link href="{{ url_for('static', filename='css/main.css') }}?v=20260819-tab-keyboard" rel="stylesheet">
 </head>
@@ -151,9 +151,6 @@
     <main class="container-fluid main-content-compact">
         <div id="mainContent">
             <header class="page-header-compact mb-1">
-                <p class="page-header-oneliner small text-muted mb-3">
-                    対象ソースが1日4回更新（1・7・13・19時 JST）されます。
-                </p>
                 {% set dashboard_show_ai = (ENABLE_AI_SUMMARY_FAKE_DOOR and AI_SUMMARY_FAKE_DOOR) or (SHOW_LOCAL_AI_SUMMARY_MOCK and AI_SUMMARY_MOCK) %}
                 <div class="dashboard-summary-grid gap-2 mb-0 {% if dashboard_show_ai %}dashboard-summary-grid--2{% endif %}" aria-label="ダッシュボード要約">
                     {% if dashboard_show_ai %}
@@ -231,6 +228,9 @@
                 </div>
             </header>
             <section id="trends" aria-label="トレンド情報">
+                {% set edition_locale = 'ja' %}
+                {% set edition_region = 'jp' %}
+                {% include 'partials/edition_strip.html' %}
                 <!-- カテゴリ別タブナビ（モバイルは横スクロール） -->
                 <div class="trend-tabs-wrapper trend-tabs-compact">
                     <ul class="nav nav-tabs trend-category-tabs flex-nowrap" id="trendCategoryTabs" role="tablist" aria-orientation="horizontal">
@@ -2610,9 +2610,6 @@
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
-        .page-header-oneliner {
-            line-height: 1.25;
-        }
         .ai-summary-fake-door-root.dashboard-summary-panel .h6 {
             font-size: 0.85rem;
             line-height: 1.2;
@@ -2787,6 +2784,7 @@
     <script defer src="{{ url_for('static', filename='js/bluesky-trends.js') }}"></script>
     <script defer src="{{ url_for('static', filename='js/app.js') }}?v=20260401-shown-genre-refresh"></script>
     <script defer src="{{ url_for('static', filename='js/all-freshness.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/edition-strip.js') }}?v=20260923-edition-strip"></script>
     <script defer src="{{ url_for('static', filename='js/scheduler-refresh-banner.js') }}?v=20260723-refresh-banner"></script>
     {% if ENABLE_AI_SUMMARY_FAKE_DOOR %}
     <script defer src="{{ url_for('static', filename='js/ai-summary-fake-door.js') }}?v=20260912-payjp"></script>

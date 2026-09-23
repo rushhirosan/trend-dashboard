@@ -113,7 +113,7 @@
     
     {% include 'partials/vendor_assets.html' %}
     <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
-    {% set async_css_href = url_for('static', filename='css/trends.css') + '?v=20260728-amazon-row-action' %}
+    {% set async_css_href = url_for('static', filename='css/trends.css') + '?v=20260923-edition-strip' %}
     {% include 'partials/async_stylesheet.html' %}
     <link href="{{ url_for('static', filename='css/main.css') }}?v=20260819-tab-keyboard" rel="stylesheet">
     <!-- subscription.css は /subscription 専用。USトレンドには不要（日本ページと同じレイアウトにするため） -->
@@ -138,9 +138,6 @@
     <main class="container-fluid main-content-compact">
         <div id="mainContent">
             <header class="page-header-compact mb-1">
-                <p class="page-header-oneliner small text-muted mb-3">
-                    Sources are refreshed 4 times daily (1 / 7 / 13 / 19 JST).
-                </p>
                 {% set dashboard_show_ai = (ENABLE_AI_SUMMARY_FAKE_DOOR and AI_SUMMARY_FAKE_DOOR) or (SHOW_LOCAL_AI_SUMMARY_MOCK and AI_SUMMARY_MOCK) %}
                 <div class="dashboard-summary-grid gap-2 mb-0 {% if dashboard_show_ai %}dashboard-summary-grid--2{% endif %}" aria-label="Dashboard summary">
                     {% if dashboard_show_ai %}
@@ -218,6 +215,9 @@
                 </div>
             </header>
             <section id="trends" aria-label="Trend information">
+                {% set edition_locale = 'en' %}
+                {% set edition_region = 'us' %}
+                {% include 'partials/edition_strip.html' %}
                 <!-- Category tabs (horizontal scroll on mobile) -->
                 <div class="trend-tabs-wrapper trend-tabs-compact">
                     <ul class="nav nav-tabs trend-category-tabs flex-nowrap" id="trendCategoryTabs" role="tablist" aria-orientation="horizontal">
@@ -2669,6 +2669,7 @@
     <script defer src="{{ url_for('static', filename='js/us-trends.js') }}?v=20260919-book-amazon-row-action"></script>
     <script defer src="{{ url_for('static', filename='js/bluesky-trends.js') }}"></script>
     <script defer src="{{ url_for('static', filename='js/all-freshness.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/edition-strip.js') }}?v=20260923-edition-strip"></script>
     <script defer src="{{ url_for('static', filename='js/scheduler-refresh-banner.js') }}?v=20260723-refresh-banner"></script>
     <script defer src="{{ url_for('static', filename='js/us-admin-trends.js') }}"></script>
     {% if ENABLE_AI_SUMMARY_FAKE_DOOR %}

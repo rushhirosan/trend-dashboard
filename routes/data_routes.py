@@ -359,6 +359,30 @@ def scheduler_lock_status():
         return handle_data_error('ロック状態取得', e)
 
 
+@data_bp.route('/dashboard/edition-strip')
+def get_edition_strip():
+    """号外帯: 現在版・次の更新・隣接スロット差分の注目（最大3件）。"""
+    try:
+        from services.dashboard.edition_strip import build_edition_strip_payload
+
+        region = (request.args.get('region') or 'jp').strip().lower()
+        if region not in ('jp', 'us'):
+            region = 'jp'
+        locale = (request.args.get('locale') or ('en' if region == 'us' else 'ja')).strip().lower()
+        if locale not in ('ja', 'en'):
+            locale = 'en' if region == 'us' else 'ja'
+
+        cache = get_cache()
+        payload = build_edition_strip_payload(
+            cache,
+            region=region,
+            locale=locale,
+        )
+        return jsonify({'success': True, 'data': payload})
+    except Exception as e:
+        return handle_data_error('号外帯', e)
+
+
 @data_bp.route('/summaries/daily-snapshots')
 def get_daily_snapshots_for_ai_summary():
     """business_day ごとの trend_daily_snapshots（スロット 01/07/13/19）を返す。

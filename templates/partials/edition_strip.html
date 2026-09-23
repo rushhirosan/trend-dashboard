@@ -1,0 +1,30 @@
+{# 号外帯: 要約グリッドの下・タブの上。中身は edition-strip.js が API から埋める #}
+{% set edition_locale = edition_locale|default('ja') %}
+{% set edition_region = edition_region|default('jp') %}
+<aside
+  id="edition-strip"
+  class="edition-strip"
+  role="region"
+  aria-label="{% if edition_locale == 'en' %}This edition highlights{% else %}この版の注目{% endif %}"
+  data-locale="{{ edition_locale }}"
+  data-region="{{ edition_region }}"
+  hidden
+>
+  <div class="edition-strip__inner">
+    <div class="edition-strip__meta">
+      <span class="edition-strip__edition" data-edition-label>—</span>
+      <span class="edition-strip__just d-none" data-just-refreshed>
+        {% if edition_locale == 'en' %}Just refreshed{% else %}たった今刷新{% endif %}
+      </span>
+      <span class="edition-strip__next text-muted" data-next-refresh></span>
+    </div>
+    <ul class="edition-strip__highlights list-unstyled mb-0" data-highlights></ul>
+    <p class="edition-strip__empty small text-muted mb-0 d-none" data-empty>
+      {% if edition_locale == 'en' %}
+      No standout moves vs the previous edition.
+      {% else %}
+      前の版と比べて大きな動きは見当たりません。
+      {% endif %}
+    </p>
+  </div>
+</aside>

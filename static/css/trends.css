@@ -169,3 +169,115 @@
         margin-bottom: 1rem;
     }
 }
+
+/* 号外帯（要約の下・タブの上） */
+.edition-strip {
+    margin: 0.35rem 0 0.5rem;
+    padding: 0.45rem 0.65rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.35rem;
+    background: #f8f9fa;
+}
+
+.edition-strip[hidden] {
+    display: none !important;
+}
+
+.edition-strip__inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem 0.75rem;
+}
+
+.edition-strip__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem 0.5rem;
+    flex: 0 0 auto;
+}
+
+.edition-strip__edition {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #212529;
+}
+
+.edition-strip__just {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #0d6efd;
+}
+
+.edition-strip__next {
+    font-size: 0.7rem;
+}
+
+.edition-strip__highlights {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.65rem;
+    flex: 1 1 12rem;
+    min-width: 0;
+}
+
+.edition-strip__item {
+    font-size: 0.75rem;
+    line-height: 1.3;
+    max-width: 100%;
+}
+
+.edition-strip__item[role="button"] {
+    cursor: pointer;
+}
+
+.edition-strip__item[role="button"]:hover .edition-strip__label {
+    text-decoration: underline;
+}
+
+.edition-strip__kind {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    margin-right: 0.15rem;
+}
+
+.edition-strip__kind--new {
+    color: #198754;
+}
+
+.edition-strip__kind--rising {
+    color: #fd7e14;
+}
+
+.edition-strip__src {
+    color: #6c757d;
+    margin-right: 0.15rem;
+}
+
+.edition-strip__label {
+    font-weight: 600;
+    color: #212529;
+    word-break: break-word;
+}
+
+.edition-strip__move {
+    margin-left: 0.2rem;
+    font-size: 0.7rem;
+}
+
+.edition-strip__empty {
+    flex: 1 1 100%;
+}
+
+@media (max-width: 768px) {
+    .edition-strip {
+        padding: 0.4rem 0.5rem;
+    }
+
+    .edition-strip__highlights {
+        flex-direction: column;
+        gap: 0.2rem;
+    }
+}

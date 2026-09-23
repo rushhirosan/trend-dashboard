@@ -115,6 +115,11 @@ _SOURCE_LABELS_EN: Dict[str, str] = {
 _WS_RE = re.compile(r"\s+")
 
 
+def _jst_at(d: date, hour: int, minute: int = 0, second: int = 0) -> datetime:
+    """JST の壁時計時刻。tzinfo=JST 直指定は LMT(+09:19) になるので localize 必須。"""
+    return JST.localize(datetime(d.year, d.month, d.day, hour, minute, second))
+
+
 def normalize_label_key(text: str) -> str:
     return _WS_RE.sub(" ", str(text or "").strip()).lower()[:600]
 
@@ -197,7 +202,7 @@ def resolve_current_edition(
     for day_offset in range(0, -4, -1):
         d = now.date() + timedelta(days=day_offset)
         for hour, name, _code in _SCHEDULE:
-            start = datetime(d.year, d.month, d.day, hour, 0, 0, tzinfo=JST)
+            start = _jst_at(d, hour)
             if start > now:
                 continue
             parsed = parse_scheduler_slot_key(f"{name}_{d.isoformat()}")
@@ -208,7 +213,7 @@ def resolve_current_edition(
                 best = (start, bd, slot)
     if best is None:
         # 理論上到達しないが安全側
-        fallback_start = now.replace(hour=1, minute=0, second=0, microsecond=0) - timedelta(days=1)
+        fallback_start = _jst_at(now.date() - timedelta(days=1), 19)
         return fallback_start, now.date() - timedelta(days=1), "19"
     return best
 
@@ -224,7 +229,7 @@ def resolve_next_refresh(now: Optional[datetime] = None) -> datetime:
     for day_offset in range(0, 3):
         d = now.date() + timedelta(days=day_offset)
         for hour, _name, _code in _SCHEDULE:
-            candidate = datetime(d.year, d.month, d.day, hour, 0, 0, tzinfo=JST)
+            candidate = _jst_at(d, hour)
             if candidate > now:
                 return candidate
     return now + timedelta(days=1)

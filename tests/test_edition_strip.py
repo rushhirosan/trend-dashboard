@@ -1,6 +1,6 @@
 """号外帯: 版解決・隣接スロット差分の単体テスト。"""
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pytz
 
@@ -39,6 +39,19 @@ def test_resolve_next_refresh():
     nxt = es.resolve_next_refresh(now)
     assert nxt.hour == 13
     assert nxt.date() == date(2026, 9, 23)
+    assert nxt.utcoffset() == timedelta(hours=9)
+    assert nxt.isoformat().endswith("+09:00")
+
+
+def test_resolve_next_refresh_after_13_is_19_not_lmt():
+    """tzinfo=JST 直指定だと +09:19 → ブラウザ表示が 18:41 になる回帰を防ぐ。"""
+    now = JST.localize(datetime(2026, 9, 23, 14, 0))
+    nxt = es.resolve_next_refresh(now)
+    assert nxt.hour == 19
+    assert nxt.minute == 0
+    assert nxt.utcoffset() == timedelta(hours=9)
+    assert "+09:19" not in nxt.isoformat()
+    assert nxt.isoformat().endswith("+09:00")
 
 
 def test_previous_edition_from_07():

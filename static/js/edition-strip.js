@@ -168,14 +168,13 @@
       })
       .then(function (body) {
         if (!body || !body.success || !body.data) {
-          root.removeAttribute('hidden');
+          console.warn('edition-strip: unexpected response', body);
           return;
         }
         applyPayload(root, body.data);
       })
       .catch(function (err) {
         console.warn('edition-strip: fetch failed', err);
-        root.removeAttribute('hidden');
       });
   }
 

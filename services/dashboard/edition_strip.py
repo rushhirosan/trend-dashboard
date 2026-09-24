@@ -302,7 +302,7 @@ def _index_slot_rows(
             if not key or len(key) < 2:
                 continue
             prev = label_map.get(key)
-            if prev is None or it["r"] < prev["r"]:
+            if prev is None or it["r"] < int(prev["rank"]):
                 label_map[key] = {
                     "display": it["t"][:120],
                     "rank": it["r"],

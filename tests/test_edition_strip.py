@@ -122,7 +122,45 @@ def test_build_highlights_new_and_rising():
     assert "Quiet" not in labels
 
 
-def test_build_highlights_ignores_small_jump():
+def test_build_highlights_duplicate_labels_in_series():
+    """同一 series 内で正規化キーが重複しても KeyError にならない（US 500 の原因だった）。"""
+    current = [
+        {
+            "slot": "19",
+            "series_key": "cnn_us",
+            "items": [
+                {"t": "Same Title", "r": 3},
+                {"t": "Same  Title", "r": 1},  # 正規化で同一キー・より上位
+                {"t": "Other", "r": 2},
+            ],
+        }
+    ]
+    previous = [
+        {
+            "slot": "13",
+            "series_key": "cnn_us",
+            "items": [{"t": "Quiet", "r": 1}],
+        }
+    ]
+    out = es.build_highlights(
+        current,
+        previous,
+        current_slot="19",
+        previous_slot="13",
+        region="us",
+        locale="en",
+        limit=3,
+    )
+    labels = {h["label"] for h in out}
+    assert "Same Title" in labels or "Same  Title" in labels
+    assert all(h["kind"] == "new" for h in out)
+
+
+def test_series_matches_region_us():
+    assert es.series_matches_region("cnn_us", "us")
+    assert es.series_matches_region("wikipedia_en", "us")
+    assert not es.series_matches_region("google_jp", "us")
+
     current = [
         {
             "slot": "13",

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ page_title }} — Trends Dashboard</title>
     <meta name="description" content="{{ page_description }}">
-    <meta name="robots" content="index, follow">
+    <meta name="robots" content="{{ page_robots | default('index, follow') }}">
     <link rel="canonical" href="{{ public_base_url }}{{ page_path }}">
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
     {% include 'partials/vendor_assets.html' %}
@@ -27,7 +27,6 @@
                     <hr class="my-4">
                     <p class="small text-muted mb-2">関連ページ</p>
                     <ul class="list-unstyled small mb-0">
-                        <li class="mb-1"><a href="/legal/sct">特定商取引法に基づく表記</a></li>
                         <li class="mb-1"><a href="/legal/privacy">プライバシーポリシー</a></li>
                         <li class="mb-1"><a href="/legal/terms">利用規約</a></li>
                         <li class="mb-1"><a href="/about">このサイトについて</a></li>

@@ -1,4 +1,4 @@
-"""Legal pages for PAY.JP / tokutei shotorihiki."""
+"""Legal pages (privacy / terms public; SCT hidden until selling resumes)."""
 
 import pytest
 
@@ -25,9 +25,21 @@ def test_legal_pages_ok(client, path, needle):
     assert res.status_code == 200
     text = res.get_data(as_text=True)
     assert needle in text
-    assert "/legal/sct" in text
     assert "/legal/privacy" in text
     assert "/legal/terms" in text
+    # SCT is kept at URL but not linked from related-nav / public chrome
+    assert 'href="/legal/sct"' not in text
+
+
+def test_sct_is_noindex(client):
+    text = client.get("/legal/sct").get_data(as_text=True)
+    assert 'content="noindex, nofollow"' in text
+
+
+def test_privacy_terms_are_indexable(client):
+    for path in ("/legal/privacy", "/legal/terms"):
+        text = client.get(path).get_data(as_text=True)
+        assert 'content="index, follow"' in text
 
 
 def test_legal_pages_avoid_ai_summary_label(client):
@@ -37,10 +49,17 @@ def test_legal_pages_avoid_ai_summary_label(client):
         assert "AIサマリー" not in text
 
 
-def test_sitemap_includes_legal(client):
+def test_sitemap_excludes_sct_includes_privacy_terms(client):
     res = client.get("/sitemap.xml")
     assert res.status_code == 200
     text = res.get_data(as_text=True)
-    assert "/legal/sct" in text
+    assert "/legal/sct" not in text
     assert "/legal/privacy" in text
     assert "/legal/terms" in text
+
+
+def test_about_footer_hides_sct(client):
+    text = client.get("/about").get_data(as_text=True)
+    assert 'href="/legal/sct"' not in text
+    assert 'href="/legal/privacy"' in text
+    assert 'href="/legal/terms"' in text

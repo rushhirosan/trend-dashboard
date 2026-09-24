@@ -387,7 +387,14 @@ def create_app():
         logger.error(f"❌ /about ルート定義エラー: {e}", exc_info=True)
 
     try:
-        def _render_legal(template_name: str, *, page_title: str, page_description: str, page_path: str):
+        def _render_legal(
+            template_name: str,
+            *,
+            page_title: str,
+            page_description: str,
+            page_path: str,
+            page_robots: str = 'index, follow',
+        ):
             ga_id = app.config.get('GOOGLE_ANALYTICS_ID')
             return render_template(
                 template_name,
@@ -395,16 +402,18 @@ def create_app():
                 page_title=page_title,
                 page_description=page_description,
                 page_path=page_path,
+                page_robots=page_robots,
             )
 
         @app.route('/legal/sct')
         def legal_sct():
-            """特定商取引法に基づく表記（PAY.JP 申請用）"""
+            """特定商取引法に基づく表記（課金再開までナビ・sitemap からは隠す）"""
             return _render_legal(
                 'legal_sct.html',
                 page_title='特定商取引法に基づく表記',
                 page_description='Trends Dashboard の特定商取引法に基づく表記',
                 page_path='/legal/sct',
+                page_robots='noindex, nofollow',
             )
 
         @app.route('/legal/privacy')
@@ -745,12 +754,6 @@ Sitemap: {AppConfig.PUBLIC_BASE_URL}/sitemap.xml
     <lastmod>{about_lastmod_str}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>{base}/legal/sct</loc>
-    <lastmod>{about_lastmod_str}</lastmod>
-    <changefreq>yearly</changefreq>
-    <priority>0.3</priority>
   </url>
   <url>
     <loc>{base}/legal/privacy</loc>

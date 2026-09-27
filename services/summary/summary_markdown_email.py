@@ -425,7 +425,13 @@ def append_summary_email_footer(
     region: str,
     kind: str,
 ) -> Tuple[str, str]:
-    """配信メール末尾に Trend Dashboard と World Front Page へのリンクを付ける。"""
+    """日次メール末尾に Trend Dashboard と World Front Page へのリンクを付ける。
+
+    週次は本文のリンクでソースに届くので、末尾のサイト誘導は付けない。
+    """
+    kind_n = (kind or "daily").strip().lower()
+    if kind_n == "weekly":
+        return text, html_body
     region_n = (region or "jp").strip().lower()
     if region_n not in _FOOTER_COPY:
         region_n = "jp"

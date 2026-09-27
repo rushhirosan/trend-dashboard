@@ -134,6 +134,23 @@ def test_dashboard_email_url(monkeypatch):
     assert "utm_content=weekly" in us
 
 
+def test_weekly_email_omits_site_footer(tmp_path: Path, monkeypatch):
+    _use_default_site_base(monkeypatch)
+    weekly = tmp_path / "weekly"
+    weekly.mkdir()
+    (weekly / "2026-W38.md").write_text(
+        "---\nstatus: draft\n---\n\n# 週次\n\n本文。\n",
+        encoding="utf-8",
+    )
+    _, text, html = load_summary_email_bodies(
+        "weekly", "2026-W38", region="jp", summaries_root=tmp_path
+    )
+    assert "本文。" in text
+    assert "ダッシュボードで最新データを見る" not in text
+    assert "World Front Page" not in text
+    assert "g7-dashboard.vercel.app" not in html
+
+
 def test_append_summary_email_footer(monkeypatch):
     _use_default_site_base(monkeypatch)
     text, html = append_summary_email_footer(

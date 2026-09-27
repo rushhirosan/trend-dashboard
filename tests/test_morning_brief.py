@@ -387,9 +387,11 @@ def test_render_weekly_brief_markdown_sections():
         "jp",
         lines=lines,
     )
-    assert "## 🗓 今週のカレンダー" in md
+    assert "## 🗓 今週のカレンダー" not in md
+    assert "## ☕ ひと息（歴史 + 格言）" not in md
     assert "## 💹 マーケット（先週）" in md
-    assert "## ☕ ひと息（歴史 + 格言）" in md
+    assert "**為替**" in md
+    assert "**株**" in md
 
 
 def test_build_week_breath_lines_us_uses_week_in_history():

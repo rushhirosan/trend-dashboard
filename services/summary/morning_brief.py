@@ -785,36 +785,18 @@ def render_weekly_brief_markdown(
     *,
     lines: Optional[WeeklyBriefLines] = None,
 ) -> str:
-    """週次メール冒頭のオープナー（カレンダー・週次マーケット・ひと息）。"""
+    """週次メール冒頭。為替・株だけ。カレンダーとひと息は日次側に残す。"""
     if not morning_brief_enabled():
         return ""
     region_n = (region or "jp").lower()
     data = lines or build_weekly_brief_lines(week_mon, week_sun, region_n)
-    sections: List[str] = []
-    # 中身は配信週の日付レンジ + 祝日のみ（動向コメントではない）
-    glance_heading = (
-        "## 🗓 This week's calendar"
-        if region_n == "us"
-        else "## 🗓 今週のカレンダー"
-    )
-    sections.append(f"{glance_heading}\n\n{data.calendar}")
     market_lines = [x for x in (data.fx, data.stock) if x]
-    if market_lines:
-        market_heading = (
-            "## 💹 Markets (last week)"
-            if region_n == "us"
-            else "## 💹 マーケット（先週）"
-        )
-        sections.append(market_heading + "\n\n" + "\n".join(market_lines))
-    breath_lines = [x for x in (data.history, data.breath_second) if x]
-    if breath_lines:
-        breath_heading = (
-            "## ☕ A breath (history + quote)"
-            if region_n == "us"
-            else "## ☕ ひと息（歴史 + 格言）"
-        )
-        sections.append(breath_heading + "\n\n" + "\n".join(breath_lines))
-    if not sections:
+    if not market_lines:
         return ""
-    return "\n\n".join(sections) + "\n\n---\n"
+    market_heading = (
+        "## 💹 Markets (last week)"
+        if region_n == "us"
+        else "## 💹 マーケット（先週）"
+    )
+    return market_heading + "\n\n" + "\n".join(market_lines) + "\n\n---\n"
 

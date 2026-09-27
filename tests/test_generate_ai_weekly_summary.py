@@ -727,7 +727,8 @@ def test_assemble_weekly_markdown_jp_only(gaws):
     assert "先週の流れ" in md_llm
     assert "今週は日本のテスト話題が動いた。" in md_llm
     assert "週のホットトピック" in md_llm
-    assert "週を通じて議論が続いた。" in md_llm
+    assert "週を通じて議論が続いた。" not in md_llm
+    assert "06-08 3位" in md_llm
     assert "来週に残る論点" in md_llm
     assert "関税関連が続くか。" in md_llm
 
@@ -990,7 +991,7 @@ def test_run_generate_mechanical_includes_flow_and_hot(gaws, monkeypatch):
     )
     monkeypatch.setattr(
         "services.summary.morning_brief.render_weekly_brief_markdown",
-        lambda *a, **k: "## 🗓 今週のカレンダー\n\n**今週** test\n\n---\n",
+        lambda *a, **k: "## 💹 マーケット（先週）\n\n**為替** test\n\n---\n",
     )
     text, meta = gaws.run_generate_mechanical(
         week_mon,
@@ -1012,9 +1013,11 @@ def test_run_generate_mechanical_includes_flow_and_hot(gaws, monkeypatch):
     assert "週のホットトピック" in body
     assert "News Hot" in body
     assert "先週いちばん動いた話題" in body
-    assert "今週のカレンダー" in text
+    assert "マーケット（先週）" in text
+    assert "今週のカレンダー" not in text
+    assert "ひと息" not in text
     # オープナー → 流れ の順
-    assert text.index("今週のカレンダー") < text.index("先週の流れ")
+    assert text.index("マーケット（先週）") < text.index("先週の流れ")
 
 
 def test_merge_front_matter_mechanical_weekly(gaws):
@@ -1090,6 +1093,11 @@ def test_build_mechanical_weekly_flow_and_hot_topics(gaws):
                         "series_key": "nhk_jp",
                         "cross_source": True,
                         "best_rank": 1,
+                        "link_line": "[News Hot](https://example.com/news)",
+                        "rank_display_by_day": {
+                            "2026-09-14": "7時1位 → 13時1位 → 19時2位",
+                            "2026-09-15": "7時2位",
+                        },
                     },
                     {
                         "label": "Skip App",
@@ -1104,13 +1112,19 @@ def test_build_mechanical_weekly_flow_and_hot_topics(gaws):
     }
     flow = gaws.build_mechanical_weekly_flow(rising, category)
     assert "Rising JP" in flow
-    assert "News Hot" in flow
+    assert "[News Hot](https://example.com/news)" in flow
     assert "Skip App" not in flow
     hot = gaws.build_mechanical_weekly_hot_topics(rising, category)
     titles = [h["title"] for h in hot]
     assert "News Hot" in titles
     assert "Skip App" not in titles
     assert all("why" in h for h in hot)
+    assert "日登場" not in hot[0]["why"]
+    assert "区分" not in hot[0]["why"]
+    rendered = gaws.render_weekly_hot_topics_markdown({"hot_topics": hot})
+    assert "09-14 (1位)" in rendered
+    assert "https://example.com/news" in rendered
+    assert "日登場" not in rendered
 
 
 def test_configure_weekly_region_us_syncs_daily_locale(gaws):
@@ -1225,7 +1239,8 @@ def test_hot_topics_exclude_sticky_crypto_and_stocks(gaws):
     assert "Ethereum" not in titles
     assert "KLA Corporation" not in titles
     assert "Coyote vs. Acme" in titles
-    assert "category Entertainment & Shopping" in hot[0]["why"]
+    assert "appeared on" not in hot[0]["why"]
+    assert "category" not in hot[0]["why"]
     gaws.configure_weekly_region("jp")
 
 
@@ -1272,7 +1287,8 @@ def test_hot_topics_exclude_sticky_crypto_jp(gaws):
     assert "Bitcoin" not in titles
     assert "ソフトバンクグループ" not in titles
     assert "見知らぬ糸" in titles
-    assert "区分 エンタメ・ショッピング" in hot[0]["why"]
+    assert "日登場" not in hot[0]["why"]
+    assert "区分" not in hot[0]["why"]
 
 
 def test_script_imports_when_run_as_python_scripts_path():

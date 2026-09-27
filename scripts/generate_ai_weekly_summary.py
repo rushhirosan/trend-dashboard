@@ -4,8 +4,8 @@
 週次サマリー Markdown を生成する（既定: 機械生成・OpenAI 不使用）。
 
 メール本文は機械生成:
-オープナー（今週カレンダー・先週マーケット・ひと息）+
-先週の流れ（短文）+ いちばん動いた話題 + ホットトピック + カテゴリ top3。
+オープナー（先週マーケット）+
+先週の流れ（題名の下に URL）+ いちばん動いた話題 + ホットトピック（順位と URL）+ カテゴリ top3。
 来週論点は本文に含めない。Web 用リードは frontmatter の ``teaser`` / ``preview_lead``。
 
 ``--use-llm`` で従来の OpenAI 編集 JSON 生成（メール本文から編集セクションは除外）。
@@ -1432,6 +1432,11 @@ def enrich_hot_topics_with_links(
             row["link_line"] = _hot_topic_heading_line(plain, matched)
             if matched.get("url"):
                 row["url"] = matched.get("url")
+            rank = _rank_map_for_item(matched)
+            if rank:
+                row["rank_display_by_day"] = rank
+            if matched.get("cross_source"):
+                row["cross_source"] = True
         else:
             row["link_line"] = plain
         enriched.append(row)
@@ -1583,6 +1588,27 @@ def parse_editorial_json(raw: str) -> Dict[str, Any]:
     }
 
 
+def _rank_map_for_item(item: Dict[str, Any]) -> Dict[str, str]:
+    """カテゴリは rank_display_by_day、急上昇は rank_evidence_by_day。"""
+    display = item.get("rank_display_by_day") or {}
+    if isinstance(display, dict) and display:
+        return display
+    evidence = item.get("rank_evidence_by_day") or {}
+    if isinstance(evidence, dict) and evidence:
+        return evidence
+    return {}
+
+
+def _hot_topic_evidence_line(topic: Dict[str, Any]) -> str:
+    """カテゴリ行と同じ根拠（日別ベスト順位。登場日数・区分は書かない）。"""
+    rank = _rank_map_for_item(topic)
+    if not rank:
+        return ""
+    return format_theme_evidence_line(
+        [{"rank_display_by_day": rank, "cross_source": topic.get("cross_source")}]
+    )
+
+
 def render_weekly_hot_topics_markdown(editorial: Dict[str, Any]) -> str:
     topics = editorial.get("hot_topics") or []
     if _ACTIVE_REGION == "us":
@@ -1596,12 +1622,15 @@ def render_weekly_hot_topics_markdown(editorial: Dict[str, Any]) -> str:
         lines.append(empty)
         return "\n".join(lines).rstrip() + "\n"
     for i, t in enumerate(topics, 1):
-        why = str(t.get("why") or "").strip()
         heading_line = str(t.get("link_line") or t.get("title") or "").strip()
+        if not heading_line:
+            continue
         lines.append(f"### {i}. {heading_line}")
         lines.append("")
-        lines.append(why)
-        lines.append("")
+        evidence = _hot_topic_evidence_line(t)
+        if evidence:
+            lines.append(evidence)
+            lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -1685,11 +1714,26 @@ def _is_sticky_hot_topic_series(series_key: str, *, day_count: int) -> bool:
     return False
 
 
+def _flow_linked_title(item: Dict[str, Any]) -> str:
+    """流れの題名。URL があれば文中リンク、なければ引用符だけ。"""
+    label = str(item.get("label") or "").strip()
+    url = str(item.get("url") or "").strip()
+    if not url.startswith(("http://", "https://")):
+        link = str(item.get("link_line") or "")
+        m = re.search(r"\((https?://[^)\s]+)\)", link)
+        url = m.group(1) if m else ""
+    if url and label:
+        return f"[{label}]({url})"
+    if _ACTIVE_REGION == "us":
+        return f'"{label}"'
+    return f"「{label}」"
+
+
 def build_mechanical_weekly_flow(
     weekly_rising: Dict[str, List[Dict[str, Any]]],
     weekly_category: Dict[str, List[Dict[str, Any]]],
 ) -> str:
-    """LLM なしの「先週の流れ」短文。rising top + カテゴリ上位ラベル。"""
+    """LLM なしの「先週の流れ」。題名はソース URL 付きリンク。"""
     region = WEEKLY_REGIONS[0]
     bits: List[str] = []
     rising = weekly_rising.get(region) or []
@@ -1698,15 +1742,17 @@ def build_mechanical_weekly_flow(
         label = str(it.get("label") or "").strip()
         dc = int(it.get("day_count") or len(it.get("days") or []) or 0)
         if label:
+            title = _flow_linked_title(it)
             if _ACTIVE_REGION == "us":
                 days_bit = f" across {dc} day(s)" if dc else ""
                 bits.append(
-                    f'The sharpest rank move last week was "{label}"{days_bit}.'
+                    f"The sharpest rank move last week was {title}{days_bit}."
                 )
             else:
                 days_bit = f"（{dc}日）" if dc else ""
-                bits.append(f"順位の動きが最も大きかったのは「{label}」{days_bit}。")
-    labels: List[str] = []
+                bits.append(f"順位の動きが最も大きかったのは{title}{days_bit}。")
+    picked: List[Dict[str, Any]] = []
+    seen_labels: set[str] = set()
     for block in weekly_category.get(region) or []:
         for it in block.get("items") or []:
             lab = str(it.get("label") or "").strip()
@@ -1718,19 +1764,20 @@ def build_mechanical_weekly_flow(
                 or _is_sticky_hot_topic_series(sk, day_count=day_count)
             ):
                 continue
-            if lab in labels:
+            if lab in seen_labels:
                 continue
-            labels.append(lab)
-            if len(labels) >= 3:
+            seen_labels.add(lab)
+            picked.append(it)
+            if len(picked) >= 3:
                 break
-        if len(labels) >= 3:
+        if len(picked) >= 3:
             break
-    if labels:
+    if picked:
+        linked = [_flow_linked_title(it) for it in picked]
         if _ACTIVE_REGION == "us":
-            joined = ", ".join(f'"{x}"' for x in labels)
-            bits.append(f"Category leaders included {joined}.")
+            bits.append("Category leaders included " + ", ".join(linked) + ".")
         else:
-            bits.append("カテゴリ上位には「" + "」「".join(labels) + "」などが入った。")
+            bits.append("カテゴリ上位には" + "、".join(linked) + "が入った。")
     if bits:
         return " ".join(bits)
     if _ACTIVE_REGION == "us":
@@ -1743,7 +1790,7 @@ def build_mechanical_weekly_hot_topics(
     weekly_category: Dict[str, List[Dict[str, Any]]],
     *,
     limit: int = WEEKLY_HOT_MAX,
-) -> List[Dict[str, str]]:
+) -> List[Dict[str, Any]]:
     """カテゴリ digest から機械ホットトピックを抽出（App Store・定番 crypto/stock 除外）。"""
     region = WEEKLY_REGIONS[0]
     candidates: List[Dict[str, Any]] = []
@@ -1778,6 +1825,8 @@ def build_mechanical_weekly_hot_topics(
                     "score": score,
                     "link_line": it.get("link_line") or "",
                     "url": it.get("url"),
+                    "rank_display_by_day": it.get("rank_display_by_day") or {},
+                    "rank_evidence_by_day": it.get("rank_evidence_by_day") or {},
                 }
             )
     # rising を補完
@@ -1805,36 +1854,23 @@ def build_mechanical_weekly_hot_topics(
                 "score": int(it.get("weekly_score") or 0) or day_count * 10,
                 "link_line": it.get("link_line") or "",
                 "url": it.get("url"),
+                "rank_display_by_day": it.get("rank_display_by_day") or {},
+                "rank_evidence_by_day": it.get("rank_evidence_by_day") or {},
             }
         )
     candidates.sort(key=lambda x: (-int(x["score"]), -int(x["day_count"]), str(x["title"])))
-    out: List[Dict[str, str]] = []
+    out: List[Dict[str, Any]] = []
     for c in candidates[: max(0, limit)]:
-        dc = int(c["day_count"])
-        cat_disp = _category_heading_label(str(c.get("category") or ""))
-        if _ACTIVE_REGION == "us":
-            why_bits = []
-            if dc:
-                why_bits.append(f"appeared on {dc} day(s)")
-            if c["cross_source"]:
-                why_bits.append("crossed multiple sources")
-            if c.get("best_rank"):
-                why_bits.append(f"best rank {c['best_rank']}")
-            if cat_disp:
-                why_bits.append(f"category {cat_disp}")
-            why = "; ".join(why_bits) + "." if why_bits else "Stood out in last week's digest."
-        else:
-            why_bits = []
-            if dc:
-                why_bits.append(f"{dc}日登場")
-            if c["cross_source"]:
-                why_bits.append("複数ソースで重なった")
-            if c.get("best_rank"):
-                why_bits.append(f"最高順位 {c['best_rank']}")
-            if cat_disp:
-                why_bits.append(f"区分 {cat_disp}")
-            why = "。".join(why_bits) + "。" if why_bits else "先週の digest で目立った話題。"
-        row: Dict[str, str] = {"title": str(c["title"]), "why": why}
+        evidence = _hot_topic_evidence_line(c)
+        why = evidence[2:].strip() if evidence.startswith("> ") else evidence
+        row: Dict[str, Any] = {
+            "title": str(c["title"]),
+            "why": why,
+            "cross_source": bool(c.get("cross_source")),
+        }
+        rank = _rank_map_for_item(c)
+        if rank:
+            row["rank_display_by_day"] = rank
         if c.get("link_line"):
             row["link_line"] = str(c["link_line"])
         if c.get("url"):
@@ -1872,7 +1908,7 @@ def assemble_weekly_markdown(
         ]
 
     lines: List[str] = [title, *meta_lines]
-    # 1) オープナー（配信週カレンダー・先週マーケット・ひと息）
+    # 1) オープナー（先週マーケットのみ。カレンダー・ひと息は週次に出さない）
     try:
         from services.summary.morning_brief import render_weekly_brief_markdown
 

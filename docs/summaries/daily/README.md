@@ -32,8 +32,8 @@
 ## 運用
 
 - **スキャフォルドだけ**の `.md`（テンプレ文言のまま）は `generator` 行が無く、`.generation.json` も無いことが多いです。差分はここで判別できます。使わないプレースホルダは **削除してよい**（あとから `generate_ai_daily_summary.py --write --force --business-day …` で再生成できる）。
-- GitHub Actions **AI daily summary**（JST **06:50** 前後）は、既定で **JST 昨日** を `business_day` にして **jp → us** を直列生成します。失敗時も `.generation.json` をコミットしてからジョブを失敗扱いにします。
-- Fly の APScheduler が **09:00 JST** に DB（`summary_documents`）へその観測日があるか確認し、欠けていれば Discord。成功日は SELECT のみ（再生成・再送なし）。
+- GitHub Actions **AI daily summary** の cron は JST **06:50**（既定で **JST 昨日** を `business_day` にして **jp → us** を直列生成）。メールの実着は **9:00頃**。失敗時も `.generation.json` をコミットしてからジョブを失敗扱いにします。
+- Fly の APScheduler が **10:00 JST** に DB（`summary_documents`）へその観測日があるか確認し、欠けていれば Discord。成功日は SELECT のみ（再生成・再送なし）。09:00 だと送信中に欠走扱いになるため、日次メールのあとに見る。
 - 手動 Run のあとに遅延 cron が来た場合、**jp+us がすでに DB にあれば生成・メールをスキップ**（`workflow_dispatch` の `force` で上書き可）。
 
 親ドキュメント: [`docs/summaries/README.md`](../README.md)

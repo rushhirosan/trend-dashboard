@@ -374,12 +374,12 @@ class SubscriptionManager:
             }
     
     def send_trends_summary(self):
-        """トレンドサマリー配信を実行"""
+        """トレンドブリーフ配信を実行"""
         import psycopg2
         
         try:
             logger.info("=" * 60)
-            logger.info("📧 トレンドサマリー配信開始")
+            logger.info("📧 トレンドブリーフ配信開始")
             logger.info("=" * 60)
             
             # アクティブなサブスクリプションを取得
@@ -472,7 +472,7 @@ class SubscriptionManager:
                     logger.error(f"   ❌ メール送信失敗: {email} - {e}", exc_info=True)
             
             logger.info("=" * 60)
-            logger.info(f"📧 トレンドサマリー配信完了")
+            logger.info(f"📧 トレンドブリーフ配信完了")
             logger.info(f"   ✅ 成功: {success_count}件")
             if fail_count > 0:
                 logger.warning(f"   ❌ 失敗: {fail_count}件")
@@ -480,7 +480,7 @@ class SubscriptionManager:
             
         except Exception as e:
             logger.error("=" * 60)
-            logger.error(f"❌ トレンドサマリー配信エラー: {e}", exc_info=True)
+            logger.error(f"❌ トレンドブリーフ配信エラー: {e}", exc_info=True)
             logger.error("=" * 60)
     
     def _get_active_subscriptions(self):
@@ -801,7 +801,7 @@ class SubscriptionManager:
             return {}
     
     def _send_trends_summary_email(self, subscription, trends_data):
-        """トレンドサマリー配信メールを送信"""
+        """トレンドブリーフ配信メールを送信"""
         try:
             email = subscription['email']
             categories = subscription.get('categories', [])
@@ -854,7 +854,7 @@ class SubscriptionManager:
                 logger.info(f"📊 {email}: カテゴリマッチング結果: {len(categories)}カテゴリ ({categories[:5]}...)")
             
             # メール内容を作成
-            subject = "📊 トレンドサマリー配信 - " + datetime.now().strftime('%Y年%m月%d日')
+            subject = "📊 トレンドブリーフ配信 - " + datetime.now().strftime('%Y年%m月%d日')
             html_content = self._create_trends_summary_html(trends_data, categories, unsubscribe_token)
             text_content = self._create_trends_summary_text(trends_data, categories, unsubscribe_token)
             
@@ -862,20 +862,20 @@ class SubscriptionManager:
             success = self.email_service._send_email(email, subject, html_content, text_content)
             
             if success:
-                logger.info(f"✅ トレンドサマリー配信完了: {email}")
+                logger.info(f"✅ トレンドブリーフ配信完了: {email}")
             else:
-                logger.error(f"❌ トレンドサマリー配信失敗: {email} - メール送信がFalseを返しました")
+                logger.error(f"❌ トレンドブリーフ配信失敗: {email} - メール送信がFalseを返しました")
                 raise Exception(f"メール送信が失敗しました: {email}")
                 
         except Exception as e:
-            logger.error(f"❌ トレンドサマリー配信エラー: {e}", exc_info=True)
+            logger.error(f"❌ トレンドブリーフ配信エラー: {e}", exc_info=True)
             raise  # 例外を再発生させて、呼び出し元でエラーとして処理されるようにする
 
     def _send_confirmation_email(self, email: str, frequency: str, categories: List[str], unsubscribe_token: str):
         """登録確認メールを送信"""
         try:
             # メール内容を作成
-            subject = "📧 トレンドサマリー配信のご登録ありがとうございます"
+            subject = "📧 トレンドブリーフ配信のご登録ありがとうございます"
             html_content = self._create_confirmation_html(email, frequency, categories, unsubscribe_token)
             text_content = self._create_confirmation_text(email, frequency, categories, unsubscribe_token)
             
@@ -993,7 +993,7 @@ class SubscriptionManager:
         return sorted(categories, key=get_sort_key)
     
     def _create_trends_summary_html(self, trends_data, categories, unsubscribe_token=None):
-        """トレンドサマリー配信メールのHTML内容を作成
+        """トレンドブリーフ配信メールのHTML内容を作成
         
         Args:
             trends_data: トレンドデータの辞書
@@ -1014,7 +1014,7 @@ class SubscriptionManager:
             <html>
             <head>
                 <meta charset="UTF-8">
-                <title>トレンドサマリー配信</title>
+                <title>トレンドブリーフ配信</title>
                 <style>
                     body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
                     .header {{ background-color: #f8f9fa; padding: 20px; text-align: center; }}
@@ -1028,12 +1028,12 @@ class SubscriptionManager:
             </head>
             <body>
                 <div class="header">
-                    <h1>📊 トレンドサマリー配信</h1>
+                    <h1>📊 トレンドブリーフ配信</h1>
                     <p>{datetime.now().strftime('%Y年%m月%d日')}</p>
                 </div>
                 
                 <div class="content">
-                    <p>こんにちは！本日の<a href="{AppConfig.PUBLIC_BASE_URL}/" style="color: #007bff; text-decoration: none; font-weight: bold;">トレンド</a>サマリーをお届けします。</p>
+                    <p>こんにちは！本日の<a href="{AppConfig.PUBLIC_BASE_URL}/" style="color: #007bff; text-decoration: none; font-weight: bold;">トレンド</a>ブリーフをお届けします。</p>
             """
             
             # カテゴリ名のマッピング
@@ -1275,10 +1275,10 @@ class SubscriptionManager:
             
         except Exception as e:
             logger.error(f"❌ HTML作成エラー: {e}", exc_info=True)
-            return "<html><body><p>トレンドサマリー配信</p></body></html>"
+            return "<html><body><p>トレンドブリーフ配信</p></body></html>"
     
     def _create_trends_summary_text(self, trends_data, categories, unsubscribe_token=None):
-        """トレンドサマリー配信メールのテキスト内容を作成
+        """トレンドブリーフ配信メールのテキスト内容を作成
         
         Args:
             trends_data: トレンドデータの辞書
@@ -1295,8 +1295,8 @@ class SubscriptionManager:
             else:
                 unsubscribe_url = f"{AppConfig.PUBLIC_BASE_URL}/subscription/"
             
-            text = f"📊 トレンドサマリー配信 - {datetime.now().strftime('%Y年%m月%d日')}\n\n"
-            text += "こんにちは！本日のトレンドサマリーをお届けします。\n"
+            text = f"📊 トレンドブリーフ配信 - {datetime.now().strftime('%Y年%m月%d日')}\n\n"
+            text += "こんにちは！本日のトレンドブリーフをお届けします。\n"
             text += f"ダッシュボード: {AppConfig.PUBLIC_BASE_URL}/\n\n"
             
             # カテゴリ名のマッピング
@@ -1516,7 +1516,7 @@ class SubscriptionManager:
             
         except Exception as e:
             logger.error(f"❌ テキスト作成エラー: {e}", exc_info=True)
-            return "トレンドサマリー配信"
+            return "トレンドブリーフ配信"
 
     def _create_confirmation_html(self, email: str, frequency: str, categories: List[str], unsubscribe_token: str) -> str:
         """確認メールのHTML内容を作成"""
@@ -1618,7 +1618,7 @@ class SubscriptionManager:
                     <h1>📧 サブスクリプション登録確認</h1>
                 </div>
                 <div class="content">
-                    <p>この度は、トレンドサマリー配信サービスにご登録いただき、ありがとうございます！</p>
+                    <p>この度は、トレンドブリーフ配信サービスにご登録いただき、ありがとうございます！</p>
                     
                     <div class="highlight">
                         <h3>📊 登録情報</h3>
@@ -1718,7 +1718,7 @@ class SubscriptionManager:
         text = f"""
 📧 サブスクリプション登録確認
 
-この度は、トレンドサマリー配信サービスにご登録いただき、ありがとうございます！
+この度は、トレンドブリーフ配信サービスにご登録いただき、ありがとうございます！
 
 📊 登録情報
 メールアドレス: {email}

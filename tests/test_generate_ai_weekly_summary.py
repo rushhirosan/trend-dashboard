@@ -872,7 +872,7 @@ def test_assemble_weekly_markdown_us_english(gaws):
     md = gaws.assemble_weekly_markdown(
         "2026-W24", mon, sun, editorial, rising, category, meta
     )
-    assert "Weekly summary" in md
+    assert "Weekly brief" in md
     assert "Last week in review" not in md
     assert "Biggest movers last week" in md
     assert "Hot topics last week" not in md

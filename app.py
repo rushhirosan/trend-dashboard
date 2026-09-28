@@ -631,11 +631,11 @@ def create_app():
 ## 兄弟サイト
 - World Front Page: https://g7-dashboard.vercel.app/ （世界のニュース表紙をざっと見る。本サイトは多ソースの日次トレンド横断）
 
-## トレンドサマリー（過去分・無料プレビュー）
+## トレンドブリーフ（過去分・無料プレビュー）
 - 一覧（日本語）: {base}/summaries （直近分のみ。日次は約10日・週次は約30日で公開終了）
 - 日次（日本語）: {base}/summaries/daily/YYYY-MM-DD （観測日ごとの一行結論と急上昇トピック）
 - 週次（日本語）: {base}/summaries/weekly/YYYY-Www （週の流れと注目トピック）
-- Summaries (English/US): {base}/us/summaries , {base}/us/summaries/daily/YYYY-MM-DD , {base}/us/summaries/weekly/YYYY-Www
+- Briefs (English/US): {base}/us/summaries , {base}/us/summaries/daily/YYYY-MM-DD , {base}/us/summaries/weekly/YYYY-Www
 
 {recent_block}## 更新頻度
 毎日 1・7・13・19時 JST に更新処理を開始（完了まで通常10〜15分程度）。

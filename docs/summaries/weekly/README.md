@@ -72,7 +72,7 @@ docs/summaries/daily/2026-05-12.md  … 月曜の business_day
 docs/summaries/daily/us/2026-05-12.md
 ```
 
-日次の `YYYY-MM-DD` は **観測日（business_day）** であり、発行日ではありません（日曜分は **翌週月曜 06:50 JST** 前後に届く）。週次ジョブは **日曜分の日次がコミットされたあと** に走る想定です。
+日次の `YYYY-MM-DD` は **観測日（business_day）** であり、発行日ではありません（日曜分のメールは **翌週月曜 9:00 JST頃**。cron は 06:50）。週次ジョブは **日曜分の日次がコミットされたあと** に走る想定です。
 
 欠けている日は `missing_daily_dates` に記録され、プロンプト上は「（ファイルなし）」として渡されます。
 
@@ -84,7 +84,7 @@ docs/summaries/daily/us/2026-05-12.md
 
 ## 自動化
 
-- GitHub Actions: `.github/workflows/ai-weekly-summary.yml`（UTC 日曜 `30 22 * * 0` ≒ **JST 月曜 07:30**）。同一ジョブで jp → us を直列生成。
+- GitHub Actions: `.github/workflows/ai-weekly-summary.yml`（UTC 日曜 `30 22 * * 0` ≒ cron **JST 月曜 07:30**。メール実着は **10:00頃**）。同一ジョブで jp → us を直列生成。
 - 手動 Run のあとに遅延 cron が来た場合、**jp+us がすでに DB にあれば生成・メールをスキップ**（`workflow_dispatch` の `force` で上書き可）。
 
 親ドキュメント: [`docs/summaries/README.md`](../README.md)

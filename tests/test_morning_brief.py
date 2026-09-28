@@ -99,7 +99,7 @@ def test_build_calendar_line_includes_observation_day():
             day, "jp", observation_day=date(2026, 8, 24)
         )
     assert line.startswith("**8/25（火）**")
-    assert "サマリー生成対象日 8/24" in line
+    assert "ブリーフ対象日 8/24" in line
     assert "観測 " not in line
     assert "次の祝日は 9/21（月）敬老の日" in line
 
@@ -115,7 +115,7 @@ def test_build_calendar_line_includes_summary_date_us():
             day, "us", observation_day=date(2026, 8, 24)
         )
     assert line.startswith("**8/25 (Tue)**")
-    assert "Summary date 8/24" in line
+    assert "Brief date 8/24" in line
     assert "Observed " not in line
     assert "Next holiday: 9/7 (Mon) Labor Day" in line
 

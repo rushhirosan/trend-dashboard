@@ -12,14 +12,14 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h2 class="modal-title h5" id="summaryEmailModalLabel">{% if cta_is_us %}Summary delivery (daily & weekly){% else %}サマリー配信（日次・週次）{% endif %}</h2>
+        <h2 class="modal-title h5" id="summaryEmailModalLabel">{% if cta_is_us %}Brief delivery (daily & weekly){% else %}ブリーフ配信（日次・週次）{% endif %}</h2>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% if cta_is_us %}Close{% else %}閉じる{% endif %}"></button>
       </div>
       <div class="modal-body">
         {% if cta_is_us %}
-        <p class="small mb-3">Yesterday's and last week's trends, daily and weekly. Target: around 7:30 JST (by 8:00); weekly Mondays around 8:00 JST. Times are not guaranteed.</p>
+        <p class="small mb-3">A daily and weekly brief of yesterday's and last week's trends. Target: daily around 9:00 JST; weekly Mondays around 10:00 JST. Times are not guaranteed.</p>
         {% else %}
-        <p class="small mb-3">昨日・先週のトレンドをまとめた日次・週次配信です。目標は日次 7:30 JST頃（上限 8:00）、週次は月曜 8:00 JST頃。時刻は保証ではありません。</p>
+        <p class="small mb-3">昨日・先週のトレンドの日次・週次ブリーフです。目標は日次 9:00 JST頃、週次は月曜 10:00 JST頃。時刻は保証ではありません。</p>
         {% endif %}
         {% with checkout_form_prefix='ai-summary-cta', checkout_locale=('en' if cta_is_us else 'ja'), checkout_default_region=('us' if cta_is_us else 'jp') %}
         {% include 'partials/ai_summary_checkout_form.html' %}

@@ -200,21 +200,21 @@ def update_subscription():
 
 @subscription_bp.route('/api/send-trends-summary', methods=['POST'])
 def send_trends_summary():
-    """トレンドサマリー配信API（管理者用）"""
+    """トレンドブリーフ配信API（管理者用）"""
     try:
-        # トレンドサマリー配信を実行
+        # トレンドブリーフ配信を実行
         subscription_manager.send_trends_summary()
         
         return jsonify({
             'success': True,
-            'message': 'トレンドサマリー配信を実行しました'
+            'message': 'トレンドブリーフ配信を実行しました'
         })
         
     except Exception as e:
-        logger.error(f"❌ トレンドサマリー配信APIエラー: {e}", exc_info=True)
+        logger.error(f"❌ トレンドブリーフ配信APIエラー: {e}", exc_info=True)
         return jsonify({
             'success': False,
-            'error': 'トレンドサマリー配信に失敗しました'
+            'error': 'トレンドブリーフ配信に失敗しました'
         }), 500
 
 @subscription_bp.route('/api/statistics')

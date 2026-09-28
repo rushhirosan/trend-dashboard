@@ -10,11 +10,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     {% if is_us %}
-    <title>Trend summaries | Trends Dashboard</title>
-    <meta name="description" content="U.S. daily & weekly trend summaries (free preview). Recent {{ daily_retention_days }} days of daily and {{ weekly_retention_days }} days of weekly briefs.">
+    <title>Trend briefs | Trends Dashboard</title>
+    <meta name="description" content="U.S. daily and weekly trend briefs (free preview). Recent {{ daily_retention_days }} days of daily and {{ weekly_retention_days }} days of weekly briefs.">
     {% else %}
-    <title>トレンドサマリー一覧 | トレンドダッシュボード</title>
-    <meta name="description" content="日次・週次トレンドまとめ（無料プレビュー）の一覧。直近{{ daily_retention_days }}日分の日次と直近{{ weekly_retention_days }}日分の週次を掲載しています。">
+    <title>トレンドブリーフ一覧 | トレンドダッシュボード</title>
+    <meta name="description" content="日次・週次トレンドブリーフ（無料プレビュー）の一覧。直近{{ daily_retention_days }}日分の日次と直近{{ weekly_retention_days }}日分の週次を掲載しています。">
     {% endif %}
     <meta name="author" content="Trends Dashboard">
     <meta name="robots" content="index, follow">
@@ -22,7 +22,7 @@
 
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ public_base_url }}{{ sumpfx }}/summaries">
-    <meta property="og:title" content="{% if is_us %}Trend summaries | Trends Dashboard{% else %}トレンドサマリー一覧 | トレンドダッシュボード{% endif %}">
+    <meta property="og:title" content="{% if is_us %}Trend briefs | Trends Dashboard{% else %}トレンドブリーフ一覧 | トレンドダッシュボード{% endif %}">
     <meta property="og:image" content="{{ public_base_url }}/static/images/og-image.png">
     <meta property="og:locale" content="{% if is_us %}en_US{% else %}ja_JP{% endif %}">
     <meta property="og:site_name" content="Trends Dashboard">
@@ -45,7 +45,7 @@
     <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
 </head>
 <body class="bg-light">
-    {% set page_title = 'Trend summaries' if is_us else 'トレンドサマリー' %}
+    {% set page_title = 'Trend briefs' if is_us else 'トレンドブリーフ' %}
     {% set page_icon = 'fas fa-newspaper' %}
     {% set active_page = 'us' if is_us else 'summary' %}
     {% include 'partials/header.html' with context %}
@@ -56,7 +56,7 @@
                 <nav aria-label="breadcrumb" class="mb-3">
                     <ol class="breadcrumb small mb-0">
                         <li class="breadcrumb-item"><a href="{{ home_url }}" class="text-decoration-none">{% if is_us %}US Trends{% else %}日本トレンド{% endif %}</a></li>
-                        <li class="breadcrumb-item active" aria-current="page">{% if is_us %}Summaries{% else %}サマリー一覧{% endif %}</li>
+                        <li class="breadcrumb-item active" aria-current="page">{% if is_us %}Briefs{% else %}ブリーフ一覧{% endif %}</li>
                     </ol>
                 </nav>
 
@@ -65,16 +65,16 @@
                         <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                             <span class="badge bg-secondary">{% if is_us %}Free preview{% else %}無料プレビュー{% endif %}</span>
                         </div>
-                        <h1 class="h4 mb-2">{% if is_us %}Trend summaries{% else %}トレンドサマリー一覧{% endif %}</h1>
+                        <h1 class="h4 mb-2">{% if is_us %}Trend briefs{% else %}トレンドブリーフ一覧{% endif %}</h1>
                         <p class="text-muted small mb-0">
-                            {% if is_us %}Past trend briefs (free preview), newest first.{% else %}過去のトレンドまとめ（無料プレビュー）を新しい順に掲載しています。{% endif %}
+                            {% if is_us %}Past trend briefs (free preview), newest first.{% else %}過去のトレンドブリーフ（無料プレビュー）を新しい順に掲載しています。{% endif %}
                         </p>
                         <div class="alert alert-info small mt-3 mb-0" role="note">
                             <i class="fas fa-clock me-1" aria-hidden="true"></i>
                             {% if is_us %}
                             Only <strong>recent entries</strong> are listed. Daily briefs stay for about <strong>{{ daily_retention_days }} days</strong> and weekly briefs for about <strong>{{ weekly_retention_days }} days</strong>; older ones are removed automatically.
                             {% else %}
-                            掲載は<strong>直近分のみ</strong>です。日次は約<strong>{{ daily_retention_days }}日</strong>、週次は約<strong>{{ weekly_retention_days }}日</strong>で自動的に公開を終了し、それより前のまとめは閲覧できなくなります。
+                            掲載は<strong>直近分のみ</strong>です。日次は約<strong>{{ daily_retention_days }}日</strong>、週次は約<strong>{{ weekly_retention_days }}日</strong>で自動的に公開を終了し、それより前のブリーフは閲覧できなくなります。
                             {% endif %}
                         </div>
                     </div>
@@ -82,7 +82,7 @@
 
                 <section class="card shadow-sm mb-4">
                     <div class="card-header bg-light d-flex flex-wrap align-items-center justify-content-between gap-2">
-                        <h2 class="h6 mb-0"><i class="fas fa-calendar-day me-2 text-primary"></i>{% if is_us %}Daily briefs{% else %}日次まとめ{% endif %}</h2>
+                        <h2 class="h6 mb-0"><i class="fas fa-calendar-day me-2 text-primary"></i>{% if is_us %}Daily briefs{% else %}日次ブリーフ{% endif %}</h2>
                         <span class="small text-muted">{% if is_us %}~{{ daily_retention_days }} days{% else %}直近約{{ daily_retention_days }}日{% endif %}</span>
                     </div>
                     <div class="card-body p-0">
@@ -99,7 +99,7 @@
                         </ul>
                         {% else %}
                         <div class="p-4">
-                            <p class="small text-muted mb-0">{% if is_us %}No daily briefs are available right now.{% else %}現在、閲覧できる日次まとめはありません。{% endif %}</p>
+                            <p class="small text-muted mb-0">{% if is_us %}No daily briefs are available right now.{% else %}現在、閲覧できる日次ブリーフはありません。{% endif %}</p>
                         </div>
                         {% endif %}
                     </div>
@@ -107,7 +107,7 @@
 
                 <section class="card shadow-sm mb-4">
                     <div class="card-header bg-light d-flex flex-wrap align-items-center justify-content-between gap-2">
-                        <h2 class="h6 mb-0"><i class="fas fa-calendar-week me-2 text-primary"></i>{% if is_us %}Weekly briefs{% else %}週次まとめ{% endif %}</h2>
+                        <h2 class="h6 mb-0"><i class="fas fa-calendar-week me-2 text-primary"></i>{% if is_us %}Weekly briefs{% else %}週次ブリーフ{% endif %}</h2>
                         <span class="small text-muted">{% if is_us %}~{{ weekly_retention_days }} days{% else %}直近約{{ weekly_retention_days }}日{% endif %}</span>
                     </div>
                     <div class="card-body p-0">
@@ -124,7 +124,7 @@
                         </ul>
                         {% else %}
                         <div class="p-4">
-                            <p class="small text-muted mb-0">{% if is_us %}No weekly briefs are available right now.{% else %}現在、閲覧できる週次まとめはありません。{% endif %}</p>
+                            <p class="small text-muted mb-0">{% if is_us %}No weekly briefs are available right now.{% else %}現在、閲覧できる週次ブリーフはありません。{% endif %}</p>
                         </div>
                         {% endif %}
                     </div>

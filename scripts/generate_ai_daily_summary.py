@@ -1975,8 +1975,8 @@ def render_header_markdown(business_day: date) -> str:
     """日次の見出しのみ（観測日はタイトルに含む。メタ行は付けない）。"""
     bd = business_day.isoformat()
     if _ACTIVE_REGION == "us":
-        return f"# Daily summary — {bd} (JST)"
-    return f"# 日次サマリー — {bd}（JST）"
+        return f"# Daily brief — {bd} (JST)"
+    return f"# 日次ブリーフ — {bd}（JST）"
 
 
 def render_editorial_markdown(

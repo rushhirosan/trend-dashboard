@@ -1,5 +1,5 @@
 # JST 08:00 ≒ UTC 23:00 (previous calendar day).
-# Runs after AI daily summary (06:50 JST) and weekly (Mon 07:30 JST).
+# Deletes expired summary files only. Daily mail lands ~09:00 JST; weekly ~10:00 JST Mondays.
 # Deletes docs/summaries/daily/*.md (+ .generation.json) and weekly/*.md past retention.
 name: Summary retention purge
 

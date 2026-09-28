@@ -14,8 +14,8 @@
     <title>Daily trend brief {{ page.business_day_display }} | Trends Dashboard</title>
     <meta name="description" content="U.S. trend brief for {{ page.business_day_display }} (free preview). {{ page.one_liner[:110] }}">
     {% else %}
-    <title>日次トレンドまとめ {{ page.business_day_display }} | トレンドダッシュボード</title>
-    <meta name="description" content="{{ page.business_day_display }}のトレンドまとめ（無料プレビュー）。{{ page.one_liner[:110] }}">
+    <title>日次ブリーフ {{ page.business_day_display }} | トレンドダッシュボード</title>
+    <meta name="description" content="{{ page.business_day_display }}のトレンドブリーフ（無料プレビュー）。{{ page.one_liner[:110] }}">
     {% endif %}
     <meta name="author" content="Trends Dashboard">
     <meta name="robots" content="index, follow">
@@ -24,7 +24,7 @@
     <!-- Open Graph -->
     <meta property="og:type" content="article">
     <meta property="og:url" content="{{ public_base_url }}{{ sumpfx }}/summaries/daily/{{ page.business_day }}">
-    <meta property="og:title" content="{% if is_us %}Daily trend brief {{ page.business_day_display }}{% else %}日次トレンドまとめ {{ page.business_day_display }}{% endif %} | Trends Dashboard">
+    <meta property="og:title" content="{% if is_us %}Daily trend brief {{ page.business_day_display }}{% else %}日次ブリーフ {{ page.business_day_display }}{% endif %} | Trends Dashboard">
     <meta property="og:image" content="{{ public_base_url }}/static/images/og-image.png">
     <meta property="og:locale" content="{% if is_us %}en_US{% else %}ja_JP{% endif %}">
     <meta property="og:site_name" content="Trends Dashboard">
@@ -38,7 +38,7 @@
     {
       "@context": "https://schema.org",
       "@type": "Article",
-      "headline": "{% if is_us %}Daily trend brief {{ page.business_day_display }}{% else %}日次トレンドまとめ {{ page.business_day_display }}{% endif %}",
+      "headline": "{% if is_us %}Daily trend brief {{ page.business_day_display }}{% else %}日次ブリーフ {{ page.business_day_display }}{% endif %}",
       "description": {{ page.one_liner | tojson }},
       "datePublished": "{{ page.business_day }}",
       "inLanguage": "{{ lang }}",
@@ -68,7 +68,7 @@
     <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
 </head>
 <body class="bg-light">
-    {% set page_title = 'Trend summaries' if is_us else 'トレンドサマリー' %}
+    {% set page_title = 'Trend briefs' if is_us else 'トレンドブリーフ' %}
     {% set page_icon = 'fas fa-newspaper' %}
     {% set active_page = 'us' if is_us else 'summary' %}
     {% include 'partials/header.html' with context %}
@@ -79,8 +79,8 @@
                 <nav aria-label="breadcrumb" class="mb-3">
                     <ol class="breadcrumb small mb-0">
                         <li class="breadcrumb-item"><a href="{{ home_url }}" class="text-decoration-none">{% if is_us %}US Trends{% else %}日本トレンド{% endif %}</a></li>
-                        <li class="breadcrumb-item"><a href="{{ sumpfx }}/summaries" class="text-decoration-none">{% if is_us %}Summaries{% else %}サマリー一覧{% endif %}</a></li>
-                        <li class="breadcrumb-item active" aria-current="page">{% if is_us %}Daily{% else %}日次サマリー{% endif %}</li>
+                        <li class="breadcrumb-item"><a href="{{ sumpfx }}/summaries" class="text-decoration-none">{% if is_us %}Briefs{% else %}ブリーフ一覧{% endif %}</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">{% if is_us %}Daily{% else %}日次ブリーフ{% endif %}</li>
                     </ol>
                 </nav>
 
@@ -92,7 +92,7 @@
                             <span class="badge bg-warning text-dark">{% if is_us %}Draft (local){% else %}下書き（ローカル表示）{% endif %}</span>
                             {% endif %}
                         </div>
-                        <h1 class="h4 mb-2">{% if is_us %}Daily trend brief{% else %}日次トレンドまとめ{% endif %} — {{ page.business_day_display }}</h1>
+                        <h1 class="h4 mb-2">{% if is_us %}Daily trend brief{% else %}日次ブリーフ{% endif %} — {{ page.business_day_display }}</h1>
                         <p class="text-muted small mb-1">
                             {% if is_us %}Observation day: {{ page.business_day }} (slots {{ page.slots | join('/') }}){% else %}対象（観測日）: {{ page.business_day }}（{{ page.slots | join('/') }} 反映）{% endif %}
                         </p>
@@ -149,7 +149,7 @@
                             <li class="mb-1">{% if is_us %}Detailed rank moves per topic (7:00 → 13:00 → 19:00){% else %}各トピックの詳しい順位推移（7時 → 13時 → 19時）{% endif %}</li>
                         </ul>
                         <p class="small text-muted mb-0">
-                            {% if is_us %}Full daily (~7:30 JST) and weekly (Mondays ~8:00 JST). Times are targets.{% else %}日次全文（7:30 JST頃）と週次まとめ（月曜 8:00 JST頃）。時刻は目標です。{% endif %}
+                            {% if is_us %}Full daily (~9:00 JST) and weekly (Mondays ~10:00 JST) briefs. Times are targets.{% else %}日次ブリーフ（9:00 JST頃）と週次ブリーフ（月曜 10:00 JST頃）。時刻は目標です。{% endif %}
                         </p>
                         {% include 'partials/summary_email_cta.html' %}
                     </div>
@@ -161,9 +161,9 @@
 
                 <div class="d-flex flex-wrap gap-3 mt-4">
                     <a href="{{ home_url }}" class="btn btn-outline-primary btn-sm"><i class="fas fa-chart-line me-1"></i>{% if is_us %}Back to the dashboard{% else %}ダッシュボードで最新データを見る{% endif %}</a>
-                    <a href="{{ sumpfx }}/summaries" class="btn btn-outline-secondary btn-sm"><i class="fas fa-list me-1"></i>{% if is_us %}All summaries{% else %}サマリー一覧{% endif %}</a>
+                    <a href="{{ sumpfx }}/summaries" class="btn btn-outline-secondary btn-sm"><i class="fas fa-list me-1"></i>{% if is_us %}All briefs{% else %}ブリーフ一覧{% endif %}</a>
                     {% if page.week_available %}
-                    <a href="{{ sumpfx }}/summaries/weekly/{{ page.week_id }}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-calendar-week me-1"></i>{% if is_us %}This week's weekly{% else %}この週の週次まとめ{% endif %}</a>
+                    <a href="{{ sumpfx }}/summaries/weekly/{{ page.week_id }}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-calendar-week me-1"></i>{% if is_us %}This week's brief{% else %}この週の週次ブリーフ{% endif %}</a>
                     {% endif %}
                 </div>
             </div>

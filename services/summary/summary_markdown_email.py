@@ -302,7 +302,7 @@ _TD_STYLE = "border:1px solid #ccc;padding:4px 8px;text-align:center;"
 def markdown_to_email_html(
     markdown: str,
     *,
-    title: str = "サマリー",
+    title: str = "ブリーフ",
     skip_first_h1: bool = True,
 ) -> str:
     """配信用 HTML（インライン画像・添付なし）。リンクは <a> にする。
@@ -488,11 +488,11 @@ def summary_email_heading(kind: str, doc_id: str, region: str = "jp") -> str:
     kind = (kind or "").strip().lower()
     if region_u == "US":
         if kind == "weekly":
-            return f"Weekly summary — {doc_id} (US)"
-        return f"Daily summary — {doc_id} (US)"
+            return f"Weekly brief — {doc_id} (US)"
+        return f"Daily brief — {doc_id} (US)"
     if kind == "weekly":
-        return f"週次サマリー — {doc_id} ({region_u})"
-    return f"日次サマリー — {doc_id} ({region_u})"
+        return f"週次ブリーフ — {doc_id} ({region_u})"
+    return f"日次ブリーフ — {doc_id} ({region_u})"
 
 
 def load_summary_email_bodies(

@@ -1,4 +1,5 @@
-# JST 06:50 ≒ UTC 21:50 (previous calendar day in UTC) — before the 07:00 JST bulk refresh.
+# Cron: JST 06:50 ≒ UTC 21:50 (previous calendar day) — before the 07:00 JST bulk refresh.
+# GitHub Actions delay: the email lands around 09:00 JST. Do not move this cron to 09:00.
 # Writes JP docs/summaries/daily/{yesterday}.md and US docs/summaries/daily/us/{yesterday}.md.
 # slot 01 for that business_day is written by the 01:00 job on the next calendar day.
 # If jp+us are already in summary_documents (e.g. manual Run then delayed cron), skip all work.

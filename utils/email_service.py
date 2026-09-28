@@ -84,10 +84,10 @@ class EmailService:
         return self._send_email(to_email, subject, html_content, text_content)
         
     def send_trends_summary(self, to_email, trends_data, frequency='daily'):
-        """トレンドサマリーをメール送信"""
+        """トレンドブリーフをメール送信"""
         try:
             # メール内容を作成
-            subject = f"📊 トレンドサマリー - {self._get_frequency_text(frequency)}"
+            subject = f"📊 トレンドブリーフ - {self._get_frequency_text(frequency)}"
             html_content = self._create_html_email(trends_data, frequency)
             text_content = self._create_text_email(trends_data, frequency)
             
@@ -109,7 +109,7 @@ class EmailService:
         <html>
         <head>
             <meta charset="UTF-8">
-            <title>トレンドサマリー</title>
+            <title>トレンドブリーフ</title>
             <style>
                 body {{ font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }}
                 .container {{ max-width: 600px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
@@ -130,7 +130,7 @@ class EmailService:
         <body>
             <div class="container">
                 <div class="header">
-                    <h1>📊 トレンドサマリー</h1>
+                    <h1>📊 トレンドブリーフ</h1>
                     <p>{date_str} 更新</p>
                 </div>
         """
@@ -180,7 +180,7 @@ class EmailService:
         now = datetime.now(jst)
         date_str = now.strftime('%Y年%m月%d日 %H:%M')
         
-        text = f"📊 トレンドサマリー - {date_str}\n\n"
+        text = f"📊 トレンドブリーフ - {date_str}\n\n"
         
         for platform, data in trends_data.items():
             if data and len(data) > 0:

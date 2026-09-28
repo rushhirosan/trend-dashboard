@@ -1700,7 +1700,7 @@ def test_assemble_daily_markdown_includes_morning_brief(gads, monkeypatch):
     monkeypatch.setenv("MORNING_BRIEF_ENABLED", "true")
     brief = (
         "## 🗓 今日のカレンダー\n\n"
-        "**8/22（土）** · サマリー生成対象日 8/21 · 次の祝日は 9/21（月）敬老の日\n\n"
+        "**8/22（土）** · ブリーフ対象日 8/21 · 次の祝日は 9/21（月）敬老の日\n\n"
         "---\n"
     )
     monkeypatch.setattr(
@@ -1725,7 +1725,7 @@ def test_assemble_daily_markdown_structure(gads):
         "category_intros": {},
     }
     md = gads.assemble_daily_markdown(bd, editorial, {}, [], [], [])
-    assert "# 日次サマリー — 2026-05-31" in md
+    assert "# 日次ブリーフ — 2026-05-31" in md
     assert "対象外" in md
     assert "Medium" in md
     # 既定では「昨日の注目」はメール本文に含めない
@@ -1919,7 +1919,7 @@ def test_configure_daily_region_us_paths_and_headings(gads):
     assert "highlight" in gads._ONE_LINER_HEADING.lower()
     assert "Biggest movers" in gads._RISING_HEADING
     hdr = gads.render_header_markdown(date(2026, 7, 13))
-    assert "Daily summary" in hdr
+    assert "Daily brief" in hdr
     assert "Observation day" not in hdr
     assert "Generated" not in hdr
     gads.configure_daily_region("jp")

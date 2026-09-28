@@ -20,7 +20,7 @@ strip_legacy_weekly_charts = strip_legacy_charts
 weekly_markdown_to_email_text = markdown_to_email_text
 
 
-def weekly_markdown_to_email_html(markdown: str, *, title: str = "週次サマリー") -> str:
+def weekly_markdown_to_email_html(markdown: str, *, title: str = "週次ブリーフ") -> str:
     return markdown_to_email_html(markdown, title=title)
 
 
@@ -39,5 +39,5 @@ def load_weekly_email_bodies(
         raise FileNotFoundError(path)
     raw = path.read_text(encoding="utf-8")
     return weekly_markdown_to_email_text(raw), weekly_markdown_to_email_html(
-        raw, title=f"週次サマリー — {iso_week}"
+        raw, title=f"週次ブリーフ — {iso_week}"
     )

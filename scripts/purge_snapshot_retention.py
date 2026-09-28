@@ -10,7 +10,7 @@ trend_daily_snapshots / scheduler_slot_run / docs/summaries 原稿の古い行�
   python scripts/purge_snapshot_retention.py --dry-run
   python scripts/purge_snapshot_retention.py --summaries-only --dry-run
 
-docs/summaries の git 反映: 毎日 GHA ``summary-retention-purge.yml``（JST 08:00 前後）。
+docs/summaries の git 反映: 毎日 GHA ``summary-retention-purge.yml``（JST 08:00。期限切れの削除。日次メールは 9時頃）。
 手元で削除する場合は ``--summaries-only`` 実行後に commit する。
 """
 

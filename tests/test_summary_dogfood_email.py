@@ -77,7 +77,7 @@ def test_load_summary_email_bodies_daily(tmp_path: Path, monkeypatch):
     assert "https://ex.com" not in text
     assert " and a\n" in text or text.rstrip().endswith("and a")
     assert "<h1>" in html
-    assert "日次サマリー — 2026-07-22 (JP)" in html
+    assert "日次ブリーフ — 2026-07-22 (JP)" in html
     assert '<a href="https://ex.com">a</a>' in html
     assert "<strong>bold</strong>" in html
     assert "World Front Page" in text
@@ -91,10 +91,10 @@ def test_load_summary_email_bodies_daily(tmp_path: Path, monkeypatch):
 
 
 def test_summary_email_heading_follows_region_language():
-    assert summary_email_heading("daily", "2026-08-23", "jp") == "日次サマリー — 2026-08-23 (JP)"
-    assert summary_email_heading("daily", "2026-08-23", "us") == "Daily summary — 2026-08-23 (US)"
-    assert summary_email_heading("weekly", "2026-W34", "jp") == "週次サマリー — 2026-W34 (JP)"
-    assert summary_email_heading("weekly", "2026-W34", "us") == "Weekly summary — 2026-W34 (US)"
+    assert summary_email_heading("daily", "2026-08-23", "jp") == "日次ブリーフ — 2026-08-23 (JP)"
+    assert summary_email_heading("daily", "2026-08-23", "us") == "Daily brief — 2026-08-23 (US)"
+    assert summary_email_heading("weekly", "2026-W34", "jp") == "週次ブリーフ — 2026-W34 (JP)"
+    assert summary_email_heading("weekly", "2026-W34", "us") == "Weekly brief — 2026-W34 (US)"
 
 
 def test_load_summary_email_bodies_us_footer(tmp_path: Path, monkeypatch):
@@ -108,8 +108,8 @@ def test_load_summary_email_bodies_us_footer(tmp_path: Path, monkeypatch):
     _, text, html = load_summary_email_bodies(
         "daily", "2026-07-22", region="us", summaries_root=tmp_path
     )
-    assert "Daily summary — 2026-07-22 (US)" in html
-    assert "日次サマリー" not in html
+    assert "Daily brief — 2026-07-22 (US)" in html
+    assert "日次ブリーフ" not in html
     assert "Related: Top headlines from G7 countries" in text
     assert "G7, China & India" in html
     assert "utm_campaign=us" in html

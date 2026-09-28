@@ -28,12 +28,12 @@ def _checkout_disclaimer(region_plan: str) -> str:
     """Stripe Checkout の submit 付近に出す免責（BACKLOG の商品文言と揃える）。"""
     if region_plan == "us":
         return (
-            "Delivery times are targets (daily 7:30 JST, weekly Mondays 8:00 JST; "
-            "delay caps apply). Gaps, delays, or missing sources can happen. "
+            "Delivery times are targets (daily around 9:00 JST, weekly Mondays around 10:00 JST). "
+            "Gaps, delays, or missing sources can happen. "
             "Significant outages: a free month or a refund. Inbox delivery is not guaranteed."
         )
     return (
-        "配信は目標時刻です（日次 7:30 JST、週次月曜 8:00 JST。遅延上限あり）。"
+        "配信は目標時刻です（日次 9:00 JST頃、週次月曜 10:00 JST頃）。"
         "外部データや生成処理の都合で、欠損・遅延・欠配がありえます。"
         "重大な欠配は翌月無料または返金で対応します。メール環境による未到達は保証できません。"
     )

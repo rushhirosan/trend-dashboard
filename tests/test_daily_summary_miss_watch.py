@@ -1,4 +1,4 @@
-"""Fly 09:00 JST 日次サマリー欠走チェック（生成・メールはしない）。"""
+"""Fly 10:00 JST 日次サマリー欠走チェック（生成・メールはしない）。"""
 
 from datetime import datetime
 from unittest.mock import MagicMock, patch

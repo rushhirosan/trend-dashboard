@@ -129,7 +129,7 @@ python scripts/generate_ai_daily_summary.py --from-api --write --force
 詳細は `docs/summaries/README.md` を参照。
 
 ### generate_ai_weekly_summary.py
-`docs/summaries/daily/{business_day}.md`（クロスソース・カテゴリ別トップ3形式）を入力に OpenAI で週次＋ホットトピックを1ファイル生成する。日次ファイル名は観測日（[`docs/summaries/weekly/README.md`](../docs/summaries/weekly/README.md)）。DB・トレンド API は使わない。GHA は W1 日曜の日次のあと **W2 月曜 07:30 JST** 前後（`ai-weekly-summary.yml`）。
+`docs/summaries/daily/{business_day}.md`（クロスソース・カテゴリ別トップ3形式）を入力に OpenAI で週次＋ホットトピックを1ファイル生成する。日次ファイル名は観測日（[`docs/summaries/weekly/README.md`](../docs/summaries/weekly/README.md)）。DB・トレンド API は使わない。GHA cron は W1 日曜の日次のあと **W2 月曜 07:30 JST**（`ai-weekly-summary.yml`）。メール実着は **10:00頃**。
 
 **環境変数:** `OPENAI_API_KEY`（必須）、`OPENAI_SUMMARY_MODEL`（省略時 `gpt-4o-mini`）。
 

@@ -14,8 +14,8 @@
     <title>Weekly trend brief {{ page.iso_week }} | Trends Dashboard</title>
     <meta name="description" content="Weekly U.S. trend brief for {{ page.week_range }} (free preview). Notable topics and last week in review.">
     {% else %}
-    <title>週次トレンドまとめ {{ page.iso_week }} | トレンドダッシュボード</title>
-    <meta name="description" content="{{ page.week_range }} の週次トレンドまとめ（無料プレビュー）。日本・米国の注目トピックと先週の流れ。">
+    <title>週次ブリーフ {{ page.iso_week }} | トレンドダッシュボード</title>
+    <meta name="description" content="{{ page.week_range }} の週次トレンドブリーフ（無料プレビュー）。日本・米国の注目トピックと先週の流れ。">
     {% endif %}
     <meta name="author" content="Trends Dashboard">
     <meta name="robots" content="index, follow">
@@ -24,7 +24,7 @@
     <!-- Open Graph -->
     <meta property="og:type" content="article">
     <meta property="og:url" content="{{ public_base_url }}{{ sumpfx }}/summaries/weekly/{{ page.iso_week }}">
-    <meta property="og:title" content="{% if is_us %}Weekly trend brief {{ page.iso_week }}{% else %}週次トレンドまとめ {{ page.iso_week }}{% endif %} | Trends Dashboard">
+    <meta property="og:title" content="{% if is_us %}Weekly trend brief {{ page.iso_week }}{% else %}週次ブリーフ {{ page.iso_week }}{% endif %} | Trends Dashboard">
     <meta property="og:image" content="{{ public_base_url }}/static/images/og-image.png">
     <meta property="og:locale" content="{% if is_us %}en_US{% else %}ja_JP{% endif %}">
     <meta property="og:site_name" content="Trends Dashboard">
@@ -38,7 +38,7 @@
     {
       "@context": "https://schema.org",
       "@type": "Article",
-      "headline": "{% if is_us %}Weekly trend brief {{ page.iso_week }}{% else %}週次トレンドまとめ {{ page.iso_week }}{% endif %}",
+      "headline": "{% if is_us %}Weekly trend brief {{ page.iso_week }}{% else %}週次ブリーフ {{ page.iso_week }}{% endif %}",
       "description": {{ page.week_range | tojson }},
       "inLanguage": "{{ lang }}",
       "isAccessibleForFree": true,
@@ -67,7 +67,7 @@
     <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
 </head>
 <body class="bg-light">
-    {% set page_title = 'Trend summaries' if is_us else 'トレンドサマリー' %}
+    {% set page_title = 'Trend briefs' if is_us else 'トレンドブリーフ' %}
     {% set page_icon = 'fas fa-newspaper' %}
     {% set active_page = 'us' if is_us else 'summary' %}
     {% include 'partials/header.html' with context %}
@@ -78,8 +78,8 @@
                 <nav aria-label="breadcrumb" class="mb-3">
                     <ol class="breadcrumb small mb-0">
                         <li class="breadcrumb-item"><a href="{{ home_url }}" class="text-decoration-none">{% if is_us %}US Trends{% else %}日本トレンド{% endif %}</a></li>
-                        <li class="breadcrumb-item"><a href="{{ sumpfx }}/summaries" class="text-decoration-none">{% if is_us %}Summaries{% else %}サマリー一覧{% endif %}</a></li>
-                        <li class="breadcrumb-item active" aria-current="page">{% if is_us %}Weekly{% else %}週次サマリー{% endif %}</li>
+                        <li class="breadcrumb-item"><a href="{{ sumpfx }}/summaries" class="text-decoration-none">{% if is_us %}Briefs{% else %}ブリーフ一覧{% endif %}</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">{% if is_us %}Weekly{% else %}週次ブリーフ{% endif %}</li>
                     </ol>
                 </nav>
 
@@ -91,7 +91,7 @@
                             <span class="badge bg-warning text-dark">{% if is_us %}Draft (local){% else %}下書き（ローカル表示）{% endif %}</span>
                             {% endif %}
                         </div>
-                        <h1 class="h4 mb-2">{% if is_us %}Weekly trend brief{% else %}週次トレンドまとめ{% endif %} — {{ page.iso_week }}</h1>
+                        <h1 class="h4 mb-2">{% if is_us %}Weekly trend brief{% else %}週次ブリーフ{% endif %} — {{ page.iso_week }}</h1>
                         {% if page.week_range %}
                         <p class="text-muted small mb-1">{% if is_us %}Week of: {% else %}対象週: {% endif %}{{ page.week_range }}</p>
                         {% endif %}
@@ -164,7 +164,7 @@
                             <li class="mb-1">{% if is_us %}Within-week rank moves (day-by-day){% else %}週内の順位推移（日別の並び）{% endif %}</li>
                         </ul>
                         <p class="small text-muted mb-0">
-                            {% if is_us %}Full weekly on Mondays around 8:00 JST (target).{% else %}週次全文は月曜 8:00 JST頃（目標）。{% endif %}
+                            {% if is_us %}Full weekly brief on Mondays around 10:00 JST (target).{% else %}週次ブリーフは月曜 10:00 JST頃（目標）。{% endif %}
                         </p>
                         {% include 'partials/summary_email_cta.html' %}
                     </div>
@@ -176,7 +176,7 @@
 
                 <div class="d-flex flex-wrap gap-3 mt-4">
                     <a href="{{ home_url }}" class="btn btn-outline-primary btn-sm"><i class="fas fa-chart-line me-1"></i>{% if is_us %}Back to the dashboard{% else %}ダッシュボードで最新データを見る{% endif %}</a>
-                    <a href="{{ sumpfx }}/summaries" class="btn btn-outline-secondary btn-sm"><i class="fas fa-list me-1"></i>{% if is_us %}All summaries{% else %}サマリー一覧{% endif %}</a>
+                    <a href="{{ sumpfx }}/summaries" class="btn btn-outline-secondary btn-sm"><i class="fas fa-list me-1"></i>{% if is_us %}All briefs{% else %}ブリーフ一覧{% endif %}</a>
                 </div>
             </div>
         </div>

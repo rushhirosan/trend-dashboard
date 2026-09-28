@@ -1895,13 +1895,13 @@ def assemble_weekly_markdown(
     if include_hot_topics:
         editorial = enrich_hot_topics_with_links(editorial, weekly_rising, weekly_category)
     if _ACTIVE_REGION == "us":
-        title = f"# Weekly summary — {iso_week} (observation week JST {mon.isoformat()}–{sun.isoformat()})"
+        title = f"# Weekly brief — {iso_week} (observation week JST {mon.isoformat()}–{sun.isoformat()})"
         meta_lines = [
             f"- **Week**: {mon.isoformat()} – {sun.isoformat()} (JST)",
             "",
         ]
     else:
-        title = f"# 週次サマリー — {iso_week}（対象週 JST {mon.isoformat()}〜{sun.isoformat()}）"
+        title = f"# 週次ブリーフ — {iso_week}（対象週 JST {mon.isoformat()}〜{sun.isoformat()}）"
         meta_lines = [
             f"- **対象週**: {mon.isoformat()} 〜 {sun.isoformat()}",
             "",
@@ -2111,7 +2111,7 @@ LEGACY_SYSTEM_PROMPT = """あなたはトレンドダッシュボードの編集
 次を厳守すること:
 - 出力は日本語の Markdown のみ（YAML フロントマターは書かない。先頭から # 見出しでよい）。
 - 見出し構造:
-  - `# 週次サマリー — ISO_WEEK（対象週 JST WEEK_MON〜WEEK_SUN）`
+  - `# 週次ブリーフ — ISO_WEEK（対象週 JST WEEK_MON〜WEEK_SUN）`
   - `- **対象週**:` 1行（タイトルと重複するがスキャン用に残す）
   - `## 先週の流れ（短文）`
 - 「先週の流れ」は日次の繰り返しにせず、週としての要約にする。

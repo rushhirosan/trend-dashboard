@@ -1,5 +1,6 @@
 # Reads 7 days of trend_daily_snapshots for the prior ISO week (W1).
-# Sun's JP daily lands Mon 06:50 JST (ai-daily-summary); this job runs Mon 07:30 JST (W2 delivery week).
+# Cron: Mon 07:30 JST (UTC Sun 22:30), after the daily cron (06:50).
+# GitHub Actions delay: daily mail ~09:00 JST, this weekly mail ~10:00 JST. Do not move this cron to 10:00.
 # JP → docs/summaries/weekly/{ISO}.md ; US → docs/summaries/weekly/us/{ISO}.md
 # If jp+us are already in summary_documents (e.g. manual Run then delayed cron), skip all work.
 name: AI weekly summary

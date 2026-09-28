@@ -38,23 +38,23 @@
 
 | 観測日（`business_day`・ファイル名） | スナップショット | 日次サマリーが届く目安 |
 |--------------------------------------|------------------|-------------------------|
-| 5/18（日） | 5/18 の 07 / 13 / 19、翌暦日 01 で前日を閉じる | **5/19 06:50** 前後（Actions **AI daily summary**） |
-| 5/19（月） | 同上 | **5/20 06:50** 前後 |
+| 5/18（日） | 5/18 の 07 / 13 / 19、翌暦日 01 で前日を閉じる | **5/19 9:00** 頃（cron 06:50、Actions **AI daily summary**） |
+| 5/19（月） | 同上 | **5/20 9:00** 頃 |
 
 - スクリプト既定: `generate_ai_daily_summary.py` は **JST の昨日** を `business_day` にする（`--business-day` で上書き可）。
-- **欠走検知（Fly）**: 毎日 **09:00 JST** に `summary_documents` へ前日分（jp/us）があるかだけ見る。無いとき Discord。生成・メールはしない。
+- **欠走検知（Fly）**: 毎日 **10:00 JST** に `summary_documents` へ前日分（jp/us）があるかだけ見る。無いとき Discord。生成・メールはしない。
 - **二重実行ガード（GHA）**: 手動 Run 後に遅延 cron が来ても、jp+us が DB にあれば生成・メールをスキップ（`force` で再生成可）。
 - **夜の X 投稿案**（`docs/x_post_samples/daily/`）— **使用していない（2026-07 停止）**。日次の読み物は AI 日次サマリーのみ。
 
 ### 週次のタイムライン（JST）
 
-**W1（先週）の月曜〜日曜**の日次をまとめ、**W2（翌週）の月曜**に週次を生成する（パターンAの配信目標 **8:00** より前に原稿をコミット）。
+**W1（先週）の月曜〜日曜**の日次をまとめ、**W2（翌週）の月曜**に週次を生成する（メール実着は **10:00頃**。日次メールのあと）。
 
 例: W20 = 月 **5/11** 〜 日 **5/17** をまとめ、**5/18（月）** に `weekly/2026-W20.md` を生成:
 
-1. 日曜観測日 `2026-05-17.md` が **月曜 5/18 06:50** 前後（**AI daily summary**）に揃う。
-2. **月曜 5/18 07:30** 前後に **AI weekly summary** が `weekly/2026-W20.md` を生成・コミット。
-3. 配信は [`summary_pattern_a_phase1.md`](../summary_pattern_a_phase1.md) のとおり **月曜 8:00 JST**（遅延上限 8:30）を目標。
+1. 日曜観測日 `2026-05-17.md` のメールは **月曜 5/18 9:00** 頃（cron は **06:50**、**AI daily summary**）。
+2. **AI weekly summary** の cron は **月曜 5/18 07:30**。メール実着は **10:00頃**。`weekly/2026-W20.md` を生成・コミット。
+3. 配信目標は [`summary_pattern_a_phase1.md`](../summary_pattern_a_phase1.md) のとおり **月曜 10:00 JST頃**。
 
 詳細: [`weekly/README.md`](weekly/README.md)
 
@@ -198,7 +198,7 @@ python scripts/generate_ai_weekly_summary.py --from-api --write --force --weekly
 | 週次 `weekly/*.md` | 30 日 | `SUMMARY_WEEKLY_RETENTION_DAYS` |
 
 - **DB**（`trend_daily_snapshots` / `scheduler_slot_run`）: 本番 APScheduler が毎日 **03:00 JST** に `purge_expired_snapshots` を実行。
-- **git 原稿**: GitHub Actions **Summary retention purge**（`.github/workflows/summary-retention-purge.yml`、JST **08:00** 前後）。日次生成（06:50）・週次生成（月 07:30）のあとに古いファイルを削除してコミット。
+- **git 原稿**: GitHub Actions **Summary retention purge**（`.github/workflows/summary-retention-purge.yml`、JST **08:00**）。期限切れだけ消す。日次メール（9時頃）・週次メール（月曜 10時頃）より前に走ってよい。
 - **手元**: `python scripts/purge_snapshot_retention.py --summaries-only --dry-run` で確認後、必要なら実行して commit。
 
 ---

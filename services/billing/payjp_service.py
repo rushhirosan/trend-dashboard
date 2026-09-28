@@ -87,7 +87,7 @@ def create_checkout_session(
     base = AppConfig.PUBLIC_BASE_URL.rstrip("/")
     amount = trial_amount_jpy()
     days = trial_days()
-    product_name = f"日本のサマリーお試し（約{days}日・日次＋週次）"
+    product_name = f"日本のブリーフお試し（約{days}日・日次＋週次）"
 
     line_item: Dict[str, Any] = {"quantity": 1}
     price_id = (AppConfig.PAYJP_PRICE_ID or "").strip()

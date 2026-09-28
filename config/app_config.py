@@ -87,6 +87,21 @@ class AppConfig:
         'ENABLE_AI_SUMMARY_CHECKOUT', 'true'
     ).lower() in ('true', '1', 'yes')
 
+    # Gumroad 単品（約30日）。Ping は seller_id と商品 ID が一致したときだけ配信対象にする。
+    GUMROAD_SELLER_ID = os.getenv('GUMROAD_SELLER_ID', '').strip()
+    GUMROAD_PING_TOKEN = os.getenv('GUMROAD_PING_TOKEN', '').strip()
+    GUMROAD_PRODUCT_ID_JP = os.getenv('GUMROAD_PRODUCT_ID_JP', '').strip()
+    GUMROAD_PRODUCT_ID_US = os.getenv('GUMROAD_PRODUCT_ID_US', '').strip()
+    GUMROAD_URL_JP = os.getenv('GUMROAD_URL_JP', '').strip()
+    GUMROAD_URL_US = os.getenv('GUMROAD_URL_US', '').strip()
+    GUMROAD_ACCEPT_TEST = os.getenv(
+        'GUMROAD_ACCEPT_TEST', ''
+    ).lower() in ('true', '1', 'yes')
+    try:
+        GUMROAD_ACCESS_DAYS = int(os.getenv('GUMROAD_ACCESS_DAYS', '30') or '30')
+    except ValueError:
+        GUMROAD_ACCESS_DAYS = 30
+
     # 特商法・問い合わせ表記（公開リポジトリに個人情報を載せない。Fly secrets / .env で設定）
     LEGAL_SELLER_NAME = os.getenv('LEGAL_SELLER_NAME', '').strip()
     LEGAL_OPERATOR_NAME = os.getenv('LEGAL_OPERATOR_NAME', '').strip()

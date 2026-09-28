@@ -1,6 +1,9 @@
-{# 有料トレンドサマリー PAY.JP v2 お試し（JP・約30日）— Checkout へリダイレクト
+{# 有料トレンドサマリー。Gumroad の商品 URL がある地域は直リンク。
+   無いときは PAY.JP v2 お試し（本番審査不可の資産）。
    checkout_form_prefix で ID を分離（fake door / summary CTA 等） #}
 {% set cfp = checkout_form_prefix | default('ai-summary') %}
+{% set offer_region = checkout_default_region | default('us' if checkout_locale == 'en' else 'jp') %}
+{% set gumroad_url = (GUMROAD_URL_US if offer_region == 'us' else GUMROAD_URL_JP) | default('', true) %}
 {% set checkout_on = ENABLE_AI_SUMMARY_CHECKOUT | default(false) %}
 {% set trial_days = PAYJP_TRIAL_DAYS | default(30) %}
 {% set trial_amount = PAYJP_TRIAL_AMOUNT_JPY | default(500) %}
@@ -24,11 +27,29 @@
   {% set email_required = "メールアドレスを入力してください。" %}
 {% endif %}
 <div class="ai-summary-checkout-root"
-    data-checkout-enabled="{{ 'true' if checkout_on else 'false' }}"
+    data-checkout-enabled="{{ 'true' if checkout_on and not gumroad_url else 'false' }}"
     data-checkout-error="{{ checkout_error }}"
     data-email-required="{{ email_required }}"
     data-checkout-form-prefix="{{ cfp }}">
-  {% if checkout_on %}
+  {% if gumroad_url %}
+  {% if checkout_locale == 'en' %}
+  <p class="small fw-semibold mb-2">¥300 a month. Each morning: yesterday's top signals. Mondays: a brief of the week. Cancel anytime.</p>
+  <p class="small text-muted mb-2">Payment is handled by Gumroad. You will not get an email the moment you pay. The first one arrives the next morning. Times are targets (daily 7:30 JST, weekly Mondays 8:00 JST). Gaps can happen. Inbox delivery is not guaranteed.</p>
+  <a class="btn btn-primary btn-sm" href="{{ gumroad_url }}" target="_blank" rel="noopener noreferrer">Get the email</a>
+  <p class="small text-muted mb-0 mt-2">
+    <a href="/legal/terms">Terms</a> ·
+    <a href="/legal/privacy">Privacy</a>
+  </p>
+  {% else %}
+  <p class="small fw-semibold mb-2">月額 ¥300。毎朝、昨日の注目を届けます。月曜は週のまとめも届きます。いつでも解約できます。</p>
+  <p class="small text-muted mb-2">支払いは Gumroad が行います。支払った瞬間には届きません。1通目は翌朝です。配信は目標時刻です（日次 7:30 JST、週次月曜 8:00 JST）。欠損・遅延がありえます。メール環境による未到達は保証できません。</p>
+  <a class="btn btn-primary btn-sm" href="{{ gumroad_url }}" target="_blank" rel="noopener noreferrer">メールを受け取る</a>
+  <p class="small text-muted mb-0 mt-2">
+    <a href="/legal/terms">利用規約</a> ·
+    <a href="/legal/privacy">プライバシー</a>
+  </p>
+  {% endif %}
+  {% elif checkout_on %}
   <p class="small fw-semibold mb-2">{{ plan_label }}</p>
   <div class="mb-2">
     <label class="form-label small mb-1" for="{{ cfp }}-email">{{ email_label }}</label>

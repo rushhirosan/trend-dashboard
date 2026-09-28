@@ -26,7 +26,13 @@ from utils.logger_config import get_logger
 logger = get_logger(__name__)
 
 # Fly ヘルスチェックはカスタムドメインへ飛ばさない
-_FLY_DEV_REDIRECT_SKIP_PATHS = frozenset({"/health", "/healthz"})
+_FLY_DEV_REDIRECT_SKIP_PATHS = frozenset({
+    "/health",
+    "/healthz",
+    # POST の 301 はボディが落ちる。Ping / Webhook は fly.dev でも受ける。
+    "/api/billing/gumroad/ping",
+    "/api/billing/payjp/webhook",
+})
 
 
 def _is_fly_dev_host(host: str) -> bool:
@@ -221,6 +227,7 @@ def create_app():
             trial_amount_jpy,
             trial_days,
         )
+        from services.billing.gumroad_service import access_days, checkout_url
         return {
             'public_base_url': AppConfig.PUBLIC_BASE_URL,
             'ENABLE_SUBSCRIPTION_UI': AppConfig.ENABLE_SUBSCRIPTION_UI,
@@ -232,6 +239,9 @@ def create_app():
             'ENABLE_AI_SUMMARY_CHECKOUT': checkout_enabled(),
             'PAYJP_TRIAL_AMOUNT_JPY': trial_amount_jpy(),
             'PAYJP_TRIAL_DAYS': trial_days(),
+            'GUMROAD_URL_JP': checkout_url('jp'),
+            'GUMROAD_URL_US': checkout_url('us'),
+            'GUMROAD_ACCESS_DAYS': access_days(),
             'LEGAL_SELLER_NAME': AppConfig.LEGAL_SELLER_NAME,
             'LEGAL_OPERATOR_NAME': AppConfig.LEGAL_OPERATOR_NAME
             or AppConfig.LEGAL_SELLER_NAME,

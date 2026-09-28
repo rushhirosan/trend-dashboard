@@ -58,6 +58,17 @@ def test_sitemap_excludes_sct_includes_privacy_terms(client):
     assert "/legal/terms" in text
 
 
+def test_privacy_names_gumroad_not_payjp_as_processor(client):
+    privacy = client.get("/legal/privacy").get_data(as_text=True)
+    terms = client.get("/legal/terms").get_data(as_text=True)
+    assert "Gumroad" in privacy
+    assert "Resend" in privacy
+    assert "PAY.JP" not in privacy
+    assert "Gumroad" in terms
+    sct = client.get("/legal/sct").get_data(as_text=True)
+    assert "PAY.JP" in sct
+
+
 def test_about_footer_hides_sct(client):
     text = client.get("/about").get_data(as_text=True)
     assert 'href="/legal/sct"' not in text

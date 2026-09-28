@@ -14,6 +14,7 @@ from services.billing.payjp_service import (
     trial_amount_jpy,
     trial_days,
 )
+from services.billing.gumroad_service import handle_gumroad_ping
 from utils.logger_config import get_logger
 
 logger = get_logger(__name__)
@@ -53,6 +54,22 @@ def payjp_webhook():
     if not ok:
         logger.warning("PAY.JP webhook rejected: %s", message)
         status = 400 if "token" in message or "payload" in message else 500
+        return jsonify({"error": message}), status
+    return jsonify({"received": True, "detail": message})
+
+
+@billing_bp.route("/api/billing/gumroad/ping", methods=["POST"])
+def gumroad_ping():
+    """Gumroad Ping（application/x-www-form-urlencoded）。"""
+    fields = request.form.to_dict(flat=True)
+    if not fields:
+        return jsonify({"error": "invalid payload"}), 400
+    status, message = handle_gumroad_ping(
+        fields,
+        ping_token=request.args.get("token") or "",
+    )
+    if status >= 400:
+        logger.warning("Gumroad ping rejected: %s", message)
         return jsonify({"error": message}), status
     return jsonify({"received": True, "detail": message})
 

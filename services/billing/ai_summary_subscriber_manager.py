@@ -43,6 +43,7 @@ class AiSummarySubscriberManager:
                             payjp_customer_id VARCHAR(255),
                             payjp_subscription_id VARCHAR(255),
                             payjp_checkout_session_id VARCHAR(255),
+                            gumroad_sale_id VARCHAR(255),
                             expires_at TIMESTAMP,
                             is_active BOOLEAN DEFAULT TRUE,
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -54,6 +55,7 @@ class AiSummarySubscriberManager:
                         ("payjp_customer_id", "VARCHAR(255)"),
                         ("payjp_subscription_id", "VARCHAR(255)"),
                         ("payjp_checkout_session_id", "VARCHAR(255)"),
+                        ("gumroad_sale_id", "VARCHAR(255)"),
                         ("expires_at", "TIMESTAMP"),
                     ):
                         cursor.execute(
@@ -93,6 +95,7 @@ class AiSummarySubscriberManager:
         payjp_customer_id: Optional[str] = None,
         payjp_subscription_id: Optional[str] = None,
         payjp_checkout_session_id: Optional[str] = None,
+        gumroad_sale_id: Optional[str] = None,
         expires_at: Optional[datetime] = None,
     ) -> Tuple[bool, str]:
         email_n = (email or "").strip().lower()
@@ -116,10 +119,10 @@ class AiSummarySubscriberManager:
                             email, region_plan,
                             stripe_customer_id, stripe_subscription_id,
                             payjp_customer_id, payjp_subscription_id,
-                            payjp_checkout_session_id, expires_at,
+                            payjp_checkout_session_id, gumroad_sale_id, expires_at,
                             is_active, updated_at
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE, CURRENT_TIMESTAMP)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE, CURRENT_TIMESTAMP)
                         ON CONFLICT (email) DO UPDATE SET
                             region_plan = EXCLUDED.region_plan,
                             stripe_customer_id = COALESCE(
@@ -142,6 +145,10 @@ class AiSummarySubscriberManager:
                                 EXCLUDED.payjp_checkout_session_id,
                                 ai_summary_subscribers.payjp_checkout_session_id
                             ),
+                            gumroad_sale_id = COALESCE(
+                                EXCLUDED.gumroad_sale_id,
+                                ai_summary_subscribers.gumroad_sale_id
+                            ),
                             expires_at = COALESCE(
                                 EXCLUDED.expires_at,
                                 ai_summary_subscribers.expires_at
@@ -157,6 +164,7 @@ class AiSummarySubscriberManager:
                             payjp_customer_id,
                             payjp_subscription_id,
                             payjp_checkout_session_id,
+                            (gumroad_sale_id or "").strip() or None,
                             expires_store,
                         ),
                     )
@@ -195,6 +203,70 @@ class AiSummarySubscriberManager:
             logger.error(
                 "❌ 購読無効化エラー sub=%s: %s", sub_id, e, exc_info=True
             )
+            return False
+
+    def grant_gumroad_access(
+        self,
+        *,
+        email: str,
+        region_plan: str,
+        sale_id: str,
+        expires_at: datetime,
+    ) -> Tuple[bool, str]:
+        """Gumroad の sale を配信対象にする。同じ sale_id の再送では期限を延ばさない。"""
+        sale = (sale_id or "").strip()
+        if not sale:
+            return False, "sale_id が必要です"
+        email_n = (email or "").strip().lower()
+        if not self.validate_email(email_n):
+            return False, "有効なメールアドレスが必要です"
+        try:
+            with self.db.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT gumroad_sale_id, is_active
+                        FROM ai_summary_subscribers
+                        WHERE email = %s
+                        """,
+                        (email_n,),
+                    )
+                    row = cursor.fetchone()
+            if row and (row[0] or "") == sale and bool(row[1]):
+                return True, "already_active"
+        except Exception as e:
+            logger.error("❌ Gumroad 購読参照エラー: %s", e, exc_info=True)
+            return False, "購読参照に失敗しました"
+        return self.upsert_active(
+            email=email_n,
+            region_plan=region_plan,
+            gumroad_sale_id=sale,
+            expires_at=expires_at,
+        )
+
+    def revoke_gumroad_sale(self, sale_id: str) -> bool:
+        """この sale_id が現在の購入なら配信を止める。古い返金では新しい購入を消さない。"""
+        sale = (sale_id or "").strip()
+        if not sale:
+            return False
+        try:
+            with self.db.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        UPDATE ai_summary_subscribers
+                        SET is_active = FALSE,
+                            expires_at = CURRENT_TIMESTAMP,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE gumroad_sale_id = %s
+                          AND is_active = TRUE
+                        """,
+                        (sale,),
+                    )
+                    conn.commit()
+                    return cursor.rowcount > 0
+        except Exception as e:
+            logger.error("❌ Gumroad 返金の無効化エラー sale=%s: %s", sale, e, exc_info=True)
             return False
 
     def list_active_for_region(self, region: str) -> List[Dict[str, Any]]:

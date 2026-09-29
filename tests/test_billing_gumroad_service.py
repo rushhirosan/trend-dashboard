@@ -159,9 +159,23 @@ def test_checkout_partial_links_region_product():
             GUMROAD_ACCESS_DAYS=30,
             ENABLE_AI_SUMMARY_CHECKOUT=False,
         )
+        ja = render_template(
+            "partials/ai_summary_checkout_form.html",
+            checkout_locale="ja",
+            checkout_default_region="jp",
+            GUMROAD_URL_US="https://gumroad.com/l/us-summary",
+            GUMROAD_URL_JP="https://gumroad.com/l/jp-summary",
+            GUMROAD_ACCESS_DAYS=30,
+            ENABLE_AI_SUMMARY_CHECKOUT=False,
+        )
     assert 'href="https://gumroad.com/l/us-summary"' in html
     assert "Get the email" in html
     assert "next morning" in html
-    assert "No auto-renew" not in html
+    assert "$2 for about 30 days" in html
+    assert "No auto-renew" in html
+    assert "a month" not in html
     assert "お試し購入" not in html
     assert 'data-checkout-enabled="false"' in html
+    assert "¥300で約30日" in ja
+    assert "自動更新はありません" in ja
+    assert "月額" not in ja

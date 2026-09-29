@@ -33,7 +33,7 @@
     data-checkout-form-prefix="{{ cfp }}">
   {% if gumroad_url %}
   {% if checkout_locale == 'en' %}
-  <p class="small fw-semibold mb-2">$2 a month. Each morning: yesterday's top signals. Mondays: a brief of the week. Cancel anytime.</p>
+  <p class="small fw-semibold mb-2">$2 for about 30 days. Each morning: yesterday's top signals. Mondays: a brief of the week. No auto-renew. To continue, buy again.</p>
   <p class="small text-muted mb-2">Payment is handled by Gumroad. You will not get an email the moment you pay. The first one arrives the next morning. Times are targets (daily around 9:00 JST, weekly Mondays around 10:00 JST). Gaps can happen. Inbox delivery is not guaranteed.</p>
   <a class="btn btn-primary btn-sm" href="{{ gumroad_url }}" target="_blank" rel="noopener noreferrer">Get the email</a>
   <p class="small text-muted mb-0 mt-2">
@@ -41,7 +41,7 @@
     <a href="/legal/privacy">Privacy</a>
   </p>
   {% else %}
-  <p class="small fw-semibold mb-2">月額 ¥300。毎朝、昨日の注目を届けます。月曜は週のまとめも届きます。いつでも解約できます。</p>
+  <p class="small fw-semibold mb-2">¥300で約30日。毎朝、昨日の注目を届けます。月曜は週のまとめも届きます。自動更新はありません。続けるには、もう一度購入してください。</p>
   <p class="small text-muted mb-2">支払いは Gumroad が行います。支払った瞬間には届きません。1通目は翌朝です。配信は目標時刻です（日次 9:00 JST頃、週次月曜 10:00 JST頃）。欠損・遅延がありえます。メール環境による未到達は保証できません。</p>
   <a class="btn btn-primary btn-sm" href="{{ gumroad_url }}" target="_blank" rel="noopener noreferrer">メールを受け取る</a>
   <p class="small text-muted mb-0 mt-2">

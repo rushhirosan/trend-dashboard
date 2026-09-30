@@ -1,8 +1,7 @@
 """Gumroad の購入通知。
 
-JP は月額メンバーシップ。請求（sale）のたびに約30日、配信対象にする。
+JP / US とも月額メンバーシップ。請求（sale）のたびに約30日、配信対象にする。
 解約通知では期限を延ばさない。支払い済みの期間は expires_at まで残る。
-US は単品で、同じ sale 処理を使う。
 
 Ping は application/x-www-form-urlencoded。price は USD セントなので金額判定には使わない。
 署名は無い。Ping URL の token、seller_id、商品 ID が一致した sale だけを配信対象にする。

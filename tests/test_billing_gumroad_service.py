@@ -188,11 +188,11 @@ def test_checkout_partial_links_region_product():
             ENABLE_AI_SUMMARY_CHECKOUT=False,
         )
     assert 'href="https://gumroad.com/l/us-summary"' in html
-    assert "Get the email" in html
+    assert "Subscribe monthly" in html
     assert "next morning" in html
-    assert "$2 for about 30 days" in html
-    assert "No auto-renew" in html
-    assert "a month" not in html
+    assert "A $2/month membership" in html
+    assert "renews every month" in html
+    assert "No auto-renew" not in html
     assert "お試し購入" not in html
     assert 'data-checkout-enabled="false"' in html
     assert "月額¥300のメンバーシップ" in ja

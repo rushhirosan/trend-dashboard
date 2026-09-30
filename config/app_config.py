@@ -87,7 +87,7 @@ class AppConfig:
         'ENABLE_AI_SUMMARY_CHECKOUT', 'true'
     ).lower() in ('true', '1', 'yes')
 
-    # Gumroad。JP は月額メンバーシップ（請求ごとに約30日）。US は単品（約30日）。
+    # Gumroad。JP / US とも月額メンバーシップ（請求ごとに約30日）。
     # Ping は seller_id と商品 ID が一致したときだけ配信対象にする。
     GUMROAD_SELLER_ID = os.getenv('GUMROAD_SELLER_ID', '').strip()
     GUMROAD_PING_TOKEN = os.getenv('GUMROAD_PING_TOKEN', '').strip()

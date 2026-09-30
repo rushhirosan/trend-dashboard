@@ -1,4 +1,8 @@
-"""Gumroad 単品（約30日）の購入通知。
+"""Gumroad の購入通知。
+
+JP は月額メンバーシップ。請求（sale）のたびに約30日、配信対象にする。
+解約通知では期限を延ばさない。支払い済みの期間は expires_at まで残る。
+US は単品で、同じ sale 処理を使う。
 
 Ping は application/x-www-form-urlencoded。price は USD セントなので金額判定には使わない。
 署名は無い。Ping URL の token、seller_id、商品 ID が一致した sale だけを配信対象にする。
@@ -18,6 +22,14 @@ from utils.logger_config import get_logger
 logger = get_logger(__name__)
 
 _REVOKE_RESOURCES = frozenset({"refund", "dispute"})
+# 解約・更新・終了は sale ではない。再付与すると解約後に期限が伸びる。
+_IGNORE_RESOURCES = frozenset({
+    "dispute_won",
+    "cancellation",
+    "subscription_updated",
+    "subscription_restarted",
+    "subscription_ended",
+})
 
 
 def access_days() -> int:
@@ -63,12 +75,12 @@ def handle_gumroad_ping(
         return 200, "ignored:test"
 
     resource = _field(fields, "resource_name").lower()
-    if resource == "dispute_won":
-        return 200, "ignored:dispute_won"
+    if resource in _IGNORE_RESOURCES:
+        return 200, f"ignored:{resource}"
 
     product_id = _field(fields, "product_id")
     short_id = _field(fields, "short_product_id")
-    permalink = _field(fields, "product_permalink")
+    permalink = _field(fields, "product_permalink") or _field(fields, "permalink")
     region = _region_for_product(product_id, short_id, permalink)
     sale_id = _field(fields, "sale_id")
     mgr = subscriber_manager or AiSummarySubscriberManager()

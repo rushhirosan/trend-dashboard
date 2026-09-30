@@ -66,7 +66,9 @@ def test_privacy_names_gumroad_not_payjp_as_processor(client):
     assert "PAY.JP" not in privacy
     assert "Gumroad" in terms
     sct = client.get("/legal/sct").get_data(as_text=True)
-    assert "PAY.JP" in sct
+    assert "Gumroad" in sct
+    assert "月額" in sct
+    assert "PAY.JP" not in sct
 
 
 def test_about_footer_hides_sct(client):

@@ -94,7 +94,12 @@ def test_sale_grants_thirty_days_for_matching_product(mock_config):
     mgr = MagicMock()
     mgr.grant_gumroad_access.return_value = (True, "購読を登録しました")
     status, detail = handle_gumroad_ping(
-        _sale(product_id="other", short_product_id="other", product_permalink="short_jp"),
+        _sale(
+            product_id="other",
+            short_product_id="other",
+            product_permalink="",
+            permalink="short_jp",
+        ),
         ping_token="ping-secret",
         subscriber_manager=mgr,
     )
@@ -127,6 +132,20 @@ def test_refund_revokes_matching_sale_only(mock_config):
         subscriber_manager=mgr,
     )
     assert (status, detail) == (200, "revoke_noop")
+
+
+@patch("services.billing.gumroad_service.AppConfig")
+def test_cancellation_does_not_extend_access(mock_config):
+    _ready(mock_config)
+    mgr = MagicMock()
+    status, detail = handle_gumroad_ping(
+        _sale(resource_name="cancellation", permalink="short_jp"),
+        ping_token="ping-secret",
+        subscriber_manager=mgr,
+    )
+    assert (status, detail) == (200, "ignored:cancellation")
+    mgr.grant_gumroad_access.assert_not_called()
+    mgr.revoke_gumroad_sale.assert_not_called()
 
 
 @patch("routes.billing_routes.handle_gumroad_ping", return_value=(200, "activated"))
@@ -176,6 +195,7 @@ def test_checkout_partial_links_region_product():
     assert "a month" not in html
     assert "お試し購入" not in html
     assert 'data-checkout-enabled="false"' in html
-    assert "¥300で約30日" in ja
-    assert "自動更新はありません" in ja
-    assert "月額" not in ja
+    assert "月額¥300のメンバーシップ" in ja
+    assert "毎月自動で更新されます" in ja
+    assert "月額で受け取る" in ja
+    assert "自動更新はありません" not in ja

@@ -1,4 +1,4 @@
-"""Legal pages (privacy / terms public; SCT hidden until selling resumes)."""
+"""Legal pages (privacy, terms, and specified commercial transactions)."""
 
 import pytest
 
@@ -27,17 +27,11 @@ def test_legal_pages_ok(client, path, needle):
     assert needle in text
     assert "/legal/privacy" in text
     assert "/legal/terms" in text
-    # SCT is kept at URL but not linked from related-nav / public chrome
-    assert 'href="/legal/sct"' not in text
+    assert 'href="/legal/sct"' in text
 
 
-def test_sct_is_noindex(client):
-    text = client.get("/legal/sct").get_data(as_text=True)
-    assert 'content="noindex, nofollow"' in text
-
-
-def test_privacy_terms_are_indexable(client):
-    for path in ("/legal/privacy", "/legal/terms"):
+def test_legal_pages_are_indexable(client):
+    for path in ("/legal/sct", "/legal/privacy", "/legal/terms"):
         text = client.get(path).get_data(as_text=True)
         assert 'content="index, follow"' in text
 
@@ -49,11 +43,11 @@ def test_legal_pages_avoid_ai_summary_label(client):
         assert "AIサマリー" not in text
 
 
-def test_sitemap_excludes_sct_includes_privacy_terms(client):
+def test_sitemap_includes_privacy_terms_sct(client):
     res = client.get("/sitemap.xml")
     assert res.status_code == 200
     text = res.get_data(as_text=True)
-    assert "/legal/sct" not in text
+    assert "/legal/sct" in text
     assert "/legal/privacy" in text
     assert "/legal/terms" in text
 
@@ -64,15 +58,18 @@ def test_privacy_names_gumroad_not_payjp_as_processor(client):
     assert "Gumroad" in privacy
     assert "Resend" in privacy
     assert "PAY.JP" not in privacy
+    assert "お試し購入" not in privacy
+    assert "購入・問い合わせ" in privacy
     assert "Gumroad" in terms
     sct = client.get("/legal/sct").get_data(as_text=True)
     assert "Gumroad" in sct
     assert "月額" in sct
+    assert "お試し" not in sct
     assert "PAY.JP" not in sct
 
 
-def test_about_footer_hides_sct(client):
+def test_about_footer_links_sct(client):
     text = client.get("/about").get_data(as_text=True)
-    assert 'href="/legal/sct"' not in text
+    assert 'href="/legal/sct"' in text
     assert 'href="/legal/privacy"' in text
     assert 'href="/legal/terms"' in text

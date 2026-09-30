@@ -38,7 +38,8 @@
   <a class="btn btn-primary btn-sm" href="{{ gumroad_url }}" target="_blank" rel="noopener noreferrer">Subscribe monthly</a>
   <p class="small text-muted mb-0 mt-2">
     <a href="/legal/terms">Terms</a> ·
-    <a href="/legal/privacy">Privacy</a>
+    <a href="/legal/privacy">Privacy</a> ·
+    <a href="/legal/sct">Commercial transactions</a>
   </p>
   {% else %}
   <p class="small fw-semibold mb-2">月額¥300のメンバーシップです。毎朝、昨日の注目を届けます。月曜は週のまとめも届きます。毎月自動で更新されます。Gumroad で解約すると、次の請求から止まります。</p>
@@ -46,7 +47,8 @@
   <a class="btn btn-primary btn-sm" href="{{ gumroad_url }}" target="_blank" rel="noopener noreferrer">月額で受け取る</a>
   <p class="small text-muted mb-0 mt-2">
     <a href="/legal/terms">利用規約</a> ·
-    <a href="/legal/privacy">プライバシー</a>
+    <a href="/legal/privacy">プライバシー</a> ·
+    <a href="/legal/sct">特定商取引法</a>
   </p>
   {% endif %}
   {% elif checkout_on %}
@@ -64,10 +66,12 @@
   <p class="small text-muted mb-0 mt-2">
     {% if checkout_locale == 'en' %}
     <a href="/legal/terms">Terms</a> ·
-    <a href="/legal/privacy">Privacy</a>
+    <a href="/legal/privacy">Privacy</a> ·
+    <a href="/legal/sct">Commercial transactions</a>
     {% else %}
     <a href="/legal/terms">利用規約</a> ·
-    <a href="/legal/privacy">プライバシー</a>
+    <a href="/legal/privacy">プライバシー</a> ·
+    <a href="/legal/sct">特定商取引法</a>
     {% endif %}
   </p>
   {% else %}

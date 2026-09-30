@@ -189,6 +189,7 @@ def test_checkout_partial_links_region_product():
         )
     assert 'href="https://gumroad.com/l/us-summary"' in html
     assert "Subscribe monthly" in html
+    assert 'href="/legal/sct"' in html
     assert "next morning" in html
     assert "A $2/month membership" in html
     assert "renews every month" in html
@@ -198,4 +199,5 @@ def test_checkout_partial_links_region_product():
     assert "月額¥300のメンバーシップ" in ja
     assert "毎月自動で更新されます" in ja
     assert "月額で受け取る" in ja
+    assert 'href="/legal/sct"' in ja
     assert "自動更新はありません" not in ja

@@ -417,13 +417,12 @@ def create_app():
 
         @app.route('/legal/sct')
         def legal_sct():
-            """特定商取引法に基づく表記（課金再開までナビ・sitemap からは隠す）"""
+            """特定商取引法に基づく表記。"""
             return _render_legal(
                 'legal_sct.html',
                 page_title='特定商取引法に基づく表記',
                 page_description='Trends Dashboard の特定商取引法に基づく表記',
                 page_path='/legal/sct',
-                page_robots='noindex, nofollow',
             )
 
         @app.route('/legal/privacy')
@@ -773,6 +772,12 @@ Sitemap: {AppConfig.PUBLIC_BASE_URL}/sitemap.xml
   </url>
   <url>
     <loc>{base}/legal/terms</loc>
+    <lastmod>{about_lastmod_str}</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>{base}/legal/sct</loc>
     <lastmod>{about_lastmod_str}</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>

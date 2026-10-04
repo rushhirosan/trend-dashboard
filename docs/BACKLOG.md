@@ -10,7 +10,7 @@
 - 週次の数値 → [週次メモ](#週次メモ)
 - 日次サマリー品質・SLA の詳細手順 → [`summary_pattern_a_phase1.md`](summary_pattern_a_phase1.md)
 
-**最終更新:** 2026-09-24（PAY.JP 本番審査 **全ブランド不可**。自サイト決済の本線を再選定）
+**最終更新:** 2026-10-05（note / Substack 週次記事の仕様を追加。未実装）
 
 ---
 
@@ -92,6 +92,7 @@ PayPay は PAY.JP 側で未申請なら別結果メールは来ない想定。�
 
 - [ ] 日次: teaser 切れ・「昨日の注目」の選び方・横断の出し方
 - [ ] 週次: 日次の寄せ集めにしない（流れ・ホット・週内の実動）
+- [ ] note / Substack 週次記事 — 仕様は [`summaries/weekly/brief_note_substack.md`](summaries/weekly/brief_note_substack.md)。ブリーフは実装済みのまま。先頭のホット1位は未実装
 - [ ] 有料化前に欲しい欠損明記（`missing_sources` / 短縮テンプレ）は、初回課金の後でも可。購読 UI の免責文言は v2 お試し実装時に載せる
 
 ### この段階ではやらない
@@ -507,6 +508,7 @@ dogfood は `draft` のまま自分宛に送っている。公開・有料の ap
 | 2026-09-24 | **特商法ページを非表示**（`/legal/sct` は URL・ルート残置、`noindex`、About/関連ナビ/sitemap から外す）。プラポリ・利用規約は公開のまま。 |
 | 2026-09-13 | 日次欠走チェックを **08:15 → 09:00 JST** に変更。GHA 実着地が ~08:25–08:45 のため偽陽性が続いていた。 |
 | 2026-09-29 | メール実着に合わせて目標を **日次 9:00頃 / 週次月曜 10:00頃** に変更。cron は 06:50 / 月曜 07:30 のまま（GHA 遅れでこの着地）。欠走チェックは **09:00 → 10:00 JST**。 |
+| 2026-10-05 | note / Substack 週次は無料の集客記事。仕様は [`summaries/weekly/brief_note_substack.md`](summaries/weekly/brief_note_substack.md)。課金箱にはしない。支払いは Gumroad のまま。メールの週次ブリーフは変えない。 |
 
 ### KPI（週次記録用）
 

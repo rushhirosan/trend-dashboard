@@ -88,3 +88,5 @@ docs/summaries/daily/us/2026-05-12.md
 - 手動 Run のあとに遅延 cron が来た場合、**jp+us がすでに DB にあれば生成・メールをスキップ**（`workflow_dispatch` の `force` で上書き可）。
 
 親ドキュメント: [`docs/summaries/README.md`](../README.md)
+
+ブリーフ / note / Substack の前提と仕様: [`brief_note_substack.md`](brief_note_substack.md)。ブリーフは実装済み。note と Substack は未実装。

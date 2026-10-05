@@ -1804,7 +1804,7 @@ def test_format_digest_link_line_uses_youtube_url_when_present(gads):
     assert "\\[" not in line
 
 
-def test_market_category_compresses_flat(gads):
+def test_market_category_omits_all_day_same_rank(gads):
     blocks = [
         {
             "category": "マーケット",
@@ -1827,9 +1827,44 @@ def test_market_category_compresses_flat(gads):
         }
     ]
     md = gads.render_category_top3_markdown(blocks)
-    assert "定番（変化なし）" in md
-    assert "Bitcoin" in md
-    assert "1. [Bitcoin]" not in md
+    assert "### マーケット" not in md
+    assert "定番（変化なし）" not in md
+    assert "Steady leaders" not in md
+    assert "Bitcoin" not in md
+
+
+def test_market_category_shows_entry_from_out_as_mover(gads):
+    """圏外から入って順位を維持した銘柄は、終日同順位と区別して番号付き。"""
+    blocks = [
+        {
+            "category": "マーケット",
+            "items": [
+                {
+                    "label": "Accenture",
+                    "series_key": "stock_us",
+                    "rank_display": "out@7 → #1@13 → #1@19",
+                    "link_line": "[Accenture](https://example.com)（Stocks (US) · out@7 → #1@13 → #1@19）",
+                    "flat": True,
+                },
+                {
+                    "label": "Bitcoin",
+                    "series_key": "crypto_global",
+                    "rank_display": "#1@7 → #1@13 → #1@19",
+                    "link_line": "[Bitcoin](https://example.com)（Crypto · #1@7 → #1@13 → #1@19）",
+                    "flat": True,
+                },
+            ],
+        }
+    ]
+    gads.configure_daily_region("us")
+    md = gads.render_category_top3_markdown(blocks)
+    gads.configure_daily_region("jp")
+    assert "### Market" in md
+    assert "1. [Accenture]" in md
+    assert "out@7 → #1@13 → #1@19" in md
+    assert "Bitcoin" not in md
+    assert "Steady leaders" not in md
+    assert gads._rank_evidence_is_flat("out@7 → #1@13 → #1@19") is False
 
 
 def test_build_llm_payload_no_legacy_category_list(gads):

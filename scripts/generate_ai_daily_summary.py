@@ -999,11 +999,6 @@ def _shorten_digest_title(label: str, series_key: str = "", max_len: int = _DIGE
     return sr.balance_title_parens(cut)
 
 
-def _ranks_are_flat(ranks: dict[str, int]) -> bool:
-    vals = [int(ranks[s]) for s in DAYTIME_SLOTS if s in ranks]
-    return len(vals) >= 1 and len(set(vals)) == 1
-
-
 def _sanitize_md_link_label(title: str) -> str:
     """半角 [] は Markdown リンクを壊すので全角に置換する。"""
     return title.replace("[", "［").replace("]", "］")
@@ -1436,15 +1431,7 @@ def build_category_top3(
                     "url": cand.get("url"),
                     "link_line": link_line,
                     "stale": bool(cand.get("stale")),
-                    "flat": _ranks_are_flat(
-                        {
-                            slot: int(r)
-                            for slot, r in _parse_rank_evidence(
-                                str(cand.get("rank_display") or "")
-                            ).items()
-                            if r is not None
-                        }
-                    ),
+                    "flat": _rank_evidence_is_flat(str(cand.get("rank_display") or "")),
                 }
             )
             if len(picked) >= count:
@@ -1903,7 +1890,7 @@ def render_category_top3_markdown(
     """カテゴリ別トップ3の Markdown 本文（機械生成・リンク付き）。
 
     category_intros は後方互換のため受け取るが、統一性のため出力しない。
-    マーケットの定番（終日同順位）は圧縮1行にする。
+    マーケットは順位が動いたものだけ。終日同順位だけなら見出しごと出さない。
     """
     del category_intros  # unused — do not render per-category blurbs
     lines: List[str] = [_TOP3_HEADING, ""]
@@ -1915,52 +1902,35 @@ def render_category_top3_markdown(
         if block.get("quiet") or not items:
             lines.append(f"- **{cat_disp}**: {empty_label}")
             continue
-        lines.append(f"### {cat_disp}")
         if str(cat) in _MARKET_CATEGORY_KEYS or cat_disp in _MARKET_CATEGORY_KEYS:
-            lines.extend(_render_market_category_items(items))
+            market_lines = _render_market_category_items(items)
+            if not market_lines:
+                continue
+            lines.append(f"### {cat_disp}")
+            lines.extend(market_lines)
         else:
+            lines.append(f"### {cat_disp}")
             for i, it in enumerate(items, 1):
                 lines.append(f"{i}. {it.get('link_line') or it.get('label')}")
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
 
+def _market_item_is_flat(item: Dict[str, Any]) -> bool:
+    """終日同じ順位か。圏外/out が混ざる推移は動きあり（急上昇と同じ定義）。"""
+    evidence = str(item.get("rank_display") or "").strip()
+    if evidence:
+        return _rank_evidence_is_flat(evidence)
+    return bool(item.get("flat"))
+
+
 def _render_market_category_items(items: List[Dict[str, Any]]) -> List[str]:
-    """マーケット: 終日同順位の定番は圧縮、動いたものだけ番号付き。"""
-    movers: List[Dict[str, Any]] = []
-    flat: List[Dict[str, Any]] = []
-    for it in items:
-        if it.get("flat"):
-            flat.append(it)
-        else:
-            movers.append(it)
-    out: List[str] = []
-    for i, it in enumerate(movers, 1):
-        out.append(f"{i}. {it.get('link_line') or it.get('label')}")
-    if flat:
-        parts: List[str] = []
-        for it in flat:
-            lab = _shorten_digest_title(
-                str(it.get("label") or ""),
-                str(it.get("series_key") or ""),
-                max_len=24,
-            )
-            rd = str(it.get("rank_display") or "").strip()
-            # 終日同順位なら「終日N位」に圧縮
-            m = re.search(r"(\d+)時(\d+)位", rd) or re.search(r"#(\d+)@", rd)
-            if m and _ACTIVE_REGION != "us":
-                rank_n = m.group(2) if m.lastindex and m.lastindex >= 2 else m.group(1)
-                parts.append(f"{lab}（終日{rank_n}位）")
-            elif m and _ACTIVE_REGION == "us":
-                parts.append(f"{lab} (held #{m.group(1)})")
-            else:
-                parts.append(lab)
-        label = "Steady leaders" if _ACTIVE_REGION == "us" else "定番（変化なし）"
-        out.append(f"- **{label}**: {' · '.join(parts)}")
-    if not out:
-        for i, it in enumerate(items, 1):
-            out.append(f"{i}. {it.get('link_line') or it.get('label')}")
-    return out
+    """マーケット: 動いたものだけ番号付き。終日同順位は出さない。"""
+    movers = [it for it in items if not _market_item_is_flat(it)]
+    return [
+        f"{i}. {it.get('link_line') or it.get('label')}"
+        for i, it in enumerate(movers, 1)
+    ]
 
 
 def _category_has_items(cat_block: Dict[str, Any]) -> bool:

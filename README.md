@@ -156,7 +156,7 @@ MIT License
 
 詳細なドキュメントは [`docs/`](docs/) ディレクトリを参照してください。
 
-- [プロジェクト仕様書](docs/spec.md)
+- [プロジェクト仕様書（初期草案・保管）](docs/archive/spec.md)
 - [デプロイ手順](docs/DEPLOY.md)
 - [本番環境セットアップ](docs/PRODUCTION_SETUP.md)
 - [API価格分析](docs/API_PRICING_ANALYSIS.md)

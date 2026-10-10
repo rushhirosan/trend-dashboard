@@ -302,18 +302,6 @@ def create_app():
         return response
     
     try:
-        @app.route('/test')
-        def test_page():
-            """テストページ（デバッグ用）"""
-            try:
-                return render_template('test.html')
-            except Exception as e:
-                logger.error(f"❌ テストページレンダリングエラー: {e}")
-                return f"Error rendering test page: {e}", 500
-    except Exception as e:
-        logger.error(f"❌ /test ルート定義エラー: {e}", exc_info=True)
-    
-    try:
         @app.route('/')
         def index():
             """メインページ"""

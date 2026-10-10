@@ -9,8 +9,9 @@
 ### 設定が上書きされていないか（コード上）
 
 - **Dockerfile** の `CMD` を確認する  
-  - 例: `CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--timeout", "1200", "--workers", "1", "wsgi:app"]`  
+  - 例: `CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--timeout", "0", "--workers", "1", "wsgi:app"]`  
   - `--workers 1` が入っていれば、そのイメージでは 1 worker で起動します。
+  - `--timeout 0` はワーカーの無音タイムアウトを無効にします。長い `refresh_all` の途中で Gunicorn がプロセスを止めないためです。
 - **fly.toml** で起動コマンドを上書きしていないか確認する  
   - `[processes]` の `processes = ["app"]` は「プロセス種類の名前」だけで、コマンドは Dockerfile の `CMD` のままです。  
   - `[build]` や `[env]` に `CMD` を変える設定は通常ありません。  
@@ -137,8 +138,8 @@ curl -s "https://あなたのアプリ.fly.dev/api/scheduler/lock-status"
 
 ### 実行が長すぎてワーカーが落ちていないか
 
-- Gunicorn の `--timeout`（例: 1200 = 20 分）より長く `refresh_all_trends` がかかると、ワーカーが強制終了し、**そのプロセスでは Discord 送信まで届きません**。ロックは 30 分で自動解放されるため、次回のスケジュール実行時は別プロセスが実行できます。
-- タイムアウトを十分大きくする（例: `--timeout 1200`）か、トレンド取得の負荷を下げてください。
+- Dockerfile の Gunicorn は `--timeout 0` です。無音が続いてもワーカーは止まりません。`refresh_all_trends` が長くても、この設定では Discord 送信前に Gunicorn がプロセスを殺しません。
+- メモリ不足で落ちた場合、ロックは 30 分で自動解放されるため、次回のスケジュール実行時は別プロセスが実行できます。メモリは `fly.toml` の `memory_mb` 側で見ます。
 
 ---
 

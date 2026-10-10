@@ -45,6 +45,9 @@ venv.bak/
 *.swo
 *~
 
+# flyctl local agent state (WireGuard keys; the app does not read this)
+.fly-local/
+
 # OS
 .DS_Store
 .DS_Store?

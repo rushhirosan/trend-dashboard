@@ -89,4 +89,4 @@ docs/summaries/daily/us/2026-05-12.md
 
 親ドキュメント: [`docs/summaries/README.md`](../README.md)
 
-ブリーフ / note / Substack の前提と仕様: [`brief_note_substack.md`](brief_note_substack.md)。ブリーフは実装済み。note と Substack は未実装。
+ブリーフ / note / Substack の前提と仕様: [`brief_note_substack.md`](brief_note_substack.md)。貼る文の見本は [`note_template.md`](note_template.md) と [`substack_template.md`](substack_template.md)。ブリーフは実装済み。note と Substack は未実装。

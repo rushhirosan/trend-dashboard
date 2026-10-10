@@ -30,6 +30,9 @@ ENV/
 .env
 .env.local
 
+# flyctl local agent state (not used by the app)
+.fly-local/
+
 # Logs
 *.log
 logs/

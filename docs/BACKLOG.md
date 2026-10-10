@@ -92,7 +92,7 @@ PayPay は PAY.JP 側で未申請なら別結果メールは来ない想定。�
 
 - [ ] 日次: teaser 切れ・「昨日の注目」の選び方・横断の出し方
 - [ ] 週次: 日次の寄せ集めにしない（流れ・ホット・週内の実動）
-- [ ] note / Substack 週次記事 — 仕様は [`summaries/weekly/brief_note_substack.md`](summaries/weekly/brief_note_substack.md)。ブリーフは実装済みのまま。先頭のホット1位は未実装
+- [ ] note / Substack 週次記事 — 仕様は [`summaries/weekly/brief_note_substack.md`](summaries/weekly/brief_note_substack.md)。貼る文の見本は [`summaries/weekly/note_template.md`](summaries/weekly/note_template.md) と [`summaries/weekly/substack_template.md`](summaries/weekly/substack_template.md)。ブリーフは実装済みのまま。ホット上位3つの記事は未実装
 - [ ] 有料化前に欲しい欠損明記（`missing_sources` / 短縮テンプレ）は、初回課金の後でも可。購読 UI の免責文言は v2 お試し実装時に載せる
 
 ### この段階ではやらない

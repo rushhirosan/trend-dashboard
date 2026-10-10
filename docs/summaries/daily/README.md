@@ -27,8 +27,6 @@
 - 見出し `# 日次サマリー — YYYY-MM-DD` と **対象** 行も同じ日付にする（モデルがずれたら `--force` で再生成）。
 - 入力データは `trend_daily_snapshots` の **`business_day`**（[`docs/summaries/README.md`](../README.md) のタイムライン参照）。
 
-**X 投稿案**（`docs/x_post_samples/daily/`）— **使用していない（2026-07 停止）**。日次サマリーと同じ `YYYY-MM-DD` の命名規則だったが、自動生成・投稿は行わない。
-
 ## 運用
 
 - **スキャフォルドだけ**の `.md`（テンプレ文言のまま）は `generator` 行が無く、`.generation.json` も無いことが多いです。差分はここで判別できます。使わないプレースホルダは **削除してよい**（あとから `generate_ai_daily_summary.py --write --force --business-day …` で再生成できる）。

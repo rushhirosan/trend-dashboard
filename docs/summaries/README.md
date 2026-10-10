@@ -2,11 +2,9 @@
 
 パターンA・フェーズ1で作成する **日次サマリー／週次サマリー／週のホットトピック** を Markdown で毎コミットしていく場所。**サイトには公開しない**（静的ページやルートは未接続）。
 
-**X ポストサンプル**（`docs/x_post_samples/`）— **2026-07 運用停止・参考用のみ**（自動生成・Discord・X 投稿は使用していない）:
-
 1. **ここに下書きを日々積む**（人が書く／AIが叩いた案を貼る、どちらでもよい）
 2. **レビューで品質・リンク・事実関係を確認**（フロントマターの `status` で区別）
-3. **問題なければ配信パイプラインに載せる**（メール・X・有料枠などは別実装。原稿の正本はこのディレクトリ）
+3. **問題なければ配信パイプラインに載せる**（メール・有料枠などは別実装。原稿の正本はこのディレクトリ）
 
 運用の約束・タイムボックス・チェックリストの詳細は [`summary_pattern_a_phase1.md`](../summary_pattern_a_phase1.md) を正とする。  
 マネタイズ・工程・進捗・その他の将来 To Do は [`BACKLOG.md`](../BACKLOG.md) を参照。
@@ -44,7 +42,6 @@
 - スクリプト既定: `generate_ai_daily_summary.py` は **JST の昨日** を `business_day` にする（`--business-day` で上書き可）。
 - **欠走検知（Fly）**: 毎日 **10:00 JST** に `summary_documents` へ前日分（jp/us）があるかだけ見る。無いとき Discord。生成・メールはしない。
 - **二重実行ガード（GHA）**: 手動 Run 後に遅延 cron が来ても、jp+us が DB にあれば生成・メールをスキップ（`force` で再生成可）。
-- **夜の X 投稿案**（`docs/x_post_samples/daily/`）— **使用していない（2026-07 停止）**。日次の読み物は AI 日次サマリーのみ。
 
 ### 週次のタイムライン（JST）
 
@@ -121,7 +118,7 @@ python scripts/scaffold_summary_drafts.py --today --weekly-for-date 2026-05-11
 
 `scripts/generate_ai_daily_summary.py` が `trend_daily_snapshots` の **前日 `business_day`** × スロット **07 → 13 → 19 → 01**（`01` は翌暦日 1 時ジョブで前日を閉じる）を読み、`gpt-4o-mini`（`OPENAI_SUMMARY_MODEL` で変更可）で **`docs/summaries/daily/{business_day}.md`** を生成する（**ファイル名 = 観測日**、生成実行日ではない）。
 
-**`--write` 時は同じディレクトリに `YYYY-MM-DD.generation.json` を必ず書き**（成功・失敗・キー欠如・スナップショット空・OpenAI エラー）— 日付ごとに結果を追いやすくするため（旧 X 投稿 md と同様のパターン）。
+**`--write` 時は同じディレクトリに `YYYY-MM-DD.generation.json` を必ず書き**（成功・失敗・キー欠如・スナップショット空・OpenAI エラー）— 日付ごとに結果を追いやすくするため。
 
 - **JST 6:50 前後**に動かす想定（7 時一括取得より前で、前日の `01` スロットが揃ったあと）。GitHub Actions: `.github/workflows/ai-daily-summary.yml`（UTC `50 21 * * *`）。失敗時も `.generation.json` をコミットしてからジョブを失敗扱いにする。
 - **Secrets（GHA）**: `OPENAI_API_KEY`（必須）。`DATABASE_URL` は不要（`--from-api` で本番 `/api/summaries/daily-snapshots` を使用）。

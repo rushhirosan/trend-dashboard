@@ -2,7 +2,7 @@
 """
 指定スロットの trend_daily_snapshots をキャッシュから保存する（全量 refresh なし）。
 
-19 時定時 / gap_retry 失敗後の手動補完用。AI 日次サマリー・X 投稿案が slot 19 を要求する。
+19 時定時 / gap_retry 失敗後の手動補完用。AI 日次サマリーが slot 19 を要求する。
 
 例:
   python scripts/backfill_snapshot_slot.py --slot-key 7pm_2026-06-20

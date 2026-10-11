@@ -28,7 +28,7 @@
     <meta property="og:site_name" content="Trends Dashboard">
     <meta name="twitter:card" content="summary_large_image">
 
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
+    {% include 'partials/site_icons.html' %}
 
     {% if config.get('GOOGLE_ANALYTICS_ID') %}
     <script async src="https://www.googletagmanager.com/gtag/js?id={{ config.GOOGLE_ANALYTICS_ID }}"></script>

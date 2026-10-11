@@ -7,7 +7,7 @@
     <meta name="description" content="{{ page_description }}">
     <meta name="robots" content="{{ page_robots | default('index, follow') }}">
     <link rel="canonical" href="{{ public_base_url }}{{ page_path }}">
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
+    {% include 'partials/site_icons.html' %}
     {% include 'partials/vendor_assets.html' %}
     <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">

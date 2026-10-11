@@ -37,8 +37,9 @@
     <link rel="alternate" type="text/plain" href="{{ public_base_url }}/llms.txt" title="llms.txt">
     
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
-    <link rel="apple-touch-icon" sizes="512x512" href="{{ url_for('static', filename='images/icon-512.png') }}">
+    {% with site_icon_apple=true %}
+    {% include 'partials/site_icons.html' %}
+    {% endwith %}
     
     <!-- Performance Optimization: Preconnect to external domains -->
     <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin>

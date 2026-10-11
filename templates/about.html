@@ -29,8 +29,9 @@
     <meta name="twitter:image" content="{{ public_base_url }}/static/images/og-image.png">
     
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
-    <link rel="apple-touch-icon" sizes="512x512" href="{{ url_for('static', filename='images/icon-512.png') }}">
+    {% with site_icon_apple=true %}
+    {% include 'partials/site_icons.html' %}
+    {% endwith %}
     
     <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

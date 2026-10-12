@@ -66,7 +66,9 @@ def test_data_status_page_removed():
 
 def test_vendor_assets_self_hosted():
     index = (TEMPLATES / "index.html").read_text(encoding="utf-8")
-    assert "partials/vendor_assets.html" in index
+    styles = (TEMPLATES / "partials" / "site_styles.html").read_text(encoding="utf-8")
+    assert "partials/site_styles.html" in index
+    assert "partials/vendor_assets.html" in styles
     assert "cdnjs.cloudflare.com/ajax/libs/bootstrap" not in index
     assert "cdnjs.cloudflare.com/ajax/libs/font-awesome" not in index
     assert "vendor/bootstrap/5.1.3/bootstrap.bundle.min.js" in index

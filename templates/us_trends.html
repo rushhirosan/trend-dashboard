@@ -30,11 +30,7 @@
     <!-- Canonical URL -->
     <link rel="canonical" href="{{ public_base_url }}/us">
     
-    <!-- hreflang: 日本語/英語の言語別バージョン -->
-    <link rel="alternate" hreflang="ja" href="{{ public_base_url }}/">
-    <link rel="alternate" hreflang="en" href="{{ public_base_url }}/us">
-    <link rel="alternate" hreflang="x-default" href="{{ public_base_url }}/">
-    <link rel="alternate" type="text/plain" href="{{ public_base_url }}/llms.txt" title="llms.txt">
+    {% include 'partials/hreflang.html' %}
     
     <!-- Favicon -->
     {% with site_icon_apple=true %}
@@ -112,8 +108,7 @@
     </script>
     {% endif %}
     
-    {% include 'partials/vendor_assets.html' %}
-    <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
+    {% include 'partials/site_styles.html' %}
     {% set async_css_href = url_for('static', filename='css/trends.css') + '?v=20260923-edition-strip' %}
     {% include 'partials/async_stylesheet.html' %}
     <link href="{{ url_for('static', filename='css/main.css') }}?v=20260819-tab-keyboard" rel="stylesheet">

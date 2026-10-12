@@ -10,7 +10,7 @@
 - 週次の数値 → [週次メモ](#週次メモ)
 - 日次サマリー品質・SLA の詳細手順 → [`summary_pattern_a_phase1.md`](summary_pattern_a_phase1.md)
 
-**最終更新:** 2026-10-05（note / Substack 週次記事の仕様を追加。未実装）
+**最終更新:** 2026-10-13（note / Substack 週次原稿を週次ジョブで生成。貼り付けは手動）
 
 ---
 
@@ -92,7 +92,7 @@ PayPay は PAY.JP 側で未申請なら別結果メールは来ない想定。�
 
 - [ ] 日次: teaser 切れ・「昨日の注目」の選び方・横断の出し方
 - [ ] 週次: 日次の寄せ集めにしない（流れ・ホット・週内の実動）
-- [ ] note / Substack 週次記事 — 仕様は [`summaries/weekly/brief_note_substack.md`](summaries/weekly/brief_note_substack.md)。貼る文の見本は [`summaries/weekly/note_template.md`](summaries/weekly/note_template.md) と [`summaries/weekly/substack_template.md`](summaries/weekly/substack_template.md)。ブリーフは実装済みのまま。ホット上位3つの記事は未実装
+- [x] note / Substack 週次記事 — 仕様は [`summaries/weekly/brief_note_substack.md`](summaries/weekly/brief_note_substack.md)。週次ジョブが `weekly/note/` と `weekly/substack/` に貼る文を書く。貼り付けは手動。見本は [`summaries/weekly/note_template.md`](summaries/weekly/note_template.md) と [`summaries/weekly/substack_template.md`](summaries/weekly/substack_template.md)
 - [ ] 有料化前に欲しい欠損明記（`missing_sources` / 短縮テンプレ）は、初回課金の後でも可。購読 UI の免責文言は v2 お試し実装時に載せる
 
 ### この段階ではやらない

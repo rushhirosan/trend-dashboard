@@ -1291,6 +1291,153 @@ def test_hot_topics_exclude_sticky_crypto_jp(gaws):
     assert "区分" not in hot[0]["why"]
 
 
+def test_public_weekly_post_keeps_two_day_hot_topics_only(gaws):
+    gaws.configure_weekly_region("jp")
+    category = {
+        "jp": [
+            {
+                "category": "検索・動画",
+                "items": [
+                    {
+                        "label": "一日だけ",
+                        "day_count": 1,
+                        "days": ["2026-10-06"],
+                        "series_key": "wikipedia_ja",
+                        "weekly_score": 99,
+                        "link_line": "[一日だけ](https://example.com/one)（Wikipedia）",
+                        "rank_display_by_day": {
+                            "2026-10-06": "7時1位 → 13時1位 → 19時1位",
+                        },
+                    },
+                    {
+                        "label": "石橋静河",
+                        "day_count": 3,
+                        "days": ["2026-10-06", "2026-10-08", "2026-10-10"],
+                        "series_key": "wikipedia_ja",
+                        "weekly_score": 45,
+                        "link_line": "[石橋静河](https://example.com/ishibashi)（Wikipedia）",
+                        "rank_display_by_day": {
+                            "2026-10-06": "7時6位 → 13時6位 → 19時6位",
+                            "2026-10-08": "7時圏外 → 13時6位 → 19時7位",
+                            "2026-10-10": "7時7位 → 13時7位 → 19時7位",
+                        },
+                    },
+                    {
+                        "label": "Bitcoin",
+                        "day_count": 7,
+                        "series_key": "crypto_global",
+                        "weekly_score": 90,
+                    },
+                    {
+                        "label": "Skip App",
+                        "day_count": 4,
+                        "series_key": "appstore_jp",
+                        "weekly_score": 80,
+                    },
+                ],
+            }
+        ]
+    }
+    text = gaws.build_public_weekly_post(
+        {"jp": []},
+        category,
+        date(2026, 10, 5),
+        date(2026, 10, 11),
+    )
+    assert "先週のホットトピック1つ" in text
+    assert "石橋静河（Wikipedia）" in text
+    assert "10月6日は終日6位です。" in text
+    assert "10月10日は終日7位です。" in text
+    assert "10月8日は7時圏外、13時6位、19時7位。" in text
+    assert "10月5日、7日、9日、11日はダッシュボードにありません。" in text
+    assert "https://example.com/ishibashi" in text
+    assert "ダッシュボードに出ていたページ" not in text
+    assert "この順位になった理由は、今回の観測結果では出てきません。" in text
+    assert "https://trends-dashboard.com" in text
+    assert "gumroad" not in text.lower()
+    assert "一日だけ" not in text
+    assert "Bitcoin" not in text
+    assert "Skip App" not in text
+    body = text.split("## 本文", 1)[-1]
+    assert body.strip().startswith("先週のホットトピック1つ")
+
+
+def test_public_weekly_post_us_substack_shape(gaws):
+    gaws.configure_weekly_region("us")
+    category = {
+        "us": [
+            {
+                "category": "検索・動画",
+                "items": [
+                    {
+                        "label": "Janice STFU",
+                        "day_count": 2,
+                        "series_key": "music_trends_us",
+                        "weekly_score": 30,
+                        "link_line": "[Janice STFU](https://example.com/janice)（Spotify (US)）",
+                        "rank_display_by_day": {
+                            "2026-09-28": "out@7 → #9@13 → #9@19",
+                            "2026-09-29": "#6@7 → #6@13 → #6@19",
+                        },
+                    },
+                    {
+                        "label": "Second Topic",
+                        "day_count": 2,
+                        "series_key": "wikipedia_en",
+                        "weekly_score": 20,
+                        "rank_display_by_day": {
+                            "2026-09-30": "#2@7 → #2@13 → #2@19",
+                            "2026-10-01": "#1@7 → #1@13 → #1@19",
+                        },
+                    },
+                ],
+            }
+        ]
+    }
+    text = gaws.build_public_weekly_post(
+        {"us": []},
+        category,
+        date(2026, 9, 28),
+        date(2026, 10, 4),
+    )
+    assert text.split("## Post", 1)[-1].strip().startswith(
+        "Two hot topics from last week"
+    )
+    assert "Janice STFU (Spotify (US))" in text
+    assert "September 29: #6 all day." in text
+    assert "September 28: out at 07:00, #9 at 13:00, #9 at 19:00." in text
+    assert "The page on the dashboard is here." not in text
+    assert "https://trends-dashboard.com/us" in text
+    assert "does not appear in this week's observations." in text
+    assert "gumroad" not in text.lower()
+    gaws.configure_weekly_region("jp")
+
+
+def test_public_weekly_post_empty_when_no_multi_day_topics(gaws):
+    gaws.configure_weekly_region("jp")
+    text = gaws.build_public_weekly_post(
+        {"jp": []},
+        {
+            "jp": [
+                {
+                    "category": "ニュース",
+                    "items": [
+                        {
+                            "label": "一日だけ",
+                            "day_count": 1,
+                            "series_key": "nhk_jp",
+                            "weekly_score": 40,
+                        }
+                    ],
+                }
+            ]
+        },
+        date(2026, 10, 5),
+        date(2026, 10, 11),
+    )
+    assert text == ""
+
+
 def test_script_imports_when_run_as_python_scripts_path():
     """GHA は `python scripts/generate_ai_weekly_summary.py`。sys.path[0] は scripts/。"""
     import os

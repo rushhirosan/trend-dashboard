@@ -87,9 +87,6 @@
                     <div class="card-body p-4">
                         <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                             <span class="badge bg-secondary">{% if is_us %}Free preview{% else %}無料プレビュー{% endif %}</span>
-                            {% if page.status != 'approved' %}
-                            <span class="badge bg-warning text-dark">{% if is_us %}Draft (local){% else %}下書き（ローカル表示）{% endif %}</span>
-                            {% endif %}
                         </div>
                         <h1 class="h4 mb-2">{% if is_us %}Daily trend brief{% else %}日次ブリーフ{% endif %} — {{ page.business_day_display }}</h1>
                         <p class="text-muted small mb-1">

@@ -8,6 +8,10 @@
 先週の流れ（題名の下に URL）+ いちばん動いた話題 + ホットトピック（順位と URL）+ カテゴリ top3。
 来週論点は本文に含めない。Web 用リードは frontmatter の ``teaser`` / ``preview_lead``。
 
+同じ実行で note（jp）と Substack（us）の貼る文も書く。
+``docs/summaries/weekly/note/YYYY-Www.md`` と ``docs/summaries/weekly/substack/YYYY-Www.md``。
+2日以上のホットが0件の週は記事ファイルを出さない。
+
 ``--use-llm`` で従来の OpenAI 編集 JSON 生成（メール本文から編集セクションは除外）。
 ``--daily-only`` はレガシー（日次 md のみ・要 ``--use-llm``）。
 
@@ -88,6 +92,12 @@ def configure_weekly_region(region: str) -> None:
 
 def weekly_output_dir() -> Path:
     return WEEKLY_DIR if _ACTIVE_REGION == "jp" else WEEKLY_DIR / "us"
+
+
+def weekly_public_post_path(stem: str) -> Path:
+    """note（jp）または Substack（us）に貼る週次原稿。ブリーフとは別ファイル。"""
+    folder = "substack" if _ACTIVE_REGION == "us" else "note"
+    return WEEKLY_DIR / folder / f"{stem}.md"
 
 
 def weekly_daily_assist_dir(override: Optional[Path] = None) -> Path:
@@ -1785,13 +1795,21 @@ def build_mechanical_weekly_flow(
     return "先週のカテゴリ別トップと順位の動きは以下のとおり。"
 
 
+PUBLIC_HOT_MAX = 3
+PUBLIC_HOT_MIN_DAYS = 2
+
+
 def build_mechanical_weekly_hot_topics(
     weekly_rising: Dict[str, List[Dict[str, Any]]],
     weekly_category: Dict[str, List[Dict[str, Any]]],
     *,
     limit: int = WEEKLY_HOT_MAX,
+    min_day_count: int = 1,
 ) -> List[Dict[str, Any]]:
-    """カテゴリ digest から機械ホットトピックを抽出（App Store・定番 crypto/stock 除外）。"""
+    """カテゴリ digest から機械ホットトピックを抽出（App Store・定番 crypto/stock 除外）。
+
+    note / Substack は ``min_day_count=2`` で、2日以上残った先頭 ``limit`` 件だけにする。
+    """
     region = WEEKLY_REGIONS[0]
     candidates: List[Dict[str, Any]] = []
     seen: set[str] = set()
@@ -1803,6 +1821,7 @@ def build_mechanical_weekly_hot_topics(
             day_count = int(it.get("day_count") or len(it.get("days") or []) or 0)
             if (
                 not label
+                or day_count < min_day_count
                 or _is_appstore_series(sk)
                 or _is_sticky_hot_topic_series(sk, day_count=day_count)
             ):
@@ -1819,6 +1838,7 @@ def build_mechanical_weekly_hot_topics(
                 {
                     "title": label,
                     "day_count": day_count,
+                    "days": list(it.get("days") or []),
                     "cross_source": cross,
                     "category": cat,
                     "best_rank": it.get("best_rank"),
@@ -1836,6 +1856,7 @@ def build_mechanical_weekly_hot_topics(
         day_count = int(it.get("day_count") or len(it.get("days") or []) or 0)
         if (
             not label
+            or day_count < min_day_count
             or _is_appstore_series(sk)
             or _is_sticky_hot_topic_series(sk, day_count=day_count)
         ):
@@ -1848,6 +1869,7 @@ def build_mechanical_weekly_hot_topics(
             {
                 "title": label,
                 "day_count": day_count,
+                "days": list(it.get("days") or []),
                 "cross_source": bool(it.get("cross_source")),
                 "category": str(it.get("category") or ""),
                 "best_rank": it.get("best_rank"),
@@ -1867,7 +1889,10 @@ def build_mechanical_weekly_hot_topics(
             "title": str(c["title"]),
             "why": why,
             "cross_source": bool(c.get("cross_source")),
+            "day_count": int(c.get("day_count") or 0),
         }
+        if c.get("days"):
+            row["days"] = list(c["days"])
         rank = _rank_map_for_item(c)
         if rank:
             row["rank_display_by_day"] = rank
@@ -1877,6 +1902,441 @@ def build_mechanical_weekly_hot_topics(
             row["url"] = str(c["url"])
         out.append(row)
     return out
+
+
+_JP_WEEKDAYS = "月火水木金土日"
+_US_SLOT_CLOCK = {"07": "07:00", "13": "13:00", "19": "19:00"}
+_PUBLIC_POST_NO_REASON_JP = "この順位になった理由は、今回の観測結果では出てきません。"
+_PUBLIC_POST_NO_REASON_US = (
+    "Why it ranked this way does not appear in this week's observations."
+)
+
+
+def _parse_iso_date(ds: str) -> Optional[date]:
+    try:
+        return date.fromisoformat(str(ds))
+    except ValueError:
+        return None
+
+
+def _jp_month_day(d: date, *, with_weekday: bool = False) -> str:
+    text = f"{d.month}月{d.day}日"
+    if with_weekday:
+        return f"{text}（{_JP_WEEKDAYS[d.weekday()]}）"
+    return text
+
+
+def _en_month_day(d: date, *, with_weekday: bool = False) -> str:
+    text = f"{d.strftime('%B')} {d.day}"
+    if with_weekday:
+        return f"{d.strftime('%A')}, {text}"
+    return text
+
+
+def _jp_date_list(days: List[date]) -> str:
+    parts: List[str] = []
+    prev_month: Optional[int] = None
+    for d in days:
+        if prev_month == d.month:
+            parts.append(f"{d.day}日")
+        else:
+            parts.append(f"{d.month}月{d.day}日")
+        prev_month = d.month
+    return "、".join(parts)
+
+
+def _en_date_list(days: List[date]) -> str:
+    labels = [_en_month_day(d) for d in days]
+    if len(labels) == 1:
+        return labels[0]
+    if len(labels) == 2:
+        return f"{labels[0]} and {labels[1]}"
+    return ", ".join(labels[:-1]) + f", and {labels[-1]}"
+
+
+def _public_count_label_jp(n: int) -> str:
+    return f"{n}つ"
+
+
+def _public_count_label_us(n: int) -> str:
+    return {1: "One", 2: "Two", 3: "Three"}.get(n, str(n))
+
+
+def _mentioned_rank_slots(evidence: str) -> List[Tuple[str, Optional[int]]]:
+    """証拠文字列に実際に出てくる 07/13/19 だけ返す。圏外は None。"""
+    text = evidence or ""
+    ranks = parse_rank_evidence(text)
+    found: List[Tuple[str, Optional[int]]] = []
+    for slot in _DAYTIME_SLOT_KEYS:
+        hour = str(int(slot))
+        if _ACTIVE_REGION == "us":
+            if not re.search(rf"(?:out|#\d+)@{hour}(?!\d)", text):
+                continue
+        elif not re.search(rf"{hour}時(?:\d+位|圏外)", text):
+            continue
+        found.append((slot, ranks.get(slot)))
+    return found
+
+
+def _public_topic_url(topic: Dict[str, Any]) -> str:
+    url = str(topic.get("url") or "").strip()
+    if url.startswith(("http://", "https://")):
+        return url
+    link = str(topic.get("link_line") or "")
+    m = re.search(r"\((https?://[^)\s]+)\)", link)
+    return m.group(1) if m else ""
+
+
+def _public_topic_source(topic: Dict[str, Any]) -> str:
+    link = str(topic.get("link_line") or "")
+    m = re.search(r"（(.+)）\s*$", link)
+    if not m:
+        return ""
+    return m.group(1).split(" · ", 1)[0].strip()
+
+
+def _public_topic_dates(topic: Dict[str, Any]) -> List[date]:
+    rank = _rank_map_for_item(topic)
+    raw_days = list(rank.keys()) if rank else list(topic.get("days") or [])
+    parsed = [_parse_iso_date(str(ds)) for ds in raw_days]
+    return sorted(d for d in parsed if d is not None)
+
+
+def _public_day_profile(evidence: str) -> Dict[str, Any]:
+    slots = _mentioned_rank_slots(evidence)
+    known = [rank for _, rank in slots if rank is not None]
+    best = min(known) if known else _best_rank_from_evidence(evidence)
+    has_oob = bool(slots) and any(rank is None for _, rank in slots) and bool(known)
+    flat = (
+        len(slots) == 3
+        and best is not None
+        and all(rank == best for _, rank in slots)
+    )
+    return {"best": best, "flat": flat, "oob": has_oob, "slots": slots, "evidence": evidence}
+
+
+def _public_flat_sentence(days: List[date], rank: int) -> str:
+    label = _rank_number_label(rank)
+    if _ACTIVE_REGION == "us":
+        return f"{_en_date_list(days)}: {label} all day."
+    return f"{_jp_date_list(days)}は終日{label}です。"
+
+
+def _public_best_sentence(days: List[date], rank: int) -> str:
+    label = _rank_number_label(rank)
+    if _ACTIVE_REGION == "us":
+        return f"{_en_date_list(days)}: best rank {label}."
+    return f"{_jp_date_list(days)}は{label}です。"
+
+
+def _public_day_sentence(d: date, evidence: str) -> str:
+    slots = _mentioned_rank_slots(evidence)
+    if _ACTIVE_REGION == "us":
+        day = _en_month_day(d)
+        if (
+            len(slots) == 3
+            and slots[0][1] is not None
+            and all(rank == slots[0][1] for _, rank in slots)
+        ):
+            clocks = ", ".join(_US_SLOT_CLOCK[slot] for slot, _ in slots[:-1])
+            last = _US_SLOT_CLOCK[slots[-1][0]]
+            return (
+                f"{day} was {_rank_number_label(int(slots[0][1]))} "
+                f"at {clocks}, and {last}."
+            )
+        if slots:
+            parts: List[str] = []
+            for slot, rank in slots:
+                clock = _US_SLOT_CLOCK[slot]
+                if rank is None:
+                    parts.append(f"out at {clock}")
+                else:
+                    parts.append(f"{_rank_number_label(int(rank))} at {clock}")
+            return f"{day}: " + ", ".join(parts) + "."
+        best = _best_rank_from_evidence(evidence)
+        if best is not None:
+            return f"{day}: {_rank_number_label(best)}."
+        return f"{day} is on the dashboard."
+
+    day = _jp_month_day(d)
+    if (
+        len(slots) == 3
+        and slots[0][1] is not None
+        and all(rank == slots[0][1] for _, rank in slots)
+    ):
+        return f"{day}は終日{_rank_number_label(int(slots[0][1]))}でした。"
+    if slots:
+        parts = []
+        for slot, rank in slots:
+            hour = f"{int(slot)}時"
+            if rank is None:
+                parts.append(f"{hour}圏外")
+            else:
+                parts.append(f"{hour}{_rank_number_label(int(rank))}")
+        return f"{day}は{'、'.join(parts)}。"
+    best = _best_rank_from_evidence(evidence)
+    if best is not None:
+        return f"{day}は{_rank_number_label(best)}。"
+    return f"{day}はダッシュボードにあります。"
+
+
+def _public_rank_paragraph(topic: Dict[str, Any], mon: date, sun: date) -> str:
+    rank = _rank_map_for_item(topic)
+    present = _public_topic_dates(topic)
+    present_set = {d.isoformat() for d in present}
+    flat_days: Dict[int, List[date]] = {}
+    best_days: Dict[int, List[date]] = {}
+    pieces: List[Tuple[date, str]] = []
+    for d in present:
+        evidence = str(rank.get(d.isoformat()) or "")
+        profile = _public_day_profile(evidence)
+        best = profile["best"]
+        if profile["flat"] and best is not None:
+            flat_days.setdefault(int(best), []).append(d)
+        elif best is not None and not profile["oob"]:
+            best_days.setdefault(int(best), []).append(d)
+        else:
+            pieces.append((d, _public_day_sentence(d, evidence)))
+    for rank_n, days in flat_days.items():
+        days = sorted(days)
+        pieces.append((days[0], _public_flat_sentence(days, rank_n)))
+    for rank_n, days in best_days.items():
+        days = sorted(days)
+        pieces.append((days[0], _public_best_sentence(days, rank_n)))
+    pieces.sort(key=lambda item: item[0])
+    sentences = [text for _, text in pieces]
+    if not sentences:
+        dc = int(topic.get("day_count") or 0)
+        if _ACTIVE_REGION == "us":
+            if dc:
+                sentences.append(
+                    f"It stayed on the dashboard for {dc} day(s). "
+                    "Day-by-day ranks do not appear in this week's observations."
+                )
+        elif dc:
+            sentences.append(f"{dc}日、ダッシュボードに残っていました。")
+    missing = [
+        mon + timedelta(days=i)
+        for i in range(7)
+        if mon + timedelta(days=i) <= sun
+        and (mon + timedelta(days=i)).isoformat() not in present_set
+        and present
+    ]
+    if missing:
+        if _ACTIVE_REGION == "us":
+            listed = _en_date_list(missing)
+            verb = "is" if len(missing) == 1 else "are"
+            sentences.append(f"{listed} {verb} not on the dashboard.")
+        else:
+            sentences.append(f"{_jp_date_list(missing)}はダッシュボードにありません。")
+    if _ACTIVE_REGION == "us":
+        return " ".join(sentences)
+    return "".join(sentences)
+
+
+def _public_topic_heading(index: int, topic: Dict[str, Any]) -> str:
+    title = str(topic.get("title") or "").strip()
+    source = _public_topic_source(topic)
+    if _ACTIVE_REGION == "us":
+        label = f"{title} ({source})" if source else title
+    else:
+        label = f"{title}（{source}）" if source else title
+    return f"## {index}. {label}"
+
+
+def render_public_weekly_markdown(
+    topics: List[Dict[str, Any]],
+    mon: date,
+    sun: date,
+    *,
+    iso_week: str,
+) -> str:
+    """note / Substack に貼る本文。0件なら空文字（記事を出さない）。"""
+    if not topics:
+        return ""
+    n = len(topics)
+    if _ACTIVE_REGION == "us":
+        count_word = _public_count_label_us(n)
+        title = (
+            f"{count_word} hot topic from last week"
+            if n == 1
+            else f"{count_word} hot topics from last week"
+        )
+        if n == 1:
+            which = "this is the topic that stayed"
+        else:
+            which = f"these are the top {count_word.lower()} topics that stayed"
+        lead = (
+            f"From {_en_month_day(mon, with_weekday=True)} through "
+            f"{_en_month_day(sun, with_weekday=True)}, {which} on the "
+            "Trends Dashboard for two or more days. Ranks are that week's "
+            "observations. Comments include only what public articles from the "
+            "same week said."
+        )
+        reason = _PUBLIC_POST_NO_REASON_US
+        footer = (
+            "---\n\n"
+            "Category ranks and day-by-day observations are not included.\n\n"
+            "Daily ranks are here:\n"
+            "https://trends-dashboard.com/us\n\n"
+            "Subscribe by email, and yesterday's daily brief arrives each morning. "
+            "Monday's weekly brief also includes each category's top 3. "
+            "The target is about 9:00 JST for the daily and about 10:00 JST on "
+            "Monday for the weekly."
+        )
+        header = (
+            f"# Substack — {iso_week}\n\n"
+            'Copy from "Post" downward. The first line is the title.\n\n'
+            "## Post\n"
+        )
+    else:
+        count = _public_count_label_jp(n)
+        title = f"先週のホットトピック{count}"
+        lead = (
+            f"{_jp_month_day(mon, with_weekday=True)}から"
+            f"{_jp_month_day(sun, with_weekday=True)}まで、"
+            f"トレンドダッシュボードに2日以上残った話題の上位{count}です。"
+            "順位はその週の観測結果です。"
+            "コメントは、同じ週に出た公開記事に書いてあることだけを記載しています。"
+        )
+        reason = _PUBLIC_POST_NO_REASON_JP
+        footer = (
+            "---\n\n"
+            "カテゴリごとの順位と、日毎の観測結果は入れていません。\n\n"
+            "日々の順位はこちらです。\n"
+            "https://trends-dashboard.com\n\n"
+            "メールにサブスクライブすると毎朝、昨日の日次ブリーフが届きます。"
+            "月曜の週次には、カテゴリ別の top3 も入ります。"
+            "時刻の目標は日次 9:00 頃、週次は月曜 10:00 頃を予定しています。"
+        )
+        header = (
+            f"# note — {iso_week}\n\n"
+            "「本文」以降をコピーする。1行目はタイトル欄。\n\n"
+            "## 本文\n"
+        )
+    blocks: List[str] = [header, title, "", lead, ""]
+    for i, topic in enumerate(topics, 1):
+        blocks.append(_public_topic_heading(i, topic))
+        blocks.append("")
+        paragraph = _public_rank_paragraph(topic, mon, sun)
+        if paragraph:
+            blocks.append(paragraph)
+            blocks.append("")
+        comment = str(topic.get("comment") or "").strip()
+        if comment:
+            blocks.append(comment)
+            blocks.append("")
+        else:
+            url = _public_topic_url(topic)
+            if url:
+                blocks.append(url)
+                blocks.append("")
+            blocks.append(reason)
+            blocks.append("")
+    blocks.append(footer)
+    return "\n".join(blocks).rstrip() + "\n"
+
+
+def _clip_public_gist(text: str, *, max_chars: int = 280) -> str:
+    """公開ページのリードを、要旨として2文まで残す。"""
+    cleaned = re.sub(r"\s+", " ", (text or "")).strip()
+    if not cleaned:
+        return ""
+    if _ACTIVE_REGION == "us":
+        parts = [part.strip() for part in re.split(r"(?<=[.])\s+", cleaned) if part.strip()]
+    else:
+        parts = [part.strip() for part in re.split(r"(?<=。)", cleaned) if part.strip()]
+    if not parts:
+        parts = [cleaned]
+    out = ""
+    for part in parts[:2]:
+        nxt = f"{out}{part}" if _ACTIVE_REGION != "us" else " ".join(x for x in (out, part) if x)
+        if len(nxt) > max_chars and out:
+            break
+        out = nxt
+    if len(out) > max_chars:
+        out = out[:max_chars].rstrip() + "…"
+    return out
+
+
+def fetch_public_page_gist(url: str) -> str:
+    """観測URLが記事や Wikipedia なら、そのページのリードだけ返す。検索URLは空。"""
+    if not url.startswith(("http://", "https://")):
+        return ""
+    if "google.com/search" in url or "google.com/url" in url:
+        return ""
+    headers = {"User-Agent": "trend-dashboard-weekly/1.0"}
+    try:
+        wiki = re.match(r"https?://([a-z-]+)\.wikipedia\.org/wiki/([^?#]+)", url)
+        if wiki:
+            from urllib.parse import quote, unquote
+
+            lang, title = wiki.group(1), unquote(wiki.group(2))
+            api = (
+                f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/"
+                f"{quote(title, safe='')}"
+            )
+            res = requests.get(api, timeout=8, headers=headers)
+            if not res.ok:
+                return ""
+            return _clip_public_gist(str(res.json().get("extract") or ""))
+        res = requests.get(url, timeout=8, headers=headers)
+        if not res.ok:
+            return ""
+        html = res.text[:120_000]
+        patterns = (
+            r'<meta[^>]+property=["\']og:description["\'][^>]+content=["\']([^"\']+)',
+            r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:description["\']',
+            r'<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']+)',
+        )
+        for pattern in patterns:
+            matched = re.search(pattern, html, re.I)
+            if matched:
+                import html as html_lib
+
+                return _clip_public_gist(html_lib.unescape(matched.group(1)))
+    except (requests.RequestException, ValueError, TypeError):
+        return ""
+    return ""
+
+
+def _attach_public_page_comments(topics: List[Dict[str, Any]]) -> None:
+    """要旨が無い件だけ、観測ページのリードと理由の一文を足す。"""
+    reason = (
+        _PUBLIC_POST_NO_REASON_US
+        if _ACTIVE_REGION == "us"
+        else _PUBLIC_POST_NO_REASON_JP
+    )
+    for topic in topics:
+        if str(topic.get("comment") or "").strip():
+            continue
+        url = _public_topic_url(topic)
+        gist = fetch_public_page_gist(url)
+        if not gist:
+            continue
+        topic["comment"] = f"{gist}\n{url}\n\n{reason}" if url else f"{gist}\n\n{reason}"
+
+
+def build_public_weekly_post(
+    weekly_rising: Dict[str, List[Dict[str, Any]]],
+    weekly_category: Dict[str, List[Dict[str, Any]]],
+    mon: date,
+    sun: date,
+    *,
+    fetch_comments: bool = False,
+) -> str:
+    """ブリーフと同じスコアで、2日以上のホット上位3件だけを note / Substack 用にする。"""
+    topics = build_mechanical_weekly_hot_topics(
+        weekly_rising,
+        weekly_category,
+        limit=PUBLIC_HOT_MAX,
+        min_day_count=PUBLIC_HOT_MIN_DAYS,
+    )
+    if fetch_comments:
+        _attach_public_page_comments(topics)
+    return render_public_weekly_markdown(
+        topics, mon, sun, iso_week=iso_week_stem(mon)
+    )
 
 
 def assemble_weekly_markdown(
@@ -2191,6 +2651,9 @@ def run_generate_snapshots(
     )
     meta["model"] = model
     meta["generator"] = "openai"
+    meta["public_post"] = build_public_weekly_post(
+        weekly_rising, weekly_category, week_mon, week_sun, fetch_comments=True
+    )
     flow_text = (
         str(editorial.get("flow_us") or editorial.get("flow_jp") or "").strip()
         if _ACTIVE_REGION == "us"
@@ -2276,6 +2739,9 @@ def run_generate_mechanical(
         meta["editorial_warning"] = "; ".join(warnings)
     meta["preview_lead_source"] = "mechanical"
     meta["teaser_source"] = "mechanical"
+    meta["public_post"] = build_public_weekly_post(
+        weekly_rising, weekly_category, week_mon, week_sun, fetch_comments=True
+    )
     full = merge_front_matter(
         stem,
         week_mon,
@@ -2344,7 +2810,11 @@ def main() -> int:
         action="store_true",
         help="Without API key: print manifest. With key: print markdown",
     )
-    p.add_argument("--write", action="store_true", help="Write docs/summaries/weekly/{ISO}.md")
+    p.add_argument(
+        "--write",
+        action="store_true",
+        help="Write the weekly brief and the note (jp) or Substack (us) paste file",
+    )
     p.add_argument("--force", action="store_true", help="Overwrite existing file")
     p.add_argument(
         "--region",
@@ -2500,22 +2970,42 @@ def main() -> int:
             )
             return 2
 
-    if args.dry_run:
+    public = str(meta.get("public_post") or "").strip()
+    if args.dry_run or not args.write:
         print(text)
-        return 0
-
-    if not args.write:
-        print(text)
+        if public:
+            print()
+            print(public)
+        elif not args.daily_only:
+            label = "Substack" if _ACTIVE_REGION == "us" else "note"
+            print(f"{label} skipped: no topics that stayed 2+ days", file=sys.stderr)
         return 0
 
     out = weekly_output_dir() / f"{stem}.md"
     out.parent.mkdir(parents=True, exist_ok=True)
     if out.exists() and not args.force:
         print(f"skip (exists): {out.relative_to(REPO_ROOT)}", file=sys.stderr)
-        return 0
+    else:
+        out.write_text(text, encoding="utf-8")
+        print(f"wrote {out.relative_to(REPO_ROOT)}")
 
-    out.write_text(text, encoding="utf-8")
-    print(f"wrote {out.relative_to(REPO_ROOT)}")
+    if args.daily_only:
+        return 0
+    public_path = weekly_public_post_path(stem)
+    if not public:
+        if public_path.exists() and args.force:
+            public_path.unlink()
+            print(f"removed {public_path.relative_to(REPO_ROOT)} (no 2-day hot topics)")
+        else:
+            label = "Substack" if _ACTIVE_REGION == "us" else "note"
+            print(f"{label} skipped: no topics that stayed 2+ days", file=sys.stderr)
+        return 0
+    if public_path.exists() and not args.force:
+        print(f"skip (exists): {public_path.relative_to(REPO_ROOT)}", file=sys.stderr)
+        return 0
+    public_path.parent.mkdir(parents=True, exist_ok=True)
+    public_path.write_text(public if public.endswith("\n") else public + "\n", encoding="utf-8")
+    print(f"wrote {public_path.relative_to(REPO_ROOT)}")
     return 0
 
 

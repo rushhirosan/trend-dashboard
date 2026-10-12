@@ -89,4 +89,4 @@ docs/summaries/daily/us/2026-05-12.md
 
 親ドキュメント: [`docs/summaries/README.md`](../README.md)
 
-ブリーフ / note / Substack の前提と仕様: [`brief_note_substack.md`](brief_note_substack.md)。貼る文の見本は [`note_template.md`](note_template.md) と [`substack_template.md`](substack_template.md)。ブリーフは実装済み。note と Substack は未実装。
+ブリーフ / note / Substack の前提と仕様: [`brief_note_substack.md`](brief_note_substack.md)。貼る文の見本は [`note_template.md`](note_template.md) と [`substack_template.md`](substack_template.md)。週次ジョブはブリーフに加えて `note/YYYY-Www.md`（jp）と `substack/YYYY-Www.md`（us）を書く。2日以上のホットが0件の週は記事ファイルを出さない。note と Substack への貼り付けは手動。スナップショット保持は約10日なので、閉じた週の月曜に一緒に書く。あとから再生成すると、残っている日だけでホットが変わる。

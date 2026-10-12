@@ -18,7 +18,7 @@
 | `daily_template.md` | 日次のひな形（フロントマター付き） |
 | `weekly_hot_bundle_template.md` | 週次＋ホットを1ファイルにまとめるひな形 |
 | `daily/` | 日次サマリー（**1日1組**・観測日ファイル名）。[`daily/README.md`](daily/README.md) |
-| `weekly/` | 週次サマリーと週のホットトピックを **1ファイルにまとめる**。[`weekly/README.md`](weekly/README.md)。ブリーフ / note / Substack の仕様は [`weekly/brief_note_substack.md`](weekly/brief_note_substack.md)。貼る文の見本は [`weekly/note_template.md`](weekly/note_template.md) と [`weekly/substack_template.md`](weekly/substack_template.md) |
+| `weekly/` | 週次サマリーと週のホットトピックを **1ファイルにまとめる**。[`weekly/README.md`](weekly/README.md)。ブリーフ / note / Substack の仕様は [`weekly/brief_note_substack.md`](weekly/brief_note_substack.md)。貼る文の見本は [`weekly/note_template.md`](weekly/note_template.md) と [`weekly/substack_template.md`](weekly/substack_template.md)。生成物は `weekly/note/YYYY-Www.md`（日本語）と `weekly/substack/YYYY-Www.md`（英語） |
 
 ---
 

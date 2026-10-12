@@ -2,18 +2,18 @@
 
 親: [`weekly/README.md`](README.md)
 
-ブリーフは実装済み。note と Substack は未実装。
+ブリーフ、note、Substack の原稿は実装済み。note と Substack への貼り付けは人が行う。
 
 ## いまの週次との差
 
-いまの `generate_ai_weekly_summary.py` は、ブリーフの本文だけを作る。note と Substack の記事は作らない。
+`generate_ai_weekly_summary.py` は、ブリーフと、note / Substack に貼る文を同じ実行で作る。順位は同じ動きの日をまとめる。観測URLが記事や Wikipedia なら、そのページの要旨を短く添える。順位の理由がそこに無いときは「今回の観測結果では出てきません」。
 
 | | ブリーフ（いまの週次メール） | note / Substack |
 |---|------------------------|----------------|
 | 中身 | マーケット、流れ、動いた話題、ホット最大5、カテゴリ top3 | 2日以上残ったホット上位3つだけ |
 | コメント | 書かない | 同じ週の公開記事に書いてあることだけ |
 | 末尾 | サイト誘導は付けない | ダッシュボードと、メールとの差分 |
-| 配信 | 月曜 7:30 生成、メールは 10:00 頃 | 月曜 8:00 頃に貼る。未実装 |
+| 配信 | 月曜 7:30 生成、メールは 10:00 頃 | 同じジョブで原稿を生成。貼り付けは月曜 8:00 頃、手動 |
 
 貼る文の見本: [`note_template.md`](note_template.md)（日本語）、[`substack_template.md`](substack_template.md)（英語）。どちらも 2026-W40。
 
@@ -46,7 +46,7 @@
 
 ダッシュボードを知らない人向けの無料記事。日本語。個人の note とは別アカウント。有料マガジンにはしない。支払いは記事の中では受けない。
 
-未実装。公開の目標は月曜 8:00 頃。見本は [`note_template.md`](note_template.md)。
+実装済み。出力は `weekly/note/YYYY-Www.md`。公開の目標は月曜 8:00 頃（貼り付けは手動）。見本は [`note_template.md`](note_template.md)。
 
 本文はこの順。
 
@@ -61,7 +61,7 @@
 
 ダッシュボードを知らない人向けの無料記事。英語。構成は note と同じ。有料購読にはしない。
 
-未実装。公開の目標は月曜 8:00 頃。見本は [`substack_template.md`](substack_template.md)。
+実装済み。出力は `weekly/substack/YYYY-Www.md`。公開の目標は月曜 8:00 頃（貼り付けは手動）。見本は [`substack_template.md`](substack_template.md)。
 
 末尾のダッシュボードは `https://trends-dashboard.com/us`。メールの説明は note と同じ差（毎朝の日次、月曜の週次にカテゴリ top3）。
 

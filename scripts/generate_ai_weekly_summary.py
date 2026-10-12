@@ -1906,10 +1906,6 @@ def build_mechanical_weekly_hot_topics(
 
 _JP_WEEKDAYS = "月火水木金土日"
 _US_SLOT_CLOCK = {"07": "07:00", "13": "13:00", "19": "19:00"}
-_PUBLIC_POST_NO_REASON_JP = "この順位になった理由は、今回の観測結果では出てきません。"
-_PUBLIC_POST_NO_REASON_US = (
-    "Why it ranked this way does not appear in this week's observations."
-)
 
 
 def _parse_iso_date(ds: str) -> Optional[date]:
@@ -1943,6 +1939,17 @@ def _jp_date_list(days: List[date]) -> str:
             parts.append(f"{d.month}月{d.day}日")
         prev_month = d.month
     return "、".join(parts)
+
+
+def _en_week_span(mon: date, sun: date) -> str:
+    """October 5–11。月をまたぐときは September 28–October 4。"""
+    if mon.year == sun.year and mon.month == sun.month:
+        return f"{mon.strftime('%B')} {mon.day}\u2013{sun.day}"
+    return f"{mon.strftime('%B')} {mon.day}\u2013{sun.strftime('%B')} {sun.day}"
+
+
+def _en_hot_topics_subtitle(mon: date, sun: date) -> str:
+    return f"A short look back at last week's hot topics, {_en_week_span(mon, sun)}."
 
 
 def _en_date_list(days: List[date]) -> str:
@@ -2056,7 +2063,7 @@ def _public_day_sentence(d: date, evidence: str) -> str:
         best = _best_rank_from_evidence(evidence)
         if best is not None:
             return f"{day}: {_rank_number_label(best)}."
-        return f"{day} is on the dashboard."
+        return f"{day} is on the trends."
 
     day = _jp_month_day(d)
     if (
@@ -2077,7 +2084,7 @@ def _public_day_sentence(d: date, evidence: str) -> str:
     best = _best_rank_from_evidence(evidence)
     if best is not None:
         return f"{day}は{_rank_number_label(best)}。"
-    return f"{day}はダッシュボードにあります。"
+    return f"{day}はトレンドにあります。"
 
 
 def _public_rank_paragraph(topic: Dict[str, Any], mon: date, sun: date) -> str:
@@ -2110,11 +2117,11 @@ def _public_rank_paragraph(topic: Dict[str, Any], mon: date, sun: date) -> str:
         if _ACTIVE_REGION == "us":
             if dc:
                 sentences.append(
-                    f"It stayed on the dashboard for {dc} day(s). "
+                    f"It stayed on the trends for {dc} day(s). "
                     "Day-by-day ranks do not appear in this week's observations."
                 )
         elif dc:
-            sentences.append(f"{dc}日、ダッシュボードに残っていました。")
+            sentences.append(f"{dc}日、トレンドに残っていました。")
     missing = [
         mon + timedelta(days=i)
         for i in range(7)
@@ -2126,9 +2133,9 @@ def _public_rank_paragraph(topic: Dict[str, Any], mon: date, sun: date) -> str:
         if _ACTIVE_REGION == "us":
             listed = _en_date_list(missing)
             verb = "is" if len(missing) == 1 else "are"
-            sentences.append(f"{listed} {verb} not on the dashboard.")
+            sentences.append(f"{listed} {verb} not on the trends.")
         else:
-            sentences.append(f"{_jp_date_list(missing)}はダッシュボードにありません。")
+            sentences.append(f"{_jp_date_list(missing)}はトレンドにありません。")
     if _ACTIVE_REGION == "us":
         return " ".join(sentences)
     return "".join(sentences)
@@ -2141,7 +2148,7 @@ def _public_topic_heading(index: int, topic: Dict[str, Any]) -> str:
         label = f"{title} ({source})" if source else title
     else:
         label = f"{title}（{source}）" if source else title
-    return f"## {index}. {label}"
+    return f"{index}. {label}"
 
 
 def render_public_weekly_markdown(
@@ -2155,6 +2162,7 @@ def render_public_weekly_markdown(
     if not topics:
         return ""
     n = len(topics)
+    subtitle = ""
     if _ACTIVE_REGION == "us":
         count_word = _public_count_label_us(n)
         title = (
@@ -2166,27 +2174,18 @@ def render_public_weekly_markdown(
             which = "this is the topic that stayed"
         else:
             which = f"these are the top {count_word.lower()} topics that stayed"
+        subtitle = _en_hot_topics_subtitle(mon, sun)
         lead = (
             f"From {_en_month_day(mon, with_weekday=True)} through "
             f"{_en_month_day(sun, with_weekday=True)}, {which} on the "
-            "Trends Dashboard for two or more days. Ranks are that week's "
-            "observations. Comments include only what public articles from the "
-            "same week said."
+            "trends for two or more days. Ranks are that week's "
+            f"observations. {subtitle}"
         )
-        reason = _PUBLIC_POST_NO_REASON_US
-        footer = (
-            "---\n\n"
-            "Category ranks and day-by-day observations are not included.\n\n"
-            "Daily ranks are here:\n"
-            "https://trends-dashboard.com/us\n\n"
-            "Subscribe by email, and yesterday's daily brief arrives each morning. "
-            "Monday's weekly brief also includes each category's top 3. "
-            "The target is about 9:00 JST for the daily and about 10:00 JST on "
-            "Monday for the weekly."
-        )
+        footer = "Daily ranks are here. https://trends-dashboard.com/us"
         header = (
             f"# Substack — {iso_week}\n\n"
-            'Copy from "Post" downward. The first line is the title.\n\n'
+            'Copy from "Post" downward. The first line is the title. '
+            "The next line is the subtitle.\n\n"
             "## Post\n"
         )
     else:
@@ -2195,26 +2194,21 @@ def render_public_weekly_markdown(
         lead = (
             f"{_jp_month_day(mon, with_weekday=True)}から"
             f"{_jp_month_day(sun, with_weekday=True)}まで、"
-            f"トレンドダッシュボードに2日以上残った話題の上位{count}です。"
+            f"トレンドに2日以上残った話題の上位{count}です。"
             "順位はその週の観測結果です。"
+            "シンプルに先週のホットトピックを簡単に振り返れる記事にしています。"
             "コメントは、同じ週に出た公開記事に書いてあることだけを記載しています。"
         )
-        reason = _PUBLIC_POST_NO_REASON_JP
-        footer = (
-            "---\n\n"
-            "カテゴリごとの順位と、日毎の観測結果は入れていません。\n\n"
-            "日々の順位はこちらです。\n"
-            "https://trends-dashboard.com\n\n"
-            "メールにサブスクライブすると毎朝、昨日の日次ブリーフが届きます。"
-            "月曜の週次には、カテゴリ別の top3 も入ります。"
-            "時刻の目標は日次 9:00 頃、週次は月曜 10:00 頃を予定しています。"
-        )
+        footer = "日々の順位はこちらです。 https://trends-dashboard.com"
         header = (
             f"# note — {iso_week}\n\n"
             "「本文」以降をコピーする。1行目はタイトル欄。\n\n"
             "## 本文\n"
         )
-    blocks: List[str] = [header, title, "", lead, ""]
+    blocks: List[str] = [header, title, ""]
+    if subtitle:
+        blocks.extend([subtitle, ""])
+    blocks.extend([lead, ""])
     for i, topic in enumerate(topics, 1):
         blocks.append(_public_topic_heading(i, topic))
         blocks.append("")
@@ -2231,8 +2225,6 @@ def render_public_weekly_markdown(
             if url:
                 blocks.append(url)
                 blocks.append("")
-            blocks.append(reason)
-            blocks.append("")
     blocks.append(footer)
     return "\n".join(blocks).rstrip() + "\n"
 
@@ -2301,12 +2293,7 @@ def fetch_public_page_gist(url: str) -> str:
 
 
 def _attach_public_page_comments(topics: List[Dict[str, Any]]) -> None:
-    """要旨が無い件だけ、観測ページのリードと理由の一文を足す。"""
-    reason = (
-        _PUBLIC_POST_NO_REASON_US
-        if _ACTIVE_REGION == "us"
-        else _PUBLIC_POST_NO_REASON_JP
-    )
+    """要旨が無い件だけ、観測ページのリードを URL と同じ行に足す。"""
     for topic in topics:
         if str(topic.get("comment") or "").strip():
             continue
@@ -2314,7 +2301,7 @@ def _attach_public_page_comments(topics: List[Dict[str, Any]]) -> None:
         gist = fetch_public_page_gist(url)
         if not gist:
             continue
-        topic["comment"] = f"{gist}\n{url}\n\n{reason}" if url else f"{gist}\n\n{reason}"
+        topic["comment"] = f"{gist} {url}".rstrip() if url else gist
 
 
 def build_public_weekly_post(

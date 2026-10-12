@@ -1349,11 +1349,14 @@ def test_public_weekly_post_keeps_two_day_hot_topics_only(gaws):
     assert "10月6日は終日6位です。" in text
     assert "10月10日は終日7位です。" in text
     assert "10月8日は7時圏外、13時6位、19時7位。" in text
-    assert "10月5日、7日、9日、11日はダッシュボードにありません。" in text
+    assert "10月5日、7日、9日、11日はトレンドにありません。" in text
     assert "https://example.com/ishibashi" in text
     assert "ダッシュボードに出ていたページ" not in text
-    assert "この順位になった理由は、今回の観測結果では出てきません。" in text
-    assert "https://trends-dashboard.com" in text
+    assert "この順位になった理由は" not in text
+    assert "メールにサブスクライブ" not in text
+    assert text.rstrip().endswith("日々の順位はこちらです。 https://trends-dashboard.com")
+    assert "1. 石橋静河（Wikipedia）" in text
+    assert "## 1." not in text
     assert "gumroad" not in text.lower()
     assert "一日だけ" not in text
     assert "Bitcoin" not in text
@@ -1403,12 +1406,17 @@ def test_public_weekly_post_us_substack_shape(gaws):
     assert text.split("## Post", 1)[-1].strip().startswith(
         "Two hot topics from last week"
     )
+    assert "A short look back at last week's hot topics, September 28–October 4." in text
+    assert "Comments include only what public articles" not in text
     assert "Janice STFU (Spotify (US))" in text
     assert "September 29: #6 all day." in text
     assert "September 28: out at 07:00, #9 at 13:00, #9 at 19:00." in text
     assert "The page on the dashboard is here." not in text
-    assert "https://trends-dashboard.com/us" in text
-    assert "does not appear in this week's observations." in text
+    assert "does not appear in this week's observations." not in text
+    assert "not on the trends." in text
+    assert text.rstrip().endswith("Daily ranks are here. https://trends-dashboard.com/us")
+    assert "1. Janice STFU (Spotify (US))" in text
+    assert "Subscribe by email" not in text
     assert "gumroad" not in text.lower()
     gaws.configure_weekly_region("jp")
 

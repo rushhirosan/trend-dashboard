@@ -297,6 +297,81 @@ def test_isolated_kkj_chunk_timeout_continues_us(monkeypatch):
     assert "cnn_US" in result["results"]
 
 
+def test_isolated_kkj_chunk_oom_continues_us(monkeypatch):
+    calls = []
+
+    def fake_subprocess(self, region, *, low_memory_mode, timeout_seconds, jp_chunk=None, jp_chunks=None):
+        calls.append((region, jp_chunk))
+        if region == "jp" and jp_chunk == 8:
+            return {
+                "success": False,
+                "results": {},
+                "error": "missing_refresh_result_json",
+                "oom_killed": True,
+                "region": "jp",
+            }, False
+        if region == "jp":
+            return {
+                "success": True,
+                "results": {f"src{jp_chunk}_JP": {"success": True}},
+                "region": "jp",
+            }, False
+        return {"success": True, "results": {"cnn_US": {"success": True}}, "region": "us"}, False
+
+    monkeypatch.setattr(sm, "SCHEDULER_JP_SUBCHUNKS", 8)
+    monkeypatch.setattr(sm.TrendsScheduler, "_run_refresh_region_subprocess", fake_subprocess)
+    monkeypatch.setattr(sm.TrendsScheduler, "_pause_between_subprocess_phases", lambda self: None)
+    scheduler = sm.TrendsScheduler(_FakeApp())
+    result, timed_out = scheduler._run_refresh_all_trends_with_job_timeout(
+        low_memory_mode=True,
+        job_timeout_seconds=5100,
+    )
+    assert timed_out is False
+    assert ("us", None) in calls
+    assert result.get("jp_phase_failed") is not True
+    assert result.get("us_phase_skipped") is not True
+    assert result.get("kkj_chunk_bypassed") is True
+    assert result.get("kkj_chunk_bypass_reason") == "oom"
+    assert result.get("kkj_chunk_timed_out") is not True
+    assert "cnn_US" in result["results"]
+    assert result["success"] is True
+
+
+def test_non_kkj_chunk_oom_still_skips_us(monkeypatch):
+    calls = []
+
+    def fake_subprocess(self, region, *, low_memory_mode, timeout_seconds, jp_chunk=None, jp_chunks=None):
+        calls.append((region, jp_chunk))
+        if region == "jp" and jp_chunk == 1:
+            return {
+                "success": False,
+                "results": {},
+                "error": "missing_refresh_result_json",
+                "oom_killed": True,
+                "region": "jp",
+            }, False
+        if region == "jp":
+            return {
+                "success": True,
+                "results": {f"src{jp_chunk}_JP": {"success": True}},
+                "region": "jp",
+            }, False
+        return {"success": True, "results": {"cnn_US": {"success": True}}, "region": "us"}, False
+
+    monkeypatch.setattr(sm, "SCHEDULER_JP_SUBCHUNKS", 8)
+    monkeypatch.setattr(sm.TrendsScheduler, "_run_refresh_region_subprocess", fake_subprocess)
+    monkeypatch.setattr(sm.TrendsScheduler, "_pause_between_subprocess_phases", lambda self: None)
+    scheduler = sm.TrendsScheduler(_FakeApp())
+    result, timed_out = scheduler._run_refresh_all_trends_with_job_timeout(
+        low_memory_mode=True,
+        job_timeout_seconds=5100,
+    )
+    assert timed_out is False
+    assert ("us", None) not in calls
+    assert result.get("jp_phase_failed") is True
+    assert result.get("us_phase_skipped") is True
+
+
 def test_non_kkj_chunk_timeout_still_skips_us(monkeypatch):
     calls = []
 

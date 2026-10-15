@@ -1216,6 +1216,8 @@ class TrendsScheduler:
         jp_timeout, us_timeout = _subprocess_phase_timeouts(jp_subchunks, job_timeout_seconds)
         jp_chunk_results: list[dict] = []
         kkj_chunk_timed_out = False
+        kkj_chunk_bypassed = False
+        kkj_bypass_reason: str | None = None
 
         for chunk_idx in range(1, jp_subchunks + 1):
             jp_result, jp_timed_out = self._run_refresh_region_subprocess(
@@ -1237,21 +1239,32 @@ class TrendsScheduler:
                 len(chunk_results),
                 jp_result.get("error"),
             )
-            if jp_timed_out:
+            phase_ok = _subprocess_phase_ok(jp_result, jp_timed_out)
+            if not phase_ok:
                 from utils.jp_refresh_chunks import is_isolated_kkj_chunk
 
                 if is_isolated_kkj_chunk(chunk_idx, jp_subchunks):
-                    # 官公需だけハングしても US とスナップショットを落とさない
+                    # 官公需だけのハング・SIGKILL では US とスナップショットを落とさない
+                    if jp_timed_out or jp_result.get("phase_timed_out"):
+                        kkj_bypass_reason = "timeout"
+                        kkj_chunk_timed_out = True
+                    elif jp_result.get("oom_killed"):
+                        kkj_bypass_reason = "oom"
+                    else:
+                        kkj_bypass_reason = str(jp_result.get("error") or "phase_failed")
+                    kkj_chunk_bypassed = True
                     logger.warning(
-                        "⚠️ JP chunk %s/%s (kkj 単独) が %ss でタイムアウト — US は継続",
+                        "⚠️ JP chunk %s/%s (kkj 単独) をスキップして US を継続 "
+                        "(reason=%s error=%s)",
                         chunk_idx,
                         jp_subchunks,
-                        jp_timeout,
+                        kkj_bypass_reason,
+                        jp_result.get("error"),
                     )
-                    kkj_chunk_timed_out = True
                     if chunk_idx < jp_subchunks:
                         self._pause_between_subprocess_phases()
                     continue
+            if jp_timed_out:
                 merged = _merge_phase_refresh_results(
                     _merge_jp_chunk_results(jp_chunk_results),
                     {"success": False, "results": {}},
@@ -1273,7 +1286,7 @@ class TrendsScheduler:
                     jp_subchunks,
                     jp_result.get("error"),
                 )
-            if not _subprocess_phase_ok(jp_result, jp_timed_out):
+            if not phase_ok:
                 logger.error(
                     "❌ JP フェーズ異常終了 (chunk=%s/%s) — US subprocess をスキップ "
                     "(success=%s error=%s oom=%s)",
@@ -1314,11 +1327,14 @@ class TrendsScheduler:
             timeout_seconds=us_timeout,
         )
         merged = _merge_phase_refresh_results(jp_result, us_result)
-        if kkj_chunk_timed_out:
-            merged["kkj_chunk_timed_out"] = True
+        if kkj_chunk_bypassed:
+            merged["kkj_chunk_bypassed"] = True
+            merged["kkj_chunk_bypass_reason"] = kkj_bypass_reason
             merged["failed_jp_chunk"] = jp_subchunks
             merged["failed_jp_chunks"] = jp_subchunks
             merged["jp_phase_timeout_seconds"] = jp_timeout
+            if kkj_chunk_timed_out:
+                merged["kkj_chunk_timed_out"] = True
         if merged.get("phase_success_mismatch"):
             logger.warning(
                 "⚠️ refresh マージ: phase_success とソース成功数が不一致 "
@@ -1701,20 +1717,39 @@ class TrendsScheduler:
                         },
                     )
 
-            elif result.get("kkj_chunk_timed_out"):
+            elif result.get("kkj_chunk_bypassed") or result.get("kkj_chunk_timed_out"):
                 jp_limit = result.get("jp_phase_timeout_seconds", "?")
                 failed_chunk = result.get("failed_jp_chunk")
                 failed_chunks = result.get("failed_jp_chunks")
-                self._send_alert(
-                    "warning",
-                    "官公需 (kkj) chunk タイムアウト",
-                    (
+                reason = result.get("kkj_chunk_bypass_reason") or (
+                    "timeout" if result.get("kkj_chunk_timed_out") else "failed"
+                )
+                if reason == "timeout":
+                    kkj_title = "官公需 (kkj) chunk タイムアウト"
+                    kkj_message = (
                         f"JP chunk {failed_chunk}/{failed_chunks}（kkj 単独）が {jp_limit} 秒以内に終わりませんでした。"
                         " 官公需は前回キャッシュのまま、US 取得は継続しています。"
-                    ),
+                    )
+                elif reason == "oom":
+                    kkj_title = "官公需 (kkj) chunk が強制終了"
+                    kkj_message = (
+                        f"JP chunk {failed_chunk}/{failed_chunks}（kkj 単独）が結果を残さず終了しました（SIGKILL）。"
+                        " 官公需は前回キャッシュのまま、US 取得は継続しています。"
+                    )
+                else:
+                    kkj_title = "官公需 (kkj) chunk 失敗"
+                    kkj_message = (
+                        f"JP chunk {failed_chunk}/{failed_chunks}（kkj 単独）が失敗しました（{reason}）。"
+                        " 官公需は前回キャッシュのまま、US 取得は継続しています。"
+                    )
+                self._send_alert(
+                    "warning",
+                    kkj_title,
+                    kkj_message,
                     {
                         "実行ID": execution_id,
                         "トリガー": self._trigger_label(trigger_source),
+                        "理由": str(reason),
                         "JP上限（秒）": str(jp_limit),
                         "ホスト": host_short,
                         "PID": str(pid),

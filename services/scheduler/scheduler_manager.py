@@ -1078,7 +1078,7 @@ class TrendsScheduler:
         if low_memory_mode:
             env.setdefault(
                 "KKJ_RANKING_FETCH_COUNT",
-                os.environ.get("KKJ_RANKING_FETCH_COUNT", "150"),
+                os.environ.get("KKJ_RANKING_FETCH_COUNT", "30"),
             )
         result_file = None
         if region == "jp" and jp_chunk is not None:

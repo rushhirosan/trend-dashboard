@@ -9,11 +9,13 @@ import gc
 import os
 import re
 import time
-import requests
-import xml.etree.ElementTree as ET
+import xml.sax
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Tuple
 from urllib.parse import urlencode
+from xml.sax.handler import ContentHandler
+
+import requests
 
 from utils.logger_config import get_logger
 from services.trends.base_trends_manager import BaseTrendsManager
@@ -49,18 +51,22 @@ RANKING_QUERIES = [
     ("cyber", "サイバー", "サイバー", "security"),
 ]
 RANKING_COUNT = 1000
-# 低メモリ refresh subprocess 用（県別 Top5 集計には十分な上限）
-LOW_MEMORY_RANKING_COUNT = 150
+# 低メモリ refresh subprocess 用。
+# Count≥40 付近で ProjectDescription が数百MBの案件が混ざることがあるため、
+# 既定は 30（実測 ~7MB）に抑える。巨大本文は SAX で読み飛ばす。
+LOW_MEMORY_RANKING_COUNT = 30
+# 誤って大きい Count を指定しても OOM/長時間DLを避ける上限
+_RANKING_FETCH_COUNT_HARD_MAX = 40
 
 
 def _ranking_fetch_count() -> int:
     raw = os.environ.get("KKJ_RANKING_FETCH_COUNT")
     if raw is not None and str(raw).strip() != "":
         try:
-            return max(25, min(RANKING_COUNT, int(raw)))
+            return max(25, min(_RANKING_FETCH_COUNT_HARD_MAX, int(raw)))
         except (TypeError, ValueError):
             pass
-    return RANKING_COUNT
+    return LOW_MEMORY_RANKING_COUNT
 
 
 # JP chunk subprocess 上限（既定 600s）より短く打ち切り、kill 前に stale cache を返す。
@@ -101,12 +107,6 @@ LG_CODE_TO_PREFECTURE = {
 }
 
 
-def _text(elem: Optional[ET.Element]) -> str:
-    if elem is None or elem.text is None:
-        return ""
-    return (elem.text or "").strip()
-
-
 def _parse_date_range(days: int) -> str:
     """APIの期間形式 'YYYY-MM-DD/' を返す（その日以降）。APIガイド: 開始日/ で終了日なし＝以降。"""
     start = (datetime.now() - timedelta(days=days)).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -135,120 +135,29 @@ def _last_n_months(n: int) -> List[Tuple[int, int]]:
     return out
 
 
-def _strip_namespace(element: ET.Element) -> None:
-    """要素と子孫のタグから名前空間を除去（{ns}Tag → Tag）"""
-    if element.tag.startswith("{"):
-        element.tag = element.tag.split("}", 1)[1]
-    for child in element:
-        _strip_namespace(child)
+# localname を lower + 区切り除去したキー。巨大本文は characters を捨てる。
+_SKIP_CONTENT_KEYS = frozenset({"projectdescription", "attachments", "attachment"})
+_RESULT_FIELD_KEYS = frozenset(
+    {
+        "projectname",
+        "title",
+        "externaldocumenturi",
+        "documenturi",
+        "url",
+        "organizationname",
+        "prefecturename",
+        "lgcode",
+        "cftissuedate",
+    }
+)
 
 
-def _fetch_kkj_xml(params: Dict[str, str], timeout: int = 45) -> Optional[ET.Element]:
-    """官公需APIにGETで問い合わせ、XMLのルート要素を返す。エラー時はNone。"""
-    url = KKJ_API_BASE + "?" + urlencode(params)
-    try:
-        r = requests.get(url, timeout=timeout)
-        r.raise_for_status()
-        raw = r.content
-        root = ET.fromstring(raw)
-        _strip_namespace(root)  # 名前空間を除去してタグ名で検索しやすくする
-        return root
-    except requests.RequestException as e:
-        logger.warning("官公需API リクエストエラー（タイムアウトや接続不可の可能性）: %s", e)
-        return None
-    except ET.ParseError as e:
-        logger.warning("官公需API XMLパースエラー: %s", e)
-        return None
-
-
-def _find_element(root: ET.Element, *tags: str) -> Optional[ET.Element]:
-    """複数のタグ名を試して最初に見つかった要素を返す（大文字小文字の違いに対応）"""
-    for tag in tags:
-        el = root.find(tag)
-        if el is not None:
-            return el
-    return None
-
-
-def _find_all(root: ET.Element, *parent_tags: str) -> List[ET.Element]:
-    """SearchResult 要素のリストを返す。APIはルートが SearchResults のことがある。"""
-    # ルート自身が SearchResults の場合はその子が SearchResult
-    root_tag = (root.tag or "").strip()
-    if root_tag and root_tag.lower().replace("_", "") == "searchresults":
-        for child_tag in ("SearchResult", "searchresult"):
-            items = root.findall(child_tag)
-            if items:
-                return items
-    # 子要素に SearchResults がある場合
-    parent = _find_element(root, *parent_tags)
-    if parent is not None:
-        for child_tag in ("SearchResult", "searchresult"):
-            items = parent.findall(child_tag)
-            if items:
-                return items
-    # root 直下の SearchResult
-    for tag in ("SearchResult", "searchresult"):
-        items = root.findall(tag)
-        if items:
-            return items
-    # 子孫をたどって SearchResult をすべて収集（ネストや名前空間の違いに対応）
-    out: List[ET.Element] = []
-    for el in root.iter():
-        if el.tag and el.tag.lower().replace("_", "") == "searchresult":
-            out.append(el)
-    return out
-
-
-def _iter_all_elements(element: ET.Element):
-    """要素とその子孫を再帰的に yield。"""
-    yield element
-    for child in element:
-        yield from _iter_all_elements(child)
-
-
-def _get_search_hits(root: ET.Element) -> Optional[int]:
-    """SearchHits または SearchResults 内の件数を返す。APIは PascalCase を使用。"""
-    # ルート直下の SearchHits を試す
-    for hits_tag in ("SearchHits", "searchhits"):
-        hits = root.find(hits_tag)
-        if hits is not None and hits.text:
-            try:
-                return int((hits.text or "").strip())
-            except ValueError:
-                pass
-    # SearchResults 内の SearchHits を試す
-    for parent_tag in ("SearchResults", "searchresults", "Results", "results"):
-        parent = root.find(parent_tag)
-        if parent is None:
-            continue
-        for hits_tag in ("SearchHits", "searchhits"):
-            hits = parent.find(hits_tag)
-            if hits is not None and hits.text:
-                try:
-                    return int((hits.text or "").strip())
-                except ValueError:
-                    pass
-    # 子孫をたどって SearchHits を探す（名前空間付きやネストが深い場合）
-    for el in _iter_all_elements(root):
-        if el.tag and el.tag.lower().endswith("searchhits") and el.text:
-            try:
-                return int((el.text or "").strip())
-            except ValueError:
-                pass
-    # SearchHits が無い場合は SearchResult の件数で代用
-    items = _find_all(root, "SearchResults", "searchresults")
-    if items:
-        return len(items)
-    return None
-
-
-def _get_error_message(root: ET.Element) -> Optional[str]:
-    """<error> または <Error> があればメッセージを返す。"""
-    for tag in ("error", "Error"):
-        err = root.find(tag)
-        if err is not None and err.text:
-            return (err.text or "").strip()
-    return None
+def _localname(tag: str) -> str:
+    if not tag:
+        return ""
+    if "}" in tag:
+        tag = tag.rsplit("}", 1)[-1]
+    return tag.strip()
 
 
 def _lg_code_to_prefecture(code: str) -> str:
@@ -257,64 +166,175 @@ def _lg_code_to_prefecture(code: str) -> str:
         return ""
     s = (code or "").strip()
     if len(s) >= 2:
-        two = s[:2]
-        return LG_CODE_TO_PREFECTURE.get(two, "")
+        return LG_CODE_TO_PREFECTURE.get(s[:2], "")
     return ""
 
 
-def _get_child_text(element: ET.Element, *tags: str) -> str:
-    """子要素のテキストを返す。複数タグ名を試す（大文字小文字の違いに対応）。"""
-    for tag in tags:
-        el = element.find(tag)
-        if el is not None:
-            text = (el.text or "").strip()
-            if text:
-                return text
-    return ""
-
-
-def _get_prefecture_from_result(sr: ET.Element) -> str:
-    """SearchResult 要素から都道府県名を抽出。APIは Organization_Name, LG_Code 等を使用。"""
-    # 1. PrefectureName, Organization_Name など都道府県名らしき文字列
-    for tag in ("PrefectureName", "prefecturename", "Organization_Name", "OrganizationName"):
-        el = sr.find(tag)
-        if el is not None and el.text:
-            text = (el.text or "").strip()
-            if text:
-                return text
-    # 2. LG_Code（都道府県コード）があれば都道府県名に変換（AI/サイバー等でこちらだけ返る場合あり）
-    for tag in ("LG_Code", "lg_code", "LGCode"):
-        el = sr.find(tag)
-        if el is not None and el.text:
-            name = _lg_code_to_prefecture(el.text)
-            if name:
-                return name
-    return ""
-
-
-def _get_case_from_result(sr: ET.Element) -> Dict[str, Any]:
-    """SearchResult 要素から案件情報（件名・URL・機関・公告日・都道府県）を抽出。"""
-    pref = _get_prefecture_from_result(sr)
-    if pref and ("県" not in pref and "府" not in pref and "都" not in pref):
+def _normalize_prefecture(pref: str, lg_code: str = "") -> str:
+    pref = (pref or "").strip()
+    if pref and ("県" not in pref and "府" not in pref and "都" not in pref and pref != "北海道"):
         m = re.search(r"^(北海道|東京都|大阪府|京都府|.{2,4}県)", pref)
-        pref = m.group(1) if m else pref
-    # APIは ProjectName / Project_Name 等のバリエーションがあり得る
-    title = _get_child_text(sr, "ProjectName", "projectname", "Project_Name", "project_name", "Title", "title")
-    url = _get_child_text(sr, "ExternalDocumentURI", "externaldocumenturi", "URL", "url", "DocumentURI", "documenturi")
-    organization = _get_child_text(sr, "OrganizationName", "organizationname", "Organization_Name", "organization_name")
-    cft_raw = _get_child_text(sr, "CftIssueDate", "cftissuedate", "Cft_Issue_Date", "cft_issue_date")
-    cft_issue_date = ""
-    if cft_raw and "T" in cft_raw:
-        cft_issue_date = cft_raw.split("T")[0]  # YYYY-MM-DD 部分のみ
-    elif cft_raw:
-        cft_issue_date = cft_raw[:10] if len(cft_raw) >= 10 else cft_raw
+        if m:
+            pref = m.group(1)
+    if pref:
+        return pref
+    return _lg_code_to_prefecture(lg_code)
+
+
+def _normalize_cft_issue_date(raw: str) -> str:
+    raw = (raw or "").strip()
+    if not raw:
+        return ""
+    if "T" in raw:
+        return raw.split("T", 1)[0]
+    return raw[:10] if len(raw) >= 10 else raw
+
+
+def _case_dict_from_raw_fields(fields: Dict[str, str]) -> Dict[str, Any]:
+    """SAX が集めたタグ→テキストから表示用案件 dict を作る。"""
+    lower = {k.lower().replace("-", "_"): v for k, v in fields.items()}
+
+    def _pick(*keys: str) -> str:
+        for key in keys:
+            val = (lower.get(key) or "").strip()
+            if val:
+                return val
+        return ""
+
+    pref = _normalize_prefecture(
+        _pick("prefecturename", "organizationname", "organization_name"),
+        _pick("lgcode", "lg_code"),
+    )
     return {
         "prefecture": pref,
-        "title": title or "",
-        "url": url or "",
-        "organization": organization or "",
-        "cft_issue_date": cft_issue_date,
+        "title": _pick("projectname", "project_name", "title"),
+        "url": _pick("externaldocumenturi", "documenturi", "url"),
+        "organization": _pick("organizationname", "organization_name"),
+        "cft_issue_date": _normalize_cft_issue_date(
+            _pick("cftissuedate", "cft_issue_date")
+        ),
     }
+
+
+class _KkjSaxHandler(ContentHandler):
+    """
+    官公需 XML をストリーム処理する。
+    ProjectDescription / Attachments の本文は characters を捨て、RSS を抑える。
+    """
+
+    def __init__(self, *, want_results: bool = True, max_results: Optional[int] = None):
+        super().__init__()
+        self.want_results = want_results
+        self.max_results = max_results
+        self.search_hits: Optional[int] = None
+        self.error_message: Optional[str] = None
+        self.results: List[Dict[str, Any]] = []
+        self._skip_depth = 0
+        self._in_search_result = False
+        self._field: Optional[str] = None
+        self._buf: List[str] = []
+        self._raw_fields: Dict[str, str] = {}
+        self._done = False
+
+    @staticmethod
+    def _tag_key(name: str) -> str:
+        return _localname(name).lower().replace("_", "").replace("-", "")
+
+    def startElement(self, name, attrs):  # noqa: N802
+        if self._done:
+            return
+        local = _localname(name)
+        local_key = self._tag_key(name)
+        if self._skip_depth:
+            self._skip_depth += 1
+            return
+        if local_key in _SKIP_CONTENT_KEYS:
+            self._skip_depth = 1
+            return
+        if local_key == "searchresult":
+            if not self.want_results:
+                self._skip_depth = 1
+                return
+            if self.max_results is not None and len(self.results) >= self.max_results:
+                self._done = True
+                return
+            self._in_search_result = True
+            self._raw_fields = {}
+            return
+        if local_key == "error":
+            self._field = "__error__"
+            self._buf = []
+            return
+        if local_key == "searchhits":
+            self._field = "__hits__"
+            self._buf = []
+            return
+        if self._in_search_result and local_key in _RESULT_FIELD_KEYS:
+            self._field = local
+            self._buf = []
+
+    def endElement(self, name):  # noqa: N802
+        local_key = self._tag_key(name)
+        if self._skip_depth:
+            self._skip_depth -= 1
+            return
+        if self._field is not None:
+            text = "".join(self._buf).strip()
+            field = self._field
+            self._field = None
+            self._buf = []
+            if field == "__hits__":
+                try:
+                    self.search_hits = int(text)
+                except ValueError:
+                    pass
+            elif field == "__error__":
+                if text:
+                    self.error_message = text
+            elif self._in_search_result and text:
+                self._raw_fields[field] = text
+        if local_key == "searchresult" and self._in_search_result:
+            self.results.append(_case_dict_from_raw_fields(self._raw_fields))
+            self._in_search_result = False
+            self._raw_fields = {}
+            if self.max_results is not None and len(self.results) >= self.max_results:
+                self._done = True
+
+    def characters(self, content):  # noqa: N802
+        if self._skip_depth or self._field is None:
+            return
+        self._buf.append(content)
+
+
+def _fetch_kkj_search(
+    params: Dict[str, str],
+    *,
+    timeout: int = 45,
+    want_results: bool = True,
+    max_results: Optional[int] = None,
+) -> Tuple[Optional[int], List[Dict[str, Any]], Optional[str], bool]:
+    """
+    官公需APIをストリーム取得して SAX パースする。
+    Returns: (search_hits, results, error_message, connection_ok)
+    """
+    url = KKJ_API_BASE + "?" + urlencode(params)
+    handler = _KkjSaxHandler(want_results=want_results, max_results=max_results)
+    try:
+        with requests.get(url, stream=True, timeout=timeout) as response:
+            response.raise_for_status()
+            response.raw.decode_content = True
+            xml.sax.parse(response.raw, handler)
+    except requests.RequestException as e:
+        logger.warning("官公需API リクエストエラー（タイムアウトや接続不可の可能性）: %s", e)
+        return None, [], None, False
+    except (xml.sax.SAXParseException, OSError, ValueError) as e:
+        logger.warning("官公需API XMLパースエラー: %s", e)
+        return None, [], None, False
+
+    hits = handler.search_hits
+    if hits is None and handler.results:
+        hits = len(handler.results)
+    return hits, handler.results, handler.error_message, True
 
 
 def _fetch_hits_for_date_range(
@@ -333,21 +353,19 @@ def _fetch_hits_for_date_range(
     if rate_limiter:
         rate_limiter.wait_if_needed()
     _ensure_kkj_deadline(deadline_at)
-    # APIガイド: 開始日/終了日 で期間指定
     period = f"{date_from}/{date_to}"
     params = {
         "Query": query,
         "CFT_Issue_Date": period,
         "Count": str(count),
     }
-    root = _fetch_kkj_xml(params)
-    if root is None:
+    # 件数だけ欲しいので SearchResult 本文は読み飛ばす
+    hits, _, err, ok = _fetch_kkj_search(params, want_results=False)
+    if not ok:
         return 0, False
-    err = _get_error_message(root)
     if err:
         logger.warning("官公需API エラー（期間）: %s", err)
         return 0, True
-    hits = _get_search_hits(root)
     return (hits if hits is not None else 0), True
 
 
@@ -357,6 +375,8 @@ def _fetch_hits_for_query(
     count: int = 1,
     rate_limiter=None,
     deadline_at: Optional[float] = None,
+    *,
+    want_results: bool = True,
 ) -> Tuple[Optional[int], List[Dict[str, Any]], bool]:
     """
     1回の検索で SearchHits（総件数）と結果リストを返す。
@@ -373,24 +393,28 @@ def _fetch_hits_for_query(
         "CFT_Issue_Date": date_from if date_from.endswith("/") else date_from + "/",
         "Count": str(count),
     }
-    root = _fetch_kkj_xml(params)
-    if root is None:
-        return 0, [], False  # 接続失敗
-    err = _get_error_message(root)
+    hits, results, err, ok = _fetch_kkj_search(
+        params,
+        want_results=want_results,
+        max_results=count if want_results else None,
+    )
+    if not ok:
+        return 0, [], False
     if err:
         logger.warning("官公需API エラー: %s", err)
         return 0, [], True
-    hits = _get_search_hits(root)
     total = hits if hits is not None else 0
-    if total == 0 and root is not None:
-        child_tags = [c.tag for c in root if c.tag]
-        logger.info("官公需API 0件: Query=%s, CFT_Issue_Date=%s, root.tag=%s, 子=%s", query[:30], date_from, root.tag, child_tags[:15])
-    results = []
-    result_elements = _find_all(root, "SearchResults", "searchresults")
-    for sr in result_elements:
-        results.append(_get_case_from_result(sr))
-    if total and total > 0 and len(results) == 0:
-        logger.info("官公需API: SearchHits=%s だが SearchResult を0件しか取得できませんでした。ルートタグ=%s", total, root.tag)
+    if total == 0:
+        logger.info(
+            "官公需API 0件: Query=%s, CFT_Issue_Date=%s",
+            query[:30],
+            date_from,
+        )
+    if total and total > 0 and want_results and len(results) == 0:
+        logger.info(
+            "官公需API: SearchHits=%s だが SearchResult を0件しか取得できませんでした",
+            total,
+        )
     return total, results, True
 
 
@@ -459,6 +483,7 @@ class KKJTrendsManager(BaseTrendsManager):
                 count=1,
                 rate_limiter=self.rate_limiter,
                 deadline_at=deadline_at,
+                want_results=False,
             )
             if ok:
                 connection_ok_count += 1
@@ -500,13 +525,15 @@ class KKJTrendsManager(BaseTrendsManager):
         prefecture_rankings: Dict[str, List[Dict[str, Any]]] = {}
         keyword_top_cases: Dict[str, List[Dict[str, Any]]] = {}
         ranking_result_count: Dict[str, int] = {}  # 県別集計の元になった一覧取得件数（総件数と異なる場合あり）
-        for key, label, query, _ in SIGNALS_QUERIES:
+        # 一覧は OR クエリだと結果が返らない／肥大化しやすいので単一語の RANKING_QUERIES を使う
+        for key, label, query, _ in RANKING_QUERIES:
             _, results, ok = _fetch_hits_for_query(
                 query,
                 date_from,
                 count=_ranking_fetch_count(),
                 rate_limiter=self.rate_limiter,
                 deadline_at=deadline_at,
+                want_results=True,
             )
             if ok:
                 connection_ok_count += 1

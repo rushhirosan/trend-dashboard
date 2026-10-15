@@ -28,8 +28,8 @@ primary_region = "nrt"
   TRENDS_SCHEDULER_SUBPROCESS_PHASE_PAUSE_SECONDS = "8"
   # US subprocess 専用上限（JP 分割数増加時も US を 600s に押し潰さない）
   TRENDS_SCHEDULER_US_SUBPROCESS_TIMEOUT_SECONDS = "2400"
-  # 官公需ランキング取得件数（subprocess 低メモリ時。県別 Top5 には 150 件で十分）
-  KKJ_RANKING_FETCH_COUNT = "150"
+  # 官公需ランキング取得件数（Count≥40 で数百MB本文が混ざるため 30 上限運用）
+  KKJ_RANKING_FETCH_COUNT = "30"
   # 官公需の連続取得を JP chunk 上限(600s)より前に打ち切り、stale cache を返す
   KKJ_FETCH_DEADLINE_SECONDS = "480"
   # memory_watchdog の fallback 上限（cgroup と揃える）

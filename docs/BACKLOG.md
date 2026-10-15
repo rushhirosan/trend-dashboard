@@ -391,6 +391,7 @@ dogfood は `draft` のまま自分宛に送っている。公開・有料の ap
 - [ ] **Grafana** で OOM / `Worker SIGKILL` アラートを UI 設定（doc 参照）
 - [ ] 6/20 の 07/13 スナップショット（`captured_at` ~16:02）を要再取得か判断 — 必要なら成功スロット後に re-backfill
 - [ ] 1536MB でも OOM 再発時: JP 2分割 / KKJ scheduler 除外 / 1792MB 検討（`fetch_all_categories=False` は不可）
+  - 2026-10-16: KKJ OOM 主因は `ProjectDescription` 数百MB。SAX 読み飛ばし + `KKJ_RANKING_FETCH_COUNT=30` で対処（メモリ増はしない）
 
 **運用メモ（調査記録）**
 

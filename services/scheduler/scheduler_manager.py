@@ -458,18 +458,30 @@ class TrendsScheduler:
         if USE_DB_LOCK:
             try:
                 if self.db and hasattr(self.db, 'try_acquire_scheduler_lock_db'):
-                    if self.db.try_acquire_scheduler_lock_db(holder_id, SCHEDULER_LOCK_MINUTES):
+                    acquired = self.db.try_acquire_scheduler_lock_db(
+                        holder_id, SCHEDULER_LOCK_MINUTES
+                    )
+                    if acquired is None:
+                        logger.warning(
+                            "⏭️ スケジューラーDBに接続できないためロック取得を中止します"
+                        )
+                        return ("unavailable", None)
+                    if acquired:
                         logger.debug("🔒 スケジューラーDB分散ロックを取得しました")
                         return ('db', holder_id)
                     # OOM 等で holder が死んでいればロックを回収
                     if self._try_recover_stale_scheduler_lock():
-                        if resume_after_recover and self.db.try_acquire_scheduler_lock_db(
-                            holder_id, SCHEDULER_LOCK_MINUTES
-                        ):
-                            logger.info(
-                                "🔒 stale lock 回収後に gap_retry 用ロックを再取得しました"
+                        if resume_after_recover:
+                            again = self.db.try_acquire_scheduler_lock_db(
+                                holder_id, SCHEDULER_LOCK_MINUTES
                             )
-                            return ('db', holder_id)
+                            if again is None:
+                                return ("unavailable", None)
+                            if again:
+                                logger.info(
+                                    "🔒 stale lock 回収後に gap_retry 用ロックを再取得しました"
+                                )
+                                return ('db', holder_id)
                         jst = pytz.timezone("Asia/Tokyo")
                         recovery_slot = self._resolve_scheduler_slot_key(datetime.now(jst))
                         logger.info(
@@ -730,6 +742,18 @@ class TrendsScheduler:
         elapsed = (now_utc - last_deploy).total_seconds()
         return elapsed <= window_sec
 
+    def _startup_slot_completed(self, slot_key: str) -> bool | None:
+        """起動時の完了判定。None は DB 不明（このとき欠損リトライは始めない）。"""
+        if not self.db or not hasattr(self.db, "has_slot_completed"):
+            return False
+        state = self.db.has_slot_completed(slot_key)
+        if state is None:
+            logger.warning(
+                "⚠️ 起動時チェック: DBに接続できないため欠損リトライは行いません（slot=%s）",
+                slot_key,
+            )
+        return state
+
     def _check_and_execute_missed_job(self, jst):
         """
         起動時に当日の1時、7時、13時、または19時を過ぎている場合は自動実行
@@ -755,7 +779,10 @@ class TrendsScheduler:
             # 当日の1時を過ぎているかチェック（DBのscheduler_slot_runで他プロセスの完了済みも判定）
             if now_jst >= today_1am:
                 slot_1am = self._slot_key_for_slot('1am', today)
-                if self.db and hasattr(self.db, 'has_slot_completed') and self.db.has_slot_completed(slot_1am):
+                completed_1am = self._startup_slot_completed(slot_1am)
+                if completed_1am is None:
+                    return
+                if completed_1am:
                     logger.info(f"⏰ 起動時チェック: 当日の1時のジョブは既に実行済みです（DB: {slot_1am}）（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
                 elif self.last_night_execution_time:
                     time_diff = (now_jst - self.last_night_execution_time).total_seconds()
@@ -773,7 +800,10 @@ class TrendsScheduler:
             # 当日の7時を過ぎているかチェック（DBのscheduler_slot_runで他プロセスの完了済みも判定）
             if now_jst >= today_7am:
                 slot_7am = self._slot_key_for_slot('7am', today)
-                if self.db and hasattr(self.db, 'has_slot_completed') and self.db.has_slot_completed(slot_7am):
+                completed_7am = self._startup_slot_completed(slot_7am)
+                if completed_7am is None:
+                    return
+                if completed_7am:
                     logger.info(f"⏰ 起動時チェック: 当日の7時のジョブは既に実行済みです（DB: {slot_7am}）（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
                 elif self.last_daily_execution_date == today:
                     logger.info(f"⏰ 起動時チェック: 当日の7時のジョブは既に実行済みです（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
@@ -786,7 +816,10 @@ class TrendsScheduler:
             # 当日の13時を過ぎているかチェック（DBのscheduler_slot_runで他プロセスの完了済みも判定）
             if now_jst >= today_1pm:
                 slot_1pm = self._slot_key_for_slot('1pm', today)
-                if self.db and hasattr(self.db, 'has_slot_completed') and self.db.has_slot_completed(slot_1pm):
+                completed_1pm = self._startup_slot_completed(slot_1pm)
+                if completed_1pm is None:
+                    return
+                if completed_1pm:
                     logger.info(f"⏰ 起動時チェック: 当日の13時のジョブは既に実行済みです（DB: {slot_1pm}）（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
                 elif self.last_afternoon_execution_time:
                     time_diff = (now_jst - self.last_afternoon_execution_time).total_seconds()
@@ -804,7 +837,10 @@ class TrendsScheduler:
             # 当日の19時を過ぎているかチェック（DBのscheduler_slot_runで他プロセスの完了済みも判定）
             if now_jst >= today_7pm:
                 slot_7pm = self._slot_key_for_slot('7pm', today)
-                if self.db and hasattr(self.db, 'has_slot_completed') and self.db.has_slot_completed(slot_7pm):
+                completed_7pm = self._startup_slot_completed(slot_7pm)
+                if completed_7pm is None:
+                    return
+                if completed_7pm:
                     logger.info(f"⏰ 起動時チェック: 当日の19時のジョブは既に実行済みです（DB: {slot_7pm}）（現在: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}）")
                 elif self.last_evening_execution_time:
                     time_diff = (now_jst - self.last_evening_execution_time).total_seconds()
@@ -1503,6 +1539,16 @@ class TrendsScheduler:
         lock_handle = self._try_acquire_scheduler_lock(
             resume_after_recover=(trigger_source == "gap_retry"),
         )
+        if lock_handle is not None and lock_handle[0] == "unavailable":
+            logger.warning(
+                "⏭️ データベースに接続できないためトレンド取得を見送ります trigger=%s",
+                trigger_source,
+            )
+            self._send_scheduler_skip_notification(
+                trigger_source=trigger_source,
+                reason="データベースに接続できないため、トレンド取得を見送りました。",
+            )
+            return False
         if lock_handle is None:
             host_short, pid = _process_identity()
             logger.warning(

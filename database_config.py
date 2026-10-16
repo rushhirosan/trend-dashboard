@@ -66,7 +66,8 @@ def _get_connection_pool():
             database_url = os.getenv('DATABASE_URL')
             if database_url:
                 # 接続パラメータを構築
-                min_conn = 2  # 最小接続数
+                # 最小1。起動時に複数本張ると 256MB の Postgres を接続嵐で落とす
+                min_conn = 1
                 max_conn = 10  # 最大接続数（OOM対策: 同時実行3 + HTTP + バッファで十分）
                 
                 # 接続パラメータを抽出
@@ -74,7 +75,7 @@ def _get_connection_pool():
                     minconn=min_conn,
                     maxconn=max_conn,
                     dsn=database_url,
-                    connect_timeout=15,
+                    connect_timeout=5,
                     keepalives=1,
                     keepalives_idle=10,
                     keepalives_interval=5,
@@ -84,7 +85,7 @@ def _get_connection_pool():
                 logger.info(f"✅ 接続プールを作成しました (min={min_conn}, max={max_conn})")
             else:
                 # 個別の環境変数を使用
-                min_conn = 2
+                min_conn = 1
                 max_conn = 10  # 最大接続数（OOM対策: 同時実行3 + HTTP + バッファで十分）
                 
                 _connection_pool = pool.ThreadedConnectionPool(
@@ -95,7 +96,7 @@ def _get_connection_pool():
                     database=os.getenv('DB_NAME', 'trends_db'),
                     user=os.getenv('DB_USER', 'postgres'),
                     password=os.getenv('DB_PASSWORD', 'password'),
-                    connect_timeout=15,
+                    connect_timeout=5,
                     keepalives=1,
                     keepalives_idle=10,
                     keepalives_interval=5,
@@ -2419,8 +2420,9 @@ class TrendsCache:
                         conn.rollback()
                     return False
         except Exception as e:
+            # False は「他が保持中」。接続不能は None（欠損リトライやロック競合と混ぜない）
             logger.warning(f"⚠️ スケジューラーDBロック取得エラー: {e}", exc_info=True)
-            return False
+            return None
     
     def release_scheduler_lock_db(self, holder_id: str) -> bool:
         """スケジューラー分散ロックを解放"""
@@ -2454,9 +2456,11 @@ class TrendsCache:
             logger.warning("⚠️ スケジューラーDBロック強制解放エラー: %s", e, exc_info=True)
             return False
 
-    def has_slot_completed(self, slot_key: str) -> bool:
+    def has_slot_completed(self, slot_key: str) -> bool | None:
         """指定スロットが「完了済み」として記録されているか（時間制限なし）。
-        起動時補完の二重実行防止: 他プロセスが既に完了していれば True（補完をスキップする）。
+
+        True=完了、False=未完了、None=DBに聞けなかった。
+        None を False にすると、障害中の再起動が全量リトライを始めて DB を巻き込む。
         """
         try:
             with self.get_connection() as conn:
@@ -2467,7 +2471,7 @@ class TrendsCache:
                     return cursor.fetchone() is not None
         except Exception as e:
             logger.warning("⚠️ has_slot_completed エラー: %s", e)
-            return False  # fail-open: エラー時は「完了済みでない」とみなして補完を許可
+            return None
 
     def has_slot_completed_recently(self, slot_key: str, window_minutes: int = 25) -> bool:
         """指定スロットが window_minutes 以内に「完了済み」として記録されているか。
@@ -2547,7 +2551,8 @@ class TrendsCache:
         """OOM 連続回収により当該スロットの自動再取得を停止しているか。"""
         if not slot_key:
             return False
-        return self.has_slot_completed(self.oom_circuit_open_slot_key(slot_key))
+        # None（DB不通）はサーキット開放ではない。再取得は slot_needs_recovery 側で止める
+        return self.has_slot_completed(self.oom_circuit_open_slot_key(slot_key)) is True
 
     def open_oom_circuit(self, slot_key: str) -> None:
         """当該スロットの OOM サーキットブレーカーを開く（自動再取得を止める）。"""

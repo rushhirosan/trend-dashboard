@@ -138,6 +138,35 @@ def test_try_acquire_does_not_resume_after_stale_recover_by_default():
     assert db.try_acquire_scheduler_lock_db.call_count == 1
 
 
+def test_startup_check_skips_gap_retry_when_db_unknown():
+    """DB 不通で has_slot_completed が None のとき、未完了扱いでリトライしない。"""
+    db = MagicMock()
+    db.has_slot_completed.return_value = None
+    db.is_oom_circuit_open.return_value = False
+    sched = _make_scheduler(db)
+    jst = pytz.timezone("Asia/Tokyo")
+    fixed = jst.localize(datetime(2026, 10, 17, 6, 2, 0))
+
+    with patch("services.scheduler.scheduler_manager.datetime") as dt_mock:
+        dt_mock.now.return_value = fixed
+        with patch.object(sched, "_schedule_startup_slot_recovery") as schedule_mock:
+            sched._check_and_execute_missed_job(jst)
+
+    schedule_mock.assert_not_called()
+
+
+def test_try_acquire_db_unavailable_does_not_look_like_lock_held():
+    db = MagicMock()
+    db.try_acquire_scheduler_lock_db.return_value = None
+    sched = _make_scheduler(db)
+
+    with patch("services.scheduler.scheduler_manager.USE_DB_LOCK", True):
+        handle = sched._try_acquire_scheduler_lock(resume_after_recover=True)
+
+    assert handle == ("unavailable", None)
+    db.try_acquire_scheduler_lock_db.assert_called_once()
+
+
 def test_recover_stale_lock_on_startup_when_holder_dead():
     db = MagicMock()
     db.get_scheduler_lock_status.return_value = {"holder_id": "host-999999-1"}

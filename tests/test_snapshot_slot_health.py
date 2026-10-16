@@ -221,6 +221,14 @@ def test_slot_needs_recovery_legacy_completed_without_snap_verified():
     assert slot_needs_recovery(db, "7am_2026-06-23") is True
 
 
+def test_slot_needs_recovery_false_when_db_unknown():
+    class UnknownDb:
+        def has_slot_completed(self, slot_key: str):
+            return None
+
+    assert slot_needs_recovery(UnknownDb(), "7am_2026-06-23") is False
+
+
 def test_refresh_succeeded_for_snapshot():
     assert refresh_succeeded_for_snapshot(
         {"success": True, "results": {"google_JP": {"success": True}}}

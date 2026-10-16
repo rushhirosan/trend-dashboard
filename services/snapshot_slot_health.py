@@ -158,11 +158,17 @@ def slot_needs_recovery(
     *,
     require_completed: bool = False,
 ) -> bool:
-    """取得+スナップショットが揃っていなければ復旧対象（gap_retry 等）。"""
+    """取得+スナップショットが揃っていなければ復旧対象（gap_retry 等）。
+
+    DB に聞けないときは False（障害中に全量再取得を始めない）。
+    """
     if not parse_slot_key(slot_key):
         return False
-    if require_completed and db and hasattr(db, "has_slot_completed"):
-        if not db.has_slot_completed(slot_key):
+    if db and hasattr(db, "has_slot_completed"):
+        state = db.has_slot_completed(slot_key)
+        if state is None:
+            return False
+        if require_completed and not state:
             return False
     return not slot_is_fully_done(db, slot_key)
 

@@ -22,7 +22,6 @@ def test_jp_sentence_lists_three_number_ones():
         now=NOW,
     )
     assert got["title"] == "いまの日本トレンド順位 | トレンドダッシュボード"
-    assert got["h1"] == "いまの順位"
     assert got["sentence"] == (
         "10月17日 19時（JST）の日本。"
         "ニュース1位は「台風のニュース」、YouTube1位は「紹介映像」、Googleトレンド1位は「検索語」。"
@@ -60,7 +59,6 @@ def test_us_sentence_prefers_cnn_and_quotes_ranks():
         now=NOW,
     )
     assert got["title"] == "Current U.S. trend ranks | Trends Dashboard"
-    assert got["h1"] == "U.S. ranks"
     assert got["sentence"].startswith("Oct 17, 19:00 JST. Current U.S. trends: ")
     assert 'news #1 is "CNN lead"' in got["sentence"]
     assert "Wire lead" not in got["sentence"]

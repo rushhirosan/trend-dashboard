@@ -328,7 +328,6 @@ def create_app():
                         'sentence': '日本のトレンド順位。ニュース・YouTube・Googleトレンドの1位は、下の一覧です。',
                         'description': '日本のトレンド順位。ニュース・YouTube・Googleトレンドの1位は、下の一覧です。',
                         'title': 'いまの日本トレンド順位 | トレンドダッシュボード',
-                        'h1': 'いまの順位',
                     }
                 return render_template(
                     'index.html',
@@ -369,7 +368,6 @@ def create_app():
                         'sentence': 'Current U.S. trend ranks for news, YouTube, and Google Trends are listed below.',
                         'description': 'Current U.S. trend ranks for news, YouTube, and Google Trends are listed below.',
                         'title': 'Current U.S. trend ranks | Trends Dashboard',
-                        'h1': 'U.S. ranks',
                     }
                 return render_template(
                     'us_trends.html',

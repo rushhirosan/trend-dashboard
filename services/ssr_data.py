@@ -163,7 +163,6 @@ def build_now_ranking(ssr: Optional[Dict[str, List[dict]]], *, variant: str, now
             "sentence": sentence,
             "description": _clip_description(sentence),
             "title": "Current U.S. trend ranks | Trends Dashboard",
-            "h1": "U.S. ranks",
         }
 
     bits_ja = [
@@ -184,7 +183,6 @@ def build_now_ranking(ssr: Optional[Dict[str, List[dict]]], *, variant: str, now
         "sentence": sentence_ja,
         "description": _clip_description(sentence_ja),
         "title": "いまの日本トレンド順位 | トレンドダッシュボード",
-        "h1": "いまの順位",
     }
 
 

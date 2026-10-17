@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- SEO Meta Tags（画面レイアウトは変更しない・head のみ） -->
-    <title>日本のトレンドダッシュボード | 20ソースを1画面で</title>
-    <meta name="description" content="日本国内の関心を1画面で把握。検索・ニュース・テック・マーケットなど20以上の公開データを横断比較。毎日4回更新（1・7・13・19時 JST）で、リアルタイムに近いトレンドを無料で確認できます。">
+    <!-- SEO Meta Tags -->
+    <title>{{ now_ranking.title }}</title>
+    <meta name="description" content="{{ now_ranking.description }}">
     <meta name="keywords" content="トレンド, Google Trends, YouTube, Spotify, はてなブックマーク, 楽天, Twitch, Podcast, トレンドダッシュボード, Zenn, Note, Qiita, OpenAlex, Bluesky, 株価, 仮想通貨, 暗号資産, ビットコイン, 投資, トレンド分析">
     <meta name="author" content="Trends Dashboard">
     <meta name="robots" content="index, follow">
@@ -14,8 +14,8 @@
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ public_base_url }}/">
-    <meta property="og:title" content="日本のトレンドを20ソース横断比較 | トレンドダッシュボード">
-    <meta property="og:description" content="日本国内の関心を1画面で把握。検索・ニュース・テック・マーケットなど20以上の公開データを横断比較できる無料ダッシュボード。毎日4回更新。">
+    <meta property="og:title" content="{{ now_ranking.title }}">
+    <meta property="og:description" content="{{ now_ranking.description }}">
     <meta property="og:image" content="{{ public_base_url }}/static/images/og-image.png">
     <meta property="og:locale" content="ja_JP">
     <meta property="og:site_name" content="トレンドダッシュボード">
@@ -23,8 +23,8 @@
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:url" content="{{ public_base_url }}/">
-    <meta name="twitter:title" content="日本のトレンドを20ソース横断比較 | トレンドダッシュボード">
-    <meta name="twitter:description" content="日本国内の関心を1画面で把握。検索・ニュース・テック・マーケットなど20以上の公開データを横断比較できる無料ダッシュボード。毎日4回更新。">
+    <meta name="twitter:title" content="{{ now_ranking.title }}">
+    <meta name="twitter:description" content="{{ now_ranking.description }}">
     <meta name="twitter:image" content="{{ public_base_url }}/static/images/og-image.png">
     
     <!-- Canonical URL -->
@@ -76,8 +76,8 @@
     {
       "@context": "https://schema.org",
       "@type": "WebPage",
-      "name": "日本のトレンドを20ソース横断比較 | トレンドダッシュボード",
-      "description": "日本国内の関心を1画面で把握。検索・ニュース・テック・マーケットなど20以上の公開データを横断比較できる無料ダッシュボード。毎日4回更新（1・7・13・19時 JST）。",
+      "name": {{ now_ranking.title | tojson }},
+      "description": {{ now_ranking.description | tojson }},
       "url": "{{ public_base_url }}/",
       "isPartOf": { "@id": "{{ public_base_url }}/#website" }
     }
@@ -115,7 +115,7 @@
     {% endif %}
     
     {% include 'partials/site_styles.html' %}
-    {% set async_css_href = url_for('static', filename='css/trends.css') + '?v=20260923-edition-strip' %}
+    {% set async_css_href = url_for('static', filename='css/trends.css') + '?v=20261017-now-ranking' %}
     {% include 'partials/async_stylesheet.html' %}
     <link href="{{ url_for('static', filename='css/main.css') }}?v=20260819-tab-keyboard" rel="stylesheet">
 </head>
@@ -132,19 +132,18 @@
     })();
     </script>
     <!-- ヘッダー -->
-    {% set page_title = 'トレンド一覧' %}
+    {% set page_title = now_ranking.h1 %}
     {% set page_icon = 'fas fa-chart-line' %}
     {% set active_page = 'index' %}
     {% include 'partials/header.html' with context %}
     {% set banner_locale = 'ja' %}
     {% include 'partials/scheduler_refresh_banner.html' %}
 
-    <noscript>
-        <div class="alert alert-info mx-3 mt-3 mb-4" role="alert">
-            <p class="mb-0">トレンドデータを表示するには JavaScript を有効にしてください。サイトの説明は <a href="/about">このサイトについて</a> を参照してください。更新は毎日 1・7・13・19時（JST）です。</p>
-        </div>
-    </noscript>
     <main class="container-fluid main-content-compact">
+        {% include 'partials/now_ranking.html' %}
+        <noscript>
+            <p class="small text-muted px-1 mb-2">各ソースの表はページ内にあります。この版の1位は上の文です。</p>
+        </noscript>
         <div id="mainContent">
             <header class="page-header-compact mb-1">
                 {% set dashboard_show_ai = (ENABLE_AI_SUMMARY_FAKE_DOOR and AI_SUMMARY_FAKE_DOOR) or (SHOW_LOCAL_AI_SUMMARY_MOCK and AI_SUMMARY_MOCK) %}

@@ -319,11 +319,23 @@ def create_app():
                     ssr_itemlist_ld = build_ssr_itemlist_json_ld(ssr_trends, variant='jp')
                 except Exception as ssr_err:
                     logger.debug(f"SSRデータ取得スキップ: {ssr_err}")
+                from services.ssr_data import build_now_ranking
+                try:
+                    now_ranking = build_now_ranking(ssr_trends, variant='jp')
+                except Exception as rank_err:
+                    logger.debug(f"いまの順位文スキップ: {rank_err}")
+                    now_ranking = {
+                        'sentence': '日本のトレンド順位。ニュース・YouTube・Googleトレンドの1位は、下の一覧です。',
+                        'description': '日本のトレンド順位。ニュース・YouTube・Googleトレンドの1位は、下の一覧です。',
+                        'title': 'いまの日本トレンド順位 | トレンドダッシュボード',
+                        'h1': 'いまの順位',
+                    }
                 return render_template(
                     'index.html',
                     config={'GOOGLE_ANALYTICS_ID': ga_id},
                     ssr_trends=ssr_trends,
                     ssr_itemlist_ld=ssr_itemlist_ld,
+                    now_ranking=now_ranking,
                 )
             except Exception as e:
                 logger.error(f"❌ メインページレンダリングエラー: {e}", exc_info=True)
@@ -348,11 +360,23 @@ def create_app():
                     ssr_itemlist_ld = build_ssr_itemlist_json_ld(ssr_trends, variant='us')
                 except Exception as ssr_err:
                     logger.debug(f"SSR USデータ取得スキップ: {ssr_err}")
+                from services.ssr_data import build_now_ranking
+                try:
+                    now_ranking = build_now_ranking(ssr_trends, variant='us')
+                except Exception as rank_err:
+                    logger.debug(f"USいまの順位文スキップ: {rank_err}")
+                    now_ranking = {
+                        'sentence': 'Current U.S. trend ranks for news, YouTube, and Google Trends are listed below.',
+                        'description': 'Current U.S. trend ranks for news, YouTube, and Google Trends are listed below.',
+                        'title': 'Current U.S. trend ranks | Trends Dashboard',
+                        'h1': 'U.S. ranks',
+                    }
                 return render_template(
                     'us_trends.html',
                     config={'GOOGLE_ANALYTICS_ID': ga_id},
                     ssr_trends=ssr_trends,
                     ssr_itemlist_ld=ssr_itemlist_ld,
+                    now_ranking=now_ranking,
                 )
             except Exception as e:
                 logger.error(f"❌ USトレンドページレンダリングエラー: {e}", exc_info=True)
@@ -605,9 +629,26 @@ def create_app():
                     logger.debug(f"llms.txt 直近サマリーURL生成スキップ: {sum_err}")
 
                 recent_block = '\n'.join(recent_lines)
+                rank_block = ''
+                try:
+                    from services.ssr_data import (
+                        build_now_ranking,
+                        fetch_ssr_trends,
+                        fetch_ssr_trends_us,
+                    )
+                    managers = app.config.get('TREND_MANAGERS') or {}
+                    jp_rank = build_now_ranking(fetch_ssr_trends(managers), variant='jp')
+                    us_rank = build_now_ranking(fetch_ssr_trends_us(managers), variant='us')
+                    rank_block = (
+                        "## いまの順位（このファイルを取得した時点）\n"
+                        f"- 日本: {jp_rank['sentence']} {base}/\n"
+                        f"- US: {us_rank['sentence']} {base}/us\n\n"
+                    )
+                except Exception as rank_err:
+                    logger.debug(f"llms.txt いまの順位スキップ: {rank_err}")
                 llms_content = f"""# Trends Dashboard（トレンドダッシュボード）
 
-> 日本・米国の20以上の公開ソースを横断比較する無料トレンドダッシュボード。
+{rank_block}> 日本・米国の20以上の公開ソースを横断比較する無料トレンドダッシュボード。
 > 検索・ニュース・テック・マーケットなどの「いま」を1画面で把握できます。
 
 ## 主要ページ

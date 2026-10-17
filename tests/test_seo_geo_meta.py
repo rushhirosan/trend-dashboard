@@ -25,6 +25,8 @@ def test_llms_txt_contains_core_pages(app_client):
     assert "/about" in text
     assert "World Front Page" in text
     assert "g7-dashboard.vercel.app" in text
+    assert "いまの順位" in text
+    assert "Current U.S. trend" in text
 
 
 def test_llms_txt_lists_recent_summary_urls(app_client):
@@ -55,13 +57,16 @@ def test_robots_txt_mentions_llms(app_client):
 
 
 def test_jp_index_head_title_without_body_copy_change(app_client):
-    """SERP向け title/description は具体的に。トップの長い説明パネルは出さない。"""
+    """SERP向け title は「いまの順位」。先頭にサーバー描画の1位文。長い説明パネルは出さない。"""
     res = app_client.get("/")
     assert res.status_code == 200
     html = res.get_data(as_text=True)
-    assert "<title>日本のトレンドダッシュボード | 20ソースを1画面で</title>" in html
-    assert 'property="og:title" content="日本のトレンドを20ソース横断比較 | トレンドダッシュボード"' in html
-    assert 'name="twitter:title" content="日本のトレンドを20ソース横断比較 | トレンドダッシュボード"' in html
+    assert "<title>いまの日本トレンド順位 | トレンドダッシュボード</title>" in html
+    assert 'property="og:title" content="いまの日本トレンド順位 | トレンドダッシュボード"' in html
+    assert 'name="twitter:title" content="いまの日本トレンド順位 | トレンドダッシュボード"' in html
+    assert 'id="now-ranking"' in html
+    assert "日本のトレンド順位" in html or "1位は「" in html
+    assert "JavaScript を有効にしてください" not in html
     assert 'href="/llms.txt"' in html or 'href="' in html and "/llms.txt" in html
     assert 'id="about-trends-dashboard"' not in html
     assert "このページで分かること" not in html
@@ -71,13 +76,15 @@ def test_jp_index_head_title_without_body_copy_change(app_client):
 
 
 def test_us_index_head_title_for_gsc_queries(app_client):
-    """GSC 上位の English クエリ（trend dashboard / real time / US）向け title。"""
+    """英語タイトルは current U.S. trend ranks。先頭にサーバー描画の #1。"""
     res = app_client.get("/us")
     assert res.status_code == 200
     html = res.get_data(as_text=True)
-    assert "<title>Real-time U.S. Trends Dashboard | Compare 20+ Sources</title>" in html
-    assert "current U.S. trends" in html
-    assert 'property="og:title" content="Compare U.S. trends across 20+ sources | Trends Dashboard"' in html
+    assert "<title>Current U.S. trend ranks | Trends Dashboard</title>" in html
+    assert "Current U.S. trend" in html
+    assert 'id="now-ranking"' in html
+    assert "Enable JavaScript" not in html
+    assert 'property="og:title" content="Current U.S. trend ranks | Trends Dashboard"' in html
     assert "What this page covers" not in html
     assert 'id="faq"' not in html
 

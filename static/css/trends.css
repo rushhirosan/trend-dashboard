@@ -170,6 +170,15 @@
     }
 }
 
+/* いまの1位（ヘッダー直下の1行） */
+.now-ranking {
+    margin: 0.35rem 0 0.25rem;
+    padding: 0 0.15rem;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: #495057;
+}
+
 /* 号外帯（要約の下・タブの上） */
 .edition-strip {
     margin: 0.35rem 0 0.5rem;

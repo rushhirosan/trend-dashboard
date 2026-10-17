@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- SEO Meta Tags (head only; no layout changes) -->
-    <title>Real-time U.S. Trends Dashboard | Compare 20+ Sources</title>
-    <meta name="description" content="See current U.S. trends in one screen—Google Trends, YouTube, news, tech, and markets. Free dashboard refreshed 4× daily (1/7/13/19 JST).">
+    <!-- SEO Meta Tags -->
+    <title>{{ now_ranking.title }}</title>
+    <meta name="description" content="{{ now_ranking.description }}">
     <meta name="keywords" content="trends, Google Trends, YouTube, Spotify, Hacker News, OpenAlex, Bluesky, Twitch, Podcast, US trends, America trends, Stock, Cryptocurrency, Bitcoin, Investment, Market trends, S&P 500, NASDAQ">
     <meta name="author" content="Trends Dashboard">
     <meta name="robots" content="index, follow">
@@ -14,8 +14,8 @@
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ public_base_url }}/us">
-    <meta property="og:title" content="Compare U.S. trends across 20+ sources | Trends Dashboard">
-    <meta property="og:description" content="See U.S. interest at a glance. Free dashboard comparing search, news, tech, and markets across 20+ public sources in one screen. Refreshed 4 times daily.">
+    <meta property="og:title" content="{{ now_ranking.title }}">
+    <meta property="og:description" content="{{ now_ranking.description }}">
     <meta property="og:image" content="{{ public_base_url }}/static/images/og-image.png">
     <meta property="og:locale" content="en_US">
     <meta property="og:site_name" content="Trends Dashboard">
@@ -23,8 +23,8 @@
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:url" content="{{ public_base_url }}/us">
-    <meta name="twitter:title" content="Compare U.S. trends across 20+ sources | Trends Dashboard">
-    <meta name="twitter:description" content="See U.S. interest at a glance. Free dashboard comparing search, news, tech, and markets across 20+ public sources in one screen. Refreshed 4 times daily.">
+    <meta name="twitter:title" content="{{ now_ranking.title }}">
+    <meta name="twitter:description" content="{{ now_ranking.description }}">
     <meta name="twitter:image" content="{{ public_base_url }}/static/images/og-image.png">
     
     <!-- Canonical URL -->
@@ -71,8 +71,8 @@
     {
       "@context": "https://schema.org",
       "@type": "WebPage",
-      "name": "Compare U.S. trends across 20+ sources | Trends Dashboard",
-      "description": "See U.S. interest at a glance. Free dashboard comparing search, news, tech, and markets across 20+ public sources in one screen. Refreshed 4 times daily (1/7/13/19 JST).",
+      "name": {{ now_ranking.title | tojson }},
+      "description": {{ now_ranking.description | tojson }},
       "url": "{{ public_base_url }}/us",
       "isPartOf": { "@id": "{{ public_base_url }}/#website" }
     }
@@ -109,7 +109,7 @@
     {% endif %}
     
     {% include 'partials/site_styles.html' %}
-    {% set async_css_href = url_for('static', filename='css/trends.css') + '?v=20260923-edition-strip' %}
+    {% set async_css_href = url_for('static', filename='css/trends.css') + '?v=20261017-now-ranking' %}
     {% include 'partials/async_stylesheet.html' %}
     <link href="{{ url_for('static', filename='css/main.css') }}?v=20260819-tab-keyboard" rel="stylesheet">
     <!-- subscription.css は /subscription 専用。USトレンドには不要（日本ページと同じレイアウトにするため） -->
@@ -118,7 +118,7 @@
 </head>
 <body id="trends-us" class="bg-light" data-trend-meta-tz="America/New_York">
     <!-- ヘッダー -->
-    {% set page_title = 'Trends Dashboard' %}
+    {% set page_title = now_ranking.h1 %}
     {% set page_icon = 'fas fa-chart-line' %}
     {% set active_page = 'us' %}
     {% set lang = 'en' %}
@@ -126,12 +126,11 @@
     {% set banner_locale = 'en' %}
     {% include 'partials/scheduler_refresh_banner.html' %}
 
-    <noscript>
-        <div class="alert alert-info mx-3 mt-3 mb-4" role="alert">
-            <p class="mb-0">Enable JavaScript to load trend data. See <a href="/about">About</a> for sources and update schedule (1 / 7 / 13 / 19 JST).</p>
-        </div>
-    </noscript>
     <main class="container-fluid main-content-compact">
+        {% include 'partials/now_ranking.html' %}
+        <noscript>
+            <p class="small text-muted px-1 mb-2">Source tables are on this page. The line above is this edition’s #1s.</p>
+        </noscript>
         <div id="mainContent">
             <header class="page-header-compact mb-1">
                 {% set dashboard_show_ai = (ENABLE_AI_SUMMARY_FAKE_DOOR and AI_SUMMARY_FAKE_DOOR) or (SHOW_LOCAL_AI_SUMMARY_MOCK and AI_SUMMARY_MOCK) %}

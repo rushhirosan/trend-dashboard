@@ -103,6 +103,91 @@ def _fetch_one(managers: dict, config: dict) -> tuple:
     return key, None
 
 
+_RANK_NAME_MAX = 42
+
+
+def _rank_name(item: dict) -> str:
+    """1位表示用。引用符と改行を除き、長い見出しは切る。"""
+    if not isinstance(item, dict):
+        return ""
+    raw = item.get("keyword") or item.get("term") or item.get("title") or ""
+    text = " ".join(str(raw).split())
+    for ch in ("「", "」", '"', "'", "<", ">"):
+        text = text.replace(ch, "")
+    text = text.strip()
+    if len(text) > _RANK_NAME_MAX:
+        text = text[: _RANK_NAME_MAX - 1].rstrip() + "…"
+    return text
+
+
+def _first_rank_name(items) -> str:
+    if not items:
+        return ""
+    return _rank_name(items[0])
+
+
+def _clip_description(sentence: str, limit: int = 155) -> str:
+    sentence = " ".join(sentence.split())
+    if len(sentence) <= limit:
+        return sentence
+    return sentence[: limit - 1].rstrip() + "…"
+
+
+def build_now_ranking(ssr: Optional[Dict[str, List[dict]]], *, variant: str, now=None) -> Dict[str, str]:
+    """いまの1位を1文にする。検索結果・画面先頭・llms.txt で同じ文を使う。
+
+    ニュース / YouTube / Googleトレンド（USは CNN をニュース扱い）の先頭1件。
+    時刻は直近の定時版（1・7・13・19時 JST）。
+    """
+    from services.dashboard.edition_strip import resolve_current_edition
+
+    slot_start, _business_day, _slot = resolve_current_edition(now)
+    ssr = ssr or {}
+    if variant == "us":
+        news_name = _first_rank_name(ssr.get("cnn")) or _first_rank_name(ssr.get("worldnews"))
+        bits = [
+            ("news", news_name),
+            ("YouTube", _first_rank_name(ssr.get("youtube"))),
+            ("Google Trends", _first_rank_name(ssr.get("google"))),
+        ]
+        present = [f'{label} #1 is "{name}"' for label, name in bits if name]
+        when = f"{slot_start.strftime('%b')} {slot_start.day}, {slot_start.hour}:00 JST"
+        if present:
+            sentence = f"{when}. Current U.S. trends: " + ", ".join(present) + "."
+        else:
+            sentence = (
+                f"{when}. Current U.S. trend ranks for news, YouTube, and Google Trends "
+                "are listed below."
+            )
+        return {
+            "sentence": sentence,
+            "description": _clip_description(sentence),
+            "title": "Current U.S. trend ranks | Trends Dashboard",
+            "h1": "U.S. ranks",
+        }
+
+    bits_ja = [
+        ("ニュース", _first_rank_name(ssr.get("news"))),
+        ("YouTube", _first_rank_name(ssr.get("youtube"))),
+        ("Googleトレンド", _first_rank_name(ssr.get("google"))),
+    ]
+    present_ja = [f"{label}1位は「{name}」" for label, name in bits_ja if name]
+    when_ja = f"{slot_start.month}月{slot_start.day}日 {slot_start.hour}時（JST）"
+    if present_ja:
+        sentence_ja = f"{when_ja}の日本。" + "、".join(present_ja) + "。"
+    else:
+        sentence_ja = (
+            f"{when_ja}の日本のトレンド順位。"
+            "ニュース・YouTube・Googleトレンドの1位は、下の一覧です。"
+        )
+    return {
+        "sentence": sentence_ja,
+        "description": _clip_description(sentence_ja),
+        "title": "いまの日本トレンド順位 | トレンドダッシュボード",
+        "h1": "いまの順位",
+    }
+
+
 def _sort_and_limit(key: str, data: list) -> list:
     """ソースごとのソート・件数制限"""
     if not data:

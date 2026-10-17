@@ -140,10 +140,6 @@
     {% include 'partials/scheduler_refresh_banner.html' %}
 
     <main class="container-fluid main-content-compact">
-        {% include 'partials/now_ranking.html' %}
-        <noscript>
-            <p class="small text-muted px-1 mb-2">各ソースの表はページ内にあります。この版の1位は上の文です。</p>
-        </noscript>
         <div id="mainContent">
             <header class="page-header-compact mb-1">
                 {% set dashboard_show_ai = (ENABLE_AI_SUMMARY_FAKE_DOOR and AI_SUMMARY_FAKE_DOOR) or (SHOW_LOCAL_AI_SUMMARY_MOCK and AI_SUMMARY_MOCK) %}

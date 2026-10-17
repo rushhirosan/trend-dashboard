@@ -64,8 +64,9 @@ def test_jp_index_head_title_without_body_copy_change(app_client):
     assert "<title>いまの日本トレンド順位 | トレンドダッシュボード</title>" in html
     assert 'property="og:title" content="いまの日本トレンド順位 | トレンドダッシュボード"' in html
     assert 'name="twitter:title" content="いまの日本トレンド順位 | トレンドダッシュボード"' in html
-    assert 'id="now-ranking"' in html
-    assert "日本のトレンド順位" in html or "1位は「" in html
+    assert 'name="description" content="' in html
+    assert "1位は「" in html or "日本のトレンド順位" in html
+    assert 'id="now-ranking"' not in html
     assert "JavaScript を有効にしてください" not in html
     assert 'href="/llms.txt"' in html or 'href="' in html and "/llms.txt" in html
     assert 'id="about-trends-dashboard"' not in html
@@ -82,7 +83,7 @@ def test_us_index_head_title_for_gsc_queries(app_client):
     html = res.get_data(as_text=True)
     assert "<title>Current U.S. trend ranks | Trends Dashboard</title>" in html
     assert "Current U.S. trend" in html
-    assert 'id="now-ranking"' in html
+    assert 'id="now-ranking"' not in html
     assert "Enable JavaScript" not in html
     assert 'property="og:title" content="Current U.S. trend ranks | Trends Dashboard"' in html
     assert "What this page covers" not in html

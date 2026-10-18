@@ -42,6 +42,7 @@
 - スクリプト既定: `generate_ai_daily_summary.py` は **JST の昨日** を `business_day` にする（`--business-day` で上書き可）。
 - **欠走検知（Fly）**: 毎日 **10:00 JST** に `summary_documents` へ前日分（jp/us）があるかだけ見る。無いとき Discord。生成・メールはしない。
 - **二重実行ガード（GHA）**: 手動 Run 後に遅延 cron が来ても、jp+us が DB にあれば生成・メールをスキップ（`force` で再生成可）。
+- **格言（JP）**: 10秒名言の RSS 全件を `docs/summaries/tounou_proverb_cache.json` に置く。配信日が週の計画に無いときだけ更新し、未出の新着をその週の月曜から順に出す。日次ジョブがこの JSON もコミットする。GHA は DB を見ない。
 
 ### 週次のタイムライン（JST）
 

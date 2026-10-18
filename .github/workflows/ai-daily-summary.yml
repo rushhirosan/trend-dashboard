@@ -69,7 +69,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/summaries/daily/
+          git add docs/summaries/daily/ docs/summaries/tounou_proverb_cache.json
           if git diff --cached --quiet; then
             echo "No changes to commit."
             exit 0

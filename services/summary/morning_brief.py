@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import os
+import random
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
@@ -20,6 +22,10 @@ logger = get_logger(__name__)
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TOUNOU_RSS_URL = "https://meigen.tounou.net/?feed=rss2"
 TOUNOU_ATTRIBUTION = "10秒名言"
+TOUNOU_CATALOG_MAX_PAGES = 80
+# 再生成で直近の格言がずれないよう、計画済みの行は少し残す
+TOUNOU_ASSIGNMENT_KEEP_DAYS = 21
+_POST_ID_RE = re.compile(r"[?&]p=(\d+)")
 
 HTTP_HEADERS = {
     "User-Agent": (
@@ -444,30 +450,73 @@ def _meaning_from_tounou_lines(lines: List[str]) -> Optional[str]:
     return None
 
 
-def _fetch_tounou_rss_items(*, max_items: int = 30) -> List[Dict[str, str]]:
-    try:
-        resp = requests.get(
-            TOUNOU_RSS_URL,
-            timeout=10,
-            headers=HTTP_HEADERS,
-        )
-        resp.raise_for_status()
-        if not resp.text.strip().startswith("<?xml"):
-            logger.warning("morning_brief: tounou RSS returned non-xml")
-            return []
-        root = ET.fromstring(resp.text)
-    except Exception as exc:
-        logger.warning("morning_brief: tounou RSS fetch failed: %s", exc)
+def _proverb_cache_path() -> Path:
+    """日次生成は GHA で DB を見ない。週の計画はこの JSON をコミットして持ち越す。"""
+    override = os.getenv("TOUNOU_PROVERB_CACHE_PATH", "").strip()
+    if override:
+        return Path(override)
+    return REPO_ROOT / "docs" / "summaries" / "tounou_proverb_cache.json"
+
+
+def _tounou_post_id(item_el: ET.Element) -> str:
+    for el in item_el.iter():
+        if el.tag.endswith("post-id") and (el.text or "").strip().isdigit():
+            return el.text.strip()
+    blob = f"{item_el.findtext('link') or ''} {item_el.findtext('guid') or ''}"
+    match = _POST_ID_RE.search(blob)
+    return match.group(1) if match else ""
+
+
+def _parse_tounou_rss_items(xml_text: str) -> List[Dict[str, str]]:
+    if not str(xml_text or "").strip().startswith("<?xml"):
         return []
+    root = ET.fromstring(xml_text)
     out: List[Dict[str, str]] = []
     for item in root.findall(".//item"):
         title = (item.findtext("title") or "").strip()
         link = (item.findtext("link") or "").strip()
-        if title and link:
-            out.append({"title": title, "link": link})
-        if len(out) >= max_items:
-            break
+        post_id = _tounou_post_id(item)
+        if title and link and post_id:
+            out.append({"id": post_id, "title": title, "link": link})
     return out
+
+
+def _fetch_tounou_rss_page(page: int) -> List[Dict[str, str]]:
+    url = TOUNOU_RSS_URL if page <= 1 else f"{TOUNOU_RSS_URL}&paged={page}"
+    try:
+        resp = requests.get(url, timeout=10, headers=HTTP_HEADERS)
+        resp.raise_for_status()
+    except Exception as exc:
+        logger.warning("morning_brief: tounou RSS page %s failed: %s", page, exc)
+        return []
+    try:
+        return _parse_tounou_rss_items(resp.text)
+    except Exception as exc:
+        logger.warning("morning_brief: tounou RSS page %s parse failed: %s", page, exc)
+        return []
+
+
+def _fetch_tounou_catalog() -> List[Dict[str, str]]:
+    """RSS を最終ページまで辿る。1ページは10件なので、先頭だけでは週次で同じ格言に戻る。"""
+    catalog: List[Dict[str, str]] = []
+    seen: set[str] = set()
+    for page in range(1, TOUNOU_CATALOG_MAX_PAGES + 1):
+        items = _fetch_tounou_rss_page(page)
+        if not items:
+            break
+        fresh = [item for item in items if item["id"] not in seen]
+        if not fresh:
+            break
+        for item in fresh:
+            seen.add(item["id"])
+            catalog.append(item)
+    catalog.sort(key=lambda item: int(item["id"]))
+    return catalog
+
+
+def _fetch_tounou_rss_items(*, max_items: int = 30) -> List[Dict[str, str]]:
+    """キャッシュが空のときの先頭ページだけ。"""
+    return _fetch_tounou_rss_page(1)[:max_items]
 
 
 def _fetch_tounou_speaker(article_url: str) -> Optional[str]:
@@ -488,6 +537,210 @@ def _select_tounou_item_for_day(items: List[Dict[str, str]], day: date) -> Optio
     return items[idx]
 
 
+def _week_monday(day: date) -> date:
+    return day - timedelta(days=day.weekday())
+
+
+def _empty_proverb_cache() -> Dict[str, Any]:
+    return {
+        "week_start": "",
+        "fetched_at": "",
+        "pending_ids": [],
+        "catalog": [],
+        "assignments": {},
+    }
+
+
+def _load_proverb_cache() -> Dict[str, Any]:
+    path = _proverb_cache_path()
+    if not path.is_file():
+        return _empty_proverb_cache()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.warning("morning_brief: proverb cache unreadable: %s", exc)
+        return _empty_proverb_cache()
+    if not isinstance(data, dict):
+        return _empty_proverb_cache()
+    data.setdefault("week_start", "")
+    data.setdefault("fetched_at", "")
+    data.setdefault("pending_ids", [])
+    data.setdefault("catalog", [])
+    data.setdefault("assignments", {})
+    return data
+
+
+def _save_proverb_cache(cache: Dict[str, Any]) -> None:
+    path = _proverb_cache_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(cache, ensure_ascii=False, indent=2) + "\n"
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(payload, encoding="utf-8")
+    tmp.replace(path)
+
+
+def _merge_proverb_catalog(
+    old_catalog: List[Dict[str, str]],
+    pending_ids: List[str],
+    fresh: List[Dict[str, str]],
+) -> Tuple[List[Dict[str, str]], List[str]]:
+    """新着 ID は未出キューの先頭へ。既存の並びは崩さない。"""
+    old_ids = {str(item.get("id") or "") for item in old_catalog}
+    pending_set = {str(pid) for pid in pending_ids}
+    catalog: List[Dict[str, str]] = []
+    seen: set[str] = set()
+    for item in fresh:
+        post_id = str(item.get("id") or "")
+        if not post_id or post_id in seen:
+            continue
+        seen.add(post_id)
+        catalog.append({"id": post_id, "title": item.get("title") or "", "link": item.get("link") or ""})
+    catalog.sort(key=lambda item: int(item["id"]))
+    newcomers = [
+        item["id"]
+        for item in catalog
+        if item["id"] not in old_ids and item["id"] not in pending_set
+    ]
+    newcomers.sort(key=lambda post_id: int(post_id), reverse=True)
+    pending = newcomers + [str(pid) for pid in pending_ids if str(pid) in seen]
+    return catalog, pending
+
+
+def _prune_assignments(assignments: Dict[str, str], monday: date) -> Dict[str, str]:
+    cutoff = monday - timedelta(days=TOUNOU_ASSIGNMENT_KEEP_DAYS)
+    kept: Dict[str, str] = {}
+    for key, line in assignments.items():
+        try:
+            assigned = date.fromisoformat(str(key))
+        except ValueError:
+            continue
+        if assigned >= cutoff and line:
+            kept[str(key)] = str(line)
+    return kept
+
+
+def _assign_proverb_week(
+    catalog: List[Dict[str, str]],
+    pending_ids: List[str],
+    monday: date,
+) -> Tuple[Dict[str, str], List[str]]:
+    """週の7日を埋める。未出があれば月曜から順に使い、足りなければ一覧から補う。"""
+    by_id = {item["id"]: item for item in catalog if item.get("id")}
+    pending = [pid for pid in pending_ids if pid in by_id]
+    rng = random.Random(monday.toordinal())
+    pool_ids = [item["id"] for item in catalog]
+    rng.shuffle(pool_ids)
+    pool_at = 0
+    used: set[str] = set()
+    assignments: Dict[str, str] = {}
+    for offset in range(7):
+        day = monday + timedelta(days=offset)
+        chosen: Optional[str] = None
+        while pending:
+            pid = pending.pop(0)
+            if pid not in used and pid in by_id:
+                chosen = pid
+                break
+        if chosen is None:
+            while pool_at < len(pool_ids):
+                pid = pool_ids[pool_at]
+                pool_at += 1
+                if pid not in used:
+                    chosen = pid
+                    break
+        if chosen is None and catalog:
+            chosen = catalog[day.toordinal() % len(catalog)]["id"]
+        if not chosen or chosen not in by_id:
+            continue
+        used.add(chosen)
+        item = by_id[chosen]
+        author = _fetch_tounou_speaker(item["link"])
+        assignments[day.isoformat()] = _format_jp_proverb_line(item["title"], author=author)
+    return assignments, pending
+
+
+def _fallback_proverb_line(catalog: List[Dict[str, str]], day: date) -> Optional[str]:
+    item = _select_tounou_item_for_day(catalog, day)
+    if not item:
+        return None
+    author = _fetch_tounou_speaker(item.get("link") or "")
+    return _format_jp_proverb_line(item.get("title") or "", author=author)
+
+
+def _legacy_proverb_line(day: date) -> Optional[str]:
+    items = _fetch_tounou_rss_items()
+    item = _select_tounou_item_for_day(items, day)
+    if not item:
+        return None
+    author = _fetch_tounou_speaker(item["link"])
+    return _format_jp_proverb_line(item["title"], author=author)
+
+
+def _proverb_line_for_day(day: date) -> Optional[str]:
+    cache = _load_proverb_cache()
+    assignments = cache.get("assignments") or {}
+    cached_line = assignments.get(day.isoformat())
+    if cached_line:
+        return str(cached_line)
+
+    monday = _week_monday(day)
+    week_start_raw = str(cache.get("week_start") or "")
+    if week_start_raw:
+        try:
+            stored_monday = date.fromisoformat(week_start_raw)
+        except ValueError:
+            stored_monday = None
+        if stored_monday is not None and monday < stored_monday:
+            return _fallback_proverb_line(list(cache.get("catalog") or []), day)
+
+    fresh = _fetch_tounou_catalog()
+    if fresh:
+        catalog, pending = _merge_proverb_catalog(
+            list(cache.get("catalog") or []),
+            list(cache.get("pending_ids") or []),
+            fresh,
+        )
+        fetched_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    elif cache.get("catalog"):
+        logger.warning("morning_brief: tounou catalog refresh failed; using previous cache")
+        catalog = list(cache.get("catalog") or [])
+        pending = [str(pid) for pid in (cache.get("pending_ids") or [])]
+        fetched_at = str(cache.get("fetched_at") or "")
+    else:
+        return _legacy_proverb_line(day)
+
+    if not catalog:
+        return None
+
+    week_assignments, pending = _assign_proverb_week(catalog, pending, monday)
+    merged = _prune_assignments(dict(assignments), monday)
+    merged.update(week_assignments)
+    _save_proverb_cache(
+        {
+            "week_start": monday.isoformat(),
+            "fetched_at": fetched_at,
+            "pending_ids": pending,
+            "catalog": catalog,
+            "assignments": merged,
+        }
+    )
+    logger.info(
+        "morning_brief: proverb week %s catalog=%s pending=%s",
+        monday.isoformat(),
+        len(catalog),
+        len(pending),
+    )
+    return merged.get(day.isoformat())
+
+
+def build_jp_proverb_line(day: date) -> Optional[str]:
+    try:
+        return _proverb_line_for_day(day)
+    except Exception as exc:
+        logger.warning("morning_brief: proverb line failed: %s", exc)
+        return _legacy_proverb_line(day)
+
+
 def _format_jp_proverb_line(
     title: str,
     meaning: Optional[str] = None,
@@ -501,15 +754,6 @@ def _format_jp_proverb_line(
     if note:
         return f"**格言** {proverb} — {note}（{TOUNOU_ATTRIBUTION}）"
     return f"**格言** {proverb}（{TOUNOU_ATTRIBUTION}）"
-
-
-def build_jp_proverb_line(day: date) -> Optional[str]:
-    items = _fetch_tounou_rss_items()
-    item = _select_tounou_item_for_day(items, day)
-    if not item:
-        return None
-    author = _fetch_tounou_speaker(item["link"])
-    return _format_jp_proverb_line(item["title"], author=author)
 
 
 def _fetch_zenquotes_today() -> Optional[str]:
@@ -723,14 +967,20 @@ def build_week_market_lines(
 
 
 def build_week_breath_lines(
-    week_mon: date, week_sun: date, region: str
+    week_mon: date,
+    week_sun: date,
+    region: str,
+    *,
+    include_proverb: bool = True,
 ) -> tuple[Optional[str], Optional[str]]:
     """観測週の代表日（水曜）の歴史 + 週固定の格言。"""
     mid = week_mon + timedelta(days=min(2, (week_sun - week_mon).days))
     region_n = (region or "jp").lower()
     history = build_history_line(mid, region_n)
     history = _rewrite_history_line_for_weekly(history, region_n)
-    second = build_breath_second_line(week_mon, region_n)
+    second = (
+        build_breath_second_line(week_mon, region_n) if include_proverb else None
+    )
     return history, second
 
 
@@ -768,7 +1018,10 @@ def build_weekly_brief_lines(
     fx_line = stock_line = None
     if include_market and not _morning_brief_market_disabled():
         fx_line, stock_line = build_week_market_lines(week_mon, week_sun, region_n)
-    history, second = build_week_breath_lines(week_mon, week_sun, region_n)
+    # 週次メールは格言を出さない。日次側の未出キューをここで消費しない。
+    history, second = build_week_breath_lines(
+        week_mon, week_sun, region_n, include_proverb=False
+    )
     return WeeklyBriefLines(
         calendar=calendar,
         fx=fx_line,

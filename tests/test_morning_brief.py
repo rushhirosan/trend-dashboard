@@ -10,13 +10,17 @@ from services.summary.morning_brief import (
     _format_en_on_this_day_line,
     _format_jp_history_line,
     _format_jp_proverb_line,
+    _load_proverb_cache,
     _meaning_from_tounou_lines,
+    _merge_proverb_catalog,
+    _parse_tounou_rss_items,
     _select_tounou_item_for_day,
     _split_jp_history_year,
     build_calendar_line,
     build_jp_proverb_line,
     build_morning_brief_lines,
     build_week_breath_lines,
+    build_weekly_brief_lines,
     delivery_day_for_business_day,
     render_morning_brief_markdown,
     WeeklyBriefLines,
@@ -270,16 +274,47 @@ def test_select_tounou_item_for_day_is_stable():
     assert _select_tounou_item_for_day(items, d) == _select_tounou_item_for_day(items, d)
 
 
-def test_build_jp_proverb_line_from_tounou():
+def test_parse_tounou_rss_items_uses_post_id():
+    xml = """<?xml version="1.0"?>
+    <rss><channel><item>
+    <title>急がば回れ</title>
+    <link>https://meigen.tounou.net/?p=42</link>
+    <guid>https://meigen.tounou.net/?p=42</guid>
+    </item></channel></rss>
+    """
+    assert _parse_tounou_rss_items(xml) == [
+        {
+            "id": "42",
+            "title": "急がば回れ",
+            "link": "https://meigen.tounou.net/?p=42",
+        }
+    ]
+
+
+def test_merge_proverb_catalog_puts_new_ids_first():
+    old = [{"id": "1", "title": "古い", "link": "https://meigen.tounou.net/?p=1"}]
+    fresh = old + [
+        {"id": "9", "title": "新しい", "link": "https://meigen.tounou.net/?p=9"},
+        {"id": "8", "title": "その次", "link": "https://meigen.tounou.net/?p=8"},
+    ]
+    catalog, pending = _merge_proverb_catalog(old, ["1"], fresh)
+    assert [item["id"] for item in catalog] == ["1", "8", "9"]
+    assert pending[:2] == ["9", "8"]
+    assert pending[2:] == ["1"]
+
+
+def test_build_jp_proverb_line_from_tounou(monkeypatch, tmp_path):
+    monkeypatch.setenv("TOUNOU_PROVERB_CACHE_PATH", str(tmp_path / "cache.json"))
     items = [
         {
+            "id": "1",
             "title": "急がば回れ",
             "link": "https://meigen.tounou.net/?p=1",
         }
     ]
 
     with patch(
-        "services.summary.morning_brief._fetch_tounou_rss_items",
+        "services.summary.morning_brief._fetch_tounou_catalog",
         return_value=items,
     ), patch(
         "services.summary.morning_brief._fetch_tounou_speaker",
@@ -288,6 +323,116 @@ def test_build_jp_proverb_line_from_tounou():
         line = build_jp_proverb_line(date(2026, 8, 22))
 
     assert line == "**格言** 「急がば回れ」 — 新井正明（10秒名言）"
+
+
+def test_proverb_week_pins_new_quote_and_stays_stable(monkeypatch, tmp_path):
+    cache_path = tmp_path / "cache.json"
+    monkeypatch.setenv("TOUNOU_PROVERB_CACHE_PATH", str(cache_path))
+    cache_path.write_text(
+        """{
+          "week_start": "2026-10-05",
+          "fetched_at": "2026-10-05T00:00:00+00:00",
+          "pending_ids": ["1", "2"],
+          "catalog": [
+            {"id": "1", "title": "古い1", "link": "https://meigen.tounou.net/?p=1"},
+            {"id": "2", "title": "古い2", "link": "https://meigen.tounou.net/?p=2"}
+          ],
+          "assignments": {
+            "2026-10-05": "**格言** 「古い1」（10秒名言）"
+          }
+        }""",
+        encoding="utf-8",
+    )
+    fresh = [
+        {"id": "1", "title": "古い1", "link": "https://meigen.tounou.net/?p=1"},
+        {"id": "2", "title": "古い2", "link": "https://meigen.tounou.net/?p=2"},
+        {"id": "99", "title": "新しい一言", "link": "https://meigen.tounou.net/?p=99"},
+    ]
+    with patch(
+        "services.summary.morning_brief._fetch_tounou_catalog",
+        return_value=fresh,
+    ) as fetch, patch(
+        "services.summary.morning_brief._fetch_tounou_speaker",
+        return_value="著者",
+    ) as speaker:
+        monday = build_jp_proverb_line(date(2026, 10, 12))
+        again = build_jp_proverb_line(date(2026, 10, 12))
+        tuesday = build_jp_proverb_line(date(2026, 10, 13))
+    assert monday == "**格言** 「新しい一言」 — 著者（10秒名言）"
+    assert again == monday
+    assert tuesday == "**格言** 「古い1」 — 著者（10秒名言）"
+    assert fetch.call_count == 1
+    assert speaker.call_count == 7
+    saved = _load_proverb_cache()
+    assert saved["pending_ids"] == []
+    assert saved["assignments"]["2026-10-05"].startswith("**格言** 「古い1」")
+
+
+def test_proverb_refresh_failure_keeps_previous_catalog(monkeypatch, tmp_path):
+    monkeypatch.setenv("TOUNOU_PROVERB_CACHE_PATH", str(tmp_path / "cache.json"))
+    (tmp_path / "cache.json").write_text(
+        """{
+          "week_start": "2026-10-05",
+          "fetched_at": "2026-10-05T00:00:00+00:00",
+          "pending_ids": ["5"],
+          "catalog": [
+            {"id": "5", "title": "残す一言", "link": "https://meigen.tounou.net/?p=5"}
+          ],
+          "assignments": {}
+        }""",
+        encoding="utf-8",
+    )
+    with patch(
+        "services.summary.morning_brief._fetch_tounou_catalog",
+        return_value=[],
+    ), patch(
+        "services.summary.morning_brief._fetch_tounou_speaker",
+        return_value="著者",
+    ):
+        line = build_jp_proverb_line(date(2026, 10, 12))
+    assert line == "**格言** 「残す一言」 — 著者（10秒名言）"
+
+
+def test_proverb_lookup_before_cached_week_does_not_consume_queue(monkeypatch, tmp_path):
+    monkeypatch.setenv("TOUNOU_PROVERB_CACHE_PATH", str(tmp_path / "cache.json"))
+    (tmp_path / "cache.json").write_text(
+        """{
+          "week_start": "2026-10-12",
+          "fetched_at": "2026-10-12T00:00:00+00:00",
+          "pending_ids": ["3", "4"],
+          "catalog": [
+            {"id": "3", "title": "未出", "link": "https://meigen.tounou.net/?p=3"},
+            {"id": "4", "title": "次", "link": "https://meigen.tounou.net/?p=4"}
+          ],
+          "assignments": {
+            "2026-10-12": "**格言** 「済」（10秒名言）"
+          }
+        }""",
+        encoding="utf-8",
+    )
+    with patch(
+        "services.summary.morning_brief._fetch_tounou_catalog",
+    ) as fetch, patch(
+        "services.summary.morning_brief._fetch_tounou_speaker",
+        return_value="著者",
+    ):
+        line = build_jp_proverb_line(date(2026, 10, 5))
+    fetch.assert_not_called()
+    assert "未出" in line or "次" in line
+    assert _load_proverb_cache()["pending_ids"] == ["3", "4"]
+
+
+def test_weekly_brief_does_not_plan_proverbs(monkeypatch):
+    monkeypatch.setenv("MORNING_BRIEF_SKIP_MARKET", "true")
+    with patch(
+        "services.summary.morning_brief.build_week_calendar_line",
+        return_value="**今週**",
+    ), patch(
+        "services.summary.morning_brief.build_week_breath_lines",
+        return_value=(None, None),
+    ) as breath:
+        build_weekly_brief_lines(date(2026, 10, 5), date(2026, 10, 11), "jp")
+    assert breath.call_args.kwargs["include_proverb"] is False
 
 
 def test_render_morning_brief_markdown_jp():

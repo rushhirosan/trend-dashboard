@@ -89,6 +89,8 @@ local_data.sql
 *.json
 !requirements*.json
 !package*.json
+# 日次ジョブが週の格言計画を持ち越す。秘密情報ではない。
+!docs/summaries/tounou_proverb_cache.json
 
 # Flask
 instance/

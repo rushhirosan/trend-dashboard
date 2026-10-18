@@ -69,7 +69,11 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/summaries/daily/ docs/summaries/tounou_proverb_cache.json
+          git add docs/summaries/daily/
+          # 格言キャッシュは JP 生成時だけ出来る。無い日は日次 Markdown のコミットを止めない。
+          if [ -f docs/summaries/tounou_proverb_cache.json ]; then
+            git add docs/summaries/tounou_proverb_cache.json
+          fi
           if git diff --cached --quiet; then
             echo "No changes to commit."
             exit 0

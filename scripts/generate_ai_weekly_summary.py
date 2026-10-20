@@ -113,7 +113,6 @@ WEEKLY_SCORE_CROSS = 25
 
 _WEEKLY_RISING_HEADING = "## 📈 先週いちばん動いた話題"
 _WEEKLY_CATEGORY_HEADING = "## 📊 カテゴリ別 — 先週の top3"
-_WEEKLY_CROSS_HEADING = "## 複数ソースで週を通じて重なった話題"
 _WEEKLY_HOT_HEADING = "## 🔥 週のホットトピック"
 _WEEKLY_NEXT_HEADING = "## 来週に残る論点"
 _WEEKLY_HOT_HEADING_US = "## 🔥 Hot topics last week"
@@ -121,7 +120,6 @@ _WEEKLY_NEXT_HEADING_US = "## What to watch next week"
 # 週次「動いた」として載せる最低 jump_sum（横ばい・悪化のみは除外）
 WEEKLY_RISING_MIN_JUMP = 5.0
 WEEKLY_HOT_MAX = 5
-WEEKLY_NEXT_MIN = 2
 WEEKLY_NEXT_MAX = 3
 
 # 週次カテゴリ top3: 同一トピック/ソースの重複を抑える
@@ -970,8 +968,6 @@ def build_mechanical_llm_payload(
     return {"regions": regions}
 
 
-_RANK_EVIDENCE_SLOT_RE = re.compile(r"(\d+)時(?:(\d+)位|圏外)")
-_RANK_EVIDENCE_SLOT_RE_EN = re.compile(r"(?:out|#(\d+))@(\d+)")
 _DAYTIME_SLOT_KEYS = ("07", "13", "19")
 
 
@@ -987,26 +983,13 @@ def parse_rank_evidence(evidence: str) -> Dict[str, Optional[int]]:
     """rank_evidence 文字列を {07,13,19} → 順位（圏外は None）に分解。
 
     JP（7時1位）と US（#1@7 / out@7）の両方を受理する。
+    日次と同じ実装を使う。表記が分かれると週次の表と note の文がずれる。
     """
-    ranks: Dict[str, Optional[int]] = {s: None for s in _DAYTIME_SLOT_KEYS}
-    text = evidence or ""
-    for m in _RANK_EVIDENCE_SLOT_RE.finditer(text):
-        slot = m.group(1).zfill(2)
-        if slot not in ranks:
-            continue
-        rank_str = m.group(2)
-        ranks[slot] = int(rank_str) if rank_str else None
-    for m in _RANK_EVIDENCE_SLOT_RE_EN.finditer(text):
-        slot = m.group(2).zfill(2)
-        if slot not in ranks:
-            continue
-        rank_str = m.group(1)
-        ranks[slot] = int(rank_str) if rank_str else None
-    return ranks
+    return _daily()._parse_rank_evidence(evidence)
 
 
 def _format_rank_cell(rank: Optional[int]) -> str:
-    return "—" if rank is None else str(rank)
+    return _daily()._format_rank_cell(rank)
 
 
 def _day_count_for_item(item: Dict[str, Any]) -> int:
@@ -1323,15 +1306,6 @@ def format_weekly_rank_trend_block(
     return trend.replace("**順位の動き**", "**日別ベスト順位**", 1) + "\n"
 
 
-def format_weekly_best_rank_block(
-    label: str,
-    rank_evidence_by_day: Dict[str, str],
-    **_: Any,
-) -> str:
-    """後方互換エイリアス（``format_weekly_rank_trend_block``）。"""
-    return format_weekly_rank_trend_block(label, rank_evidence_by_day)
-
-
 def _compact_weekly_link_line(item: Dict[str, Any]) -> str:
     """週次表示用: link_line から順位表記を除き、ソース名だけ残す。"""
     link = str(item.get("link_line") or "").strip()
@@ -1491,47 +1465,6 @@ def render_weekly_rising_markdown(
         lines.append("")
     if not any_items:
         return f"{heading}\n\n{empty_msg}\n"
-    return "\n".join(lines).rstrip() + "\n"
-
-
-def render_weekly_cross_markdown(
-    weekly_cross: Dict[str, List[Dict[str, Any]]],
-) -> str:
-    lines: List[str] = [_WEEKLY_CROSS_HEADING, ""]
-    any_items = False
-    for region in WEEKLY_REGIONS:
-        items = weekly_cross.get(region) or []
-        lines.append(f"### {WEEKLY_REGION_LABELS[region]}")
-        lines.append("")
-        if not items:
-            lines.append("（週を通じて複数ソースにまたがった同一トピックはありませんでした）")
-            lines.append("")
-            continue
-        any_items = True
-        for i, it in enumerate(items, 1):
-            label = str(it.get("label") or "").strip() or "（ラベル不明）"
-            lines.append(f"#### {i}. {label}")
-            lines.append("")
-            days = it.get("days") or []
-            meta_parts: List[str] = []
-            if days:
-                meta_parts.append(f"**{len(days)}日**")
-            sources = (it.get("sources_display") or "").strip()
-            if sources:
-                meta_parts.append(sources)
-            if meta_parts:
-                lines.append("> " + " · ".join(meta_parts))
-                lines.append("")
-            rank_by_day = it.get("rank_evidence_by_day") or {}
-            table = format_weekly_rank_table(rank_by_day)
-            if table:
-                lines.append(table)
-                lines.append("")
-    if not any_items:
-        return (
-            f"{_WEEKLY_CROSS_HEADING}\n\n"
-            "（週を通じて複数ソースにまたがった同一トピックはありませんでした）\n"
-        )
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -1799,6 +1732,30 @@ PUBLIC_HOT_MAX = 3
 PUBLIC_HOT_MIN_DAYS = 2
 
 
+def _mechanical_hot_topic_candidate(
+    it: Dict[str, Any],
+    *,
+    title: str,
+    day_count: int,
+    category: str,
+    score: int,
+) -> Dict[str, Any]:
+    """カテゴリ digest と rising で同じ候補形にする。スコア式は呼び出し側。"""
+    return {
+        "title": title,
+        "day_count": day_count,
+        "days": list(it.get("days") or []),
+        "cross_source": bool(it.get("cross_source")),
+        "category": category,
+        "best_rank": it.get("best_rank"),
+        "score": score,
+        "link_line": it.get("link_line") or "",
+        "url": it.get("url"),
+        "rank_display_by_day": it.get("rank_display_by_day") or {},
+        "rank_evidence_by_day": it.get("rank_evidence_by_day") or {},
+    }
+
+
 def build_mechanical_weekly_hot_topics(
     weekly_rising: Dict[str, List[Dict[str, Any]]],
     weekly_category: Dict[str, List[Dict[str, Any]]],
@@ -1835,19 +1792,13 @@ def build_mechanical_weekly_hot_topics(
                 day_count * 10 + (15 if cross else 0) + weekly_series_weight(sk)
             )
             candidates.append(
-                {
-                    "title": label,
-                    "day_count": day_count,
-                    "days": list(it.get("days") or []),
-                    "cross_source": cross,
-                    "category": cat,
-                    "best_rank": it.get("best_rank"),
-                    "score": score,
-                    "link_line": it.get("link_line") or "",
-                    "url": it.get("url"),
-                    "rank_display_by_day": it.get("rank_display_by_day") or {},
-                    "rank_evidence_by_day": it.get("rank_evidence_by_day") or {},
-                }
+                _mechanical_hot_topic_candidate(
+                    it,
+                    title=label,
+                    day_count=day_count,
+                    category=cat,
+                    score=score,
+                )
             )
     # rising を補完
     for it in weekly_rising.get(region) or []:
@@ -1866,19 +1817,13 @@ def build_mechanical_weekly_hot_topics(
             continue
         seen.add(nk)
         candidates.append(
-            {
-                "title": label,
-                "day_count": day_count,
-                "days": list(it.get("days") or []),
-                "cross_source": bool(it.get("cross_source")),
-                "category": str(it.get("category") or ""),
-                "best_rank": it.get("best_rank"),
-                "score": int(it.get("weekly_score") or 0) or day_count * 10,
-                "link_line": it.get("link_line") or "",
-                "url": it.get("url"),
-                "rank_display_by_day": it.get("rank_display_by_day") or {},
-                "rank_evidence_by_day": it.get("rank_evidence_by_day") or {},
-            }
+            _mechanical_hot_topic_candidate(
+                it,
+                title=label,
+                day_count=day_count,
+                category=str(it.get("category") or ""),
+                score=int(it.get("weekly_score") or 0) or day_count * 10,
+            )
         )
     candidates.sort(key=lambda x: (-int(x["score"]), -int(x["day_count"]), str(x["title"])))
     out: List[Dict[str, Any]] = []

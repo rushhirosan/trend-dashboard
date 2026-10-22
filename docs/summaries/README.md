@@ -86,7 +86,7 @@
 週次の「順位の動き」は **画像・添付なし** で送る。
 
 - 原稿 Markdown: スロット別の **表** + **日別ベスト順位** のテキスト一行（例: `06-24 (2位) → 06-26 (1位) ↑`）
-- 配信本文の組み立て: `services/summary/weekly_summary_email.py`（レガシーの Mermaid / SVG / `![](...)` は除去）
+- 配信本文の組み立て: `services/summary/summary_markdown_email.py`（レガシーの Mermaid / SVG / `![](...)` は除去）
 - メールは HTML + テキストの multipart のみ（`EmailService` と同様、ファイル添付なし）
 
 ---

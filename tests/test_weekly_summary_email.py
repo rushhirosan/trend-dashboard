@@ -1,9 +1,9 @@
-"""Tests for services/summary/weekly_summary_email.py."""
+"""Tests for summary markdown email rendering."""
 
-from services.summary.weekly_summary_email import (
-    strip_legacy_weekly_charts,
-    weekly_markdown_to_email_html,
-    weekly_markdown_to_email_text,
+from services.summary.summary_markdown_email import (
+    markdown_to_email_html,
+    markdown_to_email_text,
+    strip_legacy_charts,
 )
 
 _SAMPLE = """---
@@ -23,22 +23,22 @@ iso_week: "2026-W26"
 """
 
 
-def test_strip_legacy_weekly_charts_removes_images():
-    out = strip_legacy_weekly_charts(_SAMPLE)
+def test_strip_legacy_charts_removes_images():
+    out = strip_legacy_charts(_SAMPLE)
     assert "![chart]" not in out
     assert "**日別ベスト順位**" in out
     assert "| 06-24 |" in out
 
 
-def test_weekly_markdown_to_email_text_has_no_attachments_markers():
-    text = weekly_markdown_to_email_text(_SAMPLE)
+def test_markdown_to_email_text_has_no_attachments_markers():
+    text = markdown_to_email_text(_SAMPLE)
     assert "![chart]" not in text
     assert "06-24 (2位)" in text
     assert "status: approved" not in text
 
 
-def test_weekly_markdown_to_email_html_is_inline_only():
-    html = weekly_markdown_to_email_html(_SAMPLE)
+def test_markdown_to_email_html_is_inline_only():
+    html = markdown_to_email_html(_SAMPLE)
     assert "<img" not in html
     assert "06-24 (2位)" in html
     assert "<table" in html
@@ -57,26 +57,26 @@ The same topic appeared on independent sources.
 |:--:|:-:|:-:|:-:|
 | Rank | 8 | — | — |
 """
-    html = weekly_markdown_to_email_html(md)
+    html = markdown_to_email_html(md)
     assert html.count("<tr>") == 2
     assert html.count("<th") == 4
     assert html.count("<td") == 4
     assert "&nbsp;" in html
-    text = weekly_markdown_to_email_text(md)
+    text = markdown_to_email_text(md)
     header = next(l for l in text.splitlines() if "07" in l and "13" in l and "19" in l)
     # 空角セル分のパディングが残り、07 が左端に来ない
     assert header.startswith(" ")
     assert "Rank" in text
 
 
-def test_weekly_markdown_to_email_html_has_anchor_links():
+def test_markdown_to_email_html_has_anchor_links():
     md = """---
 status: draft
 ---
 
 1. [PAYDAY 3](https://www.google.com/search?q=PAYDAY+3)（Twitch）
 """
-    html = weekly_markdown_to_email_html(md)
+    html = markdown_to_email_html(md)
     assert '<a href="https://www.google.com/search?q=PAYDAY+3">PAYDAY 3</a>' in html
     assert "PAYDAY 3 (https://" not in html
 
@@ -137,12 +137,12 @@ def test_history_and_quote_lines_stay_one_line():
         "**格言** 「後悔するよりも反省する事だ。"
         "後悔は人をネガティブにする。」 — メタルギア ソリッド・スネーク（10秒名言）\n"
     )
-    html = weekly_markdown_to_email_html(md)
+    html = markdown_to_email_html(md)
     assert "戦い。<br>" not in html
     assert "事だ。<br>" not in html
     assert "戦い。（Wikipedia）" in html
     assert "事だ。後悔は人をネガティブにする。」 — メタルギア ソリッド・スネーク（10秒名言）" in html
-    text = weekly_markdown_to_email_text(md)
+    text = markdown_to_email_text(md)
     assert "戦い。\n" not in text
     assert "事だ。\n" not in text
     assert "事だ。後悔は人をネガティブにする。」" in text
@@ -154,12 +154,12 @@ def test_english_history_and_quote_lines_stay_one_line():
         '**Quote** "Bad things are not the worst things that an happen to us. '
         'NOTHING is the worst thing…" — Richard Bach (ZenQuotes)\n'
     )
-    html = weekly_markdown_to_email_html(md)
+    html = markdown_to_email_html(md)
     assert "Manzikert.<br>" not in html
     assert "us.<br>" not in html
     assert "Manzikert. (Wikipedia)" in html
     assert "us. NOTHING is the worst thing…" in html
-    text = weekly_markdown_to_email_text(md)
+    text = markdown_to_email_text(md)
     assert "Manzikert.\n" not in text
     assert "us.\n" not in text
     assert "us. NOTHING is the worst thing…" in text
@@ -174,18 +174,18 @@ status: draft
 
 今週はAが注目を集めました。また、Bが話題となりました。検索ではCが急上昇し、1位を記録。エンタメではDが注目を集めました。
 """
-    html = weekly_markdown_to_email_html(md)
+    html = markdown_to_email_html(md)
     assert "集めました。<br>" in html
     assert "なりました。<br>" in html
     # 「記録。」のあとも改行（句点）
     assert "記録。<br>" in html
-    text = weekly_markdown_to_email_text(md)
+    text = markdown_to_email_text(md)
     assert "集めました。\nまた、" in text
 
 
 def test_list_item_period_not_broken():
     md = "1. タイトルです\n"
-    html = weekly_markdown_to_email_html(md)
+    html = markdown_to_email_html(md)
     assert "1.<br>" not in html
     assert "1. タイトルです" in html
 
@@ -201,7 +201,7 @@ status: draft
 
 本文です。
 """
-    html = weekly_markdown_to_email_html(md, title="日次サマリー — 2026-07-22 (JP)")
+    html = markdown_to_email_html(md, title="日次サマリー — 2026-07-22 (JP)")
     assert html.count("<h1>") == 1
     assert "日次サマリー — 2026-07-22 (JP)" in html
     assert "（JST）" not in html
@@ -214,7 +214,7 @@ def test_email_strips_category_trend_blurbs():
 
 1. [A](https://ex.com)
 """
-    html = weekly_markdown_to_email_html(md)
+    html = markdown_to_email_html(md)
     assert "昨日の傾向" not in html
     assert "WordPressが話題" not in html
     assert "テック・開発" in html
@@ -229,7 +229,7 @@ def test_email_strips_redundant_header_meta():
 
 本文。
 """
-    html = weekly_markdown_to_email_html(md, title="日次サマリー — 2026-07-24 (JP)")
+    html = markdown_to_email_html(md, title="日次サマリー — 2026-07-24 (JP)")
     assert "対象（観測日）" not in html
     assert "生成・送信完了" not in html
     assert "昨日の注目" in html

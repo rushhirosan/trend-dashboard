@@ -110,11 +110,6 @@ class AppConfig:
     LEGAL_EMAIL = os.getenv('LEGAL_EMAIL', '').strip()
     LEGAL_PHONE = os.getenv('LEGAL_PHONE', '').strip()
 
-    # 旧 Stripe（許可されず未使用。残してあるだけ）
-    STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '').strip()
-    STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY', '').strip()
-    STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', '').strip()
-    STRIPE_PRICE_ID = os.getenv('STRIPE_PRICE_ID', '').strip()
     # 本番は approved のみ表示。ローカル DEBUG では draft も可（明示 false で無効化）
     _allow_draft_env = os.getenv('AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT')
     if _allow_draft_env is not None and _allow_draft_env.strip() != '':

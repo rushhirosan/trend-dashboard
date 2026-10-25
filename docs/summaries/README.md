@@ -46,13 +46,13 @@
 
 ### 週次のタイムライン（JST）
 
-**W1（先週）の月曜〜日曜**の日次をまとめ、**W2（翌週）の月曜**に週次を生成する（メール実着は **10:00頃**。日次メールのあと）。
+**W1（先週）の月曜〜日曜**をまとめ、**W2（翌週）の月曜 4:00** に週次を生成する（メール実着は **6:30頃**）。
 
 例: W20 = 月 **5/11** 〜 日 **5/17** をまとめ、**5/18（月）** に `weekly/2026-W20.md` を生成:
 
 1. 日曜観測日 `2026-05-17.md` のメールは **月曜 5/18 9:00** 頃（cron は **06:50**、**AI daily summary**）。
-2. **AI weekly summary** の cron は **月曜 5/18 07:30**。メール実着は **10:00頃**。`weekly/2026-W20.md` を生成・コミット。
-3. 配信目標は [`summary_pattern_a_phase1.md`](../summary_pattern_a_phase1.md) のとおり **月曜 10:00 JST頃**。
+2. **AI weekly summary** の cron は **月曜 5/18 04:00**。メール実着は **6:30頃**。`weekly/2026-W20.md` を生成・コミット。
+3. 配信目標は [`summary_pattern_a_phase1.md`](../summary_pattern_a_phase1.md) のとおり **月曜 6:30 JST頃**。
 
 詳細: [`weekly/README.md`](weekly/README.md)
 
@@ -196,7 +196,7 @@ python scripts/generate_ai_weekly_summary.py --from-api --write --force --weekly
 | 週次 `weekly/*.md` | 30 日 | `SUMMARY_WEEKLY_RETENTION_DAYS` |
 
 - **DB**（`trend_daily_snapshots` / `scheduler_slot_run`）: 本番 APScheduler が毎日 **03:00 JST** に `purge_expired_snapshots` を実行。
-- **git 原稿**: GitHub Actions **Summary retention purge**（`.github/workflows/summary-retention-purge.yml`、JST **08:00**）。期限切れだけ消す。日次メール（9時頃）・週次メール（月曜 10時頃）より前に走ってよい。
+- **git 原稿**: GitHub Actions **Summary retention purge**（`.github/workflows/summary-retention-purge.yml`、JST **08:00**）。期限切れだけ消す。週次メール（月曜 6:30頃）のあと、日次メール（9時頃）の前に走る。
 - **手元**: `python scripts/purge_snapshot_retention.py --summaries-only --dry-run` で確認後、必要なら実行して commit。
 
 ---

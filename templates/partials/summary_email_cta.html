@@ -17,9 +17,9 @@
       </div>
       <div class="modal-body">
         {% if cta_is_us %}
-        <p class="small mb-3">A daily and weekly brief of yesterday's and last week's trends. Target: daily around 9:00 JST; weekly Mondays around 10:00 JST. Times are not guaranteed.</p>
+        <p class="small mb-3">A daily and weekly brief of yesterday's and last week's trends. Target: daily around 9:00 JST; weekly Mondays around 6:30 JST. Times are not guaranteed.</p>
         {% else %}
-        <p class="small mb-3">昨日・先週のトレンドの日次・週次ブリーフです。目標は日次 9:00 JST頃、週次は月曜 10:00 JST頃。時刻は保証ではありません。</p>
+        <p class="small mb-3">昨日・先週のトレンドの日次・週次ブリーフです。目標は日次 9:00 JST頃、週次は月曜 6:30 JST頃。時刻は保証ではありません。</p>
         {% endif %}
         {% with checkout_form_prefix='ai-summary-cta', checkout_locale=('en' if cta_is_us else 'ja'), checkout_default_region=('us' if cta_is_us else 'jp') %}
         {% include 'partials/ai_summary_checkout_form.html' %}

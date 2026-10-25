@@ -1,5 +1,6 @@
 # JST 08:00 ≒ UTC 23:00 (previous calendar day).
-# Deletes expired summary files only. Daily mail lands ~09:00 JST; weekly ~10:00 JST Mondays.
+# Deletes expired summary files only. Weekly mail lands ~06:30 JST Mondays; daily mail ~09:00 JST.
+# This 08:00 purge runs after the weekly job and before the daily mail. It removes only files past retention.
 # Deletes docs/summaries/daily/*.md (+ .generation.json) and weekly/*.md past retention.
 name: Summary retention purge
 

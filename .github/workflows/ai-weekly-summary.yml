@@ -1,6 +1,6 @@
 # Reads 7 days of trend_daily_snapshots for the prior ISO week (W1).
-# Cron: Mon 07:30 JST (UTC Sun 22:30), after the daily cron (06:50).
-# GitHub Actions delay: daily mail ~09:00 JST, this weekly mail ~10:00 JST. Do not move this cron to 10:00.
+# Cron: Mon 04:00 JST (UTC Sun 19:00), after Sunday's 01:00 slot and the 03:00 snapshot purge.
+# GitHub Actions delay: the commit and weekly mail land around 06:30 JST. Do not move this cron later.
 # JP → docs/summaries/weekly/{ISO}.md and weekly/note/{ISO}.md
 # US → docs/summaries/weekly/us/{ISO}.md and weekly/substack/{ISO}.md
 # If jp+us are already in summary_documents (e.g. manual Run then delayed cron), skip all work.
@@ -8,7 +8,7 @@ name: AI weekly summary
 
 on:
   schedule:
-    - cron: "30 22 * * 0"
+    - cron: "0 19 * * 0"
   workflow_dispatch:
     inputs:
       force:

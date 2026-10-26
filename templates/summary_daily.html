@@ -25,7 +25,7 @@
     <meta property="og:type" content="article">
     <meta property="og:url" content="{{ public_base_url }}{{ sumpfx }}/summaries/daily/{{ page.business_day }}">
     <meta property="og:title" content="{% if is_us %}Daily trend brief {{ page.business_day_display }}{% else %}日次ブリーフ {{ page.business_day_display }}{% endif %} | Trends Dashboard">
-    <meta property="og:image" content="{{ public_base_url }}/static/images/og-image.png">
+    <meta property="og:image" content="{% if page.thumb_file %}{{ public_base_url }}{{ url_for('static', filename=page.thumb_file) }}{% else %}{{ public_base_url }}/static/images/og-image.png{% endif %}">
     <meta property="og:locale" content="{% if is_us %}en_US{% else %}ja_JP{% endif %}">
     <meta property="og:site_name" content="Trends Dashboard">
     <meta name="twitter:card" content="summary_large_image">
@@ -85,16 +85,23 @@
 
                 <div class="card shadow-sm mb-4">
                     <div class="card-body p-4">
-                        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                            <span class="badge bg-secondary">{% if is_us %}Free preview{% else %}無料プレビュー{% endif %}</span>
+                        <div class="d-flex gap-3 align-items-start">
+                            {% if page.thumb_file %}
+                            <img src="{{ url_for('static', filename=page.thumb_file) }}" alt="" class="summary-day-thumb summary-day-thumb-lg" width="96" height="96">
+                            {% endif %}
+                            <div>
+                                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                    <span class="badge bg-secondary">{% if is_us %}Free preview{% else %}無料プレビュー{% endif %}</span>
+                                </div>
+                                <h1 class="h4 mb-2">{% if is_us %}Daily trend brief{% else %}日次ブリーフ{% endif %} — {{ page.business_day_display }}</h1>
+                                <p class="text-muted small mb-1">
+                                    {% if is_us %}Observation day: {{ page.business_day }} (slots {{ page.slots | join('/') }}){% else %}対象（観測日）: {{ page.business_day }}（{{ page.slots | join('/') }} 反映）{% endif %}
+                                </p>
+                                {% if page.generated_at %}
+                                <p class="text-muted small mb-0">{% if is_us %}Generated: {% else %}生成: {% endif %}{{ page.generated_at }}</p>
+                                {% endif %}
+                            </div>
                         </div>
-                        <h1 class="h4 mb-2">{% if is_us %}Daily trend brief{% else %}日次ブリーフ{% endif %} — {{ page.business_day_display }}</h1>
-                        <p class="text-muted small mb-1">
-                            {% if is_us %}Observation day: {{ page.business_day }} (slots {{ page.slots | join('/') }}){% else %}対象（観測日）: {{ page.business_day }}（{{ page.slots | join('/') }} 反映）{% endif %}
-                        </p>
-                        {% if page.generated_at %}
-                        <p class="text-muted small mb-0">{% if is_us %}Generated: {% else %}生成: {% endif %}{{ page.generated_at }}</p>
-                        {% endif %}
                     </div>
                 </div>
 

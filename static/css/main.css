@@ -3550,3 +3550,15 @@ article[id^="source-"].all-card-col-user-hidden,
     flex-wrap: wrap;
     align-items: center;
 }
+
+.summary-day-thumb {
+    width: 72px;
+    height: 72px;
+    object-fit: cover;
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+.summary-day-thumb-lg {
+    width: 96px;
+    height: 96px;
+}

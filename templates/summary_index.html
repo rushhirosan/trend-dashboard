@@ -89,10 +89,17 @@
                         <ul class="list-group list-group-flush">
                             {% for item in daily_items %}
                             <li class="list-group-item py-3">
-                                <a href="{{ item.url }}" class="fw-semibold text-decoration-none">{{ item.display }}</a>
-                                {% if item.one_liner %}
-                                <p class="small text-muted mb-0 mt-1">{{ item.one_liner[:120] }}{% if item.one_liner|length > 120 %}…{% endif %}</p>
-                                {% endif %}
+                                <div class="d-flex gap-3 align-items-start">
+                                    {% if item.thumb_file %}
+                                    <img src="{{ url_for('static', filename=item.thumb_file) }}" alt="" class="summary-day-thumb" width="72" height="72">
+                                    {% endif %}
+                                    <div>
+                                        <a href="{{ item.url }}" class="fw-semibold text-decoration-none">{{ item.display }}</a>
+                                        {% if item.one_liner %}
+                                        <p class="small text-muted mb-0 mt-1">{{ item.one_liner[:120] }}{% if item.one_liner|length > 120 %}…{% endif %}</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
                             </li>
                             {% endfor %}
                         </ul>

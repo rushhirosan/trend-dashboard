@@ -29,6 +29,7 @@ JST = timezone(timedelta(hours=9))
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DAILY_DIR = _REPO_ROOT / "docs" / "summaries" / "daily"
 _WEEKLY_DIR = _REPO_ROOT / "docs" / "summaries" / "weekly"
+_DAILY_THUMB_DIR = _REPO_ROOT / "static" / "images" / "summaries" / "daily"
 
 _DAILY_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _WEEKLY_ID_RE = re.compile(r"^\d{4}-W\d{2}$")
@@ -392,6 +393,17 @@ def _one_liner_from_rising(rising: list[dict], *, region: str) -> str:
     return f"「{lab}」が大きく動いた。"
 
 
+def daily_thumb_filename(business_day: str, region: str = "jp") -> Optional[str]:
+    """日次一覧と詳細で共有するサムネの static 相対パス。ファイルが無い日は None。"""
+    region = _norm_region(region)
+    if not _DAILY_DATE_RE.match(business_day or ""):
+        return None
+    name = f"{business_day}.jpg"
+    if not (_DAILY_THUMB_DIR / region / name).is_file():
+        return None
+    return f"images/summaries/daily/{region}/{name}"
+
+
 def load_daily_page(
     date_str: str, *, region: str = "jp", allow_draft: bool = False
 ) -> Optional[dict]:
@@ -445,6 +457,7 @@ def load_daily_page(
         "slots": list(_parse_slots(fm) or ("07", "13", "19", "01")),
         "one_liner": one_liner,
         "one_liner_sentences": one_liner_sentences,
+        "thumb_file": daily_thumb_filename(business_day.isoformat(), region),
         "rising": rising,
         "locked_sections": locked,
         "week_id": week_id,
@@ -672,6 +685,7 @@ def build_summary_index(*, region: str = "jp", allow_draft: bool = False) -> dic
                 "id": date_str,
                 "display": page["business_day_display"],
                 "one_liner": page["one_liner"],
+                "thumb_file": page.get("thumb_file") or "",
                 "url": f"{pfx}/summaries/daily/{date_str}",
             }
         )

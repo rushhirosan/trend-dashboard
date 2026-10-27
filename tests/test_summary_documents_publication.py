@@ -262,6 +262,24 @@ def test_upsert_endpoint_success(mock_upsert, client, monkeypatch):
     mock_upsert.assert_called_once_with("daily", "jp", "2026-07-17", _PAYLOAD["body_md"])
 
 
+@patch("services.summary.summary_store.upsert_thumb", return_value=True)
+def test_upsert_thumb_endpoint_success(mock_upsert, client, monkeypatch):
+    monkeypatch.setenv("SUMMARY_UPSERT_TOKEN", "secret-token")
+    res = client.post(
+        "/api/summaries/thumbs",
+        json={
+            "kind": "daily",
+            "region": "jp",
+            "id": "2026-10-26",
+            "content_type": "image/png",
+            "image_b64": "aGVsbG8=",
+        },
+        headers={"Authorization": "Bearer secret-token"},
+    )
+    assert res.status_code == 200
+    mock_upsert.assert_called_once_with("daily", "jp", "2026-10-26", b"hello", "image/png")
+
+
 def test_get_document_exists_requires_token(client, monkeypatch):
     monkeypatch.delenv("SUMMARY_UPSERT_TOKEN", raising=False)
     res = client.get(

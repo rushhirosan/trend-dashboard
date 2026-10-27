@@ -477,6 +477,23 @@ def create_app():
             weekly_retention_days=weekly_summary_retention_days(),
         )
 
+    def _render_summary_daily_thumb(region, date_str):
+        from flask import Response, abort
+        from services.summary.summary_pages import load_daily_page, read_daily_thumb
+        allow_draft = app.config.get('AI_SUMMARY_FAKE_DOOR_ALLOW_DRAFT', False)
+        page = load_daily_page(date_str, region=region, allow_draft=allow_draft)
+        if not page or not page.get('thumb_url'):
+            abort(404)
+        blob = read_daily_thumb(date_str, region)
+        if not blob:
+            abort(404)
+        data, content_type = blob
+        return Response(
+            data,
+            mimetype=content_type,
+            headers={'Cache-Control': 'public, max-age=3600'},
+        )
+
     def _render_summary_daily(region, date_str):
         from flask import abort
         from services.summary.summary_pages import load_daily_page, daily_neighbors
@@ -531,6 +548,28 @@ def create_app():
         logger.error(f"❌ /summaries ルート定義エラー: {e}", exc_info=True)
 
     try:
+        @app.route('/summaries/daily/<date_str>/thumb')
+        def summary_daily_thumb(date_str):
+            """日次サムネ。DB にあればそれを、無ければ static ファイルを返す。"""
+            try:
+                return _render_summary_daily_thumb('jp', date_str)
+            except Exception as e:
+                if getattr(e, 'code', None) == 404:
+                    raise
+                logger.error(f"❌ 日次サムネ応答エラー: {e}", exc_info=True)
+                return f"Error rendering daily thumb: {e}", 500
+
+        @app.route('/us/summaries/daily/<date_str>/thumb')
+        def summary_daily_thumb_us(date_str):
+            """日次サムネ（US）。"""
+            try:
+                return _render_summary_daily_thumb('us', date_str)
+            except Exception as e:
+                if getattr(e, 'code', None) == 404:
+                    raise
+                logger.error(f"❌ US日次サムネ応答エラー: {e}", exc_info=True)
+                return f"Error rendering US daily thumb: {e}", 500
+
         @app.route('/summaries/daily/<date_str>')
         def summary_daily(date_str):
             """日次サマリーの無料プレビューページ（JP・過去分・approved のみ／ローカルは draft も可）"""

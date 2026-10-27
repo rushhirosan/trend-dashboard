@@ -393,15 +393,58 @@ def _one_liner_from_rising(rising: list[dict], *, region: str) -> str:
     return f"「{lab}」が大きく動いた。"
 
 
-def daily_thumb_filename(business_day: str, region: str = "jp") -> Optional[str]:
-    """日次一覧と詳細で共有するサムネの static 相対パス。ファイルが無い日は None。"""
+_THUMB_SUFFIXES = (".jpg", ".jpeg", ".png")
+
+
+def daily_thumb_path(business_day: str, region: str = "jp") -> Optional[Path]:
+    """ディスク上の日次サムネ。jpg を優先し、生成分の png も見る。"""
     region = _norm_region(region)
     if not _DAILY_DATE_RE.match(business_day or ""):
         return None
-    name = f"{business_day}.jpg"
-    if not (_DAILY_THUMB_DIR / region / name).is_file():
+    for suffix in _THUMB_SUFFIXES:
+        path = _DAILY_THUMB_DIR / region / f"{business_day}{suffix}"
+        if path.is_file():
+            return path
+    return None
+
+
+def daily_thumb_filename(business_day: str, region: str = "jp") -> Optional[str]:
+    """日次サムネの static 相対パス。ファイルが無い日は None。"""
+    path = daily_thumb_path(business_day, region)
+    if path is None:
         return None
-    return f"images/summaries/daily/{region}/{name}"
+    region = _norm_region(region)
+    return f"images/summaries/daily/{region}/{path.name}"
+
+
+def daily_thumb_url(business_day: str, region: str = "jp") -> Optional[str]:
+    """一覧と詳細が使うサムネ URL。ファイルか DB のどちらかにあれば返す。"""
+    region = _norm_region(region)
+    if not _DAILY_DATE_RE.match(business_day or ""):
+        return None
+    has_file = daily_thumb_path(business_day, region) is not None
+    has_db = False if has_file else bool(summary_store.has_thumb("daily", region, business_day))
+    if not has_file and not has_db:
+        return None
+    return f"{_url_prefix(region)}/summaries/daily/{business_day}/thumb"
+
+
+def read_daily_thumb(business_day: str, region: str = "jp") -> Optional[tuple[bytes, str]]:
+    """公開用の画像バイト。DB を優先し、無ければ static ファイル。"""
+    region = _norm_region(region)
+    if not _DAILY_DATE_RE.match(business_day or ""):
+        return None
+    stored = summary_store.get_thumb("daily", region, business_day)
+    if stored:
+        return stored
+    path = daily_thumb_path(business_day, region)
+    if path is None:
+        return None
+    content_type = "image/png" if path.suffix.lower() == ".png" else "image/jpeg"
+    try:
+        return path.read_bytes(), content_type
+    except OSError:
+        return None
 
 
 def load_daily_page(
@@ -458,6 +501,7 @@ def load_daily_page(
         "one_liner": one_liner,
         "one_liner_sentences": one_liner_sentences,
         "thumb_file": daily_thumb_filename(business_day.isoformat(), region),
+        "thumb_url": daily_thumb_url(business_day.isoformat(), region),
         "rising": rising,
         "locked_sections": locked,
         "week_id": week_id,
@@ -686,6 +730,7 @@ def build_summary_index(*, region: str = "jp", allow_draft: bool = False) -> dic
                 "display": page["business_day_display"],
                 "one_liner": page["one_liner"],
                 "thumb_file": page.get("thumb_file") or "",
+                "thumb_url": page.get("thumb_url") or "",
                 "url": f"{pfx}/summaries/daily/{date_str}",
             }
         )

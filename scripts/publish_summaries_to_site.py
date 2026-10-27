@@ -15,6 +15,7 @@ GitHub Actions（ai-daily-summary / ai-weekly-summary）が生成・コミット
 from __future__ import annotations
 
 import argparse
+import base64
 import os
 import re
 import sys
@@ -24,7 +25,9 @@ import requests
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SUMMARIES_DIR = REPO_ROOT / "docs" / "summaries"
+THUMB_ROOT = REPO_ROOT / "static" / "images" / "summaries" / "daily"
 DEFAULT_BASE_URL = "https://trends-dashboard.com"
+_THUMB_TYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
 
 _DOC_ID_RES = {
     "daily": re.compile(r"^\d{4}-\d{2}-\d{2}$"),
@@ -52,6 +55,76 @@ def collect_documents() -> list[dict]:
                     }
                 )
     return docs
+
+
+def collect_thumbs() -> list[dict]:
+    """static に置いた日次サムネ。同じ日に複数拡張子があれば jpg を優先する。"""
+    thumbs: list[dict] = []
+    for region in ("jp", "us"):
+        directory = THUMB_ROOT / region
+        if not directory.is_dir():
+            continue
+        by_day: dict[str, Path] = {}
+        for path in sorted(directory.iterdir()):
+            if path.suffix.lower() not in _THUMB_TYPES:
+                continue
+            if not _DOC_ID_RES["daily"].match(path.stem):
+                continue
+            current = by_day.get(path.stem)
+            if current is None or current.suffix.lower() == ".png":
+                by_day[path.stem] = path
+        for day, path in sorted(by_day.items()):
+            thumbs.append({"region": region, "id": day, "path": path})
+    return thumbs
+
+
+def publish_thumbs(base_url: str, token: str, *, dry_run: bool) -> int:
+    """サムネを送る。エンドポイント未デプロイ（404）の間は警告だけにして原稿公開は成功させる。"""
+    thumbs = collect_thumbs()
+    if not thumbs:
+        print("No daily thumbs found.")
+        return 0
+    endpoint = f"{base_url.rstrip('/')}/api/summaries/thumbs"
+    print(f"Publishing {len(thumbs)} thumb(s) to {endpoint}")
+    failures = 0
+    endpoint_missing = False
+    for thumb in thumbs:
+        label = f"daily/{thumb['region']}/{thumb['id']}"
+        if dry_run:
+            print(f"  [dry-run] {label} ({thumb['path']})")
+            continue
+        if endpoint_missing:
+            continue
+        try:
+            image = thumb["path"].read_bytes()
+            content_type = _THUMB_TYPES[thumb["path"].suffix.lower()]
+            resp = requests.post(
+                endpoint,
+                json={
+                    "kind": "daily",
+                    "region": thumb["region"],
+                    "id": thumb["id"],
+                    "content_type": content_type,
+                    "image_b64": base64.b64encode(image).decode("ascii"),
+                },
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=30,
+            )
+            if resp.status_code == 200:
+                print(f"  OK   {label}")
+            elif resp.status_code == 404:
+                endpoint_missing = True
+                print(
+                    "  WARN thumb endpoint is not deployed yet; skipping image publish.",
+                    file=sys.stderr,
+                )
+            else:
+                failures += 1
+                print(f"  FAIL {label}: HTTP {resp.status_code} {resp.text[:200]}", file=sys.stderr)
+        except Exception as e:
+            failures += 1
+            print(f"  FAIL {label}: {e}", file=sys.stderr)
+    return failures
 
 
 def main() -> int:
@@ -109,8 +182,12 @@ def main() -> int:
             failures += 1
             print(f"  FAIL {label}: {e}", file=sys.stderr)
 
-    if failures:
-        print(f"ERROR: {failures} document(s) failed to publish.", file=sys.stderr)
+    thumb_failures = publish_thumbs(args.base_url, token, dry_run=args.dry_run)
+    if failures or thumb_failures:
+        print(
+            f"ERROR: {failures} document(s), {thumb_failures} thumb(s) failed to publish.",
+            file=sys.stderr,
+        )
         return 1
     print("All documents published.")
     return 0

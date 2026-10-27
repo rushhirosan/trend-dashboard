@@ -64,12 +64,21 @@ jobs:
           TREND_DASHBOARD_BASE_URL: https://trends-dashboard.com
         run: python scripts/generate_ai_daily_summary.py --from-api --write --force --region us
 
+      # 同じ話題は前日の画像をコピーし、話題が変わった日だけ画像を作る。
+      # 失敗しても原稿のコミットとメールは続ける。
+      - name: Attach daily thumbnails
+        if: always() && steps.already.outputs.skip != 'true'
+        continue-on-error: true
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python scripts/attach_daily_thumbs.py
+
       - name: Commit if changed
         if: always() && steps.already.outputs.skip != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/summaries/daily/
+          git add docs/summaries/daily/ static/images/summaries/daily/
           # 格言キャッシュは JP 生成時だけ出来る。無い日は日次 Markdown のコミットを止めない。
           if [ -f docs/summaries/tounou_proverb_cache.json ]; then
             git add docs/summaries/tounou_proverb_cache.json

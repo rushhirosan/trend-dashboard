@@ -3,6 +3,8 @@
 キャッシュデータ、統計情報などのAPIエンドポイント
 """
 
+import base64
+import binascii
 import hmac
 import os
 from datetime import date
@@ -514,6 +516,48 @@ def upsert_summary_document():
     if not summary_store.upsert_document(kind, region, doc_id, body_md):
         return jsonify({'success': False, 'error': 'summary_documents への保存に失敗しました'}), 500
     logger.info("📝 summary_documents upsert: %s/%s/%s (%d bytes)", kind, region, doc_id, len(body_md))
+    return jsonify({'success': True, 'kind': kind, 'region': region, 'id': doc_id})
+
+
+@data_bp.route('/summaries/thumbs', methods=['POST'])
+def upsert_summary_thumb():
+    """日次サムネを summary_thumbs に upsert する。
+
+    原稿と同じく deploy を挟まずに一覧へ出すため、画像バイトを DB に置く。
+    認証: ``Authorization: Bearer $SUMMARY_UPSERT_TOKEN``。
+    """
+    from services.summary import summary_store
+
+    auth_err = _require_summary_upsert_token()
+    if auth_err is not None:
+        return auth_err
+
+    payload = request.get_json(silent=True) or {}
+    kind = str(payload.get('kind') or '').strip().lower()
+    region = str(payload.get('region') or '').strip().lower()
+    doc_id = str(payload.get('id') or '').strip()
+    content_type = str(payload.get('content_type') or '').strip().lower()
+    image_b64 = payload.get('image_b64')
+
+    if kind != 'daily' or not summary_store.valid_doc(kind, region, doc_id):
+        return jsonify({
+            'success': False,
+            'error': 'kind は daily、region は jp/us、id は YYYY-MM-DD 形式が必要です',
+        }), 400
+    if content_type not in summary_store.THUMB_CONTENT_TYPES:
+        return jsonify({'success': False, 'error': 'content_type は image/jpeg か image/png です'}), 400
+    if not isinstance(image_b64, str) or not image_b64.strip():
+        return jsonify({'success': False, 'error': 'image_b64 が必要です'}), 400
+    try:
+        image = base64.b64decode(image_b64, validate=True)
+    except (binascii.Error, ValueError):
+        return jsonify({'success': False, 'error': 'image_b64 を読めません'}), 400
+    if not image or len(image) > summary_store.MAX_THUMB_BYTES:
+        return jsonify({'success': False, 'error': '画像が空か、大きすぎます'}), 413
+
+    if not summary_store.upsert_thumb(kind, region, doc_id, image, content_type):
+        return jsonify({'success': False, 'error': 'summary_thumbs への保存に失敗しました'}), 500
+    logger.info("🖼️ summary_thumbs upsert: %s/%s/%s (%d bytes)", kind, region, doc_id, len(image))
     return jsonify({'success': True, 'kind': kind, 'region': region, 'id': doc_id})
 
 

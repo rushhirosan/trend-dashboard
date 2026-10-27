@@ -198,6 +198,24 @@ def collect_expired_summary_files(
     return expired_daily, expired_weekly
 
 
+def _expired_daily_thumb_paths(summaries_dir: Path, expired_daily: List[Path]) -> List[Path]:
+    """期限切れ日次原稿に対応する static サムネ。docs/summaries 以外の作業ディレクトリでは空。"""
+    if summaries_dir.name != "summaries" or summaries_dir.parent.name != "docs":
+        return []
+    repo = summaries_dir.parent.parent
+    found: List[Path] = []
+    for path in expired_daily:
+        if path.suffix != ".md" or not _DAILY_SUMMARY_RE.match(path.name):
+            continue
+        region = "us" if path.parent.name == "us" else "jp"
+        base = repo / "static" / "images" / "summaries" / "daily" / region
+        for suffix in (".jpg", ".jpeg", ".png"):
+            thumb = base / f"{path.stem}{suffix}"
+            if thumb.is_file():
+                found.append(thumb)
+    return found
+
+
 def purge_expired_summary_files(
     summaries_dir: Optional[Path] = None,
     *,
@@ -214,6 +232,7 @@ def purge_expired_summary_files(
     )
     deleted_daily: List[str] = []
     deleted_weekly: List[str] = []
+    thumb_paths = _expired_daily_thumb_paths(summaries_base_dir(summaries_dir), expired_daily)
 
     if not dry_run:
         for path in expired_daily:
@@ -222,6 +241,12 @@ def purge_expired_summary_files(
                 deleted_daily.append(str(path))
             except OSError as e:
                 logger.warning("⚠️ 日次サマリー削除失敗 %s: %s", path, e)
+        for path in thumb_paths:
+            try:
+                if path.is_file():
+                    path.unlink()
+            except OSError as e:
+                logger.warning("⚠️ 日次サムネ削除失敗 %s: %s", path, e)
         for path in expired_weekly:
             try:
                 path.unlink(missing_ok=True)
@@ -240,6 +265,7 @@ def purge_expired_summary_files(
         "weekly_summary_files_deleted": len(expired_weekly if dry_run else deleted_weekly),
         "daily_summary_paths": [str(p) for p in expired_daily],
         "weekly_summary_paths": [str(p) for p in expired_weekly],
+        "daily_thumb_paths": [str(p) for p in thumb_paths],
     }
 
 

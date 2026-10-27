@@ -31,6 +31,9 @@ _DOC_ID_RES = {
 
 # 1原稿の上限。実際は数十KB想定で、異常な巨大 payload を弾くためのガード。
 MAX_BODY_BYTES = 512 * 1024
+# 256px の PNG/JPEG を想定。異常に大きい画像は受け取らない。
+MAX_THUMB_BYTES = 512 * 1024
+THUMB_CONTENT_TYPES = ("image/jpeg", "image/png")
 
 _CREATE_TABLE_SQL = """
     CREATE TABLE IF NOT EXISTS summary_documents (
@@ -38,6 +41,18 @@ _CREATE_TABLE_SQL = """
         region VARCHAR(10) NOT NULL,
         doc_id VARCHAR(20) NOT NULL,
         body_md TEXT NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (kind, region, doc_id)
+    )
+"""
+
+_CREATE_THUMBS_SQL = """
+    CREATE TABLE IF NOT EXISTS summary_thumbs (
+        kind VARCHAR(10) NOT NULL,
+        region VARCHAR(10) NOT NULL,
+        doc_id VARCHAR(20) NOT NULL,
+        image BYTEA NOT NULL,
+        content_type VARCHAR(40) NOT NULL,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         PRIMARY KEY (kind, region, doc_id)
     )
@@ -73,6 +88,7 @@ def _ensure_table(cache: TrendsCache) -> None:
     with cache.get_connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute(_CREATE_TABLE_SQL)
+            cursor.execute(_CREATE_THUMBS_SQL)
             conn.commit()
     _table_ready = True
 
@@ -133,6 +149,90 @@ def has_document(kind: str, region: str, doc_id: str) -> Optional[bool]:
         return None
 
 
+def upsert_thumb(
+    kind: str, region: str, doc_id: str, image: bytes, content_type: str
+) -> bool:
+    """日次サムネのバイト列を upsert する。閲覧は deploy を待たずにこの行を返す。"""
+    if kind != "daily" or not valid_doc(kind, region, doc_id):
+        return False
+    if content_type not in THUMB_CONTENT_TYPES:
+        return False
+    if not image or len(image) > MAX_THUMB_BYTES:
+        return False
+    try:
+        cache = TrendsCache()
+        _ensure_table(cache)
+        with cache.get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO summary_thumbs
+                        (kind, region, doc_id, image, content_type, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, NOW())
+                    ON CONFLICT (kind, region, doc_id)
+                    DO UPDATE SET
+                        image = EXCLUDED.image,
+                        content_type = EXCLUDED.content_type,
+                        updated_at = NOW()
+                    """,
+                    (kind, region, doc_id, image, content_type),
+                )
+                conn.commit()
+        return True
+    except Exception as e:
+        logger.error("❌ summary_thumbs upsert エラー (%s/%s/%s): %s", kind, region, doc_id, e, exc_info=True)
+        return False
+
+
+def has_thumb(kind: str, region: str, doc_id: str) -> Optional[bool]:
+    """サムネ行の有無。True=ある / False=無い / None=形式不正または DB エラー。"""
+    if not valid_doc(kind, region, doc_id):
+        return None
+    try:
+        cache = TrendsCache()
+        with cache.get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT 1 FROM summary_thumbs
+                    WHERE kind = %s AND region = %s AND doc_id = %s
+                    LIMIT 1
+                    """,
+                    (kind, region, doc_id),
+                )
+                return cursor.fetchone() is not None
+    except Exception as e:
+        logger.warning("⚠️ summary_thumbs 存在確認スキップ (%s/%s/%s): %s", kind, region, doc_id, e)
+        return None
+
+
+def get_thumb(kind: str, region: str, doc_id: str) -> Optional[Tuple[bytes, str]]:
+    """(画像バイト, content_type)。行が無い・DB が使えない場合は None。"""
+    if not valid_doc(kind, region, doc_id):
+        return None
+    try:
+        cache = TrendsCache()
+        with cache.get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT image, content_type FROM summary_thumbs
+                    WHERE kind = %s AND region = %s AND doc_id = %s
+                    """,
+                    (kind, region, doc_id),
+                )
+                row = cursor.fetchone()
+                if not row:
+                    return None
+                image = row[0]
+                if isinstance(image, memoryview):
+                    image = image.tobytes()
+                return bytes(image), str(row[1])
+    except Exception as e:
+        logger.warning("⚠️ summary_thumbs 取得スキップ (%s/%s/%s): %s", kind, region, doc_id, e)
+        return None
+
+
 def get_document(kind: str, region: str, doc_id: str) -> Optional[str]:
     """原稿本文を返す。行が無い・DB が使えない場合は None（ファイル fallback 用）。"""
     if not valid_doc(kind, region, doc_id):
@@ -185,7 +285,7 @@ def purge_expired(
     dry_run: bool = False,
 ) -> dict:
     """保持期間超過の行を削除する（daily: doc_id < cutoff、weekly: ISO 週の月曜 < cutoff）。"""
-    result = {"daily_rows_deleted": 0, "weekly_rows_deleted": 0, "ok": True}
+    result = {"daily_rows_deleted": 0, "weekly_rows_deleted": 0, "daily_thumbs_deleted": 0, "ok": True}
     try:
         cache = cache or TrendsCache()
         _ensure_table(cache)
@@ -205,9 +305,19 @@ def purge_expired(
                 ]
                 result["weekly_rows_deleted"] = len(expired_weeks)
 
+                cursor.execute(
+                    "SELECT COUNT(*) FROM summary_thumbs WHERE kind = 'daily' AND doc_id < %s",
+                    (daily_cutoff.isoformat(),),
+                )
+                result["daily_thumbs_deleted"] = int(cursor.fetchone()[0])
+
                 if not dry_run:
                     cursor.execute(
                         "DELETE FROM summary_documents WHERE kind = 'daily' AND doc_id < %s",
+                        (daily_cutoff.isoformat(),),
+                    )
+                    cursor.execute(
+                        "DELETE FROM summary_thumbs WHERE kind = 'daily' AND doc_id < %s",
                         (daily_cutoff.isoformat(),),
                     )
                     if expired_weeks:

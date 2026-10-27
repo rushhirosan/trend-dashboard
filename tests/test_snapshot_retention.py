@@ -159,3 +159,26 @@ def test_purge_expired_summary_files_deletes(tmp_path: Path):
     assert result["daily_summary_files_deleted"] == 1
     assert not (daily / "2026-06-01.md").exists()
     assert (daily / "2026-06-20.md").exists()
+
+
+def test_purge_expired_summary_files_deletes_matching_thumb(tmp_path: Path):
+    summaries = tmp_path / "docs" / "summaries"
+    daily = summaries / "daily"
+    daily.mkdir(parents=True)
+    (daily / "2026-06-01.md").write_text("old", encoding="utf-8")
+    (daily / "2026-06-20.md").write_text("keep", encoding="utf-8")
+    thumbs = tmp_path / "static" / "images" / "summaries" / "daily" / "jp"
+    thumbs.mkdir(parents=True)
+    (thumbs / "2026-06-01.jpg").write_bytes(b"old")
+    (thumbs / "2026-06-20.jpg").write_bytes(b"keep")
+
+    purge_expired_summary_files(
+        summaries,
+        today=date(2026, 6, 22),
+        daily_days=10,
+        weekly_days=30,
+        dry_run=False,
+    )
+
+    assert not (thumbs / "2026-06-01.jpg").exists()
+    assert (thumbs / "2026-06-20.jpg").exists()

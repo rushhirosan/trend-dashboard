@@ -90,8 +90,8 @@
                             {% for item in daily_items %}
                             <li class="list-group-item py-3">
                                 <div class="d-flex gap-3 align-items-start">
-                                    {% if item.thumb_file %}
-                                    <img src="{{ url_for('static', filename=item.thumb_file) }}" alt="" class="summary-day-thumb" width="72" height="72">
+                                    {% if item.thumb_url %}
+                                    <img src="{{ item.thumb_url }}" alt="" class="summary-day-thumb" width="72" height="72">
                                     {% endif %}
                                     <div>
                                         <a href="{{ item.url }}" class="fw-semibold text-decoration-none">{{ item.display }}</a>

@@ -1,6 +1,6 @@
 """日次サムネは同じ話題ならコピーし、変わった日だけ生成する。"""
 
-from services.summary.daily_thumbs import attach_one, topic_key
+from services.summary.daily_thumbs import attach_one, safe_fallback_topic, topic_key
 
 
 JP_25 = "ニュースでは「テスト設計エージェント「TESTRA」」が上位に（7時3位 → 13時3位 → 19時2位）。"
@@ -98,3 +98,11 @@ def test_attach_does_not_replace_an_existing_thumb(tmp_path):
 
     assert result == "skip"
     assert (thumbs / "2026-10-26.jpg").read_bytes() == b"keep"
+
+
+def test_safe_fallback_topic_softens_military_leads():
+    fighter = topic_key(
+        "ニュースでは「日英伊の次期戦闘機、英国がドイツに呼びかけ」が上位に（7時圏外 → 13時1位）。"
+    )
+    assert "summit" in safe_fallback_topic(fighter)
+    assert "spotlight" in safe_fallback_topic("普通のニュース見出し")

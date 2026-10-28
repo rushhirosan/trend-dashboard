@@ -134,12 +134,40 @@ def attach_one(
     return "generated"
 
 
+# 画像 API が弾きやすい語。失敗時のフォールバック題材を決めるときに使う。
+_SENSITIVE_TOPIC = re.compile(
+    r"戦闘機|ミサイル|爆弾|戦争|軍事|weapon|fighter|missile|bomb|war\b|military",
+    re.I,
+)
+
+
+def safe_fallback_topic(topic: str) -> str:
+    """本番トピックが安全フィルタで落ちやすいときの代替題材。"""
+    if _SENSITIVE_TOPIC.search(topic or ""):
+        return "international diplomatic summit, three simple flags side by side"
+    return "simple abstract news spotlight icon, bold geometric shape"
+
+
 def openai_generate(topic: str) -> Optional[bytes]:
-    """dall-e-2 で 256px の PNG を作る。鍵が無い・失敗時は None。"""
+    """dall-e-2 で 256px の PNG を作る。鍵が無い・失敗時は None。
+
+    戦闘機など安全フィルタに弾かれやすい題材は、一度失敗したら穏やかな代替題材で再試行する。
+    """
     key = (os.getenv("OPENAI_API_KEY") or os.getenv("OPEN_API_KEY") or "").strip()
     if not key:
         print("OPENAI_API_KEY が無いので、新しいサムネは作りません。")
         return None
+    image = _openai_generate_once(key, topic)
+    if image:
+        return image
+    fallback = safe_fallback_topic(topic)
+    if fallback == topic:
+        return None
+    print(f"代替題材で再試行します: {fallback}")
+    return _openai_generate_once(key, fallback)
+
+
+def _openai_generate_once(key: str, topic: str) -> Optional[bytes]:
     model = (os.getenv("OPENAI_THUMB_MODEL") or "dall-e-2").strip()
     prompt = (
         "Square flat vector icon, one bold simple object centered, thick shapes readable at 64 pixels, "

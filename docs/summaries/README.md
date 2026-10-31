@@ -171,8 +171,8 @@ python scripts/generate_ai_weekly_summary.py --from-api --write --force --weekly
 `/summaries/...` の閲覧ページは **DB（`summary_documents` テーブル）を優先して読み**、行が無ければリポジトリ内ファイル（deploy 時点のスナップショット）へフォールバックする。
 
 1. GHA（AI daily / weekly summary）が Markdown を生成し git にコミット（正本はこれまで通り git）
-2. 日次ジョブは続けて `scripts/attach_daily_thumbs.py` を走らせる。話題（順位の括弧を除いた `preview_lead`）が前日と同じならその画像をコピーし、変わった日だけ `OPENAI_API_KEY` で 256px の絵を作る。鍵が無い、または生成に失敗した日は画像なしのままにする
-3. 同じジョブが `scripts/publish_summaries_to_site.py` で原稿を `POST /api/summaries/documents` に、日次サムネを `POST /api/summaries/thumbs` に upsert する（認証: `SUMMARY_UPSERT_TOKEN`。GHA Secrets と `fly secrets` の両方に設定）。新しい絵には GHA Secret `OPENAI_API_KEY` が要る
+2. 日次ジョブは続けて `scripts/attach_daily_thumbs.py` を走らせる。話題（順位の括弧を除いた `preview_lead`）が前日と同じならその画像をコピーし、変わった日だけ画像 API（既定 `gpt-image-1-mini`、`OPENAI_THUMB_MODEL` で変更可）で絵を作る。鍵が無い・残高切れ・安全フィルタなどで失敗した日は、話題から色と形を決めた幾何アイコンへフォールバックする（一覧に穴を残さない）
+3. 同じジョブが `scripts/publish_summaries_to_site.py` で原稿を `POST /api/summaries/documents` に、日次サムネを `POST /api/summaries/thumbs` に upsert する（認証: `SUMMARY_UPSERT_TOKEN`。GHA Secrets と `fly secrets` の両方に設定）。画像 API を使う場合は GHA Secret `OPENAI_API_KEY` が要る（無くても幾何アイコンで埋まる）
 4. 閲覧ページは DB を読むため **deploy なしで当日分が公開される**。サムネ URL（`/summaries/daily/YYYY-MM-DD/thumb`）も DB の画像を優先し、無ければ deploy 済みの static ファイルに戻る
 5. 保持期間超過の原稿・サムネ行は毎日 03:00 JST の `purge_expired_snapshots` が削除する。git 上の期限切れサムネファイルは 08:00 JST の retention purge が消す
 

@@ -32,7 +32,8 @@ _DOC_ID_RES = {
 # 1原稿の上限。実際は数十KB想定で、異常な巨大 payload を弾くためのガード。
 MAX_BODY_BYTES = 512 * 1024
 # 256px の PNG/JPEG を想定。異常に大きい画像は受け取らない。
-MAX_THUMB_BYTES = 512 * 1024
+# gpt-image-1-mini の 1024 PNG が ~1MB になることがある
+MAX_THUMB_BYTES = 2 * 1024 * 1024
 THUMB_CONTENT_TYPES = ("image/jpeg", "image/png")
 
 _CREATE_TABLE_SQL = """

@@ -106,3 +106,22 @@ def test_safe_fallback_topic_softens_military_leads():
     )
     assert "summit" in safe_fallback_topic(fighter)
     assert "spotlight" in safe_fallback_topic("普通のニュース見出し")
+
+
+def test_procedural_generate_returns_png():
+    from services.summary.daily_thumbs import procedural_generate
+
+    png = procedural_generate("ニュースでは「情報流出で広がる漏洩疲れ」が上位に")
+    assert png[:8] == b"\x89PNG\r\n\x1a\n"
+    assert len(png) > 200
+
+
+def test_openai_payload_omits_response_format_for_gpt_image():
+    from services.summary.daily_thumbs import _openai_payload
+
+    gpt = _openai_payload("gpt-image-1-mini", "icon")
+    assert "response_format" not in gpt
+    assert gpt["size"] == "1024x1024"
+    dalle = _openai_payload("dall-e-2", "icon")
+    assert dalle["response_format"] == "b64_json"
+    assert dalle["size"] == "256x256"

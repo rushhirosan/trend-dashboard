@@ -15,6 +15,11 @@ description: >-
 
 **Do this pass every ISO week. Do not wait for the user to ask.**
 
+Primary runner: the Cursor Automation **Weekly note/Substack comments**
+(Monday ~07:00 JST, after the mechanical GHA lands ~06:30). Chat agents still
+run the same checklist when the automation missed a week or the user opens a
+draft that is still ranks+URL only.
+
 When `docs/summaries/weekly/note/YYYY-Www.md` or `weekly/substack/YYYY-Www.md`
 appears from the mechanical job (GHA commit message like
 `docs(summaries): mechanical weekly summary`), treat the draft as incomplete

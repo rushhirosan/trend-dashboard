@@ -56,7 +56,7 @@ Product philosophy and conventions live in `.cursor/rules/trend-dashboard.mdc`. 
 | Path | Role |
 |------|------|
 | `docs/summary_pattern_a_phase1.md` | **Paid summary experiment (Pattern A, phase 1)**: daily/weekly deliverable timeboxes, copy-paste templates, checklists, exit criteria. Use when the user asks about 有料サマリー, 日次/週次, フェーズ1, or delivery SLAs. |
-| `docs/summaries/` | **Committed Markdown drafts** (`daily/`, `weekly/`). AI 日次: `scripts/generate_ai_daily_summary.py` + `ai-daily-summary.yml`。AI 週次: `scripts/generate_ai_weekly_summary.py` + `ai-weekly-summary.yml`。運用は `docs/summaries/README.md`。**月曜の機械生成後、note / Substack の同週記事コメントは毎週必須** → skill `weekly-public-post-comments`（催促待ちにしない）。 |
+| `docs/summaries/` | **Committed Markdown drafts** (`daily/`, `weekly/`). AI 日次: `scripts/generate_ai_daily_summary.py` + `ai-daily-summary.yml`。AI 週次: `scripts/generate_ai_weekly_summary.py` + `ai-weekly-summary.yml`。運用は `docs/summaries/README.md`。**月曜の機械生成後、note / Substack の同週記事コメントは Cursor Automation（月曜 7:00 頃）＋ skill `weekly-public-post-comments`**（催促待ちにしない）。 |
 
 ## When adding a feature
 

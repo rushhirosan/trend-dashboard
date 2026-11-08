@@ -4,8 +4,8 @@ from services.summary.summary_pages import daily_thumb_filename, daily_thumb_url
 
 
 def test_daily_thumb_filename_jp_known_day():
-    path = daily_thumb_filename("2026-10-25", "jp")
-    assert path == "images/summaries/daily/jp/2026-10-25.jpg"
+    path = daily_thumb_filename("2026-11-07", "jp")
+    assert path == "images/summaries/daily/jp/2026-11-07.png"
 
 
 def test_daily_thumb_filename_missing_day():
@@ -13,8 +13,8 @@ def test_daily_thumb_filename_missing_day():
 
 
 def test_daily_thumb_filename_us_known_day():
-    path = daily_thumb_filename("2026-10-25", "us")
-    assert path == "images/summaries/daily/us/2026-10-25.jpg"
+    path = daily_thumb_filename("2026-11-07", "us")
+    assert path == "images/summaries/daily/us/2026-11-07.png"
 
 
 def test_daily_thumb_filename_rejects_bad_id():
@@ -22,8 +22,8 @@ def test_daily_thumb_filename_rejects_bad_id():
 
 
 def test_daily_thumb_url_points_at_shared_route():
-    assert daily_thumb_url("2026-10-25", "jp") == "/summaries/daily/2026-10-25/thumb"
-    assert daily_thumb_url("2026-10-25", "us") == "/us/summaries/daily/2026-10-25/thumb"
+    assert daily_thumb_url("2026-11-07", "jp") == "/summaries/daily/2026-11-07/thumb"
+    assert daily_thumb_url("2026-11-07", "us") == "/us/summaries/daily/2026-11-07/thumb"
 
 
 def test_daily_thumb_url_missing_day(monkeypatch):

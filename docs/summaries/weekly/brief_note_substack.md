@@ -8,14 +8,14 @@
 
 `generate_ai_weekly_summary.py` は、ブリーフと、note / Substack に貼る文を同じ実行で作る。順位は同じ動きの日をまとめる。観測URLが記事や Wikipedia なら、そのページの要旨を URL と同じ行に添える。順位の理由が観測に無いときの定型文は付けない。
 
-**機械生成の直後は未完成。** 楽天・YouTube・Google 検索などは URL だけになりやすい。note / Substack を貼る前に、毎週必ず同週の公開記事コメントを足す（手順は [`.cursor/skills/weekly-public-post-comments/SKILL.md`](../../../.cursor/skills/weekly-public-post-comments/SKILL.md)）。ユーザーに催促されてからやる運用にしない。
+**機械生成の直後は未完成。** 楽天・YouTube・Google 検索などは URL だけになりやすい。同週の公開記事コメントは Cursor Automation **Weekly note/Substack comments**（月曜 7:00 頃 JST、機械 GHA のあと）が毎週足す。手順の正本は [`.cursor/skills/weekly-public-post-comments/SKILL.md`](../../../.cursor/skills/weekly-public-post-comments/SKILL.md)。チャットでも催促待ちにしない。
 
 | | ブリーフ（いまの週次メール） | note / Substack |
 |---|------------------------|----------------|
 | 中身 | マーケット、流れ、動いた話題、ホット最大5、カテゴリ top3 | 2日以上残ったホット上位3つだけ |
 | コメント | 書かない | 同じ週の公開記事に書いてあることだけ |
 | 末尾 | サイト誘導は付けない | 日々の順位のリンクだけ |
-| 配信 | 月曜 4:00 生成、メールは 6:30 頃 | 同じジョブで順位原稿を生成 → **毎週コメント追記** → 貼り付けは月曜 8:00 頃、手動 |
+| 配信 | 月曜 4:00 生成、メールは 6:30 頃 | 同じジョブで順位原稿を生成 → **Automation がコメント追記（月曜 7:00 頃）** → 貼り付けは月曜 8:00 頃、手動 |
 
 貼る文の見本: [`note_template.md`](note_template.md)（日本語）、[`substack_template.md`](substack_template.md)（英語）。どちらも 2026-W40。
 

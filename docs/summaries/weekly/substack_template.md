@@ -36,4 +36,4 @@ On September 30, Tennessee attempted to execute Christa Pike. She survived the l
 
 Her lawyer told the BBC she remained critically ill on a ventilator, and that the prognosis was still unclear. https://www.bbc.com/news/articles/ckgelynyg7d3o
 
-Daily ranks are here. https://trends-dashboard.com/us
+Daily ranks are here. https://trends-dashboard.com/us?utm_source=substack&utm_medium=weekly&utm_campaign=2026-W40

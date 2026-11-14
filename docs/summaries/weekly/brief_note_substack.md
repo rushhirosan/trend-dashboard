@@ -55,7 +55,7 @@
 1. タイトルは「先週のホットトピック3つ」。
 2. 対象週と、2日以上残った上位であること。順位は観測結果。シンプルに先週のホットトピックを振り返る記事であること。コメントは同じ週の公開記事に書いてあることだけ、と書く。
 3. ホット上位3件。選び方はブリーフのホットと同じスコア（出現日数×10 + 複数ソース +15 + 系列重み）で、1日だけのもの、App Store、居座る暗号資産・ほぼ全日の株を除いた先頭から3件。各件は、出ていた日の順位と、同じ週の公開記事。見出しは `1.`。順位の理由が観測に無いときの定型文は付けない。
-4. 末尾は「日々の順位はこちらです。」と `https://trends-dashboard.com`。カテゴリ別の説明と、メールの案内は付けない。
+4. 末尾は「日々の順位はこちらです。」とサイトURL（UTM付き）。例: `https://trends-dashboard.com/?utm_source=note&utm_medium=weekly&utm_campaign=2026-W46`（`utm_campaign` はその週の ISO 週）。カテゴリ別の説明と、メールの案内は付けない。
 
 週次ブリーフの一覧は貼らない。2日以上のホットが3件無い週は、ある件数だけ書く。0件の週は記事を出さない。
 
@@ -65,7 +65,7 @@
 
 実装済み。出力は `weekly/substack/YYYY-Www.md`。公開の目標は月曜 8:00 頃（貼り付けは手動）。見本は [`substack_template.md`](substack_template.md)。
 
-末尾は `https://trends-dashboard.com/us`。構成は note と同じで、メールの案内は付けない。
+末尾はサイトURL（UTM付き）。例: `https://trends-dashboard.com/us?utm_source=substack&utm_medium=weekly&utm_campaign=2026-W46`。構成は note と同じで、メールの案内は付けない。
 
 ## この仕様ではやらない
 

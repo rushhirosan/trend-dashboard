@@ -1354,7 +1354,11 @@ def test_public_weekly_post_keeps_two_day_hot_topics_only(gaws):
     assert "ダッシュボードに出ていたページ" not in text
     assert "この順位になった理由は" not in text
     assert "メールにサブスクライブ" not in text
-    assert text.rstrip().endswith("日々の順位はこちらです。 https://trends-dashboard.com")
+    assert text.rstrip().endswith(
+        "日々の順位はこちらです。 "
+        "https://trends-dashboard.com/"
+        "?utm_source=note&utm_medium=weekly&utm_campaign=2026-W41"
+    )
     assert "1. 石橋静河（Wikipedia）" in text
     assert "## 1." not in text
     assert "gumroad" not in text.lower()
@@ -1414,7 +1418,11 @@ def test_public_weekly_post_us_substack_shape(gaws):
     assert "The page on the dashboard is here." not in text
     assert "does not appear in this week's observations." not in text
     assert "not on the trends." in text
-    assert text.rstrip().endswith("Daily ranks are here. https://trends-dashboard.com/us")
+    assert text.rstrip().endswith(
+        "Daily ranks are here. "
+        "https://trends-dashboard.com/us"
+        "?utm_source=substack&utm_medium=weekly&utm_campaign=2026-W40"
+    )
     assert "1. Janice STFU (Spotify (US))" in text
     assert "Subscribe by email" not in text
     assert "gumroad" not in text.lower()

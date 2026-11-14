@@ -2096,6 +2096,20 @@ def _public_topic_heading(index: int, topic: Dict[str, Any]) -> str:
     return f"{index}. {label}"
 
 
+def _public_dashboard_footer_url(*, iso_week: str, region: str) -> str:
+    """note / Substack 末尾のサイト誘導。GA で媒体別流入を拾うため UTM を付ける。"""
+    campaign = (iso_week or "").strip() or "weekly"
+    if region == "us":
+        return (
+            "https://trends-dashboard.com/us"
+            f"?utm_source=substack&utm_medium=weekly&utm_campaign={campaign}"
+        )
+    return (
+        "https://trends-dashboard.com/"
+        f"?utm_source=note&utm_medium=weekly&utm_campaign={campaign}"
+    )
+
+
 def render_public_weekly_markdown(
     topics: List[Dict[str, Any]],
     mon: date,
@@ -2126,7 +2140,10 @@ def render_public_weekly_markdown(
             "trends for two or more days. Ranks are that week's "
             f"observations. {subtitle}"
         )
-        footer = "Daily ranks are here. https://trends-dashboard.com/us"
+        footer = (
+            "Daily ranks are here. "
+            + _public_dashboard_footer_url(iso_week=iso_week, region="us")
+        )
         header = (
             f"# Substack — {iso_week}\n\n"
             'Copy from "Post" downward. The first line is the title. '
@@ -2144,7 +2161,10 @@ def render_public_weekly_markdown(
             "シンプルに先週のホットトピックを簡単に振り返れる記事にしています。"
             "コメントは、同じ週に出た公開記事に書いてあることだけを記載しています。"
         )
-        footer = "日々の順位はこちらです。 https://trends-dashboard.com"
+        footer = (
+            "日々の順位はこちらです。 "
+            + _public_dashboard_footer_url(iso_week=iso_week, region="jp")
+        )
         header = (
             f"# note — {iso_week}\n\n"
             "「本文」以降をコピーする。1行目はタイトル欄。\n\n"

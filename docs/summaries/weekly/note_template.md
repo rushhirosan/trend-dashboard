@@ -32,4 +32,4 @@
 
 39巻は7月3日発売で、38巻から約2年ぶりです。船内の王位継承戦と、旅団・マフィアの話が収録されています。 https://www.shueisha.co.jp/books/items/contents.html?isbn=978-4-08-885174-7
 
-日々の順位はこちらです。 https://trends-dashboard.com
+日々の順位はこちらです。 https://trends-dashboard.com/?utm_source=note&utm_medium=weekly&utm_campaign=2026-W40

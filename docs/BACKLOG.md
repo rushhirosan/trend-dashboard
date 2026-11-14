@@ -10,7 +10,7 @@
 - 週次の数値 → [週次メモ](#週次メモ)
 - 日次サマリー品質・SLA の詳細手順 → [`summary_pattern_a_phase1.md`](summary_pattern_a_phase1.md)
 
-**最終更新:** 2026-10-13（note / Substack 週次原稿を週次ジョブで生成。貼り付けは手動）
+**最終更新:** 2026-11-14（note / Substack 末尾に UTM。当面の本線を配布・計測に更新）
 
 ---
 
@@ -38,20 +38,24 @@
 
 | 領域 | 状態 | 次のアクション |
 |------|------|----------------|
-| **課金入り口（2b）** | PAY.JP v2 実装済だが **本番審査不可**（Visa〜Apple Pay 全否）。Stripe も不可済 | **次:** 代替決済 or 媒体課金を決める（下記「本線ブロッカー」） |
-| **AIサマリー配信** | 日次・週次とも GHA → 自分宛 dogfood が安定。有料送信は dogfood の後（`--from-api`） | 購読者 API は本番済。決済接続後に本番購読者を載せる |
+| **配布（note / Substack）** | 週次原稿は自動生成。末尾URLに UTM 付与済 | **月曜 8:00** に貼付。欠番ゼロを優先 |
+| **計測** | GA4 あり。直近は Direct + Organic Social が主で Search ほぼ0 | **金曜**に週次メモへ Social / UTM セッションを1行記録 |
+| **課金仮口** | Gumroad 月額（JP ¥300 / US $2）。サイト側 CTA あり。自サイト PSP は保留 | 流入が毎週取れてから案内強化。有料1人が次の合格 |
+| **AIサマリー配信** | 日次・週次 dogfood 安定。有料送信パイプラインは用意済 | Gumroad 購入者が出たら配信対象に載せる |
+| **自サイト決済（2b）** | Stripe / PAY.JP 本番不可 | **保留**（需要が見えてから代替 PSP） |
 | **定時取得** | 1536MB で JP/US 安定 | Grafana OOM アラート（任意・後回し可） |
-| **データ保持** | DB / 原稿 10日・週次30日 purge 実装済 | 変更なし |
 
 ---
 
 ## 次にフォーカスするステップ
 
-dogfood 配信は回っている。GHA 有料送信・購読者 API は用意済み。
+**当面の本線（2026-11-14）:** 認知と計測。GA 直近28日はセッション約123・Organic Social が唯一の外流入で低下中・Search ほぼ0。週次公開＋UTMで Social 流入を定常化し、有料は後続。
 
-**課金戦略（2026-09-24）:** Stripe・PAY.JP とも **本番審査不可**。自サイトクレカの本線はいったん止め、代替を選ぶ。v2 Checkout 実装・ローカル E2E・有料配信パイプラインは資産として残す。
+dogfood 配信は回っている。GHA 有料送信・購読者 API は用意済み。課金は **Gumroad** を仮口とし、自サイトクレカは保留。
 
-### 本線ブロッカー — 決済再選定（いまここ）
+**課金戦略（2026-09-24 / 更新 2026-11-14）:** Stripe・PAY.JP とも **本番審査不可**。自サイトクレカの本線はいったん止め、当面は Gumroad。v2 Checkout 実装・ローカル E2E・有料配信パイプラインは資産として残す。代替 PSP は有料需要が見えてから。
+
+### 本線ブロッカー — 決済再選定（保留・需要確認後）
 
 | 候補 | 向き | メモ |
 |------|------|------|
@@ -93,6 +97,7 @@ PayPay は PAY.JP 側で未申請なら別結果メールは来ない想定。�
 - [ ] 日次: teaser 切れ・「昨日の注目」の選び方・横断の出し方
 - [ ] 週次: 日次の寄せ集めにしない（流れ・ホット・週内の実動）
 - [x] note / Substack 週次記事 — 仕様は [`summaries/weekly/brief_note_substack.md`](summaries/weekly/brief_note_substack.md)。週次ジョブが `weekly/note/` と `weekly/substack/` に貼る文を書く。貼り付けは手動。見本は [`summaries/weekly/note_template.md`](summaries/weekly/note_template.md) と [`summaries/weekly/substack_template.md`](summaries/weekly/substack_template.md)
+- [x] note / Substack 末尾サイトURLに UTM（`utm_source=note|substack` / `utm_medium=weekly` / `utm_campaign=YYYY-Www`）
 - [ ] 有料化前に欲しい欠損明記（`missing_sources` / 短縮テンプレ）は、初回課金の後でも可。購読 UI の免責文言は v2 お試し実装時に載せる
 
 ### この段階ではやらない
@@ -324,7 +329,7 @@ dogfood は `draft` のまま自分宛に送っている。公開・有料の ap
 
 | 案 | 主な未完了 |
 |----|-----------|
-| **B** note/Substack | 媒体決定 → 5本投稿 → CTA + UTM |
+| **B** note/Substack | 週次投稿継続。末尾 UTM 済。CTA はサイト側 Gumroad（記事内課金リンクは置かない） |
 | **C** B2B | 1枚提案 → サンプル配信 → 契約1件 |
 | **D** 寄付 | BMC 本番 username / 特典ルール |
 | **E** タイムボックス | 9:00 / 月6:30 を目標時刻として商品文に明記（昨日/先週）。出勤前とは書かない |
@@ -466,8 +471,11 @@ dogfood は `draft` のまま自分宛に送っている。公開・有料の ap
 
 ### 週次メモ
 
+金曜記入例: `| 2026-MM-DD | Wxx | note:Y/N | Substack:Y/N | Socialセッション:__ | UTM:__ | Gumroad:__ | メモ:__ |`
+
 | 日付 | メモ |
 |------|------|
+| 2026-11-14 | GA確認。28日セッション123。Social 質は良いが減少。Searchほぼ0。末尾UTM実装。次は月曜公開の定常化。 |
 | 2026-06-22 | `todo.md` + `monetization.md` を本 BACKLOG に統合。1536MB 安定・retention purge デプロイ済。 |
 | 2026-06-26 | PageSpeed 改善の進捗管理を `docs/PERFORMANCE.md` に分離。BACKLOG からリンク。 |
 | 2026-07-12 | 案1（Web プレビュー + メール全文）・GEO 公開方針・障害時 SLA を BACKLOG に追記。 |
@@ -511,12 +519,19 @@ dogfood は `draft` のまま自分宛に送っている。公開・有料の ap
 | 2026-09-29 | メール実着に合わせて目標を **日次 9:00頃 / 週次月曜 10:00頃** に変更。cron は 06:50 / 月曜 07:30 のまま（GHA 遅れでこの着地）。欠走チェックは **09:00 → 10:00 JST**。 |
 | 2026-10-05 | note / Substack 週次は無料の集客記事。仕様は [`summaries/weekly/brief_note_substack.md`](summaries/weekly/brief_note_substack.md)。課金箱にはしない。支払いは Gumroad のまま。メールの週次ブリーフは変えない。 |
 | 2026-10-26 | 週次 cron を **月曜 07:30 → 04:00 JST** に前倒し。日曜 01 スロットと 03:00 削除のあと。原稿とメールの実着は **6:30頃**。note / Substack の貼り付け目標は月曜 8:00 のまま。 |
+| 2026-11-14 | **当面の本線を配布・計測に変更。** GA 直近28日: セッション約123、Organic Social が外流入の主で低下、Search ほぼ0。note/Substack 末尾に UTM。自サイト決済再選定は需要確認まで保留。課金仮口は Gumroad。 |
 
 ### KPI（週次記録用）
 
+金曜に [週次メモ](#週次メモ) へ1行。当面はこの4つを優先。
+
 | 指標 | 意味 |
 |------|------|
-| Waitlist 登録（JP/US） | 関心の規模 |
+| note / Substack 公開 | Y/N（欠番ゼロが最優先） |
+| Organic Social セッション | GA トラフィック獲得 |
+| UTM 経由（note / substack） | `utm_source` が取れたセッション |
+| Gumroad 購入 | 累計・当週（ゼロ以外が次の合格） |
+| Waitlist 登録（JP/US） | 関心の規模（当面後回し） |
 | Fake door CTR | click / view |
 | 有料転換 | 初回課金・継続 |
 | `approved` 率 | 配信可能原稿 |

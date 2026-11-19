@@ -2,10 +2,13 @@
 
 from services.summary.summary_pages import daily_thumb_filename, daily_thumb_url
 
+# リポジトリに残っている日次サムネ（保持期間外の固定日付は使わない）
+_KNOWN_DAY = "2026-11-18"
+
 
 def test_daily_thumb_filename_jp_known_day():
-    path = daily_thumb_filename("2026-11-07", "jp")
-    assert path == "images/summaries/daily/jp/2026-11-07.png"
+    path = daily_thumb_filename(_KNOWN_DAY, "jp")
+    assert path == f"images/summaries/daily/jp/{_KNOWN_DAY}.png"
 
 
 def test_daily_thumb_filename_missing_day():
@@ -13,8 +16,8 @@ def test_daily_thumb_filename_missing_day():
 
 
 def test_daily_thumb_filename_us_known_day():
-    path = daily_thumb_filename("2026-11-07", "us")
-    assert path == "images/summaries/daily/us/2026-11-07.png"
+    path = daily_thumb_filename(_KNOWN_DAY, "us")
+    assert path == f"images/summaries/daily/us/{_KNOWN_DAY}.png"
 
 
 def test_daily_thumb_filename_rejects_bad_id():
@@ -22,8 +25,8 @@ def test_daily_thumb_filename_rejects_bad_id():
 
 
 def test_daily_thumb_url_points_at_shared_route():
-    assert daily_thumb_url("2026-11-07", "jp") == "/summaries/daily/2026-11-07/thumb"
-    assert daily_thumb_url("2026-11-07", "us") == "/us/summaries/daily/2026-11-07/thumb"
+    assert daily_thumb_url(_KNOWN_DAY, "jp") == f"/summaries/daily/{_KNOWN_DAY}/thumb"
+    assert daily_thumb_url(_KNOWN_DAY, "us") == f"/us/summaries/daily/{_KNOWN_DAY}/thumb"
 
 
 def test_daily_thumb_url_missing_day(monkeypatch):

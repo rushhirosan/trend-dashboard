@@ -15,10 +15,14 @@ description: >-
 
 **Do this pass every ISO week. Do not wait for the user to ask.**
 
-Primary runner: the Cursor Automation **Weekly note/Substack comments**
-(Monday ~07:00 JST, after the mechanical GHA lands ~06:30). Chat agents still
-run the same checklist when the automation missed a week or the user opens a
-draft that is still ranks+URL only.
+Primary runner: the Cursor Automation **Weekly note/Substack comments**.
+Trigger on **GitHub checks completed** (CI success) for
+`rushhirosan/trend-dashboard` — i.e. after the mechanical weekly GHA lands —
+not a Monday cron. Cron at 07:00 races the job and becomes a no-op. The agent
+must no-op when the newest note/substack already has proper comments, or when
+the triggering CI was unrelated and drafts are already complete. Chat agents
+still run the same checklist when the automation missed a week or the draft is
+still ranks+URL only.
 
 When `docs/summaries/weekly/note/YYYY-Www.md` or `weekly/substack/YYYY-Www.md`
 appears from the mechanical job (GHA commit message like

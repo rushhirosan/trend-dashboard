@@ -1,149 +1,108 @@
 # Scripts
 
-このディレクトリには、デバッグやメンテナンス用のスクリプトが含まれています。
+運用・CI・ローカルメンテ用のスクリプト。詳細なサマリー運用は [`docs/summaries/README.md`](../docs/summaries/README.md) を参照。
 
-## ファイル一覧
+## CI / 本番パイプライン
+
+| スクリプト | 役割 |
+|-----------|------|
+| `generate_ai_daily_summary.py` | 日次サマリー生成（GHA `ai-daily-summary.yml`） |
+| `generate_ai_weekly_summary.py` | 週次サマリー生成（GHA `ai-weekly-summary.yml`） |
+| `attach_daily_thumbs.py` | 日次サムネ生成・添付 |
+| `publish_summaries_to_site.py` | 原稿・サムネを本番 API に upsert |
+| `check_summary_already_published.py` | 既公開なら GHA をスキップ |
+| `send_summary_dogfood_email.py` | dogfood メール送信 |
+| `send_summary_paid_email.py` | 有料サマリーメール送信 |
+| `purge_snapshot_retention.py` | スナップショット / サマリー保持期間の掃除（GHA `summary-retention-purge.yml`） |
+| `record_deploy.py` | Fly `release_command` でデプロイ時刻を記録 |
+| `refresh_trends_region.py` | スケジューラがリージョン refresh を subprocess 起動 |
+
+```bash
+# 日次（手元例）
+python scripts/generate_ai_daily_summary.py --from-api --write --force --region jp
+python scripts/attach_daily_thumbs.py
+SUMMARY_UPSERT_TOKEN=... python scripts/publish_summaries_to_site.py
+
+# 週次（手元例）
+python scripts/generate_ai_weekly_summary.py --from-api --write --force --region jp
+```
+
+共有ロジック: `snapshot_rising.py`（日次/週次から import。直接実行しない）。
+
+## リリース / 計測
+
+| スクリプト | 役割 |
+|-----------|------|
+| `release.sh` | preflight（pytest・secret scan）／任意で commit・push・deploy |
+| `run_lighthouse.sh` | Lighthouse 計測ラッパー（詳細は `docs/PERFORMANCE.md`） |
+| `build_inter.py` | Inter 自前ホスト用 CSS/フォント生成 |
+| `build_noto_sans_jp.py` | Noto Sans JP 自前ホスト用生成 |
+| `build_fontawesome_subset.py` | Font Awesome サブセット CSS 生成 |
+
+```bash
+./scripts/release.sh
+./scripts/release.sh --ship
+./scripts/run_lighthouse.sh https://trends-dashboard.com/ mobile
+```
+
+## スナップショット運用（手動補完）
+
+| スクリプト | 役割 |
+|-----------|------|
+| `inspect_scheduler_slots.py` | スロット有無の確認 |
+| `backfill_snapshot_slot.py` | 指定 1 スロットをキャッシュから保存 |
+| `backfill_missing_snapshot_slots.py` | 欠落スロットの一括補完 |
+
+```bash
+# Fly SSH 例
+fly ssh console -a trends-dashboard -C \
+  "cd /app && PYTHONPATH=/app python scripts/inspect_scheduler_slots.py --business-day 2026-06-20"
+```
+
+## キャッシュ確認 / ローカル開発
 
 ### check_cache.py
-データベースのキャッシュデータを確認するスクリプト（ローカル環境用）
+ローカル DB のキャッシュ件数確認。
 
-**使用方法:**
 ```bash
 python scripts/check_cache.py
 ```
 
 ### check_cache_remote.py
-リモート環境（fly.io）でのキャッシュデータ確認用スクリプト
-**7時の更新確認機能付き** - 全カテゴリが今日の7時（JST）に更新されたかを確認します
+Fly.io 上（またはリモート `DATABASE_URL`）でのキャッシュ確認。今日 7 時（JST）更新の有無も見る。
 
-**使用方法:**
-
-#### 方法1: Fly.ioのリモート環境で実行（推奨）
 ```bash
-# Fly.ioのリモート環境に接続
 fly ssh console -a trends-dashboard
-
-# スクリプトを実行（DATABASE_URLは自動的に設定されています）
 python scripts/check_cache_remote.py
-```
-
-#### 方法2: ローカルからリモートDBに接続
-```bash
-# DATABASE_URLを設定（Fly.ioのシークレットから取得）
-export DATABASE_URL=$(fly secrets list -a trends-dashboard | grep DATABASE_URL | awk '{print $2}')
-
-# または、直接DATABASE_URLを設定
-export DATABASE_URL='postgresql://user:password@host:port/database'
-
-# スクリプトを実行
-python scripts/check_cache_remote.py
-```
-
-**出力内容:**
-- キャッシュテーブルのデータ件数
-- 7時の更新確認（各カテゴリが今日の7時に更新されたか）
-- 更新済み/未更新の件数
-
-### check_cache_status.py
-タイムアウトしているカテゴリのキャッシュデータ件数を確認するスクリプト
-
-**使用方法:**
-```bash
-python scripts/check_cache_status.py
 ```
 
 ### update_book_trends.py
-本トレンドの全カテゴリをAPIから取得しキャッシュを更新するスクリプト
+本トレンド全カテゴリを API から取得してキャッシュ更新。
 
-**ローカルでの使用方法:**
 ```bash
 python scripts/update_book_trends.py
+# 本番: fly ssh console -a trends-dashboard → 同上
 ```
-
-**本番（Fly.io）での実行:**
-```bash
-# 1. 本番マシンに SSH で入る
-fly ssh console -a trends-dashboard
-
-# 2. コンテナ内でスクリプトを実行（WORKDIR は /app）
-python scripts/update_book_trends.py
-
-# 3. 終了
-exit
-```
-本番では `fly secrets` で設定した `RAKUTEN_APP_ID` と `GOOGLE_BOOKS_API_KEY` が使われ、楽天・Google Books API から実データが取得されます。
-
-**動作:**
-- 日本: 総合・文芸・ビジネス・人文・社会・実用・IT の5カテゴリを楽天ブックスAPIから取得
-- US: All, Fiction, Business, Biography & History, Science & Tech の5カテゴリをGoogle Books APIから取得
 
 ### bootstrap_dummy_cache.py
-全カテゴリにダミーデータ（Lorem ipsum）を25件ずつキャッシュするスクリプト
-ローカル開発環境でUI/UXの確認用に使用
+全カテゴリにダミーデータ（25件）をキャッシュ。ローカル UI 確認用（既存キャッシュを上書き）。
 
-**使用方法:**
 ```bash
 python scripts/bootstrap_dummy_cache.py
 ```
 
-**動作:**
-1. 全カテゴリのマネージャーに対してダミーモードで25件ずつダミーデータを生成
-2. 生成したダミーデータをデータベースキャッシュに保存
-3. 以降、通常モードでアプリを起動してもキャッシュからダミーデータが表示される
+## サマリー下書き（任意）
 
-**注意:**
-- このスクリプトは既存のキャッシュデータを上書きします
-- 外部APIキーは不要です（ダミーモードのため）
-- 一度実行すれば、その後は通常モードでアプリを起動するだけでダミーデータが表示されます
+本流は AI 生成パイプライン。空 Markdown をテンプレから用意したいときだけ使う。
 
-### scaffold_summary_drafts.py
-`docs/summaries/` 以下に、サマリー用の空 Markdown をテンプレから生成する（X ポストサンプルと同様、**リポジトリに下書きを積む**運用向け）。
-
-**使用方法:**
 ```bash
 python scripts/scaffold_summary_drafts.py --today
 python scripts/scaffold_summary_drafts.py --daily 2026-05-11
-python scripts/scaffold_summary_drafts.py --weekly-for-date 2026-06-01
-python scripts/scaffold_summary_drafts.py --today --weekly-for-date 2026-05-11 --force
+python scripts/scaffold_summary_drafts.py --weekly-for-date 2026-05-11 --force
 ```
-
-**注意:** 同名ファイルがある場合はスキップする。上書きは `--force`。
-
-詳細は `docs/summaries/README.md` を参照。
-
-### generate_ai_daily_summary.py
-`DATABASE_URL` の `trend_daily_snapshots`（前日 × スロット 07/13/19/01）から OpenAI で日次サマリーを書く。
-出力形式: **急上昇3つ（07→13→19 の順位改善）** + **複数ソース重なり（最大3）** + **カテゴリ別トップ3**（07/13/19 を横断して評価。調達行などはノイズ除去）。**`--write`** 時は **`docs/summaries/daily/{business_day}.md`**（**ファイル名 = 観測日**、翌朝生成でも前日の日付）と成否ログ **`YYYY-MM-DD.generation.json`**。GitHub Actions では **`--from-api`**（本番 `/api/summaries/daily-snapshots`）。`GITHUB_ACTIONS` で Fly-private `DATABASE_URL` が注入されていても `--from-api` と同様に HTTP で読める。
-
-**環境変数:** `DATABASE_URL`（ローカル直読み時）、`OPENAI_API_KEY`（`--dry-run` でキーなしのときは JSON のみで可）、`OPENAI_SUMMARY_MODEL`（省略時 `gpt-4o-mini`）、CI の HTTP 読みでは `TREND_DASHBOARD_BASE_URL`。
-
-**使用方法:**
-```bash
-python scripts/generate_ai_daily_summary.py --dry-run --business-day 2026-05-10
-python scripts/generate_ai_daily_summary.py --write --force
-python scripts/generate_ai_daily_summary.py --from-api --write --force
-```
-
-**注意:** 本番 DB 直結のため、リポジトリやログに接続文字列を出さないこと。CI では GitHub **Secrets** のみを使用。
-
-詳細は `docs/summaries/README.md` を参照。
-
-### generate_ai_weekly_summary.py
-`docs/summaries/daily/{business_day}.md`（クロスソース・カテゴリ別トップ3形式）を入力に OpenAI で週次＋ホットトピックを1ファイル生成する。日次ファイル名は観測日（[`docs/summaries/weekly/README.md`](../docs/summaries/weekly/README.md)）。DB・トレンド API は使わない。GHA cron は **W2 月曜 04:00 JST**（`ai-weekly-summary.yml`。日曜 01 スロットのあと）。メール実着は **6:30頃**。
-
-**環境変数:** `OPENAI_API_KEY`（必須）、`OPENAI_SUMMARY_MODEL`（省略時 `gpt-4o-mini`）。
-
-**使用方法:**
-```bash
-python scripts/generate_ai_weekly_summary.py --dry-run
-python scripts/generate_ai_weekly_summary.py --write --force
-python scripts/generate_ai_weekly_summary.py --weekly-for-date 2026-05-14 --write --force
-```
-
-詳細は `docs/summaries/README.md` を参照。
 
 ## 注意事項
 
-- これらのスクリプトは開発・デバッグ用です
-- 本番環境で実行する場合は、事前にデータベース接続情報を確認してください
-- 環境変数（`.env`）が正しく設定されていることを確認してください
+- 本番 DB / Secrets を扱うスクリプトでは接続文字列をログやコミットに出さない
+- GHA では GitHub Secrets、Fly では `fly secrets` を使う
+- アセット系 `build_*.py` は生成物を `static/` に書く。再実行は依存更新時のみでよい

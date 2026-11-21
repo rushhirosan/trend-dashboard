@@ -236,11 +236,13 @@ def resolve_next_refresh(now: Optional[datetime] = None) -> datetime:
 
 
 def edition_label(slot_code: str, locale: str = "ja") -> str:
+    """版ラベル。日英とも HH:00 の24時表記（例: 01:00版 / 01:00 edition）。"""
     code = str(slot_code).zfill(2)
     hour = int(code)
+    clock = f"{hour:02d}:00"
     if str(locale).lower().startswith("en"):
-        return f"{hour:02d}:00 edition"
-    return f"{hour}時版"
+        return f"{clock} edition"
+    return f"{clock}版"
 
 
 def is_just_refreshed(slot_start: datetime, now: Optional[datetime] = None) -> bool:

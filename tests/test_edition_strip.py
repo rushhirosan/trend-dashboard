@@ -186,8 +186,12 @@ def test_series_matches_region_us():
 
 
 def test_edition_label_locales():
-    assert es.edition_label("07", "ja") == "7時版"
+    assert es.edition_label("01", "ja") == "01:00版"
+    assert es.edition_label("01", "en") == "01:00 edition"
+    assert es.edition_label("07", "ja") == "07:00版"
     assert es.edition_label("07", "en") == "07:00 edition"
+    assert es.edition_label("13", "ja") == "13:00版"
+    assert es.edition_label("19", "en") == "19:00 edition"
 
 
 def test_is_just_refreshed_window():
@@ -200,7 +204,7 @@ def test_build_edition_strip_payload_without_cache():
     now = JST.localize(datetime(2026, 9, 23, 7, 20))
     payload = es.build_edition_strip_payload(None, region="jp", locale="ja", now=now)
     assert payload["slot"] == "07"
-    assert payload["edition_label"] == "7時版"
+    assert payload["edition_label"] == "07:00版"
     assert payload["just_refreshed"] is True
     assert payload["highlights"] == []
     assert payload["has_snapshot"] is False

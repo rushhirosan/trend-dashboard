@@ -58,8 +58,9 @@ def test_us_sentence_prefers_cnn_and_quotes_ranks():
         variant="us",
         now=NOW,
     )
-    assert got["title"] == "Current U.S. trend ranks | Trends Dashboard"
+    assert got["title"] == "US Trends Dashboard — news, YouTube and Google Trends today"
     assert got["sentence"].startswith("Oct 17, 19:00 JST. Current U.S. trends: ")
+    assert got["description"].startswith("Free real-time U.S. trends in one screen. ")
     assert 'news #1 is "CNN lead"' in got["sentence"]
     assert "Wire lead" not in got["sentence"]
     assert 'YouTube #1 is "A video"' in got["sentence"]

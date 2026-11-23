@@ -159,10 +159,13 @@ def build_now_ranking(ssr: Optional[Dict[str, List[dict]]], *, variant: str, now
                 f"{when}. Current U.S. trend ranks for news, YouTube, and Google Trends "
                 "are listed below."
             )
+        # SERP: GSC で見えている us trends / real-time / trends dashboard 系クエリ向け
+        us_title = "US Trends Dashboard — news, YouTube and Google Trends today"
+        us_desc_prefix = "Free real-time U.S. trends in one screen. "
         return {
             "sentence": sentence,
-            "description": _clip_description(sentence),
-            "title": "Current U.S. trend ranks | Trends Dashboard",
+            "description": _clip_description(us_desc_prefix + sentence),
+            "title": us_title,
         }
 
     bits_ja = [

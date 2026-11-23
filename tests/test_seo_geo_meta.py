@@ -77,15 +77,18 @@ def test_jp_index_head_title_without_body_copy_change(app_client):
 
 
 def test_us_index_head_title_for_gsc_queries(app_client):
-    """英語タイトルは current U.S. trend ranks。先頭にサーバー描画の #1。"""
+    """英語 title/description は GSC の us trends / real-time / trends dashboard 系向け。"""
     res = app_client.get("/us")
     assert res.status_code == 200
     html = res.get_data(as_text=True)
-    assert "<title>Current U.S. trend ranks | Trends Dashboard</title>" in html
-    assert "Current U.S. trend" in html
+    assert "<title>US Trends Dashboard — news, YouTube and Google Trends today</title>" in html
+    assert "Free real-time U.S. trends in one screen." in html
     assert 'id="now-ranking"' not in html
     assert "Enable JavaScript" not in html
-    assert 'property="og:title" content="Current U.S. trend ranks | Trends Dashboard"' in html
+    assert (
+        'property="og:title" content="US Trends Dashboard — news, YouTube and Google Trends today"'
+        in html
+    )
     assert "What this page covers" not in html
     assert 'id="faq"' not in html
 

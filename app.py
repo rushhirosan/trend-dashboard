@@ -366,8 +366,11 @@ def create_app():
                     logger.debug(f"USいまの順位文スキップ: {rank_err}")
                     now_ranking = {
                         'sentence': 'Current U.S. trend ranks for news, YouTube, and Google Trends are listed below.',
-                        'description': 'Current U.S. trend ranks for news, YouTube, and Google Trends are listed below.',
-                        'title': 'Current U.S. trend ranks | Trends Dashboard',
+                        'description': (
+                            'Free real-time U.S. trends in one screen. '
+                            'Current U.S. trend ranks for news, YouTube, and Google Trends are listed below.'
+                        ),
+                        'title': 'US Trends Dashboard — news, YouTube and Google Trends today',
                     }
                 return render_template(
                     'us_trends.html',

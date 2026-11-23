@@ -373,6 +373,135 @@ def _looks_like_flat_sticky_lead(text: str) -> bool:
     return False
 
 
+def _clip_seo_text(text: str, limit: int = 155) -> str:
+    s = " ".join((text or "").split())
+    if len(s) <= limit:
+        return s
+    return s[: limit - 1].rstrip() + "…"
+
+
+def _plain_topic_label(title: str, max_len: int = 28) -> str:
+    t = " ".join((title or "").split())
+    if not t:
+        return ""
+    if len(t) <= max_len:
+        return t
+    return t[: max_len - 1].rstrip() + "…"
+
+
+def _daily_seo_topic_labels(rising: list[dict], *, limit: int = 2) -> list[str]:
+    out: list[str] = []
+    for item in rising or []:
+        lab = _plain_topic_label(str(item.get("title") or ""))
+        if lab:
+            out.append(lab)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def build_daily_seo_meta(
+    *,
+    region: str,
+    display: str,
+    one_liner: str,
+    rising: list[dict],
+) -> dict[str, str]:
+    """日次ページの title / description（SERP・OG用）。画面 H1 は変えない。"""
+    topics = _daily_seo_topic_labels(rising, limit=2)
+    if region == "us":
+        topic_bit = ", ".join(topics)
+        if topic_bit:
+            headline = f"Daily trends: {topic_bit} ({display})"
+        else:
+            headline = f"Daily trend brief {display}"
+        title = f"{headline} | Trends Dashboard"
+        desc = _clip_seo_text(
+            f"Free U.S. trend brief for {display}. {(one_liner or '').strip()}"
+        )
+    else:
+        topic_bit = "・".join(topics)
+        if topic_bit:
+            headline = f"日次: {topic_bit}（{display}）"
+        else:
+            headline = f"日次ブリーフ {display}"
+        title = f"{headline} | トレンドダッシュボード"
+        desc = _clip_seo_text(
+            f"{display}のトレンドブリーフ（無料プレビュー）。{(one_liner or '').strip()}"
+        )
+    return {
+        "seo_title": title,
+        "seo_description": desc,
+        "seo_headline": headline,
+    }
+
+
+def _weekly_seo_topic_labels(rising: Optional[dict], *, region: str) -> list[str]:
+    out: list[str] = []
+    order = (region, "us" if region == "jp" else "jp")
+    for key in order:
+        item = (rising or {}).get(key) if isinstance(rising, dict) else None
+        if not item:
+            continue
+        lab = _plain_topic_label(str(item.get("title") or ""))
+        if lab and lab not in out:
+            out.append(lab)
+        if len(out) >= 2:
+            break
+    return out
+
+
+def build_weekly_seo_meta(
+    *,
+    region: str,
+    iso_week: str,
+    week_range: str,
+    rising: Optional[dict],
+) -> dict[str, str]:
+    """週次ページの title / description（SERP・OG用）。画面 H1 は変えない。"""
+    topics = _weekly_seo_topic_labels(rising, region=region)
+    wr = (week_range or "").strip()
+    if region == "us":
+        topic_bit = ", ".join(topics)
+        if topic_bit:
+            headline = f"Weekly trends: {topic_bit} ({iso_week})"
+        else:
+            headline = f"Weekly trend brief {iso_week}"
+        title = f"{headline} | Trends Dashboard"
+        lead = wr or iso_week
+        if topic_bit:
+            desc = _clip_seo_text(
+                f"Free weekly U.S. trend brief for {lead}. Highlights: {topic_bit}."
+            )
+        else:
+            desc = _clip_seo_text(
+                f"Weekly U.S. trend brief for {lead} (free preview). "
+                "Notable topics and last week in review."
+            )
+    else:
+        topic_bit = "・".join(topics)
+        if topic_bit:
+            headline = f"週次: {topic_bit}（{iso_week}）"
+        else:
+            headline = f"週次ブリーフ {iso_week}"
+        title = f"{headline} | トレンドダッシュボード"
+        lead = wr or iso_week
+        if topic_bit:
+            desc = _clip_seo_text(
+                f"{lead} の週次トレンドブリーフ（無料プレビュー）。注目: {topic_bit}。"
+            )
+        else:
+            desc = _clip_seo_text(
+                f"{lead} の週次トレンドブリーフ（無料プレビュー）。"
+                "注目トピックと先週の流れ。"
+            )
+    return {
+        "seo_title": title,
+        "seo_description": desc,
+        "seo_headline": headline,
+    }
+
+
 def _one_liner_from_rising(rising: list[dict], *, region: str) -> str:
     """急上昇先頭から一覧・プレビュー用の1文を組み立てる。"""
     if not rising:
@@ -490,11 +619,18 @@ def load_daily_page(
     ]
 
     week_id = _iso_week_id(business_day)
+    display = _daily_display(business_day.isoformat(), region)
+    seo = build_daily_seo_meta(
+        region=region,
+        display=display,
+        one_liner=one_liner,
+        rising=rising,
+    )
     return {
         "kind": "daily",
         "region": region,
         "business_day": business_day.isoformat(),
-        "business_day_display": _daily_display(business_day.isoformat(), region),
+        "business_day_display": display,
         "generated_at": meta.get("generated_at", ""),
         "status": status,
         "slots": list(_parse_slots(fm) or ("07", "13", "19", "01")),
@@ -506,6 +642,7 @@ def load_daily_page(
         "locked_sections": locked,
         "week_id": week_id,
         "week_available": weekly_available(week_id, region=region, allow_draft=allow_draft),
+        **seo,
     }
 
 
@@ -528,6 +665,7 @@ def _parse_weekly_rising_item(content: str) -> Optional[dict]:
             if re.match(r"^\d+\.", ns) or ns.startswith("#"):
                 break
         return {
+            "title": title,
             "title_html": render_inline(f"[{title}]({url})"),
             "source": source,
             "move_html": render_inline(move),
@@ -598,16 +736,25 @@ def load_weekly_page(
         if not _title_has(title, *_FLOW_KEYS, *_RISING_KEYS)
     ]
 
+    iso_week = meta.get("iso_week", week_id)
+    week_range = meta.get("week_range_jst") or meta.get("week_range", "")
+    seo = build_weekly_seo_meta(
+        region=region,
+        iso_week=iso_week,
+        week_range=week_range,
+        rising=rising,
+    )
     return {
         "kind": "weekly",
         "region": region,
-        "iso_week": meta.get("iso_week", week_id),
-        "week_range": meta.get("week_range_jst") or meta.get("week_range", ""),
+        "iso_week": iso_week,
+        "week_range": week_range,
         "generated_at": meta.get("generated_at", ""),
         "status": status,
         "flow": flow,
         "rising": rising,
         "locked_sections": locked,
+        **seo,
     }
 
 

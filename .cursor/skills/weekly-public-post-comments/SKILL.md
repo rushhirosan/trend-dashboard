@@ -17,12 +17,16 @@ description: >-
 
 Primary runner: the Cursor Automation **Weekly note/Substack comments**.
 Trigger on **GitHub checks completed** (CI success) for
-`rushhirosan/trend-dashboard` — i.e. after the mechanical weekly GHA lands —
-not a Monday cron. Cron at 07:00 races the job and becomes a no-op. The agent
-must no-op when the newest note/substack already has proper comments, or when
-the triggering CI was unrelated and drafts are already complete. Chat agents
-still run the same checklist when the automation missed a week or the draft is
-still ranks+URL only.
+`rushhirosan/trend-dashboard` after the mechanical weekly GHA lands — not a
+Monday cron (cron races the job). The mechanical commit only updates
+`docs/summaries/weekly/**`; without another check on that commit,
+`checks completed` never fires. Workflow
+`.github/workflows/weekly-public-post-ready.yml` runs on those path pushes and
+provides the success check the automation listens for. The agent must no-op
+when the newest note/substack already has proper comments, or when the
+triggering CI was unrelated and drafts are already complete. Chat agents still
+run the same checklist when the automation missed a week or the draft is still
+ranks+URL only.
 
 When `docs/summaries/weekly/note/YYYY-Www.md` or `weekly/substack/YYYY-Www.md`
 appears from the mechanical job (GHA commit message like

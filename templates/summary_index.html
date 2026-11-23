@@ -23,10 +23,14 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ public_base_url }}{{ sumpfx }}/summaries">
     <meta property="og:title" content="{% if is_us %}Trend briefs | Trends Dashboard{% else %}トレンドブリーフ一覧 | トレンドダッシュボード{% endif %}">
+    <meta property="og:description" content="{% if is_us %}U.S. daily and weekly trend briefs (free preview). Recent {{ daily_retention_days }} days of daily and {{ weekly_retention_days }} days of weekly briefs.{% else %}日次・週次トレンドブリーフ（無料プレビュー）の一覧。直近{{ daily_retention_days }}日分の日次と直近{{ weekly_retention_days }}日分の週次を掲載しています。{% endif %}">
     <meta property="og:image" content="{{ public_base_url }}/static/images/og-image.png">
     <meta property="og:locale" content="{% if is_us %}en_US{% else %}ja_JP{% endif %}">
     <meta property="og:site_name" content="Trends Dashboard">
     <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{% if is_us %}Trend briefs | Trends Dashboard{% else %}トレンドブリーフ一覧 | トレンドダッシュボード{% endif %}">
+    <meta name="twitter:description" content="{% if is_us %}U.S. daily and weekly trend briefs (free preview). Recent {{ daily_retention_days }} days of daily and {{ weekly_retention_days }} days of weekly briefs.{% else %}日次・週次トレンドブリーフ（無料プレビュー）の一覧。直近{{ daily_retention_days }}日分の日次と直近{{ weekly_retention_days }}日分の週次を掲載しています。{% endif %}">
+    <meta name="twitter:image" content="{{ public_base_url }}/static/images/og-image.png">
 
     {% include 'partials/site_icons.html' %}
 

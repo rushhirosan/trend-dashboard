@@ -5,6 +5,8 @@ from services.summary.summary_pages import (
     _linkify,
     _parse_daily_rising,
     _split_sentences,
+    build_daily_seo_meta,
+    build_weekly_seo_meta,
 )
 
 _BODY = """## 📈 昨日いちばん動いた3つ
@@ -101,3 +103,57 @@ def test_parse_daily_rising_accepts_note_en_and_ja():
         "1. [Foo](https://example.com)（Wiki）\n\n   - **Note**: Search lane spike.\n"
     )
     assert en[0]["note"] == "Search lane spike."
+
+
+def test_build_daily_seo_meta_includes_topics_jp():
+    seo = build_daily_seo_meta(
+        region="jp",
+        display="11月23日",
+        one_liner="複数ソースで話題が重なった。",
+        rising=[
+            {"title": "トピック甲"},
+            {"title": "トピック乙"},
+            {"title": "トピック丙"},
+        ],
+    )
+    assert seo["seo_headline"] == "日次: トピック甲・トピック乙（11月23日）"
+    assert seo["seo_title"].startswith("日次: トピック甲・トピック乙")
+    assert "無料プレビュー" in seo["seo_description"]
+    assert "複数ソース" in seo["seo_description"]
+
+
+def test_build_daily_seo_meta_includes_topics_us():
+    seo = build_daily_seo_meta(
+        region="us",
+        display="November 23",
+        one_liner="Cross-source spike on Topic A.",
+        rising=[{"title": "Topic A"}, {"title": "Topic B"}],
+    )
+    assert seo["seo_headline"] == "Daily trends: Topic A, Topic B (November 23)"
+    assert "Free U.S. trend brief" in seo["seo_description"]
+
+
+def test_build_daily_seo_meta_falls_back_without_rising():
+    seo = build_daily_seo_meta(
+        region="jp",
+        display="11月23日",
+        one_liner="一文だけ。",
+        rising=[],
+    )
+    assert seo["seo_headline"] == "日次ブリーフ 11月23日"
+    assert seo["seo_title"] == "日次ブリーフ 11月23日 | トレンドダッシュボード"
+
+
+def test_build_weekly_seo_meta_uses_rising_titles():
+    seo = build_weekly_seo_meta(
+        region="jp",
+        iso_week="2026-W47",
+        week_range="2026-11-16〜2026-11-22",
+        rising={
+            "jp": {"title": "週次トピック"},
+            "us": {"title": "Weekly Topic"},
+        },
+    )
+    assert "週次トピック" in seo["seo_title"]
+    assert "2026-W47" in seo["seo_title"]
+    assert "注目: 週次トピック" in seo["seo_description"]

@@ -1730,6 +1730,80 @@ def build_mechanical_weekly_flow(
 
 PUBLIC_HOT_MAX = 3
 PUBLIC_HOT_MIN_DAYS = 2
+# note / Substack 用に前週より広めの候補を取り、重複を後ろへ回す
+PUBLIC_HOT_CANDIDATE_POOL = 9
+_PUBLIC_TOPIC_HEADING_RE = re.compile(r"(?m)^(\d+)\.\s+(.+)$")
+_PUBLIC_TOPIC_SRC_JP_RE = re.compile(r"（[^）]+）\s*$")
+
+
+def previous_iso_week_stem(mon: date) -> str:
+    """対象週の月曜から見た直前 ISO 週の stem。"""
+    return iso_week_stem(mon - timedelta(days=7))
+
+
+def _strip_public_source_suffix(raw: str) -> str:
+    """``題（ソース）`` / ``Title (Source (EN))`` からソース括弧を外す。"""
+    s = (raw or "").strip()
+    s = _PUBLIC_TOPIC_SRC_JP_RE.sub("", s).strip()
+    if not s.endswith(")"):
+        return s
+    depth = 0
+    for i in range(len(s) - 1, -1, -1):
+        ch = s[i]
+        if ch == ")":
+            depth += 1
+        elif ch == "(":
+            depth -= 1
+            if depth == 0:
+                if i == 0 or s[i - 1].isspace():
+                    return s[:i].rstrip()
+                break
+    return s
+
+
+def parse_public_post_topic_titles(text: str) -> List[str]:
+    """note / Substack 本文の ``1. 題（ソース）`` 行から題名だけ取る。"""
+    titles: List[str] = []
+    for match in _PUBLIC_TOPIC_HEADING_RE.finditer(text or ""):
+        raw = _strip_public_source_suffix(match.group(2))
+        if raw:
+            titles.append(raw)
+    return titles
+
+
+def load_previous_public_topic_keys(mon: date) -> set[str]:
+    """直前週の note / Substack に出た題名キー。ファイルが無ければ空。"""
+    path = weekly_public_post_path(previous_iso_week_stem(mon))
+    if not path.is_file():
+        return set()
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return set()
+    return {sr.normalize_label_key(t) for t in parse_public_post_topic_titles(text)}
+
+
+def prefer_fresh_public_topics(
+    topics: List[Dict[str, Any]],
+    previous_keys: set[str],
+    *,
+    limit: int = PUBLIC_HOT_MAX,
+) -> List[Dict[str, Any]]:
+    """前週 note/Substack に出た題は後ろへ回し、新しい話題を優先する。
+
+    足りない分だけ前週続きを使う（件数を落とさない）。
+    """
+    if not topics or not previous_keys:
+        return topics[: max(0, limit)]
+    fresh: List[Dict[str, Any]] = []
+    stale: List[Dict[str, Any]] = []
+    for topic in topics:
+        nk = sr.normalize_label_key(str(topic.get("title") or ""))
+        if nk and nk in previous_keys:
+            stale.append(topic)
+        else:
+            fresh.append(topic)
+    return (fresh + stale)[: max(0, limit)]
 
 
 def _mechanical_hot_topic_candidate(
@@ -2277,12 +2351,21 @@ def build_public_weekly_post(
     *,
     fetch_comments: bool = False,
 ) -> str:
-    """ブリーフと同じスコアで、2日以上のホット上位3件だけを note / Substack 用にする。"""
+    """2日以上のホットから note / Substack 用3件を選ぶ。
+
+    ブリーフのホット順位はそのまま。公開記事だけ前週に出した題を後ろへ回し、
+    毎週同じ顔ぶれになりにくくする（足りなければ前週続きで埋める）。
+    """
     topics = build_mechanical_weekly_hot_topics(
         weekly_rising,
         weekly_category,
-        limit=PUBLIC_HOT_MAX,
+        limit=max(PUBLIC_HOT_MAX, PUBLIC_HOT_CANDIDATE_POOL),
         min_day_count=PUBLIC_HOT_MIN_DAYS,
+    )
+    topics = prefer_fresh_public_topics(
+        topics,
+        load_previous_public_topic_keys(mon),
+        limit=PUBLIC_HOT_MAX,
     )
     if fetch_comments:
         _attach_public_page_comments(topics)

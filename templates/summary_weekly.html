@@ -9,26 +9,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- SEO Meta Tags -->
-    {% if is_us %}
-    <title>Weekly trend brief {{ page.iso_week }} | Trends Dashboard</title>
-    <meta name="description" content="Weekly U.S. trend brief for {{ page.week_range }} (free preview). Notable topics and last week in review.">
-    {% else %}
-    <title>週次ブリーフ {{ page.iso_week }} | トレンドダッシュボード</title>
-    <meta name="description" content="{{ page.week_range }} の週次トレンドブリーフ（無料プレビュー）。日本・米国の注目トピックと先週の流れ。">
-    {% endif %}
+    <!-- SEO Meta Tags（head のみ。画面 H1 は従来どおり週見出し） -->
+    <title>{{ page.seo_title }}</title>
+    <meta name="description" content="{{ page.seo_description }}">
     <meta name="author" content="Trends Dashboard">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="{{ public_base_url }}{{ sumpfx }}/summaries/weekly/{{ page.iso_week }}">
 
-    <!-- Open Graph -->
+    <!-- Open Graph / Twitter（シェア CTR 用。本文 UI は変更しない） -->
     <meta property="og:type" content="article">
     <meta property="og:url" content="{{ public_base_url }}{{ sumpfx }}/summaries/weekly/{{ page.iso_week }}">
-    <meta property="og:title" content="{% if is_us %}Weekly trend brief {{ page.iso_week }}{% else %}週次ブリーフ {{ page.iso_week }}{% endif %} | Trends Dashboard">
+    <meta property="og:title" content="{{ page.seo_title }}">
+    <meta property="og:description" content="{{ page.seo_description }}">
     <meta property="og:image" content="{{ public_base_url }}/static/images/og-image.png">
     <meta property="og:locale" content="{% if is_us %}en_US{% else %}ja_JP{% endif %}">
     <meta property="og:site_name" content="Trends Dashboard">
     <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ page.seo_title }}">
+    <meta name="twitter:description" content="{{ page.seo_description }}">
+    <meta name="twitter:image" content="{{ public_base_url }}/static/images/og-image.png">
 
     <!-- Favicon -->
     {% include 'partials/site_icons.html' %}
@@ -38,8 +37,8 @@
     {
       "@context": "https://schema.org",
       "@type": "Article",
-      "headline": "{% if is_us %}Weekly trend brief {{ page.iso_week }}{% else %}週次ブリーフ {{ page.iso_week }}{% endif %}",
-      "description": {{ page.week_range | tojson }},
+      "headline": {{ page.seo_headline | tojson }},
+      "description": {{ page.seo_description | tojson }},
       "inLanguage": "{{ lang }}",
       "isAccessibleForFree": true,
       "url": "{{ public_base_url }}{{ sumpfx }}/summaries/weekly/{{ page.iso_week }}",

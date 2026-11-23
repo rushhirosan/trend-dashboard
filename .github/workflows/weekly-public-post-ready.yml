@@ -1,0 +1,23 @@
+# Mechanical weekly summary が note / Substack を main に push したあと、
+# Cursor Automation（Weekly note/Substack comments）が拾える「checks completed」信号を出す。
+# リポジトリに他の CI が無いと、docs だけのコミットでは checks completed が発火しない。
+name: Weekly public post ready
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/summaries/weekly/note/**"
+      - "docs/summaries/weekly/substack/**"
+
+permissions:
+  contents: read
+
+jobs:
+  signal:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Signal note/Substack drafts landed
+        run: |
+          echo "note/substack drafts are on main."
+          echo "Cursor Automation should add same-week article comments next."

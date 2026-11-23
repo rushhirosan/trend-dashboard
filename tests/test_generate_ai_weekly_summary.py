@@ -1454,6 +1454,134 @@ def test_public_weekly_post_empty_when_no_multi_day_topics(gaws):
     assert text == ""
 
 
+def test_parse_public_post_topic_titles_strips_source(gaws):
+    text = (
+        "1. 古河電気工業（株価）\n\n"
+        "本文\n\n"
+        "2. HUNTER×HUNTER 39（楽天ブックス）\n"
+    )
+    assert gaws.parse_public_post_topic_titles(text) == [
+        "古河電気工業",
+        "HUNTER×HUNTER 39",
+    ]
+    us = "1. Ramayana: Part 1 (Wikipedia (EN))\n\n2. Housewife (Spotify (US))\n"
+    assert gaws.parse_public_post_topic_titles(us) == [
+        "Ramayana: Part 1",
+        "Housewife",
+    ]
+
+
+def test_prefer_fresh_public_topics_demotes_previous_week(gaws):
+    topics = [
+        {"title": "古河電気工業", "day_count": 4},
+        {"title": "ソフトバンクグループ", "day_count": 4},
+        {"title": "HUNTER×HUNTER 39", "day_count": 4},
+        {"title": "The Hunger Games", "day_count": 3},
+        {"title": "Qiita factory", "day_count": 2},
+    ]
+    prev = {
+        gaws.sr.normalize_label_key("古河電気工業"),
+        gaws.sr.normalize_label_key("HUNTER×HUNTER 39"),
+    }
+    got = gaws.prefer_fresh_public_topics(topics, prev, limit=3)
+    assert [t["title"] for t in got] == [
+        "ソフトバンクグループ",
+        "The Hunger Games",
+        "Qiita factory",
+    ]
+
+
+def test_prefer_fresh_fills_with_stale_when_needed(gaws):
+    topics = [
+        {"title": "古河電気工業", "day_count": 4},
+        {"title": "HUNTER×HUNTER 39", "day_count": 4},
+    ]
+    prev = {gaws.sr.normalize_label_key("古河電気工業")}
+    got = gaws.prefer_fresh_public_topics(topics, prev, limit=3)
+    assert [t["title"] for t in got] == ["HUNTER×HUNTER 39", "古河電気工業"]
+
+
+def test_build_public_weekly_post_skips_previous_week_titles(gaws, tmp_path, monkeypatch):
+    gaws.configure_weekly_region("jp")
+    note_dir = tmp_path / "note"
+    note_dir.mkdir()
+    (note_dir / "2026-W46.md").write_text(
+        "# note — 2026-W46\n\n## 本文\n\n"
+        "1. 古河電気工業（株価）\n\nrank\n\n"
+        "2. HUNTER×HUNTER 39（楽天ブックス）\n\nrank\n",
+        encoding="utf-8",
+    )
+
+    def _fake_path(stem: str):
+        return note_dir / f"{stem}.md"
+
+    monkeypatch.setattr(gaws, "weekly_public_post_path", _fake_path)
+    category = {
+        "jp": [
+            {
+                "category": "マーケット",
+                "items": [
+                    {
+                        "label": "古河電気工業",
+                        "day_count": 4,
+                        "series_key": "stock_jp",
+                        "weekly_score": 90,
+                        "link_line": "[古河電気工業](https://example.com/f)（株価）",
+                        "rank_display_by_day": {
+                            "2026-11-16": "終日1位",
+                            "2026-11-17": "終日1位",
+                        },
+                    },
+                    {
+                        "label": "ソフトバンクグループ",
+                        "day_count": 4,
+                        "series_key": "stock_jp",
+                        "weekly_score": 80,
+                        "link_line": "[ソフトバンクグループ](https://example.com/s)（株価）",
+                        "rank_display_by_day": {
+                            "2026-11-18": "4位",
+                            "2026-11-20": "1位",
+                        },
+                    },
+                    {
+                        "label": "HUNTER×HUNTER 39",
+                        "day_count": 4,
+                        "series_key": "rakuten_books",
+                        "weekly_score": 70,
+                        "link_line": "[HUNTER×HUNTER 39](https://example.com/h)（楽天ブックス）",
+                        "rank_display_by_day": {
+                            "2026-11-18": "終日1位",
+                            "2026-11-19": "終日1位",
+                        },
+                    },
+                    {
+                        "label": "新しい話題",
+                        "day_count": 2,
+                        "series_key": "qiita_jp",
+                        "weekly_score": 60,
+                        "link_line": "[新しい話題](https://example.com/q)（Qiita）",
+                        "rank_display_by_day": {
+                            "2026-11-16": "3位",
+                            "2026-11-21": "4位",
+                        },
+                    },
+                ],
+            }
+        ]
+    }
+    text = gaws.build_public_weekly_post(
+        {"jp": []},
+        category,
+        date(2026, 11, 16),
+        date(2026, 11, 22),
+    )
+    assert "1. ソフトバンクグループ（株価）" in text
+    assert "2. 新しい話題（Qiita）" in text
+    # 3件埋めのため前週続きが1件だけ後ろに入る（スコア上位の古河）
+    assert "3. 古河電気工業（株価）" in text
+    assert "HUNTER×HUNTER" not in text
+
+
 def test_script_imports_when_run_as_python_scripts_path():
     """GHA は `python scripts/generate_ai_weekly_summary.py`。sys.path[0] は scripts/。"""
     import os

@@ -74,6 +74,8 @@ def test_jp_index_head_title_without_body_copy_change(app_client):
     assert "このサイトについて" in html
     # FAQ セクションは about のみ（トップに出さない）
     assert 'id="faq"' not in html
+    # UTM 付き外部流入は US 地域記憶で /us へ飛ばさない
+    assert "/[?&]utm_/.test(location.search" in html
 
 
 def test_us_index_head_title_for_gsc_queries(app_client):

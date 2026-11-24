@@ -120,10 +120,14 @@
     <link href="{{ url_for('static', filename='css/main.css') }}?v=20260819-tab-keyboard" rel="stylesheet">
 </head>
 <body id="trends-jp" class="bg-light">
-    <!-- 前回USページを開いていた場合、外部からのルート(/)訪問時のみ /us へリダイレクト（サイト内の「日本トレンド」クリックではリダイレクトしない） -->
+    <!-- 前回USページを開いていた場合、外部からのルート(/)訪問時のみ /us へリダイレクト。
+         サイト内の「日本トレンド」クリックではリダイレクトしない。
+         note 等の UTM 付き流入は地域記憶よりリンク先（JP）を優先する。 -->
     <script>
     (function(){
       try {
+        // キャンペーン URL はパスどおり（/ なら JP）。UTM を落として /us へ飛ばさない
+        if (/[?&]utm_/.test(location.search || '')) return;
         var ref = document.referrer;
         var sameOrigin = !ref || (new URL(ref).origin === location.origin);
         if (sameOrigin) return;

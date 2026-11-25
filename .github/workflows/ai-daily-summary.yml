@@ -1,13 +1,11 @@
-# Cron: JST 06:50 ≒ UTC 21:50 (previous calendar day) — before the 07:00 JST bulk refresh.
-# GitHub Actions delay: the email lands around 09:00 JST. Do not move this cron to 09:00.
+# Manual backfill / rescue only.
+# Primary daily path is Fly APScheduler (~08:30 JST): generate → summary_documents → email.
+# Schedule cron removed (GHA queue delay regularly missed the 10:00 JST miss watch).
 # Writes JP docs/summaries/daily/{yesterday}.md and US docs/summaries/daily/us/{yesterday}.md.
-# slot 01 for that business_day is written by the 01:00 job on the next calendar day.
-# If jp+us are already in summary_documents (e.g. manual Run then delayed cron), skip all work.
+# If jp+us are already in summary_documents, skip all work unless force=true.
 name: AI daily summary
 
 on:
-  schedule:
-    - cron: "50 21 * * *"
   workflow_dispatch:
     inputs:
       force:

@@ -36,13 +36,14 @@
 
 | 観測日（`business_day`・ファイル名） | スナップショット | 日次サマリーが届く目安 |
 |--------------------------------------|------------------|-------------------------|
-| 5/18（日） | 5/18 の 07 / 13 / 19、翌暦日 01 で前日を閉じる | **5/19 9:00** 頃（cron 06:50、Actions **AI daily summary**） |
-| 5/19（月） | 同上 | **5/20 9:00** 頃 |
+| 5/18（日） | 5/18 の 07 / 13 / 19、翌暦日 01 で前日を閉じる | **5/19 9:00–10:00**（Fly **08:30 JST** 生成 → DB → メール） |
+| 5/19（月） | 同上 | **5/20 9:00–10:00** |
 
 - スクリプト既定: `generate_ai_daily_summary.py` は **JST の昨日** を `business_day` にする（`--business-day` で上書き可）。
+- **本線（Fly）**: 毎日 **08:30 JST** にスナップショット確認 → jp/us 生成 → `summary_documents` upsert → メール（`services/summary/daily_summary_job.py`）。git コミットはしない。
 - **欠走検知（Fly）**: 毎日 **10:00 JST** に `summary_documents` へ前日分（jp/us）があるかだけ見る。無いとき Discord。生成・メールはしない。
-- **二重実行ガード（GHA）**: 手動 Run 後に遅延 cron が来ても、jp+us が DB にあれば生成・メールをスキップ（`force` で再生成可）。
-- **格言（JP）**: 10秒名言の RSS 全件を `docs/summaries/tounou_proverb_cache.json` に置く。配信日が週の計画に無いときだけ更新し、未出の新着をその週の月曜から順に出す。日次ジョブがこの JSON もコミットする。GHA は DB を見ない。
+- **手動救済（GHA）**: Actions **AI daily summary** は `workflow_dispatch` のみ（schedule なし）。jp+us が DB にあればスキップ（`force` で再生成可）。
+- **格言（JP）**: 10秒名言の RSS 全件を `docs/summaries/tounou_proverb_cache.json` に置く。配信日が週の計画に無いときだけ更新し、未出の新着をその週の月曜から順に出す。
 
 ### 週次のタイムライン（JST）
 
@@ -50,7 +51,7 @@
 
 例: W20 = 月 **5/11** 〜 日 **5/17** をまとめ、**5/18（月）** に `weekly/2026-W20.md` を生成:
 
-1. 日曜観測日 `2026-05-17.md` のメールは **月曜 5/18 9:00** 頃（cron は **06:50**、**AI daily summary**）。
+1. 日曜観測日 `2026-05-17` の日次メールは **月曜 5/18 9:00–10:00**（Fly 08:30 ジョブ）。
 2. **AI weekly summary** の cron は **月曜 5/18 04:00**。メール実着は **6:30頃**。`weekly/2026-W20.md` を生成・コミット。
 3. 配信目標は [`summary_pattern_a_phase1.md`](../summary_pattern_a_phase1.md) のとおり **月曜 6:30 JST頃**。
 
@@ -121,9 +122,9 @@ python scripts/scaffold_summary_drafts.py --today --weekly-for-date 2026-05-11
 
 **`--write` 時は同じディレクトリに `YYYY-MM-DD.generation.json` を必ず書き**（成功・失敗・キー欠如・スナップショット空・OpenAI エラー）— 日付ごとに結果を追いやすくするため。
 
-- **JST 6:50 前後**に動かす想定（7 時一括取得より前で、前日の `01` スロットが揃ったあと）。GitHub Actions: `.github/workflows/ai-daily-summary.yml`（UTC `50 21 * * *`）。失敗時も `.generation.json` をコミットしてからジョブを失敗扱いにする。
-- **Secrets（GHA）**: `OPENAI_API_KEY`（必須）。`DATABASE_URL` は不要（`--from-api` で本番 `/api/summaries/daily-snapshots` を使用）。
-- **手元**: `.env` に `DATABASE_URL` と `OPENAI_API_KEY` を設定（DB 直読み）、または `--from-api`。
+- **本線**: Fly APScheduler **08:30 JST**（`DAILY_SUMMARY_ON_FLY`）。機械生成が既定（OpenAI 不要）。サムネ用に `OPENAI_API_KEY` があると画像 API を使う。
+- **手動救済**: `.github/workflows/ai-daily-summary.yml`（`workflow_dispatch` のみ。`--from-api`）。
+- **手元**: `.env` に `DATABASE_URL`（DB 直読み）、または `--from-api`。
 
 ```bash
 # JSON ペイロードだけ（API 課金なし）。DB があれば自動、無ければ --from-api
@@ -170,17 +171,16 @@ python scripts/generate_ai_weekly_summary.py --from-api --write --force --weekly
 
 `/summaries/...` の閲覧ページは **DB（`summary_documents` テーブル）を優先して読み**、行が無ければリポジトリ内ファイル（deploy 時点のスナップショット）へフォールバックする。
 
-1. GHA（AI daily / weekly summary）が Markdown を生成し git にコミット（正本はこれまで通り git）
-2. 日次ジョブは続けて `scripts/attach_daily_thumbs.py` を走らせる。話題（順位の括弧を除いた `preview_lead`）が前日と同じならその画像をコピーし、変わった日だけ画像 API（既定 `gpt-image-1-mini`、`OPENAI_THUMB_MODEL` で変更可）で絵を作る。鍵が無い・残高切れ・安全フィルタなどで失敗した日は、話題から色と形を決めた幾何アイコンへフォールバックする（一覧に穴を残さない）
-3. 同じジョブが `scripts/publish_summaries_to_site.py` で原稿を `POST /api/summaries/documents` に、日次サムネを `POST /api/summaries/thumbs` に upsert する（認証: `SUMMARY_UPSERT_TOKEN`。GHA Secrets と `fly secrets` の両方に設定）。画像 API を使う場合は GHA Secret `OPENAI_API_KEY` が要る（無くても幾何アイコンで埋まる）
-4. 閲覧ページは DB を読むため **deploy なしで当日分が公開される**。サムネ URL（`/summaries/daily/YYYY-MM-DD/thumb`）も DB の画像を優先し、無ければ deploy 済みの static ファイルに戻る
-5. 保持期間超過の原稿・サムネ行は毎日 03:00 JST の `purge_expired_snapshots` が削除する。git 上の期限切れサムネファイルは 08:00 JST の retention purge が消す
+1. **日次（Fly）**: `daily_summary_job` が Markdown をマシン上に書き、`summary_store.upsert_document` で DB へ載せる（閲覧の正本は DB）。git コミットはしない
+2. 続けてサムネ（`attach_daily_thumbs` → `summary_thumbs`）。話題が前日と同じなら画像をコピーし、変わった日だけ画像 API（鍵が無ければ幾何アイコン）
+3. DB 反映後に dogfood / 有料メール
+4. **週次 / 手動日次（GHA）**: Markdown を git にコミットし、`publish_summaries_to_site.py` で HTTP upsert（`SUMMARY_UPSERT_TOKEN`）
+5. 閲覧ページは DB を読むため **deploy なしで当日分が公開される**。サムネ URL も DB 優先
+6. 保持期間超過の原稿・サムネ行は毎日 03:00 JST の `purge_expired_snapshots` が削除する
 
-トークン未設定の場合は publish ステップがスキップされ、従来どおり「次の deploy まで反映されない」挙動に戻るだけで生成は壊れない。
+### 有料メール
 
-### 有料メール（GHA）
-
-同じジョブの dogfood の後に `scripts/send_summary_paid_email.py --from-api` が走る。
+日次は Fly ジョブ内、週次は GHA の dogfood の後に `scripts/send_summary_paid_email.py` が走る。
 
 - 原稿は GHA ワークスペースの Markdown（今生成したもの）
 - 購読者は本番 `GET /api/billing/ai-summary/subscribers`（`SUMMARY_UPSERT_TOKEN`）。GHA から Fly Postgres には繋がらない

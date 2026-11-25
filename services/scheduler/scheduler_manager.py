@@ -645,8 +645,45 @@ class TrendsScheduler:
                     max_instances=1,
                 )
 
-                # GHA 日次サマリー欠走検知。成功日は SELECT のみ。生成・メールはしない。
-                # cron は 06:50 だがメール実着は ~09:00。09:00 チェックは送信中に偽陽性になるため 10:00。
+                # 日次ブリーフ本線（Fly）。07 スロット+gap retry のあと、09–10 着を狙う。
+                # GHA schedule は止めてあり、workflow_dispatch のみ手動救済用。
+                if os.getenv("DAILY_SUMMARY_ON_FLY", "true").strip().lower() not in (
+                    "0",
+                    "false",
+                    "no",
+                    "off",
+                ):
+                    try:
+                        daily_summary_hour = int(
+                            os.getenv("DAILY_SUMMARY_HOUR_JST", "8")
+                        )
+                        daily_summary_minute = int(
+                            os.getenv("DAILY_SUMMARY_MINUTE_JST", "30")
+                        )
+                    except (TypeError, ValueError):
+                        daily_summary_hour, daily_summary_minute = 8, 30
+                    daily_summary_hour = max(0, min(23, daily_summary_hour))
+                    daily_summary_minute = max(0, min(59, daily_summary_minute))
+                    self.scheduler.add_job(
+                        func=self._run_daily_summary_job,
+                        trigger=CronTrigger(
+                            hour=daily_summary_hour,
+                            minute=daily_summary_minute,
+                            timezone=jst,
+                        ),
+                        id="daily_summary_generate",
+                        name=(
+                            f"日次サマリー生成・配信 "
+                            f"({daily_summary_hour:02d}:{daily_summary_minute:02d} JST)"
+                        ),
+                        replace_existing=True,
+                        misfire_grace_time=3600,
+                        coalesce=True,
+                        max_instances=1,
+                    )
+
+                # 日次サマリー欠走検知。成功日は SELECT のみ。生成・メールはしない。
+                # 生成は 08:30 目標・09–10 着。送信中の偽陽性を避けるため 10:00 に見る。
                 self.scheduler.add_job(
                     func=self._check_daily_summary_published,
                     trigger=CronTrigger(hour=10, minute=0, timezone=jst),
@@ -670,6 +707,7 @@ class TrendsScheduler:
                     "📅 毎日1:00/7:00/13:00/19:00 JST に全トレンド取得。"
                     " 各スロット+%s分に欠損リトライ。"
                     " 03:00 JST にスナップショット保持クリーンアップ。"
+                    " 08:30 JST 前後に日次サマリー生成（DAILY_SUMMARY_ON_FLY）。"
                     " 10:00 JST に日次サマリー欠走チェック",
                     gap_retry_minute,
                 )
@@ -2362,10 +2400,50 @@ class TrendsScheduler:
             now = now.astimezone(jst)
         return (now.date() - timedelta(days=1)).isoformat()
 
+    def _run_daily_summary_job(self) -> None:
+        """08:30 JST: 前日 business_day の日次を生成し DB へ載せたあとメールする。"""
+        from services.summary.daily_summary_job import run_daily_summary_job
+
+        try:
+            result = run_daily_summary_job()
+        except Exception as e:
+            logger.error("❌ 日次サマリー生成ジョブ例外: %s", e, exc_info=True)
+            self._send_alert(
+                "error",
+                "❌ 日次ブリーフ生成が例外終了しました",
+                (
+                    "Fly APScheduler の日次ジョブが例外で止まりました。"
+                    "生成・再送はしていません。ログを確認するか、"
+                    "Actions → AI daily summary → Run workflow で救済してください。"
+                ),
+                {"error": str(e)[:300]},
+            )
+            return
+
+        if result.skipped:
+            return
+        if result.ok:
+            return
+
+        self._send_alert(
+            "warning",
+            "⚠️ 日次ブリーフ生成が不完全です",
+            (
+                f"Fly 日次ジョブが business_day={result.business_day} を完走できませんでした"
+                f"（published={','.join(result.published) or '-'}）。"
+                "10:00 の欠走チェックも別途走ります。"
+            ),
+            {
+                "business_day": result.business_day,
+                "errors": "; ".join(result.errors)[:500] or "-",
+                "対応": "Actions → AI daily summary → Run workflow（手動救済）",
+            },
+        )
+
     def _check_daily_summary_published(self, now=None) -> None:
         """10:00 JST: 前日 business_day の日次原稿が DB にあるか。欠けているときだけ Discord。
 
-        生成・メール再送はしない（GHA 欠走の検知専用）。DB 参照失敗は欠走扱いしない。
+        生成・メール再送はしない（欠走の検知専用）。DB 参照失敗は欠走扱いしない。
         """
         from services.summary.summary_store import has_document
 
@@ -2405,9 +2483,10 @@ class TrendsScheduler:
             "warning",
             "⚠️ 日次ブリーフが未着です",
             (
-                f"GHA AI daily summary が {doc_id} を 10:00 JST までに "
+                f"Fly 日次ジョブ（08:30 JST）が {doc_id} を 10:00 JST までに "
                 f"summary_documents へ載せていません（{', '.join(missing)}）。"
-                "生成・再送はしていません。Actions で手動 Run workflow してください。"
+                "生成・再送はしていません。"
+                "Actions → AI daily summary → Run workflow で手動救済してください。"
             ),
             {
                 "business_day": doc_id,
